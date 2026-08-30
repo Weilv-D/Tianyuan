@@ -117,6 +117,10 @@ src/
 完整规范（色板 / 字阶 / 大漆盘 / 夜宴编排 / 特效几何语义 / 动效分级）见
 **[ART_BIBLE.md](./ART_BIBLE.md)**。
 
+| 主菜单 | 备战 | 交战 |
+|---|---|---|
+| ![主菜单](docs/screenshots/menu.png) | ![备战](docs/screenshots/prep.png) | ![交战](docs/screenshots/battle.png) |
+
 ## 文档索引
 
 - **[DESIGN.md](./DESIGN.md)** —— 设计说明书：核心循环、经济、羁绊与克制环、装备、
