@@ -14,6 +14,8 @@ npm test         # 163 项回归测试（vitest）
 npm run build    # tsc 严格类型检查 + 生产构建 → dist/
 ```
 
+一键启停（含端口占用自动清理与退出释放）：Windows 双击/命令行 `start.bat`（`stop` / `status` / `restart` 子命令可用）；Git Bash 用 `start.sh`。
+
 ## 打包发布（任意电脑游玩）
 
 一条命令：`npm run release`（类型检查 + 双形态构建 + 打 zip），产物在 `release/`：
