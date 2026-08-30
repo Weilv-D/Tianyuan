@@ -456,14 +456,14 @@ export class EffectsLayer {
     g.setDepth(12);
     const draw = (alpha: number) => {
       g.clear();
-      g.lineStyle(2, tint, 0.85 * alpha);
+      g.lineStyle(1.3, tint, 0.85 * alpha);
       g.strokeEllipse(r.x, r.y, rad * 2, rad * 1.15);
       g.lineStyle(1, tint, 0.4 * alpha);
       g.strokeEllipse(r.x, r.y, rad * 1.6, rad * 0.92);
       g.fillStyle(tint, 0.09 * alpha);
       g.fillEllipse(r.x, r.y, rad * 2, rad * 1.15);
       if (telegraph) {
-        g.lineStyle(2, CINNABAR.light, alpha);
+        g.lineStyle(1.3, CINNABAR.light, alpha);
         for (let i = 0; i < 4; i++) {
           const a = (i / 4) * Math.PI * 2;
           g.lineBetween(r.x + Math.cos(a) * rad * 0.5, r.y + Math.sin(a) * rad * 0.28, r.x + Math.cos(a) * rad, r.y + Math.sin(a) * rad * 0.57);

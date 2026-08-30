@@ -10,7 +10,7 @@ export type DamageTier = 'normal' | 'crit' | 'skill' | 'true' | 'heal' | 'shield
  * 分级是"信息层级"的一部分 —— 玩家余光扫过就能判断局势烈度，不必逐个读数：
  *   普攻   20px 宣纸白   轻微上浮
  *   暴击   32px 朱砂亮   冲击缩放 + 轻微倾斜 + 描边
- *   技能   26px 幽紫     带光晕
+ *   技能   26px 夜蓝     带光晕
  *   真伤   26px 鎏金     穿透语义（无视护甲）
  *   治疗   22px 灵青     向下→向上，与伤害方向相反
  *   斩杀   38px 鎏金光   屏幕级演出
@@ -31,7 +31,7 @@ export class DamageTextLayer {
     if (t) return t.setVisible(true);
     return this.scene.add
       .text(0, 0, '', {
-        fontFamily: FONT.body,
+        fontFamily: FONT.num,
         fontSize: '20px',
         fontStyle: 'bold',
       })

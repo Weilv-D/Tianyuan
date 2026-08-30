@@ -7,7 +7,7 @@ import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TE
 import { TEX } from './textures';
 
 const STAR_SCALE = [0, 0.94, 1.0, 1.14];
-const BAR_W = 46;
+const BAR_W = 40;
 
 /**
  * 当前"我方"是哪一队。
@@ -98,16 +98,16 @@ export class UnitView extends Phaser.GameObjects.Container {
 
     // 投影：用灵光纹理压扁并染黑，比画椭圆更有"落在地上"的体积感
     this.shadow = scene.add.image(0, 0, TEX.glow).setTint(SHADE).setAlpha(0.5);
-    this.shadow.setDisplaySize(56, 22);
+    this.shadow.setDisplaySize(46, 18);
 
     // 底座：六边形身份牌，稀有度色 + 阵营色描边
     this.base = scene.add.image(0, 0, TEX.hex).setTint(rarity).setAlpha(0.92);
-    this.base.setDisplaySize(64, 64);
+    this.base.setDisplaySize(52, 52);
     this.base.setScale(this.base.scaleX, this.base.scaleY * 0.5);
 
     // 光环：4/5 费的"牌面"
-    this.aura = scene.add.image(0, -30, TEX.ring).setTint(rarity).setAlpha(0);
-    this.aura.setDisplaySize(150, 150);
+    this.aura = scene.add.image(0, -26, TEX.ring).setTint(rarity).setAlpha(0);
+    this.aura.setDisplaySize(118, 118);
     this.aura.setBlendMode(Phaser.BlendModes.ADD);
 
     this.sprite = scene.add
@@ -115,13 +115,13 @@ export class UnitView extends Phaser.GameObjects.Container {
       .setOrigin(0.5, SIL_ORIGIN_Y);
     // 内容归一：不同原型的墨迹占框差异大，按可见内容高统一体量，
     // 星级体量差仍由容器级 STAR_SCALE 表达
-    this.sprite.setScale(silContentScale(defId, star, 64, 58));
+    this.sprite.setScale(silContentScale(defId, star, 54, 49));
     this.castRing = scene.add.graphics();
     this.crown = scene.add.graphics();
     this.bars = scene.add.graphics();
     this.pips = scene.add.graphics();
     // 装备图标挂在血条下方，最多三件
-    this.itemRow = scene.add.container(0, 16);
+    this.itemRow = scene.add.container(0, 14);
 
     this.add([this.shadow, this.aura, this.base, this.sprite, this.castRing, this.crown, this.bars, this.pips, this.itemRow]);
     this.applyStarScale();
@@ -148,7 +148,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.itemRow.removeAll(true);
     const n = Math.min(3, itemIds.length);
     if (n === 0) return;
-    const size = 15;
+    const size = 13;
     const gap = 3;
     const totalW = n * size + (n - 1) * gap;
     for (let i = 0; i < n; i++) {
@@ -241,8 +241,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     const g = this.bars;
     g.clear();
     if (this.dead) return;
-    const y = -92;
-    const h = 6;
+    const y = -78;
+    const h = 4.5;
     const hpRatio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
     const shieldRatio = Phaser.Math.Clamp(this.shield / this.maxHp, 0, 1);
 
@@ -293,10 +293,10 @@ export class UnitView extends Phaser.GameObjects.Container {
   private drawPips(): void {
     const g = this.pips;
     g.clear();
-    const y = -103;
-    const size = 4.2;
+    const y = -88;
+    const size = 3.6;
     for (let i = 0; i < 3; i++) {
-      const x = (i - 1) * 11;
+      const x = (i - 1) * 10;
       const on = i < this.star;
       g.fillStyle(on ? GILT.light : INK[600], on ? 1 : 0.8);
       g.beginPath();
@@ -318,9 +318,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     const g = this.crown;
     g.clear();
     if (this.star < 3 || this.dead) return;
-    const cy = -34;
+    const cy = -30;
     // 断环：四段弧，段间留白，像界格钉出的圆
-    const r = 31;
+    const r = 26;
     g.lineStyle(1.8, GILT.base, 0.62);
     for (let i = 0; i < 4; i++) {
       const a0 = (i / 4) * Math.PI * 2 + 0.3;
@@ -332,8 +332,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     for (let i = 0; i < 4; i++) {
       const a = t * 0.85 + (i / 4) * Math.PI * 2;
       const x = Math.cos(a) * (r + 7);
-      const y = cy + Math.sin(a) * (r + 7);
-      const sz = 3.2;
+      const y = cy + Math.sin(a) * (r + 6);
+      const sz = 2.8;
       g.fillStyle(GILT.light, 0.95);
       g.beginPath();
       g.moveTo(x, y - sz);
@@ -362,8 +362,8 @@ export class UnitView extends Phaser.GameObjects.Container {
   playAttack(dirX: number, dirY: number, windup: number): void {
     if (this.dead) return;
     const len = Math.hypot(dirX, dirY) || 1;
-    const dx = (dirX / len) * 9;
-    const dy = (dirY / len) * 9;
+    const dx = (dirX / len) * 7.5;
+    const dy = (dirY / len) * 7.5;
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.add({
       targets: this.sprite,
@@ -547,18 +547,18 @@ export class UnitView extends Phaser.GameObjects.Container {
     const col = this.friendly ? SPIRIT.light : CINNABAR.light;
     g.lineStyle(2.4, col, 0.85);
     g.beginPath();
-    g.arc(0, 0, 44 * (1 - p * 0.42), 0, Math.PI * 2);
+    g.arc(0, 0, 36 * (1 - p * 0.42), 0, Math.PI * 2);
     g.strokePath();
     g.lineStyle(1.2, PAPER[100], 0.6);
     g.beginPath();
-    g.arc(0, 0, 44 * (1 - p * 0.42) - 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+    g.arc(0, 0, 36 * (1 - p * 0.42) - 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
     g.strokePath();
     // 三方符文
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI * 2 + p * 2.4;
-      const r = 44 * (1 - p * 0.42);
+      const r = 36 * (1 - p * 0.42);
       g.fillStyle(col, 0.9);
-      g.fillCircle(Math.cos(a) * r, Math.sin(a) * r * 0.5, 2.6);
+      g.fillCircle(Math.cos(a) * r, Math.sin(a) * r * 0.5, 2.3);
     }
   }
 

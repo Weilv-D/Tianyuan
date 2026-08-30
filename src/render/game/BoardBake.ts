@@ -1,30 +1,31 @@
-/** 职责：己方棋盘与备战席的底座构建——外框/格子/槽位一次烘焙成纹理，运行期只换贴图不重画。 */
+/** 职责：准备阶段的大漆盘与备战席底座——与战斗共用同一烘焙盘，运行期只换贴图不重画。 */
 import Phaser from 'phaser';
 import { FONT } from '../../ui/kit';
 import { UnitPortrait } from '../../ui/cards';
 import { bakedImage, bakedTexture } from '../bake';
-import { INK, GILT, PAPER, css } from '../palette';
+import { bakeLacquerBoard, bakeLacquerGrid } from '../BoardView';
+import { INK, PAPER, css } from '../palette';
 import {
   BENCH_CELL,
   BENCH_N,
   BENCH_W,
   BENCH_X,
   BENCH_Y,
-  BOARD_H,
-  BOARD_W,
   BOARD_X,
   BOARD_Y,
   CELL,
+  GRID_X,
+  GRID_Y,
   HALF_ROWS,
 } from '../layout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
- * 棋盘/备战席烘焙层（原 GameScene.buildBoard/drawBoardCells/buildBench/drawBenchSlots 原样搬移）。
- * 产出的格子与头像数组挂在本模块上，场景经 scene.boardBake.* 读取。
+ * 准备场景的盘面层：与战斗 BoardView 共用 `lacquerBoard_v3`/`lacquerGrid_v3`
+ * 两张烘焙纹理，另加敌营纱幕（上半 4 行仅染色不可放置）与 32 个己方格头像。
  */
 export class BoardBake {
-  /** 棋盘格与备战席槽位：底座是烘焙纹理，用 Image 复用同一张图 */
+  /** 己方半场格与备战席槽位：底座是烘焙纹理，用 Image 复用同一张图 */
   readonly boardCells: Phaser.GameObjects.Image[] = [];
   readonly boardPortraits: UnitPortrait[] = [];
   readonly benchSlots: Phaser.GameObjects.Image[] = [];
@@ -34,66 +35,63 @@ export class BoardBake {
 
   constructor(private scene: GameScene) {}
 
-  // ══════════════ 己方棋盘 ══════════════
+  // ══════════════ 大漆盘（全 8 行可见） ══════════════
 
   buildBoard(): void {
-    // 外框（静态，烘焙；画布四边留 2px 给 2px 宽描边）
-    const fox = BOARD_X - 12;
-    const foy = BOARD_Y - 12;
-    bakedImage(this.scene, fox, foy, 'boardFrame', BOARD_W + 24, BOARD_H + 24, (g) => {
-      g.translateCanvas(-fox, -foy);
-      g.fillStyle(INK[850], 0.92);
-      g.fillRoundedRect(BOARD_X - 10, BOARD_Y - 10, BOARD_W + 20, BOARD_H + 20, 10);
-      g.lineStyle(2, GILT.deep, 0.55);
-      g.strokeRoundedRect(BOARD_X - 10, BOARD_Y - 10, BOARD_W + 20, BOARD_H + 20, 10);
-      g.lineStyle(1, GILT.base, 0.16);
-      g.strokeRoundedRect(BOARD_X - 6, BOARD_Y - 6, BOARD_W + 12, BOARD_H + 12, 8);
+    bakeLacquerBoard(this.scene);
+    bakeLacquerGrid(this.scene);
+
+    // 盘体与格线：与战斗同一张图 —— 两处永不走样
+    this.scene.add.image(BOARD_X, BOARD_Y, 'lacquerBoard_v3').setOrigin(0);
+    const gridImg = this.scene.add.image(GRID_X, GRID_Y, 'lacquerGrid_v3').setOrigin(0);
+    // 入场：格线次第浮现（与 BoardView 同款 stagger 淡入）
+    gridImg.setAlpha(0);
+    this.scene.tweens.add({ targets: gridImg, alpha: 1, delay: 120, duration: 460, ease: 'Quad.easeOut' });
+
+    // 敌营纱幕：上半 4 行压暗 —— "敌营"与"我方阵地"的层级一眼可读，
+    // 放置规则（canPlace）照旧在数据层兜底，纱幕只是那层视觉的"位"通道
+    bakedImage(this.scene, GRID_X, GRID_Y, 'enemyVeil_v3', CELL * 8, CELL * HALF_ROWS, (g) => {
+      g.fillStyle(INK[950], 0.34);
+      g.fillRect(0, 0, CELL * 8, CELL * HALF_ROWS);
     });
 
     for (let r = 0; r < HALF_ROWS; r++) {
       for (let c = 0; c < 8; c++) {
-        const g = this.scene.add.image(BOARD_X + c * CELL, BOARD_Y + r * CELL, '__cell').setOrigin(0);
-        this.boardCells.push(g);
-        const p = new UnitPortrait(this.scene, BOARD_X + c * CELL + 3, BOARD_Y + r * CELL + 3, CELL - 6);
-        this.boardPortraits.push(p);
+        const x = GRID_X + c * CELL;
+        const y = GRID_Y + (r + HALF_ROWS) * CELL; // 数据行 r 挂在下 4 行
+        this.boardCells.push(this.scene.add.image(x, y, '__cell').setOrigin(0));
+        this.boardPortraits.push(new UnitPortrait(this.scene, x + 3, y + 3, CELL - 6));
       }
     }
     this.boardHover = this.scene.add.graphics();
   }
 
   /**
-   * 棋盘格底座。
-   *
-   * 32 个格子每个都是「2 个圆角矩形 + 2 段刻痕」≈ 137 条命令，合计 4384 条 ——
-   * 这是准备阶段最大的单项开销，而它**画完之后一次都不会变**。
-   * 所以底座烤成两张纹理（只有前排/后排两种底色），32 个格子变成 32 个 Image；
+   * 己方格底座：烤一张纹理，32 个格子是 32 个 Image。
    * 真正会变的拖拽高亮交给单独一层 `boardHover`。
    */
   drawBoardCells(): void {
     const size = CELL;
-    for (let r = 0; r < HALF_ROWS; r++) {
-      // 前排在下方（r=0 是最靠近中线的一行），用底色深浅暗示纵深
-      const depth = (HALF_ROWS - 1 - r) / (HALF_ROWS - 1);
-      const near = depth > 0.6;
-      const key = near ? 'cellNear' : 'cellFar';
-      bakedTexture(this.scene, key, size, size, (g) => {
-        g.fillStyle(near ? INK[800] : INK[700], 0.9);
-        g.fillRoundedRect(2, 2, size - 4, size - 4, 6);
-        g.lineStyle(1, INK[500], 0.7);
-        g.strokeRoundedRect(2, 2, size - 4, size - 4, 6);
-        // 四角刻痕
-        g.lineStyle(1.5, GILT.deep, 0.25);
-        const k = 8;
-        g.lineBetween(2, 2 + k, 2, 2);
-        g.lineBetween(2, 2, 2 + k, 2);
-      });
-      for (let c = 0; c < 8; c++) {
-        const i = r * 8 + c;
-        const cell = this.boardCells[i];
-        if (!cell || !cell.setTexture) continue;
-        cell.setTexture(key);
-        cell.setPosition(BOARD_X + c * CELL, BOARD_Y + r * CELL);
-      }
+    bakedTexture(this.scene, 'prepCell_v3', size, size, (g) => {
+      g.fillStyle(INK[700], 0.7);
+      g.fillRect(2, 2, size - 4, size - 4);
+      g.lineStyle(1, INK[500], 0.6);
+      g.strokeRect(2, 2, size - 4, size - 4);
+      // 四角刻痕
+      g.lineStyle(1.2, INK[500], 0.45);
+      const k = 7;
+      g.lineBetween(6, 6, 6 + k, 6);
+      g.lineBetween(6, 6, 6, 6 + k);
+      g.lineBetween(size - 6, size - 6, size - 6 - k, size - 6);
+      g.lineBetween(size - 6, size - 6, size - 6, size - 6 - k);
+    });
+    for (let i = 0; i < this.boardCells.length; i++) {
+      const cell = this.boardCells[i];
+      if (!cell || !cell.setTexture) continue;
+      cell.setTexture('prepCell_v3');
+      const c = i % 8;
+      const r = Math.floor(i / 8);
+      cell.setPosition(GRID_X + c * CELL, GRID_Y + (r + HALF_ROWS) * CELL);
     }
     this.boardHover.clear();
   }
@@ -101,50 +99,49 @@ export class BoardBake {
   // ══════════════ 备战席 ══════════════
 
   buildBench(): void {
-    // 框架 + 签条（静态，烘焙；原点取签条左上再外扩 2px）
-    const box = BENCH_X - 10;
-    const boy = BENCH_Y - 26;
-    bakedImage(this.scene, box, boy, 'benchFrame', BENCH_W + 20, BENCH_CELL + 36, (g) => {
+    // 发丝细条框架 + 签条（静态，烘焙）
+    const box = BENCH_X - 8;
+    const boy = BENCH_Y - 24;
+    bakedImage(this.scene, box, boy, 'benchFrame_v3', BENCH_W + 16, BENCH_CELL + 32, (g) => {
       g.translateCanvas(-box, -boy);
-      g.fillStyle(INK[850], 0.85);
-      g.fillRoundedRect(BENCH_X - 8, BENCH_Y - 8, BENCH_W + 16, BENCH_CELL + 16, 8);
-      g.lineStyle(1.4, INK[500], 0.8);
-      g.strokeRoundedRect(BENCH_X - 8, BENCH_Y - 8, BENCH_W + 16, BENCH_CELL + 16, 8);
-      // 签条：标明这一行是什么（棋盘与备战席之间只隔 4px，压框角做界格签）
-      g.fillStyle(INK[850], 0.96);
-      g.fillRect(BENCH_X - 8, BENCH_Y - 24, 84, 20);
+      g.fillStyle(INK[900], 0.72);
+      g.fillRect(BENCH_X - 6, BENCH_Y - 6, BENCH_W + 12, BENCH_CELL + 12);
       g.lineStyle(1, INK[500], 0.7);
-      g.strokeRect(BENCH_X - 8, BENCH_Y - 24, 84, 20);
+      g.strokeRect(BENCH_X - 6, BENCH_Y - 6, BENCH_W + 12, BENCH_CELL + 12);
+      // 签条：压在框线上沿
+      g.fillStyle(INK[900], 0.95);
+      g.fillRect(BENCH_X - 6, BENCH_Y - 22, 78, 18);
+      g.lineStyle(1, INK[500], 0.6);
+      g.strokeRect(BENCH_X - 6, BENCH_Y - 22, 78, 18);
     });
     this.scene.add
-      .text(BENCH_X + 34, BENCH_Y - 14, '备战席', {
+      .text(BENCH_X + 33, BENCH_Y - 13, '备 战 席', {
         fontFamily: FONT.title,
         fontSize: '12px',
         color: css(PAPER[300]),
-        letterSpacing: 3,
+        letterSpacing: 2,
       })
       .setOrigin(0.5);
 
     for (let i = 0; i < BENCH_N; i++) {
       const g = this.scene.add.image(BENCH_X + i * BENCH_CELL, BENCH_Y, '__slot').setOrigin(0);
       this.benchSlots.push(g);
-      const p = new UnitPortrait(this.scene, BENCH_X + i * BENCH_CELL + 3, BENCH_Y + 3, BENCH_CELL - 6);
-      this.benchPortraits.push(p);
+      this.benchPortraits.push(new UnitPortrait(this.scene, BENCH_X + i * BENCH_CELL + 3, BENCH_Y + 3, BENCH_CELL - 6));
     }
   }
 
-  /** 备战席槽位：同样是烤一次就再也不变的东西 */
+  /** 备战席槽位：烤一次就再也不变 */
   drawBenchSlots(): void {
-    bakedTexture(this.scene, 'benchSlot', BENCH_CELL, BENCH_CELL, (g) => {
-      g.fillStyle(INK[800], 0.85);
-      g.fillRoundedRect(2, 2, BENCH_CELL - 4, BENCH_CELL - 4, 6);
-      g.lineStyle(1, INK[500], 0.6);
-      g.strokeRoundedRect(2, 2, BENCH_CELL - 4, BENCH_CELL - 4, 6);
+    bakedTexture(this.scene, 'benchSlot_v3', BENCH_CELL, BENCH_CELL, (g) => {
+      g.fillStyle(INK[800], 0.66);
+      g.fillRect(2, 2, BENCH_CELL - 4, BENCH_CELL - 4);
+      g.lineStyle(1, INK[500], 0.55);
+      g.strokeRect(2, 2, BENCH_CELL - 4, BENCH_CELL - 4);
     });
     for (let i = 0; i < BENCH_N; i++) {
       const slot = this.benchSlots[i];
       if (!slot || !slot.setTexture) continue;
-      slot.setTexture('benchSlot');
+      slot.setTexture('benchSlot_v3');
       slot.setPosition(BENCH_X + i * BENCH_CELL, BENCH_Y);
     }
   }

@@ -26,7 +26,7 @@ const BOARD_X = (W - BOARD_W) / 2;
 /** 悬停单位卡尺寸（updateHoverCard 与 makeUnitCard 共用） */
 const UNIT_CARD_W = 268;
 const UNIT_CARD_H = 176;
-const BOARD_Y = 152;
+const BOARD_Y = 176;
 
 interface Projectile {
   img: Phaser.GameObjects.Image;
@@ -106,14 +106,7 @@ export class BattleScene extends Phaser.Scene {
     // Scene 实例被复用，上次进入场景时登记的按钮引用必须清掉，否则会越积越多
     this.speedBtns = [];
 
-    // 背景：远山意象的径向渐变 + 暗角，把视线压向棋盘
-    const bg = this.add.graphics();
-    bg.fillStyle(INK[900], 1);
-    bg.fillRect(0, 0, W, H);
-    const grad = this.add.image(W / 2, H / 2, TEX.glow).setTint(INK[700]).setAlpha(0.5);
-    grad.setDisplaySize(W * 1.5, H * 1.5);
-    const vign = this.add.image(W / 2, H / 2, TEX.vignette).setDepth(90);
-    vign.setDisplaySize(W, H);
+    // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
 
     this.board = new BoardView(this, BOARD_X, BOARD_Y);
     this.fx = new EffectsLayer(this);
@@ -139,46 +132,55 @@ export class BattleScene extends Phaser.Scene {
   // ══════════════ HUD ══════════════
 
   private buildTopBar(): void {
-    const panel = makePanel(this, 24, 20, W - 48, 76, { alpha: 0.86 });
+    // 与对局同语的顶栏：发丝底线 + 楷体品牌 + 阶段条 + mono 倒计时（无面板底）
+    const hair = this.add.graphics();
+    hair.lineStyle(1, INK[600], 0.9);
+    hair.lineBetween(48, 84, W - 48, 84);
+    hair.lineStyle(1, GILT.base, 0.25);
+    hair.lineBetween(W / 2 - 200, 84, W / 2 + 200, 84);
+
     const title = this.add
-      .text(40, 20, '百战天元', {
-        fontFamily: FONT.title,
-        fontSize: '34px',
+      .text(48, 24, '百 战 天 元', {
+        fontFamily: FONT.kai,
+        fontSize: '19px',
         color: css(PAPER[100]),
+        letterSpacing: 8,
       })
       .setOrigin(0, 0);
-    title.setShadow(0, 0, css(GILT.base), 18, false, true);
+    title.setShadow(0, 0, css(GILT.base), 10, false, true);
     this.add
-      .text(40, 58, '八 人 对 弈', {
-        fontFamily: FONT.body,
-        fontSize: '12px',
-        color: css(PAPER[500]),
+      .text(48, 56, 'NIGHT FEAST', {
+        fontFamily: FONT.mono,
+        fontSize: '8px',
+        color: css(INK[300]),
+        letterSpacing: 6,
       })
       .setOrigin(0, 0);
 
     this.phaseText = this.add
-      .text(W / 2, 30, '准  备', {
+      .text(W / 2, 18, '备  战', {
         fontFamily: FONT.title,
-        fontSize: '28px',
+        fontSize: '24px',
         color: css(PAPER[100]),
+        letterSpacing: 6,
       })
       .setOrigin(0.5, 0);
     this.topSub = this.add
-      .text(W / 2, 64, '', {
+      .text(W / 2, 56, '', {
         fontFamily: FONT.body,
-        fontSize: '13px',
+        fontSize: '12px',
         color: css(PAPER[400]),
+        letterSpacing: 2,
       })
       .setOrigin(0.5, 0);
 
     this.timerText = this.add
-      .text(W - 40, 34, '00.0"', {
-        fontFamily: FONT.body,
-        fontSize: '26px',
+      .text(W - 48, 28, '00.0"', {
+        fontFamily: FONT.mono,
+        fontSize: '17px',
         color: css(GILT.base),
       })
       .setOrigin(1, 0);
-    void panel;
   }
 
   private buildSidePanels(): void {
@@ -193,40 +195,41 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private buildBottomBar(): void {
-    const y = BOARD_Y + BOARD_H + 20;
-    const panel = makePanel(this, BOARD_X, y, BOARD_W, 84, { alpha: 0.88 });
+    const y = BOARD_Y + BOARD_H + 24;
+    const pw = BOARD_W + 80;
+    const px = BOARD_X - 40;
+    makePanel(this, px, y, pw, 76, { alpha: 0.85 });
 
     const mk = (label: string, x: number, w: number, onClick: () => void, variant: 'primary' | 'ghost' = 'ghost') => {
-      const b = new Button(this, BOARD_X + x, y + 25, label, onClick, { width: w, height: 36, variant });
+      const b = new Button(this, px + x, y + 20, label, onClick, { width: w, height: 36, variant });
       this.add.existing(b);
       return b;
     };
 
     if (this.matchCtx) {
       // 对局模式：只保留观战相关控制，避免玩家误触把对局重开
-      mk('暂停', 20, 92, () => this.togglePause());
-      mk('快进到底', 124, 118, () => this.setSpeed(4));
+      mk('暂 停', 24, 96, () => this.togglePause());
+      mk('快进到底', 132, 116, () => this.setSpeed(4));
     } else {
-      mk('重开对局', 20, 130, () => this.restart(), 'primary');
-      mk('暂停', 162, 92, () => this.togglePause());
-      mk('重播', 266, 92, () => this.replay());
+      mk('重开对局', 24, 120, () => this.restart(), 'primary');
+      mk('暂 停', 156, 88, () => this.togglePause());
+      mk('重 播', 256, 88, () => this.replay());
       // 阵容切换
-      mk('我方换阵', 380, 118, () => this.cycleComp('A'));
-      mk('敌方换阵', 510, 118, () => this.cycleComp('B'));
+      mk('我方换阵', 368, 108, () => this.cycleComp('A'));
+      mk('敌方换阵', 488, 108, () => this.cycleComp('B'));
     }
 
     // 速度
     const speeds = [1, 2, 4];
     speeds.forEach((s, i) => {
-      const b = new Button(this, BOARD_X + 648 + i * 40, y + 25, `${s}×`, () => this.setSpeed(s), {
-        width: 34,
+      const b = new Button(this, px + pw - 24 - (2 - i) * 44, y + 20, `${s}×`, () => this.setSpeed(s), {
+        width: 36,
         height: 36,
         variant: s === 1 ? 'primary' : 'ghost',
       });
       this.speedBtns.push(b);
       this.add.existing(b);
     });
-    void panel;
   }
 
   private setSpeed(s: number): void {
@@ -330,7 +333,7 @@ export class BattleScene extends Phaser.Scene {
     this.running = true;
     this.paused = false;
     this.board.setPhase('prep');
-    this.phaseText.setText('准  备');
+    this.phaseText.setText('备  战');
     this.phaseText.setColor(css(SPIRIT.light));
 
     audio.unlock();
@@ -344,7 +347,7 @@ export class BattleScene extends Phaser.Scene {
       this.phaseText.setColor(css(CINNABAR.light));
       audio.startBgm('battle');
       audio.play('warn');
-      this.cameras.main.flash(220, 217, 58, 43);
+      this.cameras.main.flash(220, 0xc6, 0x5a, 0x45); // 朱砂 CINNABAR.base
     });
   }
 

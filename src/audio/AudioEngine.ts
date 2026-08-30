@@ -328,6 +328,14 @@ export class AudioEngine {
     }
   }
 
+  /** 五声拨弦的公开入口（样稿 pluck）：走 sfx 总线的音效拨弦 */
+  playPluck(freq: number): void {
+    if (!this.ctx) return;
+    this.tone('sfx', freq, 0.5, 'triangle', 0.12, 0, 0.004);
+    this.tone('sfx', freq * 2, 0.22, 'sine', 0.05, 0.005, 0.004);
+    this.tone('sfx', freq * 3, 0.12, 'sine', 0.025, 0.01, 0.004);
+  }
+
   /** 古琴/琵琶式拨弦：基频 + 两个快速衰减的泛音 */
   private pluck(freq: number, gain: number, when: number): void {
     this.tone('bgm', freq, 0.9, 'triangle', gain, when, 0.004);

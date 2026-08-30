@@ -6,10 +6,10 @@ import { GAME_BUILD, GAME_VERSION } from '../../version';
 import { CHAMPIONS } from '../../data/champions';
 import { Button, FONT } from '../../ui/kit';
 import { SettingsPanel } from '../../ui/SettingsPanel';
-import { GILT, INK, PAPER, VOID, css } from '../palette';
+import { GILT, INK, PAPER, css } from '../palette';
 import { bakeItemIcons } from '../itemIcons';
 import { bakeSilhouettes, silhouetteKey } from '../silhouetteFactory';
-import { buildTextures, grainOverlay, TEX } from '../textures';
+import { buildTextures, grainOverlay } from '../textures';
 import { H, W } from '../layout';
 
 /**
@@ -34,14 +34,7 @@ export class MenuScene extends Phaser.Scene {
     this.settings?.close();
     this.settings = null;
 
-    // 背景：与对局同源的墨色世界（玩家从菜单进对局不会有"换了个游戏"的割裂）
-    const bg = this.add.graphics();
-    bg.fillStyle(INK[900], 1);
-    bg.fillRect(0, 0, W, H);
-    const grad = this.add.image(W / 2, H / 2, TEX.glow).setTint(INK[700]).setAlpha(0.5);
-    grad.setDisplaySize(W * 1.5, H * 1.5);
-    const vign = this.add.image(W / 2, H / 2, TEX.vignette).setDepth(200);
-    vign.setDisplaySize(W, H);
+    // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），场景不再铺底
 
     // 底部剪影长卷：几名棋子的墨影平铺，暗合"点将"的意象
     const picks = [7, 19, 31, 44, 56];
@@ -60,18 +53,18 @@ export class MenuScene extends Phaser.Scene {
     // 标题
     const title = this.add
       .text(W / 2, H * 0.26, '百 战 天 元', {
-        fontFamily: FONT.title,
-        fontSize: '108px',
+        fontFamily: FONT.kai,
+        fontSize: '104px',
         color: css(PAPER[100]),
         letterSpacing: 26,
       })
       .setOrigin(0.5);
     title.setShadow(0, 0, css(GILT.base), 38, false, true);
     this.add
-      .text(W / 2, H * 0.26 + 110, '八 人 对 弈　·　案 头 山 水', {
+      .text(W / 2, H * 0.26 + 110, '八 人 对 弈　·　幽 冥 水 墨', {
         fontFamily: FONT.body,
         fontSize: '16px',
-        color: css(VOID.light),
+        color: css(GILT.base),
         letterSpacing: 8,
       })
       .setOrigin(0.5);
@@ -147,7 +140,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.add
-      .text(W - 24, H - 20, '文人案头 · 松烟墨', {
+      .text(W - 24, H - 20, '夜宴 · 幽冥水墨', {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(INK[300]),

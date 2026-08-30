@@ -16,7 +16,7 @@ import { buildTextures, grainOverlay } from '../textures';
 import { playLegendaryStarFx } from '../LegendaryFx';
 import { bakeSilhouettes } from '../silhouetteFactory';
 import { INK, GILT, CINNABAR, SPIRIT, PAPER, css } from '../palette';
-import { W, H, BOTTOM_Y } from '../layout';
+import { W, H } from '../layout';
 
 // ── 渲染模块（R2 拆分）：场景只保留 create/update 主循环、场景切换与对局数据装配；
 //    覆盖层/面板/输入/刷新细节全部委托 src/render/game/ 下的模块。 ──
@@ -158,10 +158,14 @@ export class GameScene extends Phaser.Scene {
     this.hud.buildTopBar();
     this.boardBake.buildBoard();
     this.boardBake.buildBench();
+    this.hud.buildPhaseStrip();
     this.hud.buildShop();
     this.hud.buildItemBar();
-    this.hud.buildBottomBar();
-    this.hud.buildTraitPanel();
+    this.hud.buildActionBar();
+    this.hud.buildSell();
+    this.hud.buildBoardCount();
+    this.hud.buildTraitRail();
+    this.hud.buildIntel();
     this.hud.buildScoreboard();
     this.hud.buildLogPanel();
     this.hud.buildReportPanel();
@@ -410,7 +414,7 @@ export class GameScene extends Phaser.Scene {
       this.tweens.killTweensOf(this.toast);
       this.toast.destroy();
     }
-    const c = this.add.container(W / 2, BOTTOM_Y - 34).setDepth(500);
+    const c = this.add.container(W / 2, H - 78).setDepth(500);
     const t = this.add
       .text(0, 0, msg, {
         fontFamily: FONT.body,
@@ -421,12 +425,12 @@ export class GameScene extends Phaser.Scene {
     const w = t.width + 40;
     const g = this.add.graphics();
     g.fillStyle(INK[800], 0.96);
-    g.fillRoundedRect(-w / 2, -20, w, 40, 20);
+    g.fillRect(-w / 2, -20, w, 40);
     g.lineStyle(1.4, warn ? CINNABAR.base : GILT.deep, 0.8);
-    g.strokeRoundedRect(-w / 2, -20, w, 40, 20);
+    g.strokeRect(-w / 2, -20, w, 40);
     c.add([g, t]);
     c.setAlpha(0);
-    this.tweens.add({ targets: c, alpha: 1, y: BOTTOM_Y - 44, duration: 220, ease: 'Quad.easeOut' });
+    this.tweens.add({ targets: c, alpha: 1, y: H - 88, duration: 220, ease: 'Quad.easeOut' });
     this.tweens.add({ targets: c, alpha: 0, delay: 1700, duration: 380, onComplete: () => c.destroy() });
     this.toast = c;
   }
@@ -554,6 +558,7 @@ export class GameScene extends Phaser.Scene {
     this.lastReport = reports.join('\n');
     this.refreshAll();
 
+    audio.playPluck(196); // 徵音起手：开战的弦响
     this.cameras.main.fadeOut(260, 7, 9, 12);
     this.time.delayedCall(280, () => {
       this.flushSave();

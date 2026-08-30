@@ -1,9 +1,8 @@
 /**
- * 三星五费专属全屏演出 —— 「天命之印」。
+ * 三星五费专属全屏演出 —— 「天命之印」（样稿同款制式）。
  *
- * 一局游戏里最难达成的时刻值得一次"从时间流里被抠出来"的仪式：
- * 暖墨压暗 → 巨型剪影浮现 → 朱砂方印携名将之名盖落 → 鎏金尘埃迸散 + 轻微摄震。
- * 语气遵循「文人案头」：热色只有朱砂与古金，字用宋体拉开字距，
+ * 夜色压暗 → 巨型剪影浮现 → 196px 朱砂方印携名将之名盖落（竖排楷字、双环印框）
+ * → 落款字距收拢 → 鎏金尘埃迸散 + 轻微摄震。
  * 发光只此一处 —— 全场最稀有的瞬间独享全场唯一的 ADD 光。
  */
 import Phaser from 'phaser';
@@ -12,15 +11,16 @@ import { TEX } from './textures';
 import { silhouetteKey } from './silhouetteFactory';
 import { FONT } from '../ui/kit';
 import { CHAMPION_BY_ID } from '../data/champions';
+import { audio } from '../audio/AudioEngine';
 
 export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
   const W = scene.scale.width;
   const H = scene.scale.height;
   const cx = W / 2;
-  const cy = H * 0.42;
+  const cy = H * 0.44;
   const root = scene.add.container(0, 0).setDepth(1500);
 
-  // ── 1) 暖墨压暗：把这一刻从连续的时间流里抠出来 ──
+  // ── 1) 夜色压暗：把这一刻从连续的时间流里抠出来 ──
   const dim = scene.add.rectangle(0, 0, W + 8, H + 8, SHADE).setOrigin(0).setAlpha(0);
   root.add(dim);
   scene.tweens.add({ targets: dim, alpha: 0.62, duration: 220, ease: 'Quad.easeOut' });
@@ -31,7 +31,7 @@ export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
     .setAlpha(0)
     .setScale(5.2);
   root.add(shadow);
-  scene.tweens.add({ targets: shadow, alpha: 0.13, y: cy + 40, duration: 900, ease: 'Quad.easeOut' });
+  scene.tweens.add({ targets: shadow, alpha: 0.12, y: cy + 40, duration: 900, ease: 'Quad.easeOut' });
 
   // ── 3) 印后鎏金光晕（全场唯一 ADD 光，只给这一刻） ──
   const halo = scene.add
@@ -41,67 +41,68 @@ export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
     .setDisplaySize(560, 560)
     .setAlpha(0);
   root.add(halo);
-  scene.tweens.add({ targets: halo, alpha: 0.4, duration: 520, delay: 160, ease: 'Quad.easeOut' });
+  scene.tweens.add({ targets: halo, alpha: 0.35, duration: 520, delay: 160, ease: 'Quad.easeOut' });
 
-  // ── 4) 朱砂方印：携名将之名盖落 ──
+  // ── 4) 朱砂方印：竖排楷名，双环印框（样稿 #legendSeal 制式） ──
   const name = defName(defId);
-  const sealSize = 216;
-  const seal = scene.add.container(cx, cy).setRotation(-0.06).setScale(2.4).setAlpha(0);
+  const sealSize = 196;
+  const seal = scene.add.container(cx, cy).setScale(2.1).setAlpha(0);
   const g = scene.add.graphics();
   g.fillStyle(CINNABAR.deep, 0.97);
-  g.fillRoundedRect(-sealSize / 2, -sealSize / 2, sealSize, sealSize, 14);
-  // 印章的"烂边"感：外圈古金粗边 + 内圈发丝线，像一枚真正的老印
-  g.lineStyle(4, GILT.base, 0.9);
-  g.strokeRoundedRect(-sealSize / 2, -sealSize / 2, sealSize, sealSize, 14);
-  g.lineStyle(1.5, PAPER[100], 0.35);
-  g.strokeRoundedRect(-sealSize / 2 + 10, -sealSize / 2 + 10, sealSize - 20, sealSize - 20, 10);
-  const nameSize = name.length <= 2 ? 84 : 62;
+  g.fillRect(-sealSize / 2, -sealSize / 2, sealSize, sealSize);
+  // 印框：外缘米金亮线 + 内环发丝（样稿 inset 双环）
+  g.lineStyle(1.5, GILT.light, 0.85);
+  g.strokeRect(-sealSize / 2, -sealSize / 2, sealSize, sealSize);
+  g.lineStyle(1, PAPER[100], 0.4);
+  g.strokeRect(-sealSize / 2 + 8, -sealSize / 2 + 8, sealSize - 16, sealSize - 16);
+  // 竖排楷名：一字一行，字距由行距承担
+  const nameSize = name.length <= 2 ? 56 : 42;
   const nameText = scene.add
-    .text(0, 0, name, {
-      fontFamily: FONT.title,
+    .text(0, 0, name.split('').join('\n'), {
+      fontFamily: FONT.kai,
       fontSize: `${nameSize}px`,
       color: css(PAPER[50]),
-      letterSpacing: name.length <= 2 ? 8 : 4,
+      lineSpacing: name.length <= 2 ? 6 : 2,
     })
     .setOrigin(0.5);
   seal.add([g, nameText]);
   root.add(seal);
 
-  // ── 5) 落款横幅 ──
+  // ── 5) 落款：字距从 1.7em 收拢到 1.1em（样稿 #legendText） ──
   const banner = scene.add
-    .text(cx, cy + sealSize / 2 + 40, '神 品 三 星 · 天 命 所 归', {
+    .text(cx, H * 0.81, '神 品 三 星 · 天 命 所 归', {
       fontFamily: FONT.title,
-      fontSize: '24px',
+      fontSize: '16px',
       color: css(GILT.light),
-      letterSpacing: 6,
+      letterSpacing: 20,
     })
     .setOrigin(0.5)
     .setAlpha(0);
   root.add(banner);
 
-  // ── 落印 ──
-  scene.tweens.add({ targets: seal, alpha: 1, duration: 120, delay: 220 });
+  // ── 落印：2.1 倍压下 → 定格 → 印身微 squash ──
+  scene.tweens.add({ targets: seal, alpha: 1, duration: 120, delay: 200 });
   scene.tweens.add({
     targets: seal,
     scale: 1,
-    duration: 170,
-    delay: 240,
+    duration: 300,
+    delay: 210,
     ease: 'Cubic.easeIn',
     onComplete: () => {
-      // 落印三连：摄震 + 印身微squash + 鎏金与朱砂双色尘埃迸散
+      audio.playPluck(130.8); // 宫音落印
       scene.cameras.main.shake(170, 0.0045);
-      scene.tweens.add({ targets: seal, scaleY: 0.94, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
+      scene.tweens.add({ targets: seal, scaleY: 0.9, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
       burst(scene, root, cx, cy, GILT.light, 26);
       burst(scene, root, cx, cy, CINNABAR.light, 14);
-      scene.tweens.add({ targets: banner, alpha: 1, y: cy + sealSize / 2 + 30, duration: 360, ease: 'Quad.easeOut' });
     },
   });
+  scene.tweens.add({ targets: banner, alpha: 1, letterSpacing: 12, duration: 800, delay: 620, ease: 'Quad.easeOut' });
 
-  // ── 收场：墨色散去，一切如初 ──
+  // ── 收场：夜色散去，一切如初 ──
   scene.tweens.add({
     targets: [dim, shadow, halo, seal, banner],
     alpha: 0,
-    delay: 1620,
+    delay: 1850,
     duration: 460,
     ease: 'Quad.easeIn',
     onComplete: () => root.destroy(),

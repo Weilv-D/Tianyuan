@@ -12,17 +12,20 @@ import {
   BENCH_W,
   BENCH_X,
   BENCH_Y,
-  BOARD_H,
-  BOARD_W,
-  BOARD_X,
-  BOARD_Y,
   CELL,
   DETAIL_H,
   DETAIL_W,
+  GRID_H,
+  GRID_W,
+  GRID_X,
+  GRID_Y,
+  HALF_ROWS,
   ITEM_BAR_SLOTS,
   ITEM_BAR_X,
   ITEM_BAR_Y,
+  ITEM_COLS,
   ITEM_GAP,
+  ITEM_ROWS,
   ITEM_SIZE,
   W,
   H,
@@ -152,10 +155,12 @@ export class InputController {
   // ══════════════ 命中检测 ══════════════
 
   private hitSource(x: number, y: number): { where: 'board' | 'bench'; slot: number } | null {
-    if (x >= BOARD_X && x < BOARD_X + BOARD_W && y >= BOARD_Y && y < BOARD_Y + BOARD_H) {
-      const c = Math.floor((x - BOARD_X) / CELL);
-      const r = Math.floor((y - BOARD_Y) / CELL);
-      return { where: 'board', slot: r * 8 + c };
+    // 大漆盘 8 行全可见，但只有下半 4 行是数据阵地（敌营在数据层没有槽位）
+    if (x >= GRID_X && x < GRID_X + GRID_W && y >= GRID_Y && y < GRID_Y + GRID_H) {
+      const c = Math.floor((x - GRID_X) / CELL);
+      const r = Math.floor((y - GRID_Y) / CELL);
+      if (r < GRID_H / CELL - HALF_ROWS) return null; // 敌营：不可放置也不可选中
+      return { where: 'board', slot: (r - (GRID_H / CELL - HALF_ROWS)) * 8 + c };
     }
     if (x >= BENCH_X && x < BENCH_X + BENCH_W && y >= BENCH_Y && y < BENCH_Y + BENCH_CELL) {
       return { where: 'bench', slot: Math.floor((x - BENCH_X) / BENCH_CELL) };
@@ -168,14 +173,17 @@ export class InputController {
     return this.hitSource(x, y);
   }
 
-  /** 命中了装备栏的哪一格，-1 表示没命中 */
+  /** 命中了器匣（2×5 网格）的哪一格，-1 表示没命中 */
   private hitItemChip(x: number, y: number): number {
-    if (y < ITEM_BAR_Y - 6 || y > ITEM_BAR_Y + ITEM_SIZE + 6) return -1;
-    const i = Math.floor((x - ITEM_BAR_X + ITEM_GAP / 2) / (ITEM_SIZE + ITEM_GAP));
+    const col = Math.floor((x - ITEM_BAR_X + ITEM_GAP / 2) / (ITEM_SIZE + ITEM_GAP));
+    const row = Math.floor((y - ITEM_BAR_Y + ITEM_GAP / 2) / (ITEM_SIZE + ITEM_GAP));
+    if (col < 0 || col >= ITEM_COLS || row < 0 || row >= ITEM_ROWS) return -1;
+    const i = row * ITEM_COLS + col;
     if (i < 0 || i >= ITEM_BAR_SLOTS) return -1;
     // 落在格子里而不是缝隙里
-    const left = ITEM_BAR_X + i * (ITEM_SIZE + ITEM_GAP);
-    return x >= left && x <= left + ITEM_SIZE ? i : -1;
+    const left = ITEM_BAR_X + col * (ITEM_SIZE + ITEM_GAP);
+    const top = ITEM_BAR_Y + row * (ITEM_SIZE + ITEM_GAP);
+    return x >= left && x <= left + ITEM_SIZE && y >= top && y <= top + ITEM_SIZE ? i : -1;
   }
 
   /** 点中了棋子身上的第几件装备，-1 表示没点中 */
@@ -188,9 +196,9 @@ export class InputController {
     if (u.items.length === 0) return -1;
     const size = where.where === 'board' ? CELL - 6 : BENCH_CELL - 6;
     const px =
-      (where.where === 'board' ? BOARD_X + (where.slot % 8) * CELL : BENCH_X + where.slot * BENCH_CELL) + 3;
+      (where.where === 'board' ? GRID_X + (where.slot % 8) * CELL : BENCH_X + where.slot * BENCH_CELL) + 3;
     const py =
-      (where.where === 'board' ? BOARD_Y + Math.floor(where.slot / 8) * CELL : BENCH_Y) + 3;
+      (where.where === 'board' ? GRID_Y + (Math.floor(where.slot / 8) + HALF_ROWS) * CELL : BENCH_Y) + 3;
     const isz = Math.max(11, Math.round(size * 0.17));
     const gap = 2;
     for (let i = 0; i < Math.min(3, u.items.length); i++) {
@@ -258,13 +266,13 @@ export class InputController {
     const check = canPlace(this.scene.match.human, this.dragUnit.iid, t.where, t.slot);
     const col = check.ok ? GILT.light : CINNABAR.base;
     const size = t.where === 'board' ? CELL : BENCH_CELL;
-    const ox = t.where === 'board' ? BOARD_X + (t.slot % 8) * CELL : BENCH_X + t.slot * BENCH_CELL;
-    const oy = t.where === 'board' ? BOARD_Y + Math.floor(t.slot / 8) * CELL : BENCH_Y;
+    const ox = t.where === 'board' ? GRID_X + (t.slot % 8) * CELL : BENCH_X + t.slot * BENCH_CELL;
+    const oy = t.where === 'board' ? GRID_Y + (Math.floor(t.slot / 8) + HALF_ROWS) * CELL : BENCH_Y;
     this.scene.boardBake.boardHover.setPosition(ox, oy);
-    this.scene.boardBake.boardHover.lineStyle(2.5, col, 0.9);
-    this.scene.boardBake.boardHover.strokeRoundedRect(1, 1, size - 2, size - 2, 6);
-    this.scene.boardBake.boardHover.fillStyle(col, 0.12);
-    this.scene.boardBake.boardHover.fillRoundedRect(1, 1, size - 2, size - 2, 6);
+    this.scene.boardBake.boardHover.lineStyle(2, col, 0.9);
+    this.scene.boardBake.boardHover.strokeRect(1, 1, size - 2, size - 2);
+    this.scene.boardBake.boardHover.fillStyle(col, 0.1);
+    this.scene.boardBake.boardHover.fillRect(1, 1, size - 2, size - 2);
   }
 
   private endDrag(x: number, y: number): void {

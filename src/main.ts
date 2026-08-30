@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { INK, css } from './render/palette';
 import { MenuScene } from './render/scenes/MenuScene';
 import { GameScene, GAME_SCENE_H, GAME_SCENE_W } from './render/scenes/GameScene';
 import { BattleScene } from './render/scenes/BattleScene';
@@ -87,7 +86,8 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'app',
   width: GAME_SCENE_W,
   height: GAME_SCENE_H,
-  backgroundColor: css(INK[900]),
+  // 画布透明：夜色山海（index.html #bg）作为全窗底，Phaser 只画内容层
+  transparent: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -150,12 +150,24 @@ const unlock = () => {
 window.addEventListener('pointerdown', unlock);
 window.addEventListener('keydown', unlock);
 
-// 隐藏加载遮罩
+// 自定义光标的悬停态桥接：index.html 的金环在悬停可交互对象时放大。
+// 场景级 gameobjectover/out 汇入 body.cur-hover —— DOM 光标与画布内命中同源。
+game.events.once('ready', () => {
+  const doc = document.body.classList;
+  for (const scene of game.scene.scenes) {
+    scene.input.on('gameobjectover', () => doc.add('cur-hover'));
+    scene.input.on('gameobjectout', () => doc.remove('cur-hover'));
+  }
+});
+
+// 隐藏加载序章：先让「弈」字与进度条走完入场（~1.5s），再上掀退场（clip-path 1.2s）
 const boot = document.getElementById('boot');
 if (boot) {
   requestAnimationFrame(() => {
-    boot.classList.add('hidden');
-    window.setTimeout(() => boot.remove(), 500);
+    window.setTimeout(() => {
+      boot.classList.add('hidden');
+      window.setTimeout(() => boot.remove(), 1300);
+    }, 1500);
   });
 }
 

@@ -214,14 +214,15 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
 }
 
 /**
- * 商店卡。
+ * 商店卡（样稿 .scard 窄卡语言，棋子照用本项目剪影）。
  *
- * 必须一眼给出全部决策信息：费用（左上角）、名字、稀有度、所属羁绊。
- * 买不起时整体压暗 —— 玩家不需要在脑子里做减法才能知道"这张现在买不了"。
+ * 顶部 22px 稀有度刻线 → 棋子剪影 → 棋名 → 品阶 · 称号 → 羁绊 → mono 价签。
+ * 买不起时整体压暗；悬停时整卡上浮 + 金线描边（样稿 hover 位移语言）。
  */
 export class ShopCard extends Phaser.GameObjects.Container {
   private readonly cardW: number;
   private readonly cardH: number;
+  private readonly baseY: number;
   private readonly bg: Phaser.GameObjects.Image;
   private readonly sil: Phaser.GameObjects.Image;
   private readonly nameText: Phaser.GameObjects.Text;
@@ -235,35 +236,38 @@ export class ShopCard extends Phaser.GameObjects.Container {
     super(scene, x, y);
     this.cardW = w;
     this.cardH = h;
+    this.baseY = y;
     this.bg = scene.add.image(-1, -1, '__shop').setOrigin(0);
-    this.sil = scene.add.image(w / 2, h * 0.62, '').setVisible(false);
+    this.sil = scene.add.image(w / 2, h - 66, '').setVisible(false);
     this.nameText = scene.add
-      .text(w / 2, h - 46, '', { fontFamily: FONT.title, fontSize: '19px', color: css(PAPER[100]) })
+      .text(w / 2, h - 62, '', { fontFamily: FONT.title, fontSize: '13px', color: css(PAPER[100]), letterSpacing: 4 })
       .setOrigin(0.5, 0);
     this.titleText = scene.add
-      .text(w / 2, h - 26, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]) })
+      .text(w / 2, h - 44, '', { fontFamily: FONT.body, fontSize: '10px', color: css(PAPER[400]) })
+      .setOrigin(0.5, 0);
+    this.traitText = scene.add
+      .text(w / 2, h - 30, '', { fontFamily: FONT.body, fontSize: '10px', color: css(PAPER[300]) })
       .setOrigin(0.5, 0);
     this.costText = scene.add
-      .text(10, 8, '', { fontFamily: FONT.body, fontSize: '15px', color: css(GILT.base) })
-      .setOrigin(0, 0);
-    this.traitText = scene.add
-      .text(w / 2, 10, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
+      .text(w / 2, h - 15, '', { fontFamily: FONT.mono, fontSize: '11px', color: css(GILT.light) })
       .setOrigin(0.5, 0);
-    this.add([this.bg, this.sil, this.nameText, this.titleText, this.costText, this.traitText]);
+    this.add([this.bg, this.sil, this.nameText, this.titleText, this.traitText, this.costText]);
     this.setSize(w, h);
     this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
     this.on('pointerover', () => {
       if (this.defId) scene.input.setDefaultCursor('pointer');
+      scene.tweens.add({ targets: this, y: this.baseY - 8, duration: 320, ease: 'Quad.easeOut' });
       this.redraw(true);
     });
     this.on('pointerout', () => {
       scene.input.setDefaultCursor('default');
+      scene.tweens.add({ targets: this, y: this.baseY, duration: 320, ease: 'Quad.easeOut' });
       this.redraw(false);
     });
     this.on('pointerdown', () => {
       if (!this.defId) return;
       // 买子动作发生在 pointerdown，反馈必须同帧可见：压卡 + 提亮
-      this.setScale(0.97);
+      this.setScale(0.96);
       scene.tweens.add({ targets: this, scale: 1, duration: 120, ease: 'Quad.easeOut' });
       onClick();
     });
@@ -290,18 +294,20 @@ export class ShopCard extends Phaser.GameObjects.Container {
     if (this.scene.textures.exists(key)) {
       this.sil.setTexture(key);
       // 按墨迹可见内容高缩放：所有卡片的棋子占卡面同一比例，不再随原型忽大忽小
-      const scale = silContentScale(defId, 1, this.cardH * 0.48, this.cardW * 0.6);
+      const scale = silContentScale(defId, 1, 62, this.cardW * 0.76);
       this.sil.setScale(scale).setOrigin(0.5, SIL_ORIGIN_Y);
-      this.sil.setPosition(this.cardW / 2, this.cardH * 0.72);
+      this.sil.setPosition(this.cardW / 2, this.cardH - 66);
       this.sil.setVisible(true);
     }
     this.nameText.setText(def.name);
-    this.titleText.setText(`${RARITY_NAME[def.cost]} · ${def.title}`);
-    this.costText.setText(`${def.cost}`);
+    // 品阶 · 称号 / 羁绊名：单行截断，宁可少字不可溢出
+    const title = `${RARITY_NAME[def.cost]} · ${def.title}`;
+    this.titleText.setText(clipToWidth(this.titleText, title, this.cardW - 12));
     const names = [...def.origins, ...def.classes]
       .map((t) => TRAIT_BY_ID[t]?.name ?? t)
       .join(' · ');
-    this.traitText.setText(names);
+    this.traitText.setText(clipToWidth(this.traitText, names, this.cardW - 12));
+    this.costText.setText(`${def.cost} 金`);
     this.redraw(false);
   }
 
@@ -320,33 +326,43 @@ export class ShopCard extends Phaser.GameObjects.Container {
     const h = this.cardH;
     const def = this.defId ? CHAMPION_BY_ID[this.defId] : null;
     const col = def ? RARITY_COLOR[def.cost] : INK[500];
-    const cost = def?.cost ?? 0;
     // 底板按（稀有度 × 悬停）烘焙：五费五种 × 两态共十余张，五张卡共用。
     // 悬停态要含 affordable：买不起的卡悬停不提亮，且不能和买得起时共用同一张贴图
     const hoverOn = hover && !!def && this.affordable;
-    const key = `shop_${w}x${h}_${cost}_${hoverOn ? 1 : 0}`;
+    const key = `shopv3_${w}x${h}_${def?.cost ?? 0}_${hoverOn ? 1 : 0}`;
     bakedTexture(this.scene!, key, w + 2, h + 2, (g) => {
       g.translateCanvas(1, 1);
-      g.fillStyle(INK[800], 0.94);
-      g.fillRoundedRect(0, 0, w, h, RADIUS);
+      // 漆卡：半透漆底 + 淡金细框（样稿 .scard）
+      g.fillStyle(INK[800], def ? 0.62 : 0.3);
+      g.fillRect(0, 0, w, h);
+      g.lineStyle(1, def ? GILT.base : INK[500], def ? 0.16 : 0.25);
+      g.strokeRect(0, 0, w, h);
       if (def) {
-        g.fillStyle(col, 0.08);
-        g.fillRoundedRect(0, 0, w, h, RADIUS);
-        // 顶部稀有度色带：卡片在余光里也能被认出来
-        g.fillStyle(col, 0.85);
-        g.fillRoundedRect(0, 0, w, 3, 2);
+        // 顶部稀有度刻线：22px 居中短线（样稿 .scard::before）
+        g.fillStyle(col, 0.9);
+        g.fillRect(w / 2 - 11, 0, 22, 1.5);
+        // 剪影脚下的一道稀有度微染：站位的"地"，代替此前的占位圆碟
+        g.fillStyle(col, 0.14);
+        g.fillRect(w / 2 - 26, h - 68, 52, 2);
       }
-      g.lineStyle(1.5, def ? col : INK[500], def ? 0.75 : 0.4);
-      g.strokeRoundedRect(0, 0, w, h, RADIUS);
       if (hoverOn) {
-        g.fillStyle(PAPER[100], 0.07);
-        g.fillRoundedRect(0, 0, w, h, RADIUS);
-        g.lineStyle(2, GILT.light, 0.8);
-        g.strokeRoundedRect(0, 0, w, h, RADIUS);
+        g.fillStyle(PAPER[100], 0.05);
+        g.fillRect(0, 0, w, h);
+        g.lineStyle(1, GILT.light, 0.7);
+        g.strokeRect(0, 0, w, h);
       }
     });
     this.bg.setTexture(key);
   }
+}
+
+/** 文本按像素宽截断（末端省略号） */
+function clipToWidth(t: Phaser.GameObjects.Text, s: string, maxW: number): string {
+  t.setText(s);
+  while (t.width > maxW && t.text.length > 2) {
+    t.setText(t.text.slice(0, -2).trimEnd() + '…');
+  }
+  return t.text;
 }
 
 /** 羁绊行：名称 + 当前/下一档 + 档位色。行高随描述行数自适应，绝不压到下一行 */

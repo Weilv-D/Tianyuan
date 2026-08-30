@@ -4,7 +4,7 @@ import { clearSave } from '../../game/save';
 import { loadDailyBest, recordDailyResult } from '../../game/daily';
 import { audio } from '../../audio/AudioEngine';
 import { Button, FONT } from '../../ui/kit';
-import { GILT, INK, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } from '../palette';
+import { GILT, INK, CINNABAR, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } from '../palette';
 import { buildTextures, grainOverlay, TEX } from '../textures';
 import { H, W } from '../layout';
 
@@ -205,8 +205,40 @@ export class ResultScene extends Phaser.Scene {
         em.explode(46);
         this.time.delayedCall(1800, () => em.destroy());
       });
+      // 结算印「魁首」：朱文印白名单第 3 处（赛季结算）—— 冠名落印，仪式收束
+      this.time.delayedCall(1500, () => this.stampChampionSeal());
     } else {
       audio.play(humanPlace <= 4 ? 'uiBig' : 'defeat');
     }
+  }
+
+  /** 冠位结算印：110px 朱底方印，竖排楷名「魁首」，盖落 + 微震 */
+  private stampChampionSeal(): void {
+    const size = 110;
+    const x = W / 2 + 660 / 2 - 92;
+    const y = H / 2 - 680 / 2 + 128;
+    const seal = this.add.container(x, y).setDepth(820).setScale(2.0).setAlpha(0).setRotation(-0.05);
+    const g = this.add.graphics();
+    g.fillStyle(CINNABAR.deep, 0.96);
+    g.fillRect(-size / 2, -size / 2, size, size);
+    g.lineStyle(1.2, GILT.light, 0.8);
+    g.strokeRect(-size / 2, -size / 2, size, size);
+    g.lineStyle(1, PAPER[100], 0.35);
+    g.strokeRect(-size / 2 + 6, -size / 2 + 6, size - 12, size - 12);
+    const txt = this.add
+      .text(0, 0, '魁\n首', { fontFamily: FONT.kai, fontSize: '30px', color: css(PAPER[50]), lineSpacing: 2 })
+      .setOrigin(0.5);
+    seal.add([g, txt]);
+    this.tweens.add({ targets: seal, alpha: 1, duration: 100 });
+    this.tweens.add({
+      targets: seal,
+      scale: 1,
+      duration: 220,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        this.cameras.main.shake(140, 0.0035);
+        this.tweens.add({ targets: seal, scaleY: 0.9, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
+      },
+    });
   }
 }

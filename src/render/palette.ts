@@ -1,87 +1,87 @@
 /**
- * 百战天元 · 调色板 —— 「文人案头 · 宋画」体系
+ * 百战天元 · 调色板 —— 「夜宴 · 幽冥水墨」体系（v1.3.0 起替代宋画暖调）
  *
  * 这是 ART_BIBLE.md 的代码镜像 —— 任何颜色都必须来自这里，
  * 禁止在别处硬编码十六进制。改色即改全局，杜绝风格漂移。
  *
- * 体系原则（与旧版的分水岭）：
- *  - 底色是**暖的**松烟墨，不是 GitHub 式蓝灰 —— 让宣纸真正"发光"
+ * 体系原则（夜宴版）：
+ *  - 底色是**夜的蓝墨**：n0 → n4 五阶夜蓝为骨，插值成十阶 —— 漆器夜宴
  *  - 全场只有一种热色：朱砂。它出现的地方 = 需要血液反应的地方
- *  - 冷色全部去饱和：绿是青瓷、蓝是青黛、盾是月白瓷 —— 没有荧光
- *  - 紫色禁用（旧 VOID 已改为青黛）；稀有度第四档用胭脂
- *  - 金是古金（带褐的哑光），不是亮黄
+ *  - 友方是玉青，法术是夜蓝，盾是月白灰 —— 全部去饱和，没有荧光
+ *  - 紫色全域禁用（含特效）；稀有度第四档用胭脂
+ *  - 金是旧金（#b39660，带褐的哑光），高光是米金 #e3cfa0，不是亮黄
  */
 
-// ── 松烟墨：背景与结构。暖灰褐，从焦墨到淡墨 ──
+// ── 夜墨：背景与结构。夜蓝墨，从深渊到雾青 ──
 export const INK = {
-  950: 0x0d0b09,
-  900: 0x14110e,
-  850: 0x1a1613,
-  800: 0x201b17,
-  700: 0x2c261f,
-  650: 0x332c24,
-  600: 0x3e362c,
-  500: 0x5a5044,
-  400: 0x776b5d,
-  300: 0x9b8f7e,
+  950: 0x050b13, // n0 深渊
+  900: 0x08111b, // n1 主底
+  850: 0x0c1724, // n2
+  800: 0x0f1b2a, // n2→n3 之间
+  700: 0x122031, // n3
+  650: 0x16283a, // n3→n4 之间
+  600: 0x1a2c42, // n4
+  500: 0x263a52, // 结构描边
+  400: 0x46596f, // 中灰描边
+  300: 0x7e8b9b, // 雾青（淡墨）
 } as const;
 
-// ── 陈宣纸：所有"亮面"与文字。米黄而非纯白 ──
+// ── 米金宣：所有"亮面"与文字。米金偏暖而非纯白 ──
 export const PAPER = {
-  50: 0xf7efdd,
-  100: 0xefe4cd,
-  200: 0xe0d2b4,
-  300: 0xd6c6a4,
-  400: 0xbda987,
-  500: 0x96825f,
+  50: 0xf7e7c3, // cream 最亮暖
+  100: 0xf2ecdd, // paper 主文字
+  200: 0xece5d4, // tx 正文
+  300: 0xd6c8a8, // 次级文字
+  400: 0xb5a888, // 弱文字
+  500: 0x948a70, // 最弱
 } as const;
 
 // ── 朱砂：全场唯一热色。危险 / 敌方 / 物理暴击 ──
 export const CINNABAR = {
-  deep: 0x822d1e,
-  base: 0xb0402a,
-  light: 0xcf7254,
-  glow: 0xe8a184,
+  deep: 0x6b2a1e,
+  base: 0xc65a45,
+  light: 0xe58a6f,
+  glow: 0xf2b09a,
 } as const;
 
-// ── 古金：稀有 / 高光 / 五费。哑光带褐，不刺眼 ──
+// ── 旧金：稀有 / 高光 / 五费。哑光带褐，不刺眼 ──
 export const GILT = {
-  deep: 0x7a5f28,
-  base: 0xa8853f,
-  light: 0xc9a96a,
-  glow: 0xe6d19c,
+  deep: 0x6b582a,
+  base: 0xb39660,
+  light: 0xe3cfa0,
+  glow: 0xf2e6c4,
 } as const;
 
-// ── 青瓷（旧"灵青"重塑）：友方 / 治疗 / 安全。去饱和的瓷绿 ──
+// ── 玉青：友方 / 治疗 / 安全。夜色里的青玉 ──
 export const SPIRIT = {
-  deep: 0x2f4d40,
-  base: 0x4f7a63,
-  light: 0x7fa78d,
-  glow: 0xb8d3bd,
+  deep: 0x33524a,
+  base: 0x9ec4ae,
+  light: 0xbfdacd,
+  glow: 0xdcefe4,
 } as const;
 
-// ── 青黛（旧"幽紫"重塑）：法术 / 技能。文人黛蓝，无紫 ──
+// ── 夜蓝：法术 / 技能。与底色同族的蓝，无紫 ──
 export const VOID = {
-  deep: 0x2c3550,
-  base: 0x44547a,
-  light: 0x7286ad,
-  glow: 0xa7b6d4,
+  deep: 0x2c3a55,
+  base: 0x5a6f96,
+  light: 0x8ea3c8,
+  glow: 0xb8c8e2,
 } as const;
 
-// ── 月白：环境光 / 护盾 / 中立信息。瓷青灰，冷而不蓝艳 ──
+// ── 月白：环境光 / 护盾 / 中立信息。雾青灰 ──
 export const MOON = {
-  deep: 0x5c6a67,
-  base: 0x9fb0aa,
-  light: 0xd9e4de,
+  deep: 0x56616e,
+  base: 0x8b98a8,
+  light: 0xc2cdd6,
 } as const;
 
-/** 稀有度语义色（宋画五色：石灰 / 青瓷 / 黛蓝 / 胭脂 / 古金） */
+/** 稀有度语义色（夜宴五色：雾灰 / 玉青 / 夜蓝 / 胭脂 / 米金）—— 与样稿逐值一致 */
 export const RARITY_COLOR: Record<number, number> = {
-  1: 0x8f8574, // 凡品 · 石灰
-  2: 0x4f7a63, // 灵品 · 青瓷
-  3: 0x44547a, // 宝品 · 黛蓝
-  4: 0xa85e75, // 仙品 · 胭脂
-  5: 0xc9a96a, // 神品 · 古金
+  1: 0x7e8b9b, // 凡品 · 雾灰
+  2: 0x9ec4ae, // 灵品 · 玉青
+  3: 0x8ea3c8, // 宝品 · 夜蓝
+  4: 0xcf9bae, // 仙品 · 胭脂
+  5: 0xe3cfa0, // 神品 · 米金
 };
 
 export const RARITY_NAME: Record<number, string> = {
@@ -92,7 +92,7 @@ export const RARITY_NAME: Record<number, string> = {
   5: '神品',
 };
 
-/** 阵营色：友方青瓷 / 敌方朱砂 —— 不看文字也能读懂局面 */
+/** 阵营色：友方玉青 / 敌方朱砂 —— 不看文字也能读懂局面 */
 export const TEAM_COLOR: Record<number, number> = {
   0: SPIRIT.base,
   1: CINNABAR.base,
@@ -108,23 +108,23 @@ export const SHADE = 0x000000;
 
 /** 危险按钮变体（kit Button danger）：比朱砂更深一档的暗红 */
 export const DANGER = {
-  base: 0x6f241c,
-  light: 0x9c4a3a,
+  base: 0x7e3323,
+  light: 0xa85242,
 } as const;
 
-/** 宣纸底纹的阴干调（BoardView 纸纹 setTint）—— 暖灰而非冷蓝 */
-export const PAPER_TINT = 0x8f8574;
+/** 盘面纸纹的阴干调（BoardView 纸纹 setTint）—— 夜色下的雾青 */
+export const PAPER_TINT = 0x8b98a8;
 
-/** 飘字描边暗色 —— 与 ART_BIBLE 的飘字分级一一对应，全部走暖墨底 */
+/** 飘字描边暗色 —— 与 ART_BIBLE 的飘字分级一一对应，全部走夜墨底 */
 export const DAMAGE_OUTLINE = {
-  normal: 0x141110,
-  crit: 0x38100a,
-  skill: 0x1a2030,
-  true: 0x2e250f,
-  heal: 0x12291f,
-  shield: 0x1a2120,
+  normal: 0x0a121c,
+  crit: 0x3a120a,
+  skill: 0x141d2e,
+  true: 0x2e2810,
+  heal: 0x0f2a20,
+  shield: 0x18222a,
   execute: 0x382c0e,
-  dot: 0x331711,
+  dot: 0x301a12,
 } as const;
 
 /** 伤害类型的飘字 / 特效配色 */
@@ -137,8 +137,8 @@ export const DAMAGE_COLOR = {
   shield: MOON.light,
 } as const;
 
-/** 羁绊档位色（古铜 / 暖银 / 古金 / 胭脂） */
-export const TRAIT_TIER_COLOR_HEX: readonly number[] = [0x9a7350, 0xb9b3a4, 0xc9a96a, 0xa85e75];
+/** 羁绊档位色（古铜 / 暖银 / 米金 / 胭脂） */
+export const TRAIT_TIER_COLOR_HEX: readonly number[] = [0x9a7d5e, 0xb9b3a4, 0xe3cfa0, 0xcf9bae];
 
 // ── UI 语义 ──
 export const UI = {

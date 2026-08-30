@@ -39,6 +39,7 @@ export class CodexScene extends Phaser.Scene {
     items: null,
   };
   private tabBtns: Partial<Record<CodexTab, Button>> = {};
+  private backTo: 'Menu' | 'Game' = 'Menu';
   private itemTip!: ItemTooltip;
   private detailCard: UnitDetailCard | null = null;
 
@@ -46,7 +47,9 @@ export class CodexScene extends Phaser.Scene {
     super({ key: 'Codex' });
   }
 
-  create(): void {
+  create(data: { from?: 'Menu' | 'Game' }): void {
+    // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）
+    this.backTo = data.from === 'Game' ? 'Game' : 'Menu';
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);
@@ -56,9 +59,7 @@ export class CodexScene extends Phaser.Scene {
     this.contents = { champs: null, traits: null, items: null };
     this.scrolls = { champs: null, traits: null, items: null };
 
-    const bg = this.add.graphics();
-    bg.fillStyle(INK[900], 1);
-    bg.fillRect(0, 0, W, H);
+    // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
 
     this.add
       .text(56, 24, '图 鉴', { fontFamily: FONT.title, fontSize: '30px', color: css(PAPER[100]), letterSpacing: 6 })
@@ -78,7 +79,7 @@ export class CodexScene extends Phaser.Scene {
       this.tabBtns[id] = b;
     });
 
-    new Button(this, W - 200, 26, '返 回', () => this.scene.start('Menu', {}), {
+    new Button(this, W - 200, 26, '返 回', () => this.scene.start(this.backTo, {}), {
       width: 150,
       height: 44,
       variant: 'primary',

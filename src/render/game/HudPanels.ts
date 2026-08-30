@@ -1,46 +1,54 @@
-/** 职责：对局场景静态 HUD 的构建——背景、顶栏、商店、器匣、底部指挥台与羁绊/诸侯/记事/战报四块侧板，只建不改。 */
+/** 职责：对局场景静态 HUD 的构建——顶栏导航/阶段条/商肆/器匣/操作列/朱印/羁络轨/敌情/记事/战报，只建不改。 */
 import Phaser from 'phaser';
-import { REROLL_COST, XP_BUY_COST } from '../../core/config';
-import { Bar, Button, FONT, makePanel, enableScroll } from '../../ui/kit';
-import { ItemChip, ShopCard } from '../../ui/cards';
+import { REROLL_COST } from '../../core/config';
+import { Bar, Button, FONT, enableScroll, makePanel } from '../../ui/kit';
+import { ItemChip, ShopCard, TraitRow } from '../../ui/cards';
 import { bakedImage } from '../bake';
-import { TEX } from '../textures';
-import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, css } from '../palette';
+import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, TRAIT_TIER_COLOR_HEX, css } from '../palette';
 import {
-  BOTTOM,
-  BOTTOM_H,
-  BOTTOM_Y,
+  ACT_BTN_H,
+  ACT_BTN_W,
+  ACT_X,
+  ACT_Y,
+  BENCH_Y,
+  GRID_X,
+  HEADER_H,
   ITEM_BAR_SLOTS,
   ITEM_BAR_W,
   ITEM_BAR_X,
   ITEM_BAR_Y,
-  ITEM_SIZE,
+  ITEM_COLS,
   ITEM_GAP,
-  LEFT_W,
-  LEFT_X,
-  LEFT_UP_H,
-  LEFT_UP_Y,
+  ITEM_ROWS,
+  ITEM_SIZE,
+  LOG_W,
+  LOG_X,
+  LOG_Y,
+  NAV_GAP,
+  NAV_X,
   PANEL_TITLE_H,
-  RIGHT_DOWN_X,
-  RIGHT_X,
+  PHASE_Y,
+  REPORT_X,
+  REPORT_Y,
+  RAIL_X,
+  RAIL_Y,
+  SELL_SIZE,
+  SELL_X,
+  SELL_Y,
   SHOP_CH,
   SHOP_CW,
   SHOP_GAP,
   SHOP_W,
   SHOP_X,
   SHOP_Y,
-  SIDE_DOWN_H,
-  SIDE_DOWN_W,
-  SIDE_DOWN_Y,
   W,
-  H,
 } from '../layout';
+import { TRAIT_BY_ID } from '../../data/traits';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
- * HUD 面板构建（原 GameScene.buildBackground/buildTopBar/buildShop/buildItemBar/
- * buildBottomBar/buildTraitPanel/buildScoreboard/buildLogPanel/buildReportPanel 原样搬移）。
- * 创建顺序由场景 create() 保持原样；产出的控件挂在本模块上，场景经 scene.hud.* 读取。
+ * 夜宴 HUD。左轨羁络、右栏敌情/八方/战报、中央大漆盘 + 盘下阶段条 + 底部牌铺。
+ * 创建顺序由场景 create() 保持；产出的控件挂在本模块上，场景经 scene.hud.* 读取。
  */
 export class HudPanels {
   // 顶栏
@@ -48,8 +56,10 @@ export class HudPanels {
   phaseText!: Phaser.GameObjects.Text;
   timerText!: Phaser.GameObjects.Text;
   timerBar!: Bar;
+  streakText!: Phaser.GameObjects.Text;
+  streakLabel!: Phaser.GameObjects.Text;
 
-  // 底部
+  // 状态数值（顶栏 stats）
   goldText!: Phaser.GameObjects.Text;
   hpBar!: Bar;
   hpText!: Phaser.GameObjects.Text;
@@ -57,7 +67,8 @@ export class HudPanels {
   xpText!: Phaser.GameObjects.Text;
   xpBar!: Bar;
   boardCountText!: Phaser.GameObjects.Text;
-  streakText!: Phaser.GameObjects.Text;
+
+  // 操作列 / 出售
   rerollBtn!: Button;
   levelBtn!: Button;
   undoBtn!: Button;
@@ -69,62 +80,191 @@ export class HudPanels {
   itemChips: ItemChip[] = [];
   itemHint!: Phaser.GameObjects.Text;
 
-  // 侧面板
+  // 侧栏
   traitContainer!: Phaser.GameObjects.Container;
   traitScroll: ReturnType<typeof enableScroll> | null = null;
   scoreContainer!: Phaser.GameObjects.Container;
   opponentText!: Phaser.GameObjects.Text;
+  intelContainer!: Phaser.GameObjects.Container;
   logText!: Phaser.GameObjects.Text;
   reportText!: Phaser.GameObjects.Text;
+
+  /** 羁绊全览浮层（nav「羁绊」开合） */
+  private traitModal: Phaser.GameObjects.Container | null = null;
+  private traitModalScroll: ReturnType<typeof enableScroll> | null = null;
 
   constructor(private scene: GameScene) {}
 
   // ══════════════ 背景 ══════════════
 
   buildBackground(): void {
-    const bg = this.scene.add.graphics();
-    bg.fillStyle(INK[900], 1);
-    bg.fillRect(0, 0, W, H);
-    const grad = this.scene.add.image(W / 2, H / 2, TEX.glow).setTint(INK[700]).setAlpha(0.45);
-    grad.setDisplaySize(W * 1.5, H * 1.5);
-    const vign = this.scene.add.image(W / 2, H / 2, TEX.vignette).setDepth(200);
-    vign.setDisplaySize(W, H);
+    // 夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
   }
 
-  // ══════════════ 顶栏 ══════════════
+  // ══════════════ 顶栏（样稿 header：导航 · 品牌 · 数值） ══════════════
 
   buildTopBar(): void {
-    makePanel(this.scene, 16, 8, W - 32, 50, { alpha: 0.9 });
+    // header 底缘发丝线：墨线通栏 + 中央一段金线
+    const hair = this.scene.add.graphics();
+    hair.lineStyle(1, INK[600], 0.9);
+    hair.lineBetween(48, HEADER_H, W - 48, HEADER_H);
+    hair.lineStyle(1, GILT.base, 0.22);
+    hair.lineBetween(W / 2 - 200, HEADER_H, W / 2 + 200, HEADER_H);
+
+    // ── 左导航：楷/mono 双行 + 下划线 hover（样稿 .nl） ──
+    const nav: [string, string, () => void][] = [
+      ['图 鉴', 'Codex', () => this.scene.scene.start('Codex', { from: 'Game', match: this.scene.match })],
+      ['羁 绊', 'Bonds', () => this.openTraitModal()],
+      ['阵 容', 'Legion', () => this.scoutNextOpponent()],
+    ];
+    nav.forEach(([cn, en, onClick], i) => {
+      const x = NAV_X + i * NAV_GAP;
+      const c = this.scene.add.container(x, 26);
+      const cnT = this.scene.add
+        .text(0, 0, cn, { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 4 })
+        .setOrigin(0, 0);
+      const enT = this.scene.add
+        .text(0, 24, en, {
+          fontFamily: FONT.mono,
+          fontSize: '9px',
+          color: css(INK[300]),
+          letterSpacing: 3,
+        })
+        .setOrigin(0, 0)
+        .setAlpha(0.85);
+      // 悬停下划线：scaleX 展开而非重画（样稿 .nl::after）
+      const underline = this.scene.add.graphics();
+      underline.lineStyle(1, GILT.light, 0.95);
+      underline.beginPath();
+      underline.moveTo(0, 44);
+      underline.lineTo(200, 44);
+      underline.strokePath();
+      underline.setScale(0.36, 1); // 200×0.36 = 72px 覆盖字宽
+      underline.setAlpha(0);
+      c.add([cnT, enT, underline]);
+      c.setInteractive(new Phaser.Geom.Rectangle(0, -6, 88, 56), Phaser.Geom.Rectangle.Contains);
+      c.on('pointerover', () => {
+        enT.setColor(css(GILT.light));
+        this.scene.tweens.add({ targets: underline, alpha: 1, scaleX: 0.36, duration: 260, ease: 'Quad.easeOut' });
+        this.scene.input.setDefaultCursor('pointer');
+      });
+      c.on('pointerout', () => {
+        enT.setColor(css(INK[300]));
+        this.scene.tweens.add({ targets: underline, alpha: 0, duration: 200 });
+        this.scene.input.setDefaultCursor('default');
+      });
+      c.on('pointerdown', () => this.scene.tweens.add({ targets: c, scale: 0.96, duration: 70, yoyo: true }));
+      c.on('pointerup', onClick);
+    });
+
+    // ── 中央品牌：楷体 + 引线 + 英文微注（样稿 .brand） ──
     this.scene.add
-      .text(34, 20, '百战天元', { fontFamily: FONT.title, fontSize: '26px', color: css(PAPER[100]) })
-      .setOrigin(0, 0)
-      .setShadow(0, 0, css(GILT.base), 12, false, true);
-
-    this.roundText = this.scene.add
-      .text(190, 22, '', { fontFamily: FONT.body, fontSize: '18px', color: css(PAPER[200]) })
-      .setOrigin(0, 0);
-
-    this.phaseText = this.scene.add
-      .text(W / 2, 20, '', { fontFamily: FONT.title, fontSize: '22px', color: css(SPIRIT.light) })
+      .text(W / 2, 22, '百 战 天 元', {
+        fontFamily: FONT.kai,
+        fontSize: '21px',
+        color: css(PAPER[100]),
+        letterSpacing: 10,
+      })
       .setOrigin(0.5, 0);
+    this.scene.add
+      .text(W / 2, 54, 'NIGHT FEAST', {
+        fontFamily: FONT.mono,
+        fontSize: '8px',
+        color: css(INK[300]),
+        letterSpacing: 8,
+      })
+      .setOrigin(0.5, 0)
+      .setAlpha(0.9);
+    const brandLine = this.scene.add.graphics();
+    brandLine.lineStyle(1, GILT.base, 0.3);
+    brandLine.lineBetween(W / 2 - 104, 38, W / 2 - 70, 38);
+    brandLine.lineBetween(W / 2 + 70, 38, W / 2 + 104, 38);
 
-    this.timerText = this.scene.add
-      .text(W - 220, 20, '', { fontFamily: FONT.body, fontSize: '24px', color: css(GILT.base) })
-      .setOrigin(1, 0);
-    this.timerBar = new Bar(this.scene, W - 210, 30, 170, 12, GILT.base);
+    // ── 右侧数值（样稿 .stats：mono 值 + 小注）：回合 / 来金 / 生命 / 等级 ──
+    const stat = (rightX: number, labelText: string): Phaser.GameObjects.Text => {
+      this.scene.add
+        .text(rightX - 24, 58, labelText, {
+          fontFamily: FONT.body,
+          fontSize: '9px',
+          color: css(INK[300]),
+          letterSpacing: 4,
+        })
+        .setOrigin(0.5, 0);
+      return this.scene.add.text(rightX, 22, '', { fontFamily: FONT.mono, fontSize: '17px', color: css(PAPER[100]) }).setOrigin(1, 0);
+    };
+    this.roundText = stat(W - 580, '回 合');
+    this.goldText = stat(W - 470, '金');
+    this.goldText.setColor(css(GILT.light));
+    this.streakText = stat(W - 360, '来 金');
+    this.streakText.setColor(css(GILT.base));
+    this.streakLabel = this.scene.add
+      .text(W - 360 - 24, 58, '来 金', {
+        fontFamily: FONT.body,
+        fontSize: '9px',
+        color: css(INK[300]),
+        letterSpacing: 4,
+      })
+      .setOrigin(0.5, 0);
+    this.hpText = stat(W - 250, '生 命');
+    this.hpText.setColor(css(SPIRIT.base));
+    this.levelText = stat(W - 140, '等 级');
+
+    this.hpBar = new Bar(this.scene, W - 250 - 56, 70, 56, 3, SPIRIT.base);
+    this.xpBar = new Bar(this.scene, W - 140 - 56, 70, 56, 3, VOID.base);
+    this.xpText = this.scene.add
+      .text(W - 140 - 64, 70, '', { fontFamily: FONT.mono, fontSize: '9px', color: css(INK[300]) })
+      .setOrigin(1, 0.5);
 
     // 设置入口
-    new Button(this.scene, W - 60, 15, '⚙', () => this.scene.openSettings(), { width: 40, height: 32 });
+    new Button(this.scene, W - 88, 26, '⚙', () => this.scene.openSettings(), { width: 40, height: 34 });
   }
 
-  // ══════════════ 商店 ══════════════
+  // ══════════════ 阶段条（盘下：— 备 战 — 开战 · 空格 00:30 —） ══════════════
+
+  buildPhaseStrip(): void {
+    const cx = W / 2;
+    const line = this.scene.add.graphics();
+    line.lineStyle(1, GILT.base, 0.25);
+    line.lineBetween(cx - 380, PHASE_Y, cx - 250, PHASE_Y);
+    line.lineBetween(cx + 290, PHASE_Y, cx + 420, PHASE_Y);
+
+    this.phaseText = this.scene.add
+      .text(cx - 150, PHASE_Y, '', {
+        fontFamily: FONT.title,
+        fontSize: '15px',
+        color: css(PAPER[100]),
+        letterSpacing: 7,
+      })
+      .setOrigin(0.5);
+
+    new Button(this.scene, cx + 20, PHASE_Y - 16, '开 战 · 空格', () => this.scene.startBattlePhase(), {
+      width: 140,
+      height: 32,
+      variant: 'primary',
+      fontSize: 12,
+    });
+
+    this.timerText = this.scene.add
+      .text(cx + 120, PHASE_Y, '', { fontFamily: FONT.mono, fontSize: '13px', color: css(GILT.base) })
+      .setOrigin(0, 0.5);
+    this.timerBar = new Bar(this.scene, cx + 120, PHASE_Y + 12, 120, 2, GILT.base);
+  }
+
+  // ══════════════ 商肆（样稿 .scard 窄卡 × 5） ══════════════
 
   buildShop(): void {
-    makePanel(this.scene, SHOP_X - 16, SHOP_Y - 34, SHOP_W + 32, SHOP_CH + 44, { title: '商  肆' });
     this.scene.add
-      .text(SHOP_X + SHOP_W - 16, SHOP_Y - 26, `刷新 ${REROLL_COST} 金 · 锁定后下回合保留`, {
-        fontFamily: FONT.body,
+      .text(SHOP_X, SHOP_Y - 22, '商 肆', {
+        fontFamily: FONT.title,
         fontSize: '12px',
+        color: css(PAPER[300]),
+        letterSpacing: 4,
+      })
+      .setOrigin(0, 0);
+    this.scene.add
+      .text(SHOP_X + SHOP_W, SHOP_Y - 22, `刷新 ${REROLL_COST} 金 · 锁定后下回合保留`, {
+        fontFamily: FONT.body,
+        fontSize: '11px',
         color: css(PAPER[400]),
       })
       .setOrigin(1, 0);
@@ -142,214 +282,293 @@ export class HudPanels {
     }
   }
 
-  // ══════════════ 装备栏 ══════════════
+  // ══════════════ 器匣（2×5 网格） ══════════════
 
   buildItemBar(): void {
-    const iox = ITEM_BAR_X - 12;
-    const ioy = ITEM_BAR_Y - 26;
-    bakedImage(this.scene, iox, ioy, 'itemFrame', ITEM_BAR_W + 24, ITEM_SIZE + 38, (g) => {
-      g.translateCanvas(-iox, -ioy);
-      g.fillStyle(INK[850], 0.82);
-      g.fillRoundedRect(ITEM_BAR_X - 10, ITEM_BAR_Y - 10, ITEM_BAR_W + 20, ITEM_SIZE + 20, 8);
-      g.lineStyle(1.4, GILT.deep, 0.35);
-      g.strokeRoundedRect(ITEM_BAR_X - 10, ITEM_BAR_Y - 10, ITEM_BAR_W + 20, ITEM_SIZE + 20, 8);
-      // 界格签（与备战席签条同一语汇）：压在框线上沿，不与备战席格子内容相犯
-      g.fillStyle(INK[850], 0.96);
-      g.fillRect(ITEM_BAR_X - 10, ITEM_BAR_Y - 24, 72, 20);
-      g.lineStyle(1, INK[500], 0.7);
-      g.strokeRect(ITEM_BAR_X - 10, ITEM_BAR_Y - 24, 72, 20);
+    const gw = ITEM_BAR_W;
+    const gh = ITEM_ROWS * (ITEM_SIZE + ITEM_GAP) - ITEM_GAP;
+    bakedImage(this.scene, ITEM_BAR_X - 10, ITEM_BAR_Y - 24, 'itemFrame_v3', gw + 20, gh + 34, (g) => {
+      g.translateCanvas(-(ITEM_BAR_X - 10), -(ITEM_BAR_Y - 24));
+      g.fillStyle(INK[900], 0.66);
+      g.fillRect(ITEM_BAR_X - 8, ITEM_BAR_Y - 8, gw + 16, gh + 16);
+      g.lineStyle(1, INK[500], 0.6);
+      g.strokeRect(ITEM_BAR_X - 8, ITEM_BAR_Y - 8, gw + 16, gh + 16);
+      // 界格签
+      g.fillStyle(INK[900], 0.95);
+      g.fillRect(ITEM_BAR_X - 8, ITEM_BAR_Y - 22, 70, 18);
+      g.lineStyle(1, INK[500], 0.55);
+      g.strokeRect(ITEM_BAR_X - 8, ITEM_BAR_Y - 22, 70, 18);
     });
     this.scene.add
-      .text(ITEM_BAR_X + 26, ITEM_BAR_Y - 14, '器  匣', {
+      .text(ITEM_BAR_X + 27, ITEM_BAR_Y - 13, '器 匣', {
         fontFamily: FONT.title,
         fontSize: '12px',
         color: css(PAPER[300]),
         letterSpacing: 3,
       })
       .setOrigin(0.5);
-    // 提示文字放框外右侧：此前在框上方，与备战席第 4~9 格的棋子名同带互压
-    this.itemHint = this.scene.add
-      .text(ITEM_BAR_X + ITEM_BAR_W + 36, ITEM_BAR_Y + ITEM_SIZE / 2, '', {
-        fontFamily: FONT.body,
-        fontSize: '12px',
-        color: css(PAPER[400]),
-      })
-      .setOrigin(0, 0.5);
 
     for (let i = 0; i < ITEM_BAR_SLOTS; i++) {
+      const col = i % ITEM_COLS;
+      const row = Math.floor(i / ITEM_COLS);
       const chip = new ItemChip(
         this.scene,
-        ITEM_BAR_X + i * (ITEM_SIZE + ITEM_GAP),
-        ITEM_BAR_Y,
+        ITEM_BAR_X + col * (ITEM_SIZE + ITEM_GAP),
+        ITEM_BAR_Y + row * (ITEM_SIZE + ITEM_GAP),
         ITEM_SIZE,
         () => this.scene.onItemChipClick(i)
       );
       this.itemChips.push(chip);
     }
+
+    this.itemHint = this.scene.add
+      .text(ITEM_BAR_X - 8, ITEM_BAR_Y + gh + 16, '', {
+        fontFamily: FONT.body,
+        fontSize: '11px',
+        color: css(PAPER[400]),
+        wordWrap: { width: gw + 16 },
+        lineSpacing: 3,
+      })
+      .setOrigin(0, 0);
   }
 
-  // ══════════════ 底部指挥台 ══════════════
+  // ══════════════ 操作列（2×3） ══════════════
 
-  buildBottomBar(): void {
-    makePanel(this.scene, LEFT_X, BOTTOM_Y, W - 32, BOTTOM_H, { alpha: 0.92 });
-    const cy = BOTTOM.baseY;
-
-    // ── 左：玩家状态。两列：状态列（血/收入/金币，宽 statusW）+ 等级列（levelX 起），
-    // 列间 36px 空隙 —— 等级文字曾直接压在血条末端上，此空隙就是那条教训。 ──
-    const stx = LEFT_X + BOTTOM.padX;
-    this.scene.add
-      .text(stx, cy, '状 态', { fontFamily: FONT.title, fontSize: '15px', color: css(PAPER[300]) })
-      .setOrigin(0, 0);
-
-    this.hpBar = new Bar(this.scene, stx, cy + 30, BOTTOM.statusW, 20, SPIRIT.base);
-    this.hpText = this.scene.add
-      .text(stx, cy + 58, '', { fontFamily: FONT.body, fontSize: '14px', color: css(PAPER[200]) })
-      .setOrigin(0, 0);
-    this.streakText = this.scene.add
-      .text(stx, cy + 82, '', { fontFamily: FONT.body, fontSize: '13px', color: css(CINNABAR.light) })
-      .setOrigin(0, 0);
-
-    this.goldText = this.scene.add
-      .text(stx, cy + 104, '', { fontFamily: FONT.title, fontSize: '30px', color: css(GILT.light) })
-      .setOrigin(0, 0);
-    this.scene.add
-      .text(stx + 64, cy + 122, '金币', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]) })
-      .setOrigin(0, 0);
-
-    const lx = LEFT_X + BOTTOM.levelX;
-    this.levelText = this.scene.add
-      .text(lx, cy + 30, '', { fontFamily: FONT.title, fontSize: '22px', color: css(PAPER[100]) })
-      .setOrigin(0, 0);
-    this.xpBar = new Bar(this.scene, lx, cy + 66, 200, 14, VOID.base);
-    this.xpText = this.scene.add
-      .text(lx, cy + 84, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]) })
-      .setOrigin(0, 0);
-    this.boardCountText = this.scene.add
-      .text(lx, cy + 106, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[300]) })
-      .setOrigin(0, 0);
-
-    // ── 中：操作 ──
-    const bx = LEFT_X + 560;
-    this.scene.add
-      .text(bx, cy, '操 作', { fontFamily: FONT.title, fontSize: '15px', color: css(PAPER[300]) })
-      .setOrigin(0, 0);
-
-    this.rerollBtn = new Button(this.scene, bx, cy + 26, `刷新 (${REROLL_COST})`, () => this.scene.onReroll(), {
-      width: 168,
-      height: 54,
-      variant: 'ghost',
+  buildActionBar(): void {
+    const gx = ACT_X;
+    const gy = ACT_Y;
+    const step = ACT_BTN_W + 10;
+    const rowStep = ACT_BTN_H + 10;
+    this.rerollBtn = new Button(this.scene, gx, gy, `刷新 · D`, () => this.scene.onReroll(), {
+      width: ACT_BTN_W,
+      height: ACT_BTN_H,
     });
-    this.levelBtn = new Button(this.scene, bx + 180, cy + 26, `升级 (${XP_BUY_COST})`, () => this.scene.onBuyXp(), {
-      width: 168,
-      height: 54,
+    this.levelBtn = new Button(this.scene, gx + step, gy, `升级 · F`, () => this.scene.onBuyXp(), {
+      width: ACT_BTN_W,
+      height: ACT_BTN_H,
       variant: 'primary',
     });
-    new Button(this.scene, bx, cy + 90, '一键布阵', () => this.scene.onAutoArrange(), { width: 168, height: 44 });
-    this.undoBtn = new Button(this.scene, bx + 180, cy + 90, '撤销', () => this.scene.onUndo(), { width: 168, height: 44 });
-    new Button(this.scene, bx + 360, cy + 26, '一键装备', () => this.scene.onAutoEquip(), { width: 150, height: 108, fontSize: 15 });
+    new Button(this.scene, gx, gy + rowStep, '布阵 · E', () => this.scene.onAutoArrange(), {
+      width: ACT_BTN_W,
+      height: ACT_BTN_H,
+    });
+    this.undoBtn = new Button(this.scene, gx + step, gy + rowStep, '撤销 · Z', () => this.scene.onUndo(), {
+      width: ACT_BTN_W,
+      height: ACT_BTN_H,
+    });
+    new Button(this.scene, gx, gy + rowStep * 2, '一键装备', () => this.scene.onAutoEquip(), {
+      width: ACT_BTN_W,
+      height: ACT_BTN_H,
+    });
+    this.lockBtn = new Button(this.scene, gx + step, gy + rowStep * 2, '锁定商店', () => this.scene.onToggleLock(), {
+      width: ACT_BTN_W,
+      height: ACT_BTN_H,
+    });
+  }
 
-    // ── 右：卖出区 + 开战 ──
-    const sx = W - 16 - 420;
-    this.scene.add
-      .text(sx, cy, '出 售', { fontFamily: FONT.title, fontSize: '15px', color: css(PAPER[300]) })
-      .setOrigin(0, 0);
-    // 出售区 + 朱文印章（静态，烘焙为一张）
-    const zox = sx - 2;
-    const zoy = cy + 24;
-    bakedImage(this.scene, zox, zoy, 'sellZone', 172, 112, (g) => {
-      g.translateCanvas(-zox, -zoy);
-      g.fillStyle(INK[800], 0.85);
-      g.fillRect(sx, cy + 26, 168, 108);
-      g.lineStyle(1.5, CINNABAR.deep, 0.7);
-      g.strokeRect(sx, cy + 26, 168, 108);
-      // 印章：出售动作的仪式感来自"钤印"，与全局界格/直角语言同源
+  // ══════════════ 出售朱印（拖入出售） ══════════════
+
+  buildSell(): void {
+    bakedImage(this.scene, SELL_X, SELL_Y, 'sellSeal_v3', SELL_SIZE, SELL_SIZE, (g) => {
       g.fillStyle(CINNABAR.deep, 0.96);
-      g.fillRect(sx + 56, cy + 52, 56, 56);
-      g.lineStyle(2, CINNABAR.light, 0.85);
-      g.strokeRect(sx + 59, cy + 55, 50, 50);
+      g.fillRect(0, 0, SELL_SIZE, SELL_SIZE);
+      g.lineStyle(1.5, CINNABAR.light, 0.8);
+      g.strokeRect(4, 4, SELL_SIZE - 8, SELL_SIZE - 8);
     });
     this.scene.add
-      .text(sx + 84, cy + 81, '出售', {
-        fontFamily: FONT.title,
-        fontSize: '20px',
+      .text(SELL_X + SELL_SIZE / 2, SELL_Y + SELL_SIZE / 2, '出售', {
+        fontFamily: FONT.kai,
+        fontSize: '15px',
         color: css(PAPER[50]),
-        letterSpacing: 6,
+        letterSpacing: 5,
       })
       .setOrigin(0.5);
-    this.sellRect = new Phaser.Geom.Rectangle(sx, cy + 26, 168, 108);
-
-    this.lockBtn = new Button(this.scene, W - 16 - 236, cy + 26, '锁定商店', () => this.scene.onToggleLock(), {
-      width: 210,
-      height: 48,
-    });
-    new Button(this.scene, W - 16 - 236, cy + 84, '准备完毕 · 空格', () => this.scene.startBattlePhase(), {
-      width: 210,
-      height: 50,
-      variant: 'primary',
-    });
-  }
-
-  // ══════════════ 侧面板 ══════════════
-
-  buildTraitPanel(): void {
-    makePanel(this.scene, LEFT_X, LEFT_UP_Y, LEFT_W, LEFT_UP_H, { title: '阵 营 羁 绊', accent: SPIRIT.base });
-    const bodyX = LEFT_X + 16;
-    const bodyY = LEFT_UP_Y + PANEL_TITLE_H;
-    this.traitContainer = this.scene.add.container(bodyX, bodyY);
-    // 内容可超出面板（最多 17 条羁绊 × 自适应行高 > 350px 可视高）：遮罩 + 滚轮
-    this.traitScroll = enableScroll(
-      this.scene,
-      this.traitContainer,
-      bodyX,
-      bodyY,
-      LEFT_W - 32,
-      LEFT_UP_H - PANEL_TITLE_H - 10,
-    );
-  }
-
-  buildScoreboard(): void {
-    makePanel(this.scene, RIGHT_X, LEFT_UP_Y, LEFT_W, LEFT_UP_H, { title: '八 方 诸 侯', accent: CINNABAR.base });
-    this.scoreContainer = this.scene.add.container(RIGHT_X + 16, LEFT_UP_Y + PANEL_TITLE_H);
-    // 提示与面板标题同行错位：标题「八 方 诸 侯」占 x+24~154，对手名右对齐占 x+384 起
     this.scene.add
-      .text(RIGHT_X + 176, LEFT_UP_Y + 18, '点击各家名字可侦查阵容', {
+      .text(SELL_X + SELL_SIZE / 2, SELL_Y + SELL_SIZE + 10, '拖 入 出 售', {
         fontFamily: FONT.body,
-        fontSize: '12px',
-        color: css(PAPER[500]),
+        fontSize: '10px',
+        color: css(CINNABAR.light),
+        letterSpacing: 3,
+      })
+      .setOrigin(0.5, 0)
+      .setAlpha(0.8);
+    this.sellRect = new Phaser.Geom.Rectangle(SELL_X, SELL_Y, SELL_SIZE, SELL_SIZE);
+  }
+
+  // ══════════════ 羁络轨（左） ══════════════
+
+  buildTraitRail(): void {
+    // 竖排帽「羁 络」
+    ['羁', '络'].forEach((ch, i) => {
+      this.scene.add
+        .text(RAIL_X, 112 + i * 20, ch, {
+          fontFamily: FONT.kai,
+          fontSize: '12px',
+          color: css(PAPER[400]),
+        })
+        .setOrigin(0.5, 0);
+    });
+    this.traitContainer = this.scene.add.container(RAIL_X, RAIL_Y);
+    // 17 条 × 38px ≈ 646：可视区给足，超出才滚
+    this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_X - 24, RAIL_Y - 20, 48, 660);
+  }
+
+  // ══════════════ 敌情（右上） ══════════════
+
+  buildIntel(): void {
+    this.scene.add
+      .text(REPORT_X + 0, 140, '敌 情 · 本 轮 对 手', {
+        fontFamily: FONT.body,
+        fontSize: '10px',
+        color: css(INK[300]),
+        letterSpacing: 4,
       })
       .setOrigin(0, 0);
     this.opponentText = this.scene.add
-      .text(RIGHT_X + LEFT_W - 16, LEFT_UP_Y + 16, '', {
-        fontFamily: FONT.body,
-        fontSize: '12px',
-        color: css(GILT.base),
-      })
-      .setOrigin(1, 0);
+      .text(REPORT_X, 160, '', { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 2 })
+      .setOrigin(0, 0);
+    this.intelContainer = this.scene.add.container(REPORT_X, 188);
   }
 
-  buildLogPanel(): void {
-    makePanel(this.scene, LEFT_X, SIDE_DOWN_Y, SIDE_DOWN_W, SIDE_DOWN_H, { title: '对 局 记 事' });
-    this.logText = this.scene.add
-      .text(LEFT_X + 14, SIDE_DOWN_Y + 38, '', {
+  // ══════════════ 八方诸侯（右中，紧凑行） ══════════════
+
+  buildScoreboard(): void {
+    this.scene.add
+      .text(REPORT_X, 316, '八 方 诸 侯 · 点 击 侦 查', {
         fontFamily: FONT.body,
-        fontSize: '13px',
+        fontSize: '10px',
+        color: css(INK[300]),
+        letterSpacing: 4,
+      })
+      .setOrigin(0, 0);
+    this.scoreContainer = this.scene.add.container(REPORT_X, 338);
+  }
+
+  // ══════════════ 记事（左下）/ 战报（右下） ══════════════
+
+  buildLogPanel(): void {
+    const hair = this.scene.add.graphics();
+    hair.lineStyle(1, INK[500], 0.7);
+    hair.lineBetween(LOG_X, LOG_Y, LOG_X + LOG_W, LOG_Y);
+    this.scene.add
+      .text(LOG_X, LOG_Y + 12, '对 局 记 事', {
+        fontFamily: FONT.body,
+        fontSize: '10px',
+        color: css(INK[300]),
+        letterSpacing: 4,
+      })
+      .setOrigin(0, 0);
+    this.logText = this.scene.add
+      .text(LOG_X, LOG_Y + 34, '', {
+        fontFamily: FONT.body,
+        fontSize: '12px',
         color: css(PAPER[300]),
-        wordWrap: { width: SIDE_DOWN_W - 28 },
+        wordWrap: { width: LOG_W },
         lineSpacing: 4,
       })
       .setOrigin(0, 0);
   }
 
   buildReportPanel(): void {
-    makePanel(this.scene, RIGHT_DOWN_X, SIDE_DOWN_Y, SIDE_DOWN_W, SIDE_DOWN_H, { title: '上 回 合 战 报' });
-    this.reportText = this.scene.add
-      .text(RIGHT_DOWN_X + 14, SIDE_DOWN_Y + 38, '', {
+    const hair = this.scene.add.graphics();
+    hair.lineStyle(1, INK[500], 0.7);
+    hair.lineBetween(REPORT_X, REPORT_Y, REPORT_X + 282, REPORT_Y);
+    this.scene.add
+      .text(REPORT_X, REPORT_Y + 12, '上 回 合 战 报', {
         fontFamily: FONT.body,
-        fontSize: '13px',
+        fontSize: '10px',
+        color: css(INK[300]),
+        letterSpacing: 4,
+      })
+      .setOrigin(0, 0);
+    this.reportText = this.scene.add
+      .text(REPORT_X, REPORT_Y + 34, '', {
+        fontFamily: FONT.body,
+        fontSize: '12px',
         color: css(PAPER[300]),
-        wordWrap: { width: SIDE_DOWN_W - 28 },
+        wordWrap: { width: 282 },
         lineSpacing: 5,
       })
       .setOrigin(0, 0);
+  }
+
+  // ══════════════ 场上计数（备战席左） ══════════════
+
+  buildBoardCount(): void {
+    this.boardCountText = this.scene.add
+      .text(GRID_X - 16, BENCH_Y + 32, '', {
+        fontFamily: FONT.mono,
+        fontSize: '11px',
+        color: css(PAPER[400]),
+      })
+      .setOrigin(1, 0.5);
+  }
+
+  // ══════════════ 羁绊全览浮层（nav「羁绊」） ══════════════
+
+  openTraitModal(): void {
+    if (this.traitModal) {
+      this.traitModal.destroy();
+      this.traitModal = null;
+      this.traitModalScroll = null;
+      return;
+    }
+    const shade = this.scene.add.rectangle(0, 0, W, 1080, 0x000000, 0.55).setOrigin(0).setDepth(560).setInteractive();
+    const panelW = 640;
+    const panelH = 720;
+    const px = (W - panelW) / 2;
+    const py = (1080 - panelH) / 2;
+    const modal = makePanel(this.scene, px, py, panelW, panelH, { title: '羁 绊 全 览', accent: SPIRIT.base, alpha: 0.98 });
+    modal.setDepth(561);
+    void shade;
+
+    const bodyX = px + 20;
+    const bodyY = py + PANEL_TITLE_H + 8;
+    const content = this.scene.add.container(bodyX, bodyY).setDepth(562);
+    const traits = this.scene.match.traitsOf(this.scene.match.human.board);
+    const countOf = new Map(traits.map((t) => [t.id, t] as const));
+    let y = 0;
+    for (const def of Object.values(TRAIT_BY_ID)) {
+      const t = countOf.get(def.id);
+      const count = t?.count ?? 0;
+      const tier = t?.tier ?? -1;
+      const nextBreak = def.breakpoints.find((b) => b > count) ?? def.breakpoints[def.breakpoints.length - 1];
+      const color = tier >= 0 ? TRAIT_TIER_COLOR_HEX[Math.min(tier, 3)] : INK[500];
+      const desc = tier >= 0 ? def.effectText[Math.min(tier, def.effectText.length - 1)] : def.description;
+      const row = new TraitRow(this.scene, 0, y, panelW - 40);
+      row.set(def.id, count, tier, nextBreak, color, desc);
+      content.add(row);
+      y += row.rowHeight + 4;
+    }
+    this.traitModalScroll = enableScroll(this.scene, content, bodyX, bodyY, panelW - 40, panelH - PANEL_TITLE_H - 60);
+    this.traitModalScroll.setHeight(y);
+
+    const close = new Button(this.scene, px + panelW / 2, py + panelH - 30, '关 闭', () => this.closeTraitModal(), {
+      width: 140,
+      height: 40,
+      variant: 'primary',
+    });
+    close.setDepth(562);
+
+    this.traitModal = this.scene.add.container(0, 0).setDepth(560);
+    this.traitModal.add([shade, modal, content, close]);
+  }
+
+  closeTraitModal(): void {
+    this.traitModal?.destroy();
+    this.traitModal = null;
+    this.traitModalScroll = null;
+  }
+
+  /** nav「阵容」：直接侦查本轮对手（墨兽轮提示无可侦） */
+  private scoutNextOpponent(): void {
+    const pr = this.scene.match.pairings.find((x) => x.a === 0 || x.b === 0);
+    if (!pr) return;
+    const other = pr.a === 0 ? pr.b : pr.a;
+    if (pr.beast || other < 0) {
+      this.scene.showToast(pr.beast ? '墨兽轮 · 无阵可侦' : '本轮无对手可侦查');
+      return;
+    }
+    this.scene.pauseScout.showOpponentBoard(other);
   }
 }

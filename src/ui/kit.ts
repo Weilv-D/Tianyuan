@@ -1,23 +1,28 @@
 import Phaser from 'phaser';
-import { css, DANGER, GILT, INK, PAPER, UI } from '../render/palette';
+import { css, CINNABAR, DANGER, GILT, INK, PAPER, UI } from '../render/palette';
 import { bakedTexture } from '../render/bake';
 import { audio } from '../audio/AudioEngine';
 
 /**
- * UI 设计系统基元 —— 「文人案头」体系。
+ * UI 设计系统基元 —— 「夜宴 · 幽冥水墨」体系。
  *
- * 字体全线宋体系（碑刻感是一切气质的来源）；控件语言是"宣纸上的墨线"：
- * 细线（1px）而非粗描边、哑光底、克制的悬停。任何面板、按钮、徽章
+ * 字体三线：楷体（标题/品牌/印文的书写感）、宋体（正文的刻本感）、
+ * mono（数值与英文小注的仪器感）。控件语言是"大漆描金"：
+ * 1px 金线描边、半透漆底、悬停提亮而非发光。任何面板、按钮、徽章
  * 都不允许自己定义圆角与线宽。
  */
 
 export const FONT = {
+  /** 标题/品牌/印文：楷体 —— 书写的字，不是排印的字 */
+  kai: '"Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif',
   /** 标题：宋体 + 字距，碑刻感 */
   title: '"Songti SC", "STZhongsong", "Noto Serif SC", "SimSun", serif',
   /** 正文：同一宋体族 —— 全 serif 是本体系的身份 */
   body: '"Songti SC", "STSong", "Noto Serif SC", "SimSun", serif',
   /** 数字：衬线拉丁数字与宋体同构，且小字号更清晰 */
   num: 'Georgia, "Songti SC", "SimSun", serif',
+  /** 仪器小注：回合数、金数、英文微标 */
+  mono: '"SF Mono", "Menlo", "Consolas", "Courier New", monospace',
 } as const;
 
 /** 标题字距（宋体拉开才好看，挤在一起就成报纸） */
@@ -31,7 +36,7 @@ export const GRID = 4;
 
 /**
  * 界格角饰 —— 本体系的"圆角替代品"。
- * 四角短线像宣纸装裱的界格钉，直角由此获得装饰性而不显生硬。
+ * 四角短线像漆盘木胎的界格钉，直角由此获得装饰性而不显生硬。
  */
 export function cornerTicks(
   g: Phaser.GameObjects.Graphics,
@@ -80,21 +85,21 @@ export function makePanel(
   const a = opts.alpha ?? 0.9;
 
   // 面板底是死的：烤成纹理（角饰外扩 3px，画布四边留 4px 边距），每帧成本归零
-  const key = `panel_${Math.round(w)}x${Math.round(h)}_${accent.toString(16)}_${a}`;
+  const key = `panel_v3_${Math.round(w)}x${Math.round(h)}_${accent.toString(16)}_${a}`;
   bakedTexture(scene, key, w + 8, h + 8, (g) => {
     g.translateCanvas(4, 4);
-    g.fillStyle(INK[800], a);
+    g.fillStyle(INK[800], Math.min(0.82, a));
     g.fillRect(0, 0, w, h);
     // 顶部一道强调线：让每块面板都有"标题带"的秩序感
-    g.fillStyle(accent, 0.5);
-    g.fillRect(0, 0, w, 2);
+    g.fillStyle(accent, 0.55);
+    g.fillRect(0, 0, w, 1.5);
     // 细线语言：外圈墨线 1px，内圈金色发丝线若隐若现
     g.lineStyle(1, INK[500], 1);
     g.strokeRect(0, 0, w, h);
-    g.lineStyle(1, GILT.base, 0.1);
+    g.lineStyle(1, GILT.base, 0.12);
     g.strokeRect(1.5, 1.5, w - 3, h - 3);
     // 界格角饰：直角体系的签名
-    cornerTicks(g, -3, -3, w + 6, h + 6, accent, 0.4);
+    cornerTicks(g, -3, -3, w + 6, h + 6, accent, 0.45);
   });
   c.add(scene.add.image(-4, -4, key).setOrigin(0));
 
@@ -122,6 +127,10 @@ export interface ButtonOptions {
   disabled?: boolean;
 }
 
+/**
+ * 描边式按钮：夜宴的按钮没有"实心色块"——只有漆底、金线与提亮。
+ * 四态（常态/悬停/按下/禁用）各自烘焙一张纹理，redraw 只换贴图。
+ */
 export class Button extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Image;
   private readonly label: Phaser.GameObjects.Text;
@@ -146,14 +155,13 @@ export class Button extends Phaser.GameObjects.Container {
     this.variant = opts.variant ?? 'ghost';
     this.disabled = opts.disabled ?? false;
 
-    // 按状态烘焙四张纹理（画布四边留 1px），redraw 只做换贴图
     this.bg = scene.add.image(-1, -1, '__btn').setOrigin(0);
     this.label = scene.add
       .text(this.btnW / 2, this.btnH / 2, text, {
         fontFamily: FONT.title,
         fontSize: `${opts.fontSize ?? 14}px`,
         color: css(PAPER[100]),
-        letterSpacing: TRACK.label,
+        letterSpacing: TRACK.title,
       })
       .setOrigin(0.5);
 
@@ -182,7 +190,8 @@ export class Button extends Phaser.GameObjects.Container {
     this.on('pointerdown', () => {
       if (this.disabled) return;
       this.pressed = true;
-      this.setScale(0.97);
+      // 按下 0.96 / 70ms 弹回：触觉反馈交给形变，不靠发光
+      scene.tweens.add({ targets: this, scale: 0.96, duration: 70, yoyo: true });
       this.redraw();
       audio.play('ui');
     });
@@ -206,7 +215,7 @@ export class Button extends Phaser.GameObjects.Container {
 
   setDisabled(v: boolean): void {
     this.disabled = v;
-    this.label.setAlpha(v ? 0.4 : 1);
+    this.label.setAlpha(v ? 0.35 : 1);
     this.redraw();
   }
 
@@ -214,40 +223,53 @@ export class Button extends Phaser.GameObjects.Container {
     const state = this.disabled ? 'dis' : this.pressed ? 'prs' : this.hovered ? 'hov' : 'nrm';
     const w = this.btnW;
     const h = this.btnH;
-    const key = `btn_${this.variant}_${w}x${h}_${state}`;
+    const key = `btnv3_${this.variant}_${w}x${h}_${state}`;
     bakedTexture(this.scene!, key, w + 2, h + 2, (g) => {
       g.translateCanvas(1, 1);
-      const base =
-        this.variant === 'primary' ? GILT.deep : this.variant === 'danger' ? DANGER.base : INK[700];
-      const top = this.variant === 'primary' ? GILT.base : this.variant === 'danger' ? DANGER.light : INK[500];
+      // 三变体的漆底与线色：primary 金、danger 朱、ghost 墨
+      const wash = this.variant === 'ghost' ? INK[800] : this.variant === 'primary' ? GILT.base : CINNABAR.base;
+      const washA = this.variant === 'ghost' ? 0.5 : this.variant === 'primary' ? 0.13 : 0.09;
+      const line =
+        this.variant === 'primary' ? GILT.base : this.variant === 'danger' ? CINNABAR.base : GILT.base;
 
-      g.fillStyle(this.disabled ? INK[650] : base, this.variant === 'ghost' ? 0.88 : 0.92);
-      g.fillRoundedRect(0, 0, w, h, RADIUS);
+      if (!this.disabled) {
+        g.fillStyle(wash, washA);
+        g.fillRect(0, 0, w, h);
+      } else {
+        g.fillStyle(INK[850], 0.55);
+        g.fillRect(0, 0, w, h);
+      }
+
       if (!this.disabled) {
         if (this.pressed) {
-          // 按下：明显提亮 + 金边，松手即回落 —— 每次点击都有"确实按到了"
-          g.fillStyle(PAPER[100], 0.14);
-          g.fillRoundedRect(0, 0, w, h, RADIUS);
-          g.lineStyle(2, GILT.light, 0.95);
+          // 按下：明显提亮 + 亮边 2px，松手即回落
+          const hi = this.variant === 'danger' ? DANGER.light : GILT.light;
+          g.fillStyle(PAPER[100], 0.12);
+          g.fillRect(0, 0, w, h);
+          g.lineStyle(2, hi, 0.95);
         } else if (this.hovered) {
-          g.fillStyle(PAPER[100], 0.07);
-          g.fillRoundedRect(0, 0, w, h, RADIUS);
-          g.lineStyle(1.5, top, 1);
+          const hi = this.variant === 'danger' ? CINNABAR.light : GILT.light;
+          g.fillStyle(GILT.base, this.variant === 'danger' ? 0.07 : 0.08);
+          g.fillRect(0, 0, w, h);
+          g.lineStyle(1.5, hi, 0.9);
         } else {
-          g.lineStyle(1, top, 0.7);
+          g.lineStyle(1, line, this.variant === 'ghost' ? 0.35 : this.variant === 'danger' ? 0.55 : 0.7);
         }
       } else {
-        g.lineStyle(1, INK[500], 0.5);
+        g.lineStyle(1, INK[500], 0.4);
       }
-      g.strokeRoundedRect(0, 0, w, h, RADIUS);
+      g.strokeRect(0, 0, w, h);
       if (!this.pressed && !this.disabled) {
         // 内侧发丝高光：斜面感来自细线而不是粗边
-        g.lineStyle(1, PAPER[100], this.hovered ? 0.12 : 0.05);
-        g.strokeRoundedRect(1.5, 1.5, w - 3, h - 3, RADIUS - 2);
+        g.lineStyle(1, PAPER[100], this.hovered ? 0.1 : 0.05);
+        g.strokeRect(1.5, 1.5, w - 3, h - 3);
       }
     });
     this.bg.setTexture(key);
-    this.label.setColor(css(this.pressed ? PAPER[50] : PAPER[100]));
+    // 主按钮的字是米金，危按钮的字是朱砂亮字——按钮的身份先于阅读到达
+    const idle =
+      this.variant === 'primary' ? GILT.light : this.variant === 'danger' ? CINNABAR.light : PAPER[100];
+    this.label.setColor(css(this.pressed ? PAPER[50] : idle));
   }
 }
 
@@ -267,16 +289,14 @@ export class Bar extends Phaser.GameObjects.Container {
     this.barH = h;
     this.color = color;
     // 底槽与描边是死的，烤成一张图；只有"充到多少"是活的。
-    // 一个 Bar 原本 6 个圆角矩形 ≈ 273 条命令，准备阶段屏上十几个就是三千多条，
-    // 而这层底每秒重放 60 次、画的却是同一个东西。
-    const key = `barTrack_${Math.round(w)}_${Math.round(h)}`;
+    const key = `barTrack_v3_${Math.round(w)}_${Math.round(h)}`;
     bakedTexture(scene, key, w + 2, h + 2, (g) => {
-      g.fillStyle(INK[900], 0.9);
-      g.fillRoundedRect(0, 0, w + 2, h + 2, h / 2 + 1);
+      g.fillStyle(INK[950], 0.85);
+      g.fillRect(0, 0, w + 2, h + 2);
       g.fillStyle(INK[600], 1);
-      g.fillRoundedRect(1, 1, w, h, h / 2);
-      g.lineStyle(1, INK[400], 0.9);
-      g.strokeRoundedRect(1, 1, w, h, h / 2);
+      g.fillRect(1, 1, w, h);
+      g.lineStyle(1, INK[500], 0.9);
+      g.strokeRect(1, 1, w, h);
     });
     this.add(scene.add.image(-1, -1, key).setOrigin(0));
     this.g = scene.add.graphics();
@@ -327,15 +347,13 @@ export class Bar extends Phaser.GameObjects.Container {
     const g = this.g;
     const w = this.barW;
     const h = this.barH;
-    const r = h / 2;
     g.clear();
     if (this.ghost > this.shown) {
       g.fillStyle(PAPER[100], 0.32);
-      g.fillRoundedRect(0, 0, w * this.ghost, h, r);
+      g.fillRect(0, 0, w * this.ghost, h);
     }
     g.fillStyle(this.color, 1);
-    g.fillRoundedRect(0, 0, w * this.shown, h, r);
-    // 顶部高光用普通矩形即可：它贴着上沿，左右两端被圆角裁掉的部分看不出来
+    g.fillRect(0, 0, w * this.shown, h);
     g.fillStyle(PAPER[50], 0.2);
     g.fillRect(1, 1, Math.max(0, w * this.shown - 2), Math.max(1, h * 0.32));
   }
@@ -362,13 +380,13 @@ export function makeChip(
   const w = t.width + 16;
   const h = 22;
   const g = scene.add.graphics();
-  g.fillStyle(active ? INK[700] : INK[800], active ? 0.95 : 0.6);
-  g.fillRoundedRect(0, -h / 2, w, h, h / 2);
-  g.lineStyle(1.4, active ? color : INK[500], active ? 0.95 : 0.5);
-  g.strokeRoundedRect(0, -h / 2, w, h, h / 2);
+  g.fillStyle(active ? INK[700] : INK[800], active ? 0.9 : 0.55);
+  g.fillRect(0, -h / 2, w, h);
+  g.lineStyle(1.4, active ? color : INK[500], active ? 0.9 : 0.45);
+  g.strokeRect(0, -h / 2, w, h);
   if (active) {
-    g.fillStyle(color, 0.16);
-    g.fillRoundedRect(0, -h / 2, w, h, h / 2);
+    g.fillStyle(color, 0.14);
+    g.fillRect(0, -h / 2, w, h);
   }
   c.add([g, t]);
   t.setPosition(8, 0);
