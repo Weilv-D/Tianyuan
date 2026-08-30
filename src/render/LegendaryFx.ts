@@ -12,6 +12,7 @@ import { silhouetteKey } from './silhouetteFactory';
 import { FONT } from '../ui/kit';
 import { CHAMPION_BY_ID } from '../data/champions';
 import { audio } from '../audio/AudioEngine';
+import { motion } from './motion';
 
 export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
   const W = scene.scale.width;
@@ -90,19 +91,22 @@ export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
     ease: 'Cubic.easeIn',
     onComplete: () => {
       audio.playPluck(130.8); // 宫音落印
-      scene.cameras.main.shake(170, 0.0045);
-      scene.tweens.add({ targets: seal, scaleY: 0.9, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
-      burst(scene, root, cx, cy, GILT.light, 26);
-      burst(scene, root, cx, cy, CINNABAR.light, 14);
+      if (!motion.calm) scene.cameras.main.shake(170, 0.0045);
+      scene.tweens.add({ targets: seal, scaleY: motion.calm ? 0.96 : 0.9, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+      if (!motion.calm) {
+        burst(scene, root, cx, cy, GILT.light, 26);
+        burst(scene, root, cx, cy, CINNABAR.light, 14);
+      }
     },
   });
   scene.tweens.add({ targets: banner, alpha: 1, letterSpacing: 12, duration: 800, delay: 620, ease: 'Quad.easeOut' });
 
   // ── 收场：夜色散去，一切如初 ──
+  // 静观模式：整段演出缩短为约 1 秒（v2 圣经 §五）
   scene.tweens.add({
     targets: [dim, shadow, halo, seal, banner],
     alpha: 0,
-    delay: 1850,
+    delay: motion.calm ? 700 : 1850,
     duration: 460,
     ease: 'Quad.easeIn',
     onComplete: () => root.destroy(),

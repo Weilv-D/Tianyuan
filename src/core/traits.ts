@@ -381,10 +381,15 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     const tier = members[0].trait.tier['guardian'] ?? 0;
     const hpPct = t(`hp${tier}`, [0.14, 0.24, 0.28][tier] ?? 0.14);
     const armor = t(`armor${tier}`, [16, 26, 32][tier] ?? 16);
+    // t2 形态置换（DESIGN §十三 2v4 结构边的立项解）：护甲墙的一部分/全部搬进
+    // 生命池，反伤改按最大生命百分比计（血池即引信）。默认 0 = 关闭，
+    // 行为与历史逐字节一致（golden 快照锁定）。
+    const swapCut = tier >= 2 ? t('t2ArmorCut', 0) : 0;
+    const swapHp = tier >= 2 ? t('t2HpGain', 0) : 0;
     for (const u of members) {
-      u.maxHp = Math.round(u.maxHp * (1 + hpPct));
+      u.maxHp = Math.round(u.maxHp * (1 + hpPct + swapHp));
       u.hp = u.maxHp;
-      u.baseArmor += armor;
+      u.baseArmor += armor * (1 - swapCut);
     }
     const team = members[0].team;
     if (tier >= 1) {
@@ -434,7 +439,11 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
           st = { hits: 0, sum: 0 };
           thornSec.set(dst.uid, st);
         }
-        const decayed = dst.baseArmor * t('thornsArmorRatio', 0.52) * Math.pow(MECH.thornDecayPerHit, st.hits);
+        // t2 形态置换：反弹改按自身最大生命百分比计（血池即弹药）——
+        // 与 t2ArmorCut 配套：甲墙卸掉后物理队咬得动，但每一口都在啃反伤引信。
+        const hpThorns = tier >= 2 ? t('t2ThornsHpPct', 0) : 0;
+        const base = hpThorns > 0 ? dst.maxHp * hpThorns : dst.baseArmor * t('thornsArmorRatio', 0.52);
+        const decayed = base * Math.pow(MECH.thornDecayPerHit, st.hits);
         const secCap = MECH.thornSecCapHpRatio > 0 ? dst.maxHp * MECH.thornSecCapHpRatio : Infinity;
         const dmg = Math.min(decayed, Math.max(0, secCap - st.sum));
         if (dmg <= 0) return;

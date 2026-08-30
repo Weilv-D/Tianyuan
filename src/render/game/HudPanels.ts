@@ -259,7 +259,7 @@ export class HudPanels {
     this.scene.add
       .text(SHOP_X, SHOP_Y - 22, '商 肆', {
         fontFamily: FONT.title,
-        fontSize: '12px',
+        fontSize: '13px',
         color: css(PAPER[300]),
         letterSpacing: 4,
       })
@@ -305,7 +305,7 @@ export class HudPanels {
     this.scene.add
       .text(ITEM_BAR_X + 27, ITEM_BAR_Y - 13, '器 匣', {
         fontFamily: FONT.title,
-        fontSize: '12px',
+        fontSize: '13px',
         color: css(PAPER[300]),
         letterSpacing: 3,
       })
@@ -406,7 +406,7 @@ export class HudPanels {
       this.scene.add
         .text(RAIL_X, 112 + i * 20, ch, {
           fontFamily: FONT.kai,
-          fontSize: '12px',
+          fontSize: '13px',
           color: css(PAPER[400]),
         })
         .setOrigin(0.5, 0);
@@ -464,7 +464,7 @@ export class HudPanels {
     this.logText = this.scene.add
       .text(LOG_X, LOG_Y + 34, '', {
         fontFamily: FONT.body,
-        fontSize: '12px',
+        fontSize: '13px',
         color: css(PAPER[300]),
         wordWrap: { width: LOG_W },
         lineSpacing: 4,
@@ -487,7 +487,7 @@ export class HudPanels {
     this.reportText = this.scene.add
       .text(REPORT_X, REPORT_Y + 34, '', {
         fontFamily: FONT.body,
-        fontSize: '12px',
+        fontSize: '13px',
         color: css(PAPER[300]),
         wordWrap: { width: 282 },
         lineSpacing: 5,

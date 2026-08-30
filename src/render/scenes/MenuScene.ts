@@ -11,6 +11,7 @@ import { bakeItemIcons } from '../itemIcons';
 import { bakeSilhouettes, silhouetteKey } from '../silhouetteFactory';
 import { buildTextures, grainOverlay } from '../textures';
 import { H, W } from '../layout';
+import { motion } from '../motion';
 
 /**
  * 主菜单场景。
@@ -81,6 +82,7 @@ export class MenuScene extends Phaser.Scene {
     const hasSave = !!loadMatch();
     const prefs = loadPrefs();
     audio.setMuted(prefs.muted);
+    motion.calm = prefs.calm;
 
     const bx = W / 2;
     let by = H * 0.52;

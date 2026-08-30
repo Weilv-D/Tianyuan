@@ -182,7 +182,7 @@ export class CodexScene extends Phaser.Scene {
       );
       row.add(
         this.add
-          .text(80, 15, t.description, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[500]) })
+          .text(80, 15, t.description, { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[500]) })
           .setOrigin(0, 0)
       );
       // 档位标记：几档亮几格（与对局内羁绊行同语汇）

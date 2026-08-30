@@ -12,6 +12,7 @@ import { UnitView, setFriendlyTeam } from '../UnitView';
 import { bakeItemIcons } from '../itemIcons';
 import { EffectsLayer } from '../EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../DamageText';
+import { motion } from '../motion';
 import { audio } from '../../audio/AudioEngine';
 import { Button, enableScroll, FONT, makeChip, makePanel, type ScrollHandle } from '../../ui/kit';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../../game/comp';
@@ -347,7 +348,7 @@ export class BattleScene extends Phaser.Scene {
       this.phaseText.setColor(css(CINNABAR.light));
       audio.startBgm('battle');
       audio.play('warn');
-      this.cameras.main.flash(220, 0xc6, 0x5a, 0x45); // 朱砂 CINNABAR.base
+      if (!motion.calm) this.cameras.main.flash(220, 0xc6, 0x5a, 0x45); // 朱砂 CINNABAR.base（静观关闭）
     });
   }
 
@@ -1030,7 +1031,7 @@ export class BattleScene extends Phaser.Scene {
     // 4) 屏幕震动（按特效累计强度分级，不做无差别抖动）。
     //    边沿触发：此前 fx.shake>0 期间每帧重调 shake() 会不断重置震动计时，
     //    表现为持续微抖 —— 只在强度从无到有的那一刻触发一次。
-    const shake = this.fx.shake;
+    const shake = motion.calm ? 0 : this.fx.shake;
     if (shake > 0 && this.lastShake <= 0) {
       this.cameras.main.shake(Math.min(320, 90 + shake * 90), Math.min(0.012, 0.0022 * shake));
     }

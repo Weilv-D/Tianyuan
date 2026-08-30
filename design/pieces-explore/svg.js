@@ -35,10 +35,10 @@ function svgWarrior() {
   const inner = `
     ${SHADOW(62, 30).replace('SHARED', 'w1')}
     <!-- 长刀（背后） -->
-    <line x1="33" y1="124" x2="74" y2="38" stroke="#3b414d" stroke-width="4.6" stroke-linecap="round"/>
-    <line x1="33" y1="124" x2="74" y2="38" stroke="#20242c" stroke-width="1.4" opacity="0.6"/>
-    <path d="M70,46 Q88,30 95,10 Q79,22 62,34 Z" fill="url(#steel-w2)" stroke="#191d24" stroke-width="1.6"/>
-    <path d="M70,46 Q86,31 92,17" fill="none" stroke="#aab4c4" stroke-width="1.1" opacity="0.8"/>
+    <line x1="33" y1="124" x2="76" y2="33" stroke="#3b414d" stroke-width="4.6" stroke-linecap="round"/>
+    <line x1="33" y1="124" x2="76" y2="33" stroke="#20242c" stroke-width="1.4" opacity="0.6"/>
+    <path d="M74,42 Q90,26 96,7 Q80,19 63,31 Z" fill="url(#steelW)" stroke="#191d24" stroke-width="1.6"/>
+    <path d="M74,42 Q88,27 93,14" fill="none" stroke="#aab4c4" stroke-width="1.1" opacity="0.8"/>
     <!-- 腿与靴 -->
     <path d="M47,126 L45,106 L57,104 L58,126 Z" fill="#23262e" stroke="#15171c" stroke-width="1.4"/>
     <path d="M63,126 L64,104 L76,106 L74,126 Z" fill="#23262e" stroke="#15171c" stroke-width="1.4"/>
@@ -64,8 +64,8 @@ function svgWarrior() {
     <path d="M40,70 L37,88 L48,91 L51,73 Z" fill="#333947" stroke="#191d24" stroke-width="1.5"/>
     <circle cx="43" cy="91" r="5.2" fill="#c9b696" stroke="#191d24" stroke-width="1.4"/>
     <!-- 右臂扶刀柄 -->
-    <path d="M61,58 Q70,52 76,45 L83,50 Q75,60 65,68 Z" fill="#3d4452" stroke="#191d24" stroke-width="1.5"/>
-    <circle cx="78" cy="46" r="5" fill="#c9b696" stroke="#191d24" stroke-width="1.4"/>
+    <path d="M61,58 Q70,52 74,45 L82,49 Q76,60 65,68 Z" fill="#3d4452" stroke="#191d24" stroke-width="1.5"/>
+    <circle cx="75" cy="44" r="5" fill="#c9b696" stroke="#191d24" stroke-width="1.4"/>
     <!-- 头盔 -->
     <path d="M50,53 Q49,37 60,36 Q71,37 70,53 L66,58 L54,58 Z" fill="#4a5262" stroke="#191d24" stroke-width="1.6"/>
     <rect x="53.5" y="46" width="13" height="2.8" fill="#101319"/>
@@ -73,7 +73,7 @@ function svgWarrior() {
     <path d="M60,36 Q57,27 67,22 Q64,31 62,36 Z" fill="#7d3a30" stroke="#191d24" stroke-width="1.3"/>
     <path d="M62,36 Q66,31 72,30 Q68,36 64,38 Z" fill="#6a2f26"/>
     <!-- 刀穗 -->
-    <path d="M74,40 L79,52 M77,40 L82,50" stroke="#8a4034" stroke-width="1.3" opacity="0.85"/>
+    <path d="M76,36 L81,48 M79,35 L84,45" stroke="#8a4034" stroke-width="1.3" opacity="0.85"/>
   `;
   return wrap('warrior', '#5a6c8a', inner).replace('steel-w2', 'steelW').replace('armor-w2', 'armorW')
     + `<svg width="0" height="0"><defs>
@@ -93,15 +93,9 @@ function svgGolem() {
     <!-- 碎石 -->
     <path d="M14,120 L20,110 L28,116 L26,124 L16,124 Z" fill="#4a505a" stroke="#20242a" stroke-width="1.3"/>
     <path d="M96,122 L101,114 L108,119 L106,125 L98,125 Z" fill="#454b55" stroke="#20242a" stroke-width="1.3"/>
-    <!-- 左臂（拄地巨拳） -->
-    <path d="M30,86 Q16,92 19,106 Q23,119 39,116 L47,110 Q42,94 34,86 Z" fill="#565d68" stroke="#20242a" stroke-width="1.7"/>
-    <path d="M24,108 Q28,114 38,113" fill="none" stroke="#2a2f36" stroke-width="1.3"/>
-    <!-- 右臂（微抬） -->
-    <path d="M90,84 Q102,88 101,101 Q98,113 85,112 L78,107 Q82,93 86,85 Z" fill="#4a505a" stroke="#20242a" stroke-width="1.7"/>
-    <path d="M82,106 Q88,110 96,107" fill="none" stroke="#2a2f36" stroke-width="1.2"/>
     <!-- 躯干巨岩 -->
     <path d="M28,118 Q18,96 30,74 Q36,56 58,52 Q80,50 88,68 Q98,84 92,104 Q90,120 74,124 L42,124 Q31,122 28,118 Z"
-      fill="url(#stone-g2)" stroke="#20242a" stroke-width="1.8"/>
+      fill="url(#stoneG)" stroke="#20242a" stroke-width="1.8"/>
     <!-- 裂纹 -->
     <path d="M52,72 L58,86 L54,98" fill="none" stroke="#262b32" stroke-width="1.4"/>
     <path d="M70,64 L66,78 L72,90" fill="none" stroke="#262b32" stroke-width="1.2"/>
@@ -109,14 +103,20 @@ function svgGolem() {
     <!-- 受光面 -->
     <path d="M34,72 Q40,58 56,54" fill="none" stroke="#8d96a3" stroke-width="1.6" opacity="0.55"/>
     <path d="M30,92 Q28,80 34,70" fill="none" stroke="#8d96a3" stroke-width="1.3" opacity="0.4"/>
+    <!-- 左臂（拄地巨拳） -->
+    <path d="M30,86 Q16,92 19,106 Q23,119 39,116 L47,110 Q42,94 34,86 Z" fill="#565d68" stroke="#20242a" stroke-width="1.7"/>
+    <path d="M24,108 Q28,114 38,113" fill="none" stroke="#2a2f36" stroke-width="1.3"/>
+    <!-- 右臂（微抬） -->
+    <path d="M90,84 Q102,88 101,101 Q98,113 85,112 L78,107 Q82,93 86,85 Z" fill="#4a505a" stroke="#20242a" stroke-width="1.7"/>
+    <path d="M82,106 Q88,110 96,107" fill="none" stroke="#2a2f36" stroke-width="1.2"/>
     <!-- 头（嵌岩） -->
     <path d="M48,60 Q45,45 58,43 Q71,44 70,58 Q64,67 53,66 Z" fill="#767e8c" stroke="#20242a" stroke-width="1.6"/>
     <path d="M50,50 Q52,46 58,45" fill="none" stroke="#9aa4b0" stroke-width="1.2" opacity="0.7"/>
     <!-- 琥珀目 -->
-    <rect x="52.5" y="52" width="6" height="2.4" rx="1" fill="#e8b34a" transform="rotate(-4 55 53)"/>
-    <rect x="62" y="52" width="6" height="2.4" rx="1" fill="#e8b34a" transform="rotate(4 65 53)"/>
-    <rect x="53" y="52.4" width="5" height="1.6" rx="0.8" fill="#f7dfa0" transform="rotate(-4 55 53)"/>
-    <rect x="62.5" y="52.4" width="5" height="1.6" rx="0.8" fill="#f7dfa0" transform="rotate(4 65 53)"/>
+    <rect x="51.5" y="51" width="7.5" height="3" rx="1.2" fill="#e8b34a" transform="rotate(-4 55 52.5)"/>
+    <rect x="61.5" y="51" width="7.5" height="3" rx="1.2" fill="#e8b34a" transform="rotate(4 65 52.5)"/>
+    <rect x="52.2" y="51.5" width="6" height="1.8" rx="0.9" fill="#f7dfa0" transform="rotate(-4 55 52.5)"/>
+    <rect x="62.2" y="51.5" width="6" height="1.8" rx="0.9" fill="#f7dfa0" transform="rotate(4 65 52.5)"/>
     <!-- 苔衣 -->
     <path d="M46,45 Q52,41 60,42 Q56,47 50,47 Z" fill="#5a7050" opacity="0.9"/>
     <path d="M34,74 Q42,68 52,68 Q44,76 36,78 Z" fill="#4e6448" opacity="0.85"/>

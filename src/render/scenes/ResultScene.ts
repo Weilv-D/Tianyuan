@@ -87,7 +87,7 @@ export class ResultScene extends Phaser.Scene {
     panel.add(
       this.add
         .text(0, by + 106, `${human.wins} 胜 ${human.losses} 负　最佳连胜 ${human.bestStreak}　累计输出 ${Math.round(human.totalDamage)}　终局 ${human.level} 级`, {
-          fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]),
+          fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]),
         })
         .setOrigin(0.5, 0)
     );
@@ -129,14 +129,14 @@ export class ResultScene extends Phaser.Scene {
       row.add(
         this.add
           .text(300, 3, `${p.ai ? p.ai.label : '玩家'}`, {
-            fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[500]),
+            fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[500]),
           })
           .setOrigin(0, 0)
       );
       row.add(
         this.add
           .text(bw - 88, 3, p.alive ? `存活 ${p.hp}` : `${p.wins} 胜`, {
-            fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]),
+            fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]),
           })
           .setOrigin(1, 0)
       );

@@ -41,7 +41,7 @@ body.cur-hover #cur-ring{width:46px;height:46px;border-color:var(--gold)}
 #boot{position:fixed;inset:0;z-index:5000;background:var(--n1);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;
   transition:clip-path 1.2s var(--ez-page);clip-path:inset(0 0 0 0)}
-#boot.hidden{clip-path:inset(0 0 100% 0)}
+#boot.hidden{clip-path:inset(0 0 100% 0);pointer-events:none}
 #boot .glyph{font-family:var(--kai);font-size:130px;color:var(--paper);line-height:1;
   opacity:0;animation:glyphIn 1.5s var(--ez-in) .15s forwards}
 @keyframes glyphIn{from{opacity:0;transform:scale(1.14);filter:blur(12px)}

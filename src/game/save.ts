@@ -128,6 +128,8 @@ export interface Preferences {
   volUi: number;
   muted: boolean;
   autoDeploy: boolean;
+  /** 静观模式：震动归零、闪光关闭、飘字去冲击缩放、天命之印缩短（前庭敏感/低配降级档） */
+  calm: boolean;
 }
 
 const PREF_KEY = 'inkarena.prefs.v1';
@@ -138,6 +140,7 @@ export const DEFAULT_PREFS: Preferences = {
   volUi: 0.6,
   muted: false,
   autoDeploy: true,
+  calm: false,
 };
 
 export function loadPrefs(): Preferences {

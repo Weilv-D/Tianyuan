@@ -3,6 +3,7 @@ import type { FxKind } from '../core/events';
 import { CINNABAR, GILT, MOON, PAPER, SPIRIT, VOID } from './palette';
 import { TEX } from './textures';
 import { CELL as BOARD_CELL } from './BoardView';
+import { motion } from './motion';
 
 export interface FxRequest {
   kind: FxKind;
@@ -507,6 +508,7 @@ export class EffectsLayer {
 
   /** 屏幕级的全屏演出（五费大招 / 三星星辰绽放） */
   fullscreenFlash(tint: number, strength = 1): void {
+    if (motion.calm) return;
     const cam = this.scene.cameras.main;
     if (!cam) return;
     cam.flash(180 * strength, (tint >> 16) & 0xff, (tint >> 8) & 0xff, tint & 0xff);

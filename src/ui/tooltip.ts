@@ -83,7 +83,7 @@ export class ItemTooltip {
     const desc = this.scene.add
       .text(14, y, def.desc, {
         fontFamily: FONT.body,
-        fontSize: '12px',
+        fontSize: '13px',
         color: css(PAPER[300]),
         wordWrap: { width: w - 28 },
       })
@@ -106,7 +106,7 @@ export class ItemTooltip {
       const rec = this.scene.add
         .text(14, y, recipeLine, {
           fontFamily: FONT.body,
-          fontSize: '12px',
+          fontSize: '13px',
           color: css(GILT.base),
           wordWrap: { width: w - 28 },
         })

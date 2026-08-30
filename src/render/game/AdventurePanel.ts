@@ -160,7 +160,7 @@ export class AdventurePanel {
       card.add(
         this.scene.add.text(12, 44, opt.desc, {
           fontFamily: FONT.body,
-          fontSize: '12px',
+          fontSize: '13px',
           color: css(PAPER[300]),
           wordWrap: { width: cardW - 24 },
           lineSpacing: 3,

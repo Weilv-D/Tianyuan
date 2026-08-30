@@ -160,15 +160,15 @@ game.events.once('ready', () => {
   }
 });
 
-// 隐藏加载序章：先让「弈」字与进度条走完入场（~1.5s），再上掀退场（clip-path 1.2s）
+// 隐藏加载序章：先让「弈」字与进度条走完入场（~1.5s），再上掀退场（clip-path 1.2s）。
+// 刻意不用 requestAnimationFrame 包裹：后台标签页会节流 RAF，首帧回调不来
+// boot 就永久滞留，把整屏点击都挡在序章上（实测事故，2026-08-30）。
 const boot = document.getElementById('boot');
 if (boot) {
-  requestAnimationFrame(() => {
-    window.setTimeout(() => {
-      boot.classList.add('hidden');
-      window.setTimeout(() => boot.remove(), 1300);
-    }, 1500);
-  });
+  window.setTimeout(() => {
+    boot.classList.add('hidden');
+    window.setTimeout(() => boot.remove(), 1300);
+  }, 1500);
 }
 
 // 开发期：把致命错误暴露在控制台之外，避免"白屏无提示"

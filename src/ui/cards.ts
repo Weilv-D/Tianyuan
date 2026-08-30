@@ -243,10 +243,10 @@ export class ShopCard extends Phaser.GameObjects.Container {
       .text(w / 2, h - 62, '', { fontFamily: FONT.title, fontSize: '13px', color: css(PAPER[100]), letterSpacing: 4 })
       .setOrigin(0.5, 0);
     this.titleText = scene.add
-      .text(w / 2, h - 44, '', { fontFamily: FONT.body, fontSize: '10px', color: css(PAPER[400]) })
+      .text(w / 2, h - 44, '', { fontFamily: FONT.body, fontSize: '11px', color: css(PAPER[400]) })
       .setOrigin(0.5, 0);
     this.traitText = scene.add
-      .text(w / 2, h - 30, '', { fontFamily: FONT.body, fontSize: '10px', color: css(PAPER[300]) })
+      .text(w / 2, h - 30, '', { fontFamily: FONT.body, fontSize: '11px', color: css(PAPER[300]) })
       .setOrigin(0.5, 0);
     this.costText = scene.add
       .text(w / 2, h - 15, '', { fontFamily: FONT.mono, fontSize: '11px', color: css(GILT.light) })
@@ -381,7 +381,7 @@ export class TraitRow extends Phaser.GameObjects.Container {
     this.bg = scene.add.image(0, 0, '__trow').setOrigin(0);
     this.nameText = scene.add.text(30, 4, '', { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 1 }).setOrigin(0, 0);
     this.countText = scene.add.text(w - 8, 5, '', { fontFamily: FONT.num, fontSize: '12px', color: css(GILT.base) }).setOrigin(1, 0);
-    this.descText = scene.add.text(30, 21, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { width: w - 44 } }).setOrigin(0, 0);
+    this.descText = scene.add.text(30, 21, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]), wordWrap: { width: w - 44 } }).setOrigin(0, 0);
     this.add([this.bg, this.nameText, this.countText, this.descText]);
     scene.add.existing(this);
   }
@@ -459,11 +459,11 @@ export class UnitDetailCard {
     this.subT = scene.add.text(14, 40, '', { fontFamily: FONT.body, fontSize: '13px', color: css(GILT.light) }).setOrigin(0, 0);
     this.costT = scene.add.text(w - 14, 14, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[300]) }).setOrigin(1, 0);
     for (let i = 0; i < 4; i++) {
-      const t = scene.add.text(14, 66 + i * 19, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) }).setOrigin(0, 0);
+      const t = scene.add.text(14, 66 + i * 19, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[300]) }).setOrigin(0, 0);
       this.statT.push(t);
     }
     this.itemsRow = scene.add.container(14, 148);
-    this.traitT = scene.add.text(14, 172, '', { fontFamily: FONT.body, fontSize: '12px', color: css(SPIRIT.light) }).setOrigin(0, 0);
+    this.traitT = scene.add.text(14, 172, '', { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) }).setOrigin(0, 0);
     this.skillT = scene.add.text(14, 194, '', { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) }).setOrigin(0, 0);
     this.descT = scene.add
       .text(14, 214, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { width: w - 28 } })
@@ -517,7 +517,7 @@ export class UnitDetailCard {
         ix += 20;
       }
       const t = this.container.scene!.add
-        .text(ix, 2, idef.name, { fontFamily: FONT.body, fontSize: '12px', color: css(GILT.light) })
+        .text(ix, 2, idef.name, { fontFamily: FONT.body, fontSize: '13px', color: css(GILT.light) })
         .setOrigin(0, 0);
       this.itemsRow.add(t);
       ix += t.width + 10;

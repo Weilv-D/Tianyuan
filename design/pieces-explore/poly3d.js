@@ -170,13 +170,14 @@ function drawMesh(ctx, W, H, mesh, angle) {
     const rp = f.pts.map(rotY);
     const vp = rp.map(view);
     const depth = (vp[0][2] + vp[1][2] + vp[2][2] + vp[3][2]) / 4;
-    // 视空间法线
+    // 视空间法线：几何法线随体旋转后，再过一次俯仰 —— 光照固定在视空间
     const ax = rp[1][0] - rp[0][0], ay = rp[1][1] - rp[0][1], az = rp[1][2] - rp[0][2];
     const bx = rp[2][0] - rp[0][0], by = rp[2][1] - rp[0][1], bz = rp[2][2] - rp[0][2];
     let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
     const nl = Math.hypot(nx, ny, nz) || 1;
     nx /= nl; ny /= nl; nz /= nl;
-    const lam = 0.52 + 0.52 * Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+    const vy = ny * ct - nz * st, vz = ny * st + nz * ct;
+    const lam = 0.66 + 0.44 * Math.max(0, nx * LIGHT[0] + vy * LIGHT[1] + vz * LIGHT[2]);
     faces.push({ vp, depth, color: shadeHex(f.color, lam) });
   }
   faces.sort((a, b) => a.depth - b.depth);
@@ -205,7 +206,7 @@ function mountPoly(canvas, build) {
     ctx.clearRect(0, 0, VW, VH);
     drawMesh(ctx, VW, VH, mesh, angle);
   };
-  ANIM.push({ render, speed: 0.45 + Math.random() * 0.12, step: (dt) => { angle += dt; } });
+  ANIM.push({ render, speed: 0.28 + Math.random() * 0.1, step: (dt) => { angle += dt; } });
   render();
 }
 let polyLast = 0;

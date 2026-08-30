@@ -3,6 +3,7 @@ import { audio } from '../audio/AudioEngine';
 import { savePrefs, type Preferences } from '../game/save';
 import { Button, FONT } from './kit';
 import { GILT, INK, PAPER, SHADE, css } from '../render/palette';
+import { motion } from '../render/motion';
 import { H, W } from '../render/layout';
 
 /**
@@ -65,7 +66,7 @@ export class SettingsPanel {
     panel.add(shade);
 
     const bw = 440;
-    const bh = prefs && this.host.inMatch ? 520 : 420;
+    const bh = prefs && this.host.inMatch ? 578 : 478;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
     const g = scene.add.graphics();
@@ -142,6 +143,24 @@ export class SettingsPanel {
       this.host.onAutoDeploy?.(prefs.autoDeploy);
     }, { width: 180, height: 40 });
     panel.add(autoBtn);
+    y += 60;
+
+    // 静观模式（降级档）：震动归零 / 闪光关闭 / 飘字去冲击 / 天命之印缩短
+    const calmBtn = new Button(scene, bx + 34, y + 6, prefs.calm ? '静观模式 开' : '静观模式 关', () => {
+      prefs.calm = !prefs.calm;
+      motion.calm = prefs.calm;
+      calmBtn.setText(prefs.calm ? '静观模式 开' : '静观模式 关');
+    }, { width: 150, height: 40 });
+    panel.add(calmBtn);
+    panel.add(
+      scene.add
+        .text(bx + 196, y + 20, '减少震动与闪光，演出缩短', {
+          fontFamily: FONT.body,
+          fontSize: '12px',
+          color: css(PAPER[400]),
+        })
+        .setOrigin(0, 0)
+    );
     y += 60;
 
     if (this.host.inMatch) {

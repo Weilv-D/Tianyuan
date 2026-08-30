@@ -17,6 +17,7 @@ import { playLegendaryStarFx } from '../LegendaryFx';
 import { bakeSilhouettes } from '../silhouetteFactory';
 import { INK, GILT, CINNABAR, SPIRIT, PAPER, css } from '../palette';
 import { W, H } from '../layout';
+import { motion } from '../motion';
 
 // ── 渲染模块（R2 拆分）：场景只保留 create/update 主循环、场景切换与对局数据装配；
 //    覆盖层/面板/输入/刷新细节全部委托 src/render/game/ 下的模块。 ──
@@ -124,6 +125,7 @@ export class GameScene extends Phaser.Scene {
     this.eliminated = new EliminatedOverlay(this);
 
     this.prefs = loadPrefs();
+    motion.calm = this.prefs.calm;
     this.inputCtl.resetForCreate();
     this.saveTimer?.remove();
     this.saveTimer = null;
@@ -450,12 +452,14 @@ export class GameScene extends Phaser.Scene {
     const title =
       kind === 'star3' ? '三  星' : kind === 'item' ? '神  兵' : kind === 'streak' ? '连  胜' : '翻  盘';
 
-    // 全屏色闪 + 轻微推镜，把这一刻从连续的时间流里"抠"出来
-    const [r, g, b] = rgbOf(color);
-    this.cameras.main.flash(isBig ? 420 : 260, r, g, b);
-    if (isBig) {
-      this.cameras.main.zoomTo(1.012, 90);
-      this.time.delayedCall(220, () => this.cameras.main.zoomTo(1, 220));
+    // 全屏色闪 + 轻微推镜，把这一刻从连续的时间流里"抠"出来（静观模式只留文字浮现）
+    if (!motion.calm) {
+      const [r, g, b] = rgbOf(color);
+      this.cameras.main.flash(isBig ? 420 : 260, r, g, b);
+      if (isBig) {
+        this.cameras.main.zoomTo(1.012, 90);
+        this.time.delayedCall(220, () => this.cameras.main.zoomTo(1, 220));
+      }
     }
 
     const c = this.add.container(W / 2, H * 0.34).setDepth(650);
