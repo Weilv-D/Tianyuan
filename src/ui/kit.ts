@@ -1,0 +1,453 @@
+import Phaser from 'phaser';
+import { css, DANGER, GILT, INK, PAPER, UI } from '../render/palette';
+import { bakedTexture } from '../render/bake';
+import { audio } from '../audio/AudioEngine';
+
+/**
+ * UI 设计系统基元 —— 「文人案头」体系。
+ *
+ * 字体全线宋体系（碑刻感是一切气质的来源）；控件语言是"宣纸上的墨线"：
+ * 细线（1px）而非粗描边、哑光底、克制的悬停。任何面板、按钮、徽章
+ * 都不允许自己定义圆角与线宽。
+ */
+
+export const FONT = {
+  /** 标题：宋体 + 字距，碑刻感 */
+  title: '"Songti SC", "STZhongsong", "Noto Serif SC", "SimSun", serif',
+  /** 正文：同一宋体族 —— 全 serif 是本体系的身份 */
+  body: '"Songti SC", "STSong", "Noto Serif SC", "SimSun", serif',
+  /** 数字：衬线拉丁数字与宋体同构，且小字号更清晰 */
+  num: 'Georgia, "Songti SC", "SimSun", serif',
+} as const;
+
+/** 标题字距（宋体拉开才好看，挤在一起就成报纸） */
+export const TRACK = {
+  title: 3,
+  label: 1,
+} as const;
+
+export const RADIUS = 0; // 直角体系：圆角在 main.ts 的 Graphics 接管处被全局禁用
+export const GRID = 4;
+
+/**
+ * 界格角饰 —— 本体系的"圆角替代品"。
+ * 四角短线像宣纸装裱的界格钉，直角由此获得装饰性而不显生硬。
+ */
+export function cornerTicks(
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color: number,
+  alpha = 0.55,
+  len = 9,
+): void {
+  g.lineStyle(2, color, alpha);
+  g.beginPath();
+  g.moveTo(x, y + len);
+  g.lineTo(x, y);
+  g.lineTo(x + len, y);
+  g.moveTo(x + w - len, y);
+  g.lineTo(x + w, y);
+  g.lineTo(x + w, y + len);
+  g.moveTo(x + w, y + h - len);
+  g.lineTo(x + w, y + h);
+  g.lineTo(x + w - len, y + h);
+  g.moveTo(x + len, y + h);
+  g.lineTo(x, y + h);
+  g.lineTo(x, y + h - len);
+  g.strokePath();
+}
+
+export interface PanelOptions {
+  title?: string;
+  accent?: number;
+  alpha?: number;
+  padding?: number;
+}
+
+export function makePanel(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  opts: PanelOptions = {},
+): Phaser.GameObjects.Container {
+  const c = scene.add.container(x, y);
+  const accent = opts.accent ?? GILT.deep;
+  const a = opts.alpha ?? 0.9;
+
+  // 面板底是死的：烤成纹理（角饰外扩 3px，画布四边留 4px 边距），每帧成本归零
+  const key = `panel_${Math.round(w)}x${Math.round(h)}_${accent.toString(16)}_${a}`;
+  bakedTexture(scene, key, w + 8, h + 8, (g) => {
+    g.translateCanvas(4, 4);
+    g.fillStyle(INK[800], a);
+    g.fillRect(0, 0, w, h);
+    // 顶部一道强调线：让每块面板都有"标题带"的秩序感
+    g.fillStyle(accent, 0.5);
+    g.fillRect(0, 0, w, 2);
+    // 细线语言：外圈墨线 1px，内圈金色发丝线若隐若现
+    g.lineStyle(1, INK[500], 1);
+    g.strokeRect(0, 0, w, h);
+    g.lineStyle(1, GILT.base, 0.1);
+    g.strokeRect(1.5, 1.5, w - 3, h - 3);
+    // 界格角饰：直角体系的签名
+    cornerTicks(g, -3, -3, w + 6, h + 6, accent, 0.4);
+  });
+  c.add(scene.add.image(-4, -4, key).setOrigin(0));
+
+  if (opts.title) {
+    const t = scene.add
+      .text(GRID * 3, GRID * 2.5, opts.title, {
+        fontFamily: FONT.title,
+        fontSize: '16px',
+        color: css(PAPER[100]),
+        letterSpacing: TRACK.title,
+      })
+      .setAlpha(0.92);
+    c.add(t);
+  }
+  return c;
+}
+
+export type ButtonVariant = 'primary' | 'ghost' | 'danger';
+
+export interface ButtonOptions {
+  variant?: ButtonVariant;
+  width?: number;
+  height?: number;
+  fontSize?: number;
+  disabled?: boolean;
+}
+
+export class Button extends Phaser.GameObjects.Container {
+  private readonly bg: Phaser.GameObjects.Image;
+  private readonly label: Phaser.GameObjects.Text;
+  private readonly btnW: number;
+  private readonly btnH: number;
+  private readonly variant: ButtonVariant;
+  private disabled = false;
+  private hovered = false;
+  private pressed = false;
+
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    text: string,
+    onClick: () => void,
+    opts: ButtonOptions = {},
+  ) {
+    super(scene, x, y);
+    this.btnW = opts.width ?? 108;
+    this.btnH = opts.height ?? 34;
+    this.variant = opts.variant ?? 'ghost';
+    this.disabled = opts.disabled ?? false;
+
+    // 按状态烘焙四张纹理（画布四边留 1px），redraw 只做换贴图
+    this.bg = scene.add.image(-1, -1, '__btn').setOrigin(0);
+    this.label = scene.add
+      .text(this.btnW / 2, this.btnH / 2, text, {
+        fontFamily: FONT.title,
+        fontSize: `${opts.fontSize ?? 14}px`,
+        color: css(PAPER[100]),
+        letterSpacing: TRACK.label,
+      })
+      .setOrigin(0.5);
+
+    this.add([this.bg, this.label]);
+    this.setSize(this.btnW, this.btnH);
+    // 命中区向四周外扩 5px：快速点击时指尖/指针常有 1~2px 漂移，
+    // 贴边按下被判"没点上"是"点击不灵敏"的主要来源
+    const pad = 5;
+    this.setInteractive(
+      new Phaser.Geom.Rectangle(-pad, -pad, this.btnW + pad * 2, this.btnH + pad * 2),
+      Phaser.Geom.Rectangle.Contains,
+    );
+
+    this.on('pointerover', () => {
+      this.hovered = true;
+      this.redraw();
+      scene.input.setDefaultCursor('pointer');
+    });
+    this.on('pointerout', () => {
+      this.hovered = false;
+      this.pressed = false;
+      this.setScale(1);
+      this.redraw();
+      scene.input.setDefaultCursor('default');
+    });
+    this.on('pointerdown', () => {
+      if (this.disabled) return;
+      this.pressed = true;
+      this.setScale(0.97);
+      this.redraw();
+      audio.play('ui');
+    });
+    this.on('pointerup', () => {
+      if (this.disabled) return;
+      this.pressed = false;
+      this.setScale(1);
+      this.redraw();
+      onClick();
+    });
+
+    this.redraw();
+    scene.add.existing(this);
+  }
+
+  setText(s: string): void {
+    // setText 会触发整段文本重新栅格化（2× 分辨率下更贵），同值直接跳过
+    if (this.label.text === s) return;
+    this.label.setText(s);
+  }
+
+  setDisabled(v: boolean): void {
+    this.disabled = v;
+    this.label.setAlpha(v ? 0.4 : 1);
+    this.redraw();
+  }
+
+  private redraw(): void {
+    const state = this.disabled ? 'dis' : this.pressed ? 'prs' : this.hovered ? 'hov' : 'nrm';
+    const w = this.btnW;
+    const h = this.btnH;
+    const key = `btn_${this.variant}_${w}x${h}_${state}`;
+    bakedTexture(this.scene!, key, w + 2, h + 2, (g) => {
+      g.translateCanvas(1, 1);
+      const base =
+        this.variant === 'primary' ? GILT.deep : this.variant === 'danger' ? DANGER.base : INK[700];
+      const top = this.variant === 'primary' ? GILT.base : this.variant === 'danger' ? DANGER.light : INK[500];
+
+      g.fillStyle(this.disabled ? INK[650] : base, this.variant === 'ghost' ? 0.88 : 0.92);
+      g.fillRoundedRect(0, 0, w, h, RADIUS);
+      if (!this.disabled) {
+        if (this.pressed) {
+          // 按下：明显提亮 + 金边，松手即回落 —— 每次点击都有"确实按到了"
+          g.fillStyle(PAPER[100], 0.14);
+          g.fillRoundedRect(0, 0, w, h, RADIUS);
+          g.lineStyle(2, GILT.light, 0.95);
+        } else if (this.hovered) {
+          g.fillStyle(PAPER[100], 0.07);
+          g.fillRoundedRect(0, 0, w, h, RADIUS);
+          g.lineStyle(1.5, top, 1);
+        } else {
+          g.lineStyle(1, top, 0.7);
+        }
+      } else {
+        g.lineStyle(1, INK[500], 0.5);
+      }
+      g.strokeRoundedRect(0, 0, w, h, RADIUS);
+      if (!this.pressed && !this.disabled) {
+        // 内侧发丝高光：斜面感来自细线而不是粗边
+        g.lineStyle(1, PAPER[100], this.hovered ? 0.12 : 0.05);
+        g.strokeRoundedRect(1.5, 1.5, w - 3, h - 3, RADIUS - 2);
+      }
+    });
+    this.bg.setTexture(key);
+    this.label.setColor(css(this.pressed ? PAPER[50] : PAPER[100]));
+  }
+}
+
+/** 带过渡的数值条。任何数值变化都走 200~400ms 补间，没有生硬跳变。 */
+export class Bar extends Phaser.GameObjects.Container {
+  private readonly g: Phaser.GameObjects.Graphics;
+  private readonly barW: number;
+  private readonly barH: number;
+  private readonly color: number;
+  private value = 1;
+  private shown = 1;
+  private ghost = 1;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number, color: number) {
+    super(scene, x, y);
+    this.barW = w;
+    this.barH = h;
+    this.color = color;
+    // 底槽与描边是死的，烤成一张图；只有"充到多少"是活的。
+    // 一个 Bar 原本 6 个圆角矩形 ≈ 273 条命令，准备阶段屏上十几个就是三千多条，
+    // 而这层底每秒重放 60 次、画的却是同一个东西。
+    const key = `barTrack_${Math.round(w)}_${Math.round(h)}`;
+    bakedTexture(scene, key, w + 2, h + 2, (g) => {
+      g.fillStyle(INK[900], 0.9);
+      g.fillRoundedRect(0, 0, w + 2, h + 2, h / 2 + 1);
+      g.fillStyle(INK[600], 1);
+      g.fillRoundedRect(1, 1, w, h, h / 2);
+      g.lineStyle(1, INK[400], 0.9);
+      g.strokeRoundedRect(1, 1, w, h, h / 2);
+    });
+    this.add(scene.add.image(-1, -1, key).setOrigin(0));
+    this.g = scene.add.graphics();
+    this.add(this.g);
+    this.redraw();
+    scene.add.existing(this);
+    // Container 默认不在 scene 的 update list 里，补间动画（残影条）不会自己跑。
+    // 这里手动登记，否则带过渡的数值条会静止在初始值 —— 这个坑很隐蔽，
+    // 因为 setValue(animate=false) 看起来是好的，只有动画路径会露出问题。
+    scene.sys.updateList.add(this);
+  }
+
+  /** Phaser 的 UpdateList 只调 preUpdate，转发到 update */
+  preUpdate(): void {
+    this.update();
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.scene?.sys.updateList.remove(this);
+    super.destroy(fromScene);
+  }
+
+  setValue(v: number, animate = true): void {
+    this.value = Phaser.Math.Clamp(v, 0, 1);
+    if (!animate) {
+      this.shown = this.value;
+      this.ghost = this.value;
+      this.redraw();
+    }
+  }
+
+  override update(): void {
+    if (Math.abs(this.shown - this.value) > 0.0005) {
+      this.shown += (this.value - this.shown) * 0.14;
+      this.redraw();
+    }
+    // 残影条：掉血时留下缓慢追赶的白色残影，伤害量一眼可读
+    if (this.ghost > this.shown) {
+      this.ghost += (this.shown - this.ghost) * 0.05;
+      this.redraw();
+    } else if (this.ghost < this.shown) {
+      this.ghost = this.shown;
+    }
+  }
+
+  /** 只画"填充到哪了"这三块；底槽与描边已在烘焙图里 */
+  private redraw(): void {
+    const g = this.g;
+    const w = this.barW;
+    const h = this.barH;
+    const r = h / 2;
+    g.clear();
+    if (this.ghost > this.shown) {
+      g.fillStyle(PAPER[100], 0.32);
+      g.fillRoundedRect(0, 0, w * this.ghost, h, r);
+    }
+    g.fillStyle(this.color, 1);
+    g.fillRoundedRect(0, 0, w * this.shown, h, r);
+    // 顶部高光用普通矩形即可：它贴着上沿，左右两端被圆角裁掉的部分看不出来
+    g.fillStyle(PAPER[50], 0.2);
+    g.fillRect(1, 1, Math.max(0, w * this.shown - 2), Math.max(1, h * 0.32));
+  }
+}
+
+/** 徽章：羁绊档位、稀有度标签等 */
+export function makeChip(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  text: string,
+  color: number,
+  active = true,
+): Phaser.GameObjects.Container {
+  const c = scene.add.container(x, y);
+  const t = scene.add
+    .text(0, 0, text, {
+      fontFamily: FONT.body,
+      fontSize: '12px',
+      color: active ? css(PAPER[100]) : css(PAPER[500]),
+      letterSpacing: TRACK.label,
+    })
+    .setOrigin(0, 0.5);
+  const w = t.width + 16;
+  const h = 22;
+  const g = scene.add.graphics();
+  g.fillStyle(active ? INK[700] : INK[800], active ? 0.95 : 0.6);
+  g.fillRoundedRect(0, -h / 2, w, h, h / 2);
+  g.lineStyle(1.4, active ? color : INK[500], active ? 0.95 : 0.5);
+  g.strokeRoundedRect(0, -h / 2, w, h, h / 2);
+  if (active) {
+    g.fillStyle(color, 0.16);
+    g.fillRoundedRect(0, -h / 2, w, h, h / 2);
+  }
+  c.add([g, t]);
+  t.setPosition(8, 0);
+  c.setSize(w, h);
+  return c;
+}
+
+/** 分隔线 */
+export function divider(scene: Phaser.Scene, x: number, y: number, w: number): Phaser.GameObjects.Graphics {
+  const g = scene.add.graphics().setPosition(x, y);
+  g.lineStyle(1, INK[500], 0.8);
+  g.lineBetween(0, 0, w, 0);
+  g.lineStyle(1, GILT.base, 0.12);
+  g.lineBetween(0, 1, w, 1);
+  return g;
+}
+
+/** 有变化守卫的 setText：文本栅格化只发生在字符串真正变化时 */
+export function setTextIf(t: Phaser.GameObjects.Text, s: string): void {
+  if (t.text !== s) t.setText(s);
+}
+
+export function label(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  text: string,
+  size = 13,
+  color = UI.textSecondary,
+  font: 'title' | 'body' = 'body',
+): Phaser.GameObjects.Text {
+  return scene.add
+    .text(x, y, text, {
+      fontFamily: font === 'title' ? FONT.title : FONT.body,
+      fontSize: `${size}px`,
+      color: typeof color === 'number' ? `#${color.toString(16).padStart(6, '0')}` : color,
+    })
+    .setOrigin(0, 0);
+}
+
+/**
+ * 可滚动列表：给容器套几何遮罩并接管滚轮。
+ *
+ * 用于内容行数不定的面板（羁绊面板、战斗阵容面板）：行数超出可视高时滚动，
+ * 不超出时滚轮是空操作。内容高度由调用方在重建后通过 setHeight 告知 ——
+ * Container 的 height 依赖 getBounds 计算，重建频繁的面板自己记账更便宜。
+ */
+export interface ScrollHandle {
+  /** 内容实际高度（px）。≤ 可视高时复位到顶部 */
+  setHeight(contentH: number): void;
+}
+
+export function enableScroll(
+  scene: Phaser.Scene,
+  container: Phaser.GameObjects.Container,
+  viewX: number,
+  viewY: number,
+  viewW: number,
+  viewH: number,
+): ScrollHandle {
+  const homeY = container.y;
+  let max = 0;
+  const clamp = () => {
+    container.y = Phaser.Math.Clamp(container.y, homeY - max, homeY);
+  };
+  const g = scene.make.graphics({ x: 0, y: 0 }, false);
+  g.fillStyle(0xffffff, 1);
+  g.fillRect(viewX, viewY, viewW, viewH);
+  container.setMask(g.createGeometryMask());
+  scene.input.on('wheel', (_p: Phaser.Input.Pointer, _ox: number, _oy: number, dz: number) => {
+    if (max <= 0 || !container.scene) return;
+    container.y -= dz;
+    clamp();
+  });
+  return {
+    setHeight(contentH: number): void {
+      max = Math.max(0, contentH - viewH);
+      if (max <= 0) container.y = homeY;
+      else clamp();
+    },
+  };
+}

@@ -1,0 +1,882 @@
+/**
+ * 对局编排（Match）。
+ *
+ * 一整局 8 人自走棋的状态机：准备 → 战斗 → 结算 → 淘汰，直到只剩一人。
+ *
+ * 三条设计契约：
+ * 1. **无头可跑** —— 本文件不引用 Phaser / DOM。Node 里可以直接 new Match(seed) 跑完整局，
+ *    用于平衡模拟和回归测试。
+ * 2. **完全确定** —— 唯一的随机源是 this.rng。同样的 seed + 同样的玩家操作序列 ⇒ 同样的一局。
+ * 3. **内核与编排解耦** —— Match 只负责"谁打谁""打完谁掉多少血"，不关心战斗怎么演。
+ *    渲染层拿 buildBattleConfig() 去喂 Battle；模拟脚本直接 run()。两边用同一份配置，
+ *    所以模拟出来的平衡数据和玩家实际看到的表现是同一件事。
+ */
+
+import { Rng } from '../core/rng';
+import { Battle } from '../core/battle';
+import {
+  BENCH_SLOTS,
+  MATCH_TUNING,
+  MAX_LEVEL,
+  PLAYER_START_HP,
+  PREP_SECONDS,
+  PREP_SECONDS_LATE,
+  PREP_LATE_FROM_ROUND,
+  REROLL_COST,
+  ROUND_BASE_DAMAGE,
+  SHOP_SLOTS,
+  XP_BUY_COST,
+  XP_PER_ROUND,
+} from '../core/config';
+import { CHAMPION_BY_ID, CHAMPION_IDS_BY_COST } from '../data/champions';
+import { computeTraits } from './comp';
+import { gainXp, computeIncome } from './economy';
+import { CardPool, rollShop } from './pool';
+import { aiTakeTurn, AI_ROSTER, chooseAdventureIndex, makeProfile, type AiWorld } from './ai';
+import {
+  COMBINED_ITEM_IDS,
+  fnv1aHex,
+  rollAdventureOffer,
+  adventureGold,
+  adventureXp,
+  adventureReinforceCost,
+  reinforceRefund,
+  type AdventureOffer,
+  type AdventureOption,
+} from './adventure';
+import type { BattleSnapshot } from './replay';
+import { generateBeastBoard, BEAST_NAME } from './beast';
+import { addItem, autoEquip, stripItems } from './inventory';
+import { COMPONENT_IDS, ITEM_BY_ID } from '../data/items';
+import {
+  allUnits,
+  benchCount,
+  boardCap,
+  boardColOf,
+  boardCount,
+  boardIdx,
+  boardRowOf,
+  bumpIidCounter,
+  cloneBoard,
+  createUnit,
+  addToBench,
+  emptyBench,
+  emptyBoard,
+  localToGlobalRow,
+  resolveMerges,
+  sellValue,
+  type PlayerState,
+  type Phase,
+  type UnitInstance,
+} from './state';
+import type { ActiveTrait, BattleConfig, BattleResult, BattleUnitInput } from '../core/types';
+
+/** 把一个半场棋盘展开成入场单位。uid 从 1（team 0）或 101（team 1）开始顺序分配。 */
+function pushBoard(
+  out: BattleUnitInput[],
+  board: readonly (UnitInstance | null)[],
+  team: 0 | 1
+): void {
+  let i = 0;
+  for (let idx = 0; idx < board.length; idx++) {
+    const u = board[idx];
+    if (!u) continue;
+    out.push({
+      uid: team === 0 ? i + 1 : 101 + i,
+      defId: u.defId,
+      team,
+      star: u.star,
+      cell: { c: boardColOf(idx), r: localToGlobalRow(team, boardRowOf(idx)) },
+      items: u.items.length > 0 ? [...u.items] : undefined,
+      monster: u.isBeast ? true : undefined,
+    });
+    i++;
+  }
+}
+
+/**
+ * 棋盘 → uid 映射。uid 的分配规则必须与 pushBoard 完全一致，
+ * 否则结算时"哪个单位活下来了"会对不上号。
+ */
+export function boardUids(
+  board: readonly (UnitInstance | null)[],
+  team: 0 | 1
+): Map<number, UnitInstance> {
+  const out = new Map<number, UnitInstance>();
+  let i = 0;
+  for (const u of board) {
+    if (!u) continue;
+    out.set(team === 0 ? i + 1 : 101 + i, u);
+    i++;
+  }
+  return out;
+}
+
+export interface Pairing {
+  /** 上半场（team 0）的玩家 */
+  a: number;
+  /** 下半场（team 1）的玩家；-1 表示没有真人对手 */
+  b: number;
+  /** 墨影对手：沿用该玩家淘汰时的阵容。-1 表示轮空。 */
+  ghost: number;
+  /**
+   * 是否把 pair.a 放到下半场。
+   * 玩家永远从下半场观战 —— 这是自走棋不可动摇的视角直觉。
+   */
+  swap: boolean;
+  /** 墨兽轮：所有存活玩家各自单挑同一只墨兽 */
+  beast: boolean;
+}
+
+export interface RoundOutcome {
+  idx: number;
+  outcome: 'win' | 'loss' | 'draw' | 'bye';
+  damage: number;
+  hpAfter: number;
+  eliminated: boolean;
+  /** 本场掉落的装备（墨兽轮） */
+  drops: string[];
+}
+
+export interface MatchSettings {
+  /** 买入棋子后自动上场（有空余人口时）。新手友好默认开，老手可在设置里关掉。 */
+  autoDeploy: boolean;
+}
+
+export class Match implements AiWorld {
+  readonly seed: number;
+  rng: Rng;
+  pool: CardPool;
+  players: PlayerState[];
+  round = 0;
+  phase: Phase = 'prep';
+  pairings: Pairing[] = [];
+  /** 玩家的最终名次（0 = 游戏中）。非 AI 玩家的结局写在这里。 */
+  humanRank = 0;
+  /** 淘汰玩家留下的阵容快照，用于奇数人时的「墨影」对战 */
+  private ghosts = new Map<number, (UnitInstance | null)[]>();
+  /** 本回合的墨兽阵容（全体玩家面对同一只） */
+  private beastBoard: (UnitInstance | null)[] | null = null;
+  /** 事件日志，结算面板与调试用 */
+  log: string[] = [];
+  settings: MatchSettings = { autoDeploy: true };
+  /** 对局模式：daily 的种子来自日期哈希，ResultScene 据此记录每日最佳名次 */
+  readonly mode: 'normal' | 'daily';
+  /**
+   * 奇遇轮恩赐选择（M3）：同一回合全员共享同一份 2~3 选 1。
+   * 非 null 表示准备阶段待人选择；AI 在 beginRound 内按原型偏好即选，
+   * 人类在准备阶段任意时刻点选；进入战斗阶段未选即过期（无惩罚）并清空。
+   */
+  adventureOffer: AdventureOffer | null = null;
+  /** 每场战斗的快照（M4 回放）：种子 + 双方配置 + 结果指纹，随存档持久化 */
+  battleSnapshots: BattleSnapshot[] = [];
+
+  constructor(seed: number, humanName = '你', mode: 'normal' | 'daily' = 'normal') {
+    this.mode = mode;
+    this.seed = seed >>> 0;
+    this.rng = new Rng(this.seed);
+    this.pool = new CardPool();
+    this.players = [];
+
+    // 玩家 0 是人类，1~7 是 AI
+    this.players.push(this.blankPlayer(0, humanName, true));
+    for (let i = 0; i < AI_ROSTER.length; i++) {
+      const entry = AI_ROSTER[i];
+      const p = this.blankPlayer(i + 1, entry.name, false);
+      p.ai = makeProfile(entry.arch);
+      this.players.push(p);
+    }
+    this.log.push('对局开始 · 八方入场');
+  }
+
+  private blankPlayer(idx: number, name: string, isHuman: boolean): PlayerState {
+    return {
+      idx,
+      name,
+      isHuman,
+      hp: PLAYER_START_HP,
+      gold: 2,
+      level: 2,
+      xp: 0,
+      streak: 0,
+      bestStreak: 0,
+      board: emptyBoard(),
+      bench: emptyBench(),
+      items: [],
+      shop: new Array(SHOP_SLOTS).fill(null),
+      shopLocked: false,
+      alive: true,
+      rank: 0,
+      opponents: [],
+      wins: 0,
+      losses: 0,
+      ai: null,
+      lastOutcome: null,
+      lastDamage: 0,
+      totalDamage: 0,
+    };
+  }
+
+  // ── 查询 ──────────────────────────────────────────────
+
+  get human(): PlayerState {
+    return this.players[0];
+  }
+
+  alivePlayers(): PlayerState[] {
+    return this.players.filter((p) => p.alive);
+  }
+
+  aliveCount(): number {
+    return this.alivePlayers().length;
+  }
+
+  isOver(): boolean {
+    return this.aliveCount() <= 1;
+  }
+
+  /** 当前排名（用于计分板排序），第 1 名在最前 */
+  standings(): PlayerState[] {
+    return [...this.players].sort((a, b) => {
+      if (a.alive !== b.alive) return a.alive ? -1 : 1;
+      if (!a.alive) return (b.rank || 99) - (a.rank || 99);
+      if (a.hp !== b.hp) return b.hp - a.hp;
+      if (a.level !== b.level) return b.level - a.level;
+      return a.idx - b.idx;
+    });
+  }
+
+  prepSeconds(): number {
+    return this.round >= PREP_LATE_FROM_ROUND ? PREP_SECONDS_LATE : PREP_SECONDS;
+  }
+
+  /**
+   * 是否为墨兽轮（PvE）。
+   * 每 4 回合一次：3 / 7 / 11 / 15 …
+   * 前两回合是纯粹的建设期，不该上来就打怪；之后固定节奏插入。
+   */
+  isBeastRound(round = this.round): boolean {
+    return round >= 3 && round % 4 === 3;
+  }
+
+  /**
+   * 是否为奇遇轮（PvE 恩赐）。
+   * 与墨兽轮（3/7/11…）交替：5/9/13…—— 前两回合是建设期，第 3 轮墨兽、
+   * 第 5 轮奇遇，之后每 4 回合交替一次。
+   */
+  isAdventureRound(round = this.round): boolean {
+    return round >= 5 && round % 4 === 1;
+  }
+
+  /** 人类玩家点选奇遇恩赐（index 对应 adventureOffer.options 下标；每回合至多一次） */
+  resolveAdventure(index: number): void {
+    const offer = this.adventureOffer;
+    if (!offer) return; // 已过期（战斗阶段开始被清空）或本回合非奇遇轮：无可选恩赐
+    const opt = offer.options[index];
+    if (!opt) return; // 非法下标：不发放、不清空，调用方可重试
+    this.grantAdventure(this.human, opt, offer.round);
+    this.adventureOffer = null;
+  }
+
+  /**
+   * 发放一份奇遇恩赐（人类 resolveAdventure 与 AI 即选共用同一入口）。
+   *
+   * 纪律：只走既有系统入账 —— 金币直接加持有、经验走 gainXp、装备走 addItem
+   * （器匣，与墨兽轮 rollItemDrops 同一发放路径）、援军走 createUnit + 卡池扣除
+   * （2★ 占 3 张）+ 备战席入驻。任何入不了账的情况（备战席满 / 卡池余量不足）
+   * 按棋子卖出价折算金币返还，保证卡与金币守恒。
+   */
+  private grantAdventure(p: PlayerState, opt: AdventureOption, round: number): void {
+    switch (opt.kind) {
+      case 'gold': {
+        const n = adventureGold(round);
+        p.gold += n;
+        this.log.push(`${p.name} 奇遇 · 金币 +${n}`);
+        break;
+      }
+      case 'xp': {
+        const n = adventureXp(round);
+        gainXp(p, n);
+        this.log.push(`${p.name} 奇遇 · 经验 +${n}（等级 ${p.level}）`);
+        break;
+      }
+      case 'item': {
+        const id = this.rng.pick(COMBINED_ITEM_IDS);
+        addItem(p, id);
+        this.log.push(`${p.name} 奇遇 · 丹青成装 · ${ITEM_BY_ID[id]?.name ?? id} 入装备栏`);
+        break;
+      }
+      case 'reinforce':
+        this.grantReinforce(p, round);
+        break;
+    }
+  }
+
+  /** 援军恩赐：2★ 棋子占卡池 3 张入驻备战席；入不了账按卖出价折金返还（守恒） */
+  private grantReinforce(p: PlayerState, round: number): void {
+    const cost = adventureReinforceCost(round);
+    const refund = reinforceRefund(round); // = 2★ 卖出价（state.sellValue 口径）
+    if (benchCount(p) >= BENCH_SLOTS) {
+      p.gold += refund;
+      this.log.push(`${p.name} 奇遇 · 援军备战席已满 · 折算金币 +${refund}`);
+      return;
+    }
+    const candidates = (CHAMPION_IDS_BY_COST[cost] ?? []).filter((id) => this.pool.remaining(id) >= 3);
+    if (candidates.length === 0) {
+      // 该费用档全池余量不足 3 张：改为折金返还，不凭空造卡
+      p.gold += refund;
+      this.log.push(`${p.name} 奇遇 · 援军卡池余量不足 · 折算金币 +${refund}`);
+      return;
+    }
+    const id = this.rng.pick(candidates);
+    for (let i = 0; i < 3; i++) this.pool.take(id);
+    const u = createUnit(id, 2);
+    const slot = addToBench(p, u);
+    if (slot < 0) {
+      // 理论不可达（上方已检查备战席有空位），防御性兜底：卡回池、折金返还
+      this.pool.giveUnit(id, 2);
+      p.gold += refund;
+      this.log.push(`${p.name} 奇遇 · 援军备战席已满 · 折算金币 +${refund}`);
+      return;
+    }
+    const merges = resolveMerges(p);
+    this.log.push(`${p.name} 奇遇 · 援军 ${CHAMPION_BY_ID[id]?.name ?? id} 2★ 入驻备战席`);
+    for (const m of merges) {
+      this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[m.defId]?.name ?? m.defId} ${m.star}★`);
+    }
+  }
+
+  /** 展示名：墨兽轮显示「墨兽」而不是玩家名 */
+  displayNameOfTeam(pair: Pairing, team: 0 | 1): string {
+    const idx = this.playerIdxOfTeam(pair, team);
+    if (pair.beast) return BEAST_NAME;
+    if (idx >= 0) return this.players[idx].name;
+    if (pair.ghost >= 0) return '墨影';
+    return '（轮空）';
+  }
+
+  // ── 回合开始 ──────────────────────────────────────────
+
+  /**
+   * 进入下一个准备阶段：发钱、涨经验、刷商店、AI 行动。
+   * 这一步在渲染层表现为"回合开始"的那一刻。
+   */
+  beginRound(): void {
+    if (this.isOver()) {
+      this.phase = 'over';
+      return;
+    }
+    this.round++;
+    this.phase = 'prep';
+
+    // 墨兽阵容在回合开始时生成一次，全体玩家面对同一只。
+    // 各自 roll 会导致"有人打 Boss 有人打小怪"，那不是 PvE，是抽奖。
+    this.beastBoard = this.isBeastRound() ? generateBeastBoard(this.round, this.rng) : null;
+
+    // 奇遇轮（M3）：全员共享同一份恩赐选项。掷点位置固定在墨兽阵容生成之后、
+    // 收入结算之前 —— 同一种子的 rng 流 ⇒ 完全相同的 offer（对局层确定性契约）。
+    // 非奇遇轮显式置空，清掉任何残留。
+    this.adventureOffer = this.isAdventureRound() ? rollAdventureOffer(this.round, this.rng) : null;
+
+    for (const p of this.alivePlayers()) {
+      // 1) 结算上一回合的收入（第一回合没有上一回合）
+      if (this.round > 1) {
+        const won = p.lastOutcome === 'win';
+        const inc = computeIncome(p, won, p.lastOutcome === 'bye');
+        p.gold += inc.total;
+      }
+      // 2) 经验
+      gainXp(p, XP_PER_ROUND);
+      // 3) 商店：锁定只保一回合，用掉即清
+      if (p.shopLocked) {
+        p.shopLocked = false;
+      } else {
+        p.shop = rollShop(this.pool, this.rng, p.level);
+      }
+    }
+
+    // 4) AI 行动。按 index 顺序，保证确定性。
+    for (const p of this.alivePlayers()) {
+      if (p.isHuman) continue;
+      // 奇遇轮：AI 按原型偏好即选即结算，与人类走同一发放函数。
+      // 选择是纯函数不消耗 rng；发放（item/reinforce）消耗的 rng 按 index 顺序
+      // 固定发生，整局仍完全可复现。人类玩家的 offer 保留至点选或战斗开始。
+      if (p.ai && this.adventureOffer) {
+        const idx = chooseAdventureIndex(p.ai, this.adventureOffer);
+        this.grantAdventure(p, this.adventureOffer.options[idx], this.adventureOffer.round);
+      }
+      aiTakeTurn(this, p);
+    }
+
+    this.log.push(`第 ${this.round} 回合 · 准备 · 存活 ${this.aliveCount()} 人`);
+  }
+
+  // ── 玩家动作 ──────────────────────────────────────────
+
+  /** 买入商店第 slot 张 */
+  buy(p: PlayerState, slot: number): boolean {
+    const id = p.shop[slot];
+    if (!id) return false;
+    const def = CHAMPION_BY_ID[id];
+    if (!def) return false;
+    if (p.gold < def.cost) return false;
+    // 备战席必须能放下，除非买进来立刻能合成腾出空间
+    const copies = allUnits(p).filter((u) => u.defId === id && u.star === 1).length;
+    if (benchCount(p) >= BENCH_SLOTS && copies < 2) return false;
+    if (!this.pool.take(id)) {
+      p.shop[slot] = null;
+      return false;
+    }
+    p.gold -= def.cost;
+    p.shop[slot] = null;
+    const u = createUnit(id, 1);
+    // "满席 + 买来即合成"路径：新子仍可能无处落脚（合成要等 resolveMerges 才腾位）。
+    // 落不下就整体回滚 —— 卡、钱、商店格一项都不能被吞掉。
+    if (addToBench(p, u) < 0) {
+      this.pool.giveUnit(id, 1);
+      p.gold += def.cost;
+      p.shop[slot] = id;
+      return false;
+    }
+    const merges = resolveMerges(p);
+    if (merges.length > 0) {
+      this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★`);
+    }
+    // 新手友好：人口有空位就自动上场
+    if (this.settings.autoDeploy) this.tryAutoDeploy(p, u.iid);
+    return true;
+  }
+
+  /** 卖出棋子，按星级返还金币并把卡放回池 */
+  sell(p: PlayerState, iid: number): boolean {
+    const fromBoard = p.board.findIndex((u) => u !== null && u.iid === iid);
+    const fromBench = p.bench.findIndex((u) => u !== null && u.iid === iid);
+    const slot = fromBoard >= 0 ? fromBoard : fromBench;
+    if (slot < 0) return false;
+    const arr = fromBoard >= 0 ? p.board : p.bench;
+    const u = arr[slot];
+    if (!u) return false;
+    arr[slot] = null;
+    p.gold += sellValue(u);
+    this.pool.giveUnit(u.defId, u.star);
+    stripItems(p, u);
+    return true;
+  }
+
+  /** 刷新商店 */
+  reroll(p: PlayerState): boolean {
+    if (p.gold < REROLL_COST) return false;
+    p.gold -= REROLL_COST;
+    p.shop = rollShop(this.pool, this.rng, p.level);
+    return true;
+  }
+
+  /** 花 4 金买 4 经验 */
+  buyExp(p: PlayerState): boolean {
+    if (p.level >= MAX_LEVEL) return false;
+    if (p.gold < XP_BUY_COST) return false;
+    p.gold -= XP_BUY_COST;
+    gainXp(p, 4);
+    return true;
+  }
+
+  /** 把备战席棋子放到场上空位（自动布阵 / 买入后上场用） */
+  tryAutoDeploy(p: PlayerState, iid: number): boolean {
+    if (boardCount(p) >= boardCap(p)) return false;
+    const slot = p.bench.findIndex((u) => u !== null && u.iid === iid);
+    if (slot < 0) return false;
+    const u = p.bench[slot]!;
+    // 同名已在场 → 不上
+    if (p.board.some((x) => x !== null && x.defId === u.defId)) return false;
+    const target = this.suggestSlot(p, u.defId);
+    p.bench[slot] = null;
+    p.board[target] = u;
+    return true;
+  }
+
+  /** 按职业纵深推荐一个空格 */
+  suggestSlot(p: PlayerState, defId: string): number {
+    const def = CHAMPION_BY_ID[defId];
+    const depthRaw = def ? { guardian: 0, warrior: 0.12, assassin: 0.95, marksman: 0.72, mage: 0.78, warlock: 0.6, support: 0.88 }[def.cls] ?? 0.5 : 0.5;
+    const preferredRow = Math.min(3, Math.floor(depthRaw * 4));
+    const order: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      const half = 3.5;
+      order.push(Math.round(half + (i % 2 === 0 ? -Math.ceil(i / 2) : Math.ceil(i / 2))));
+    }
+    for (let r = preferredRow; r < 4; r++) {
+      for (const c of order) {
+        const i = boardIdx(c, r);
+        if (!p.board[i]) return i;
+      }
+    }
+    for (let i = 0; i < p.board.length; i++) if (!p.board[i]) return i;
+    return 0;
+  }
+
+  // ── 配对与战斗 ────────────────────────────────────────
+
+  /**
+   * 生成本回合的配对。
+   *
+   * 规则：随机洗牌后贪心配对，优先避开最近两回合交过手的对手 ——
+   * 玩家最烦的事之一，就是连续三轮撞同一个人。
+   * 人数为奇数时，落单者与「墨影」（最近一名被淘汰玩家的阵容）交战；
+   * 若还没有人被淘汰，则轮空（不掉血也不加连胜）。
+   */
+  makePairings(): Pairing[] {
+    // 战斗阶段开始处（渲染层 startBattlePhase → makePairings）：清空未选的奇遇恩赐。
+    // 过期无惩罚 —— 恩赐是馈赠不是任务，漏选不该变成扣血。
+    this.adventureOffer = null;
+    // 墨兽轮：每个存活玩家各自单挑同一只墨兽，玩家固定在下半场
+    if (this.isBeastRound()) {
+      return this.alivePlayers().map((p) => ({ a: p.idx, b: -1, ghost: -1, swap: true, beast: true }));
+    }
+    const alive = this.rng.shuffle(this.alivePlayers().map((p) => p.idx));
+    const out: Pairing[] = [];
+    const used = new Set<number>();
+
+    for (const a of alive) {
+      if (used.has(a)) continue;
+      const cands = alive.filter((b) => b !== a && !used.has(b));
+      if (cands.length === 0) {
+        const ghost = this.pickGhost(a);
+        out.push({ a, b: -1, ghost, swap: a === 0, beast: false });
+        used.add(a);
+        continue;
+      }
+      const recent = this.players[a].opponents.slice(-2);
+      const fresh = cands.filter((b) => !recent.includes(b));
+      const b = (fresh.length > 0 ? fresh : cands)[0];
+      used.add(a);
+      used.add(b);
+      // 人类玩家固定打下半场
+      out.push({ a, b, ghost: -1, swap: a === 0, beast: false });
+      // 记录交手历史
+      this.players[a].opponents.push(b);
+      this.players[b].opponents.push(a);
+    }
+    return out;
+  }
+
+  /** 取一个墨影对手：最近被淘汰、且有阵容可复用的玩家 */
+  private pickGhost(forIdx: number): number {
+    const dead = this.players.filter((p) => !p.alive && p.idx !== forIdx);
+    if (dead.length === 0) return -1;
+    // 取 rank 最大的（最早被淘汰的）反而最弱，取 rank 最小的（最近淘汰的）最有挑战性
+    dead.sort((x, y) => (x.rank || 99) - (y.rank || 99));
+    for (const d of dead) {
+      if (this.ghosts.has(d.idx) && this.ghosts.get(d.idx)!.some((u) => u !== null)) return d.idx;
+    }
+    return -1;
+  }
+
+  /** 记录一个玩家的阵容快照（每回合结束时调用，淘汰后即成为墨影） */
+  private snapshot(p: PlayerState): void {
+    this.ghosts.set(p.idx, cloneBoard(p.board));
+  }
+
+  /**
+   * 构造一场战斗的配置。渲染层用它建 Battle 逐步播放；模拟脚本用它直接 run()。
+   * 种子由 对局种子 + 回合 + 配对 派生，保证可复现。
+   *
+   * @param swap 把 pair.a 放到下半场（team 1）。玩家总是从下半场视角观战 ——
+   *             "自己人在下面"是自走棋不可动摇的直觉，不该因为配对顺序而翻转。
+   */
+  buildBattleConfig(pair: Pairing, swap = false): BattleConfig {
+    const pa = this.players[pair.a];
+    const seed = (this.seed ^ (this.round * 0x9e3779b1) ^ (pair.a * 0x85ebca6b) ^ ((pair.b + 2) * 0xc2b2ae35)) >>> 0;
+    const opponentBoard = this.boardOfOpponent(pair);
+
+    const teamA: 0 | 1 = swap ? 1 : 0;
+    const teamB: 0 | 1 = swap ? 0 : 1;
+
+    const units: BattleUnitInput[] = [];
+    pushBoard(units, pa.board, teamA);
+    pushBoard(units, opponentBoard, teamB);
+
+    return {
+      seed,
+      units,
+      traits: {
+        [teamA]: this.traitsOf(pa.board),
+        [teamB]: this.traitsOf(opponentBoard),
+      },
+    };
+  }
+
+  /** 棋盘 → 激活羁绊列表 */
+  traitsOf(board: readonly (UnitInstance | null)[]): ActiveTrait[] {
+    const ids: string[] = [];
+    for (const u of board) if (u) ids.push(u.defId);
+    return computeTraits(ids).map((t) => ({ id: t.id, count: t.count, tier: t.tier }));
+  }
+
+  /**
+   * 无头跑完一场（模拟脚本与"别人的战斗"用）。
+   *
+   * recordEvents=true 时额外计算事件流的 FNV-1a 摘要（M4 回放校验用）。
+   * 每场战斗结束都会向 battleSnapshots 追加一条快照（round/config/winner/ticks/digest），
+   * 记录是**纯观察者**：config 原样引用、不触碰 this.rng，战斗结果与后续 rng 流
+   * 完全不受影响 —— 这是对局层确定性契约的一部分。
+   */
+  runBattleHeadless(pair: Pairing, swap = pair.swap, recordEvents = false): BattleResult {
+    const config = this.buildBattleConfig(pair, swap);
+    const battle = new Battle(config, null, recordEvents);
+    const result = battle.run();
+    this.battleSnapshots.push({
+      round: this.round,
+      config,
+      winner: result.winner as 0 | 1 | null,
+      ticks: result.ticks,
+      eventsDigest: recordEvents ? fnv1aHex(JSON.stringify(battle.events)) : '',
+    });
+    return result;
+  }
+
+  // ── 结算 ──────────────────────────────────────────────
+
+  /**
+   * 败方应受的伤害 = 阶段基础伤害 + 胜方每个**存活**单位的追加伤害。
+   * 只算存活单位，是因为"我用三个人换掉你五个，最后只剩一个残血"应该算是打赢了。
+   */
+  damageOf(result: BattleResult, winnerTeam: 0 | 1, winnerBoard: readonly (UnitInstance | null)[]): number {
+    const baseCurve = ROUND_BASE_DAMAGE[Math.min(this.round, ROUND_BASE_DAMAGE.length - 1)];
+    // 后期处决曲线放缓：round ≥ lateDamageCurveFromRound 的 base 段乘该系数，
+    // 存活追加伤害（extra）不受影响 —— 只放缓"阶段处决"，不动"打赢余威"。
+    const lateScale =
+      this.round >= MATCH_TUNING.lateDamageCurveFromRound ? MATCH_TUNING.lateDamageCurveScale : 1;
+    const uids = boardUids(winnerBoard, winnerTeam);
+    let extra = 0;
+    for (const uid of result.survivors[winnerTeam] ?? []) {
+      const u = uids.get(uid);
+      if (!u) continue;
+      extra += MATCH_TUNING.damagePerSurvivor + (u.star - 1) * MATCH_TUNING.damagePerStar;
+    }
+    // 至少 1 点：0 伤害的败北会让玩家觉得"白打了"
+    return Math.max(1, Math.round((baseCurve * lateScale + extra) * MATCH_TUNING.playerDamageScale));
+  }
+
+  /**
+   * 结算一场战斗：更新连胜连败、扣血、判定淘汰。
+   * @returns 双方的结果描述
+   */
+  applyBattleResult(pair: Pairing, result: BattleResult): RoundOutcome[] {
+    const pa = this.players[pair.a];
+    const opponentBoard = this.boardOfOpponent(pair);
+    const out: RoundOutcome[] = [];
+
+    // 轮空：不掉血，但不给连胜奖励（否则轮空太划算）。
+    // 注意必须排除墨兽轮 —— 墨兽配对的 b 与 ghost 同样是 -1，
+    // 不排除的话它会在这里被当成轮空提前返回，既不掉血也不掉装备。
+    if (!pair.beast && pair.b < 0 && pair.ghost < 0) {
+      pa.lastOutcome = 'bye';
+      pa.lastDamage = 0;
+      out.push({ idx: pa.idx, outcome: 'bye', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [] });
+      return out;
+    }
+
+    if (result.winner === null) {
+      // 同归于尽：双方都不掉血，连胜连败清零
+      pa.lastOutcome = 'draw';
+      pa.streak = 0;
+      pa.lastDamage = 0;
+      out.push({ idx: pa.idx, outcome: 'draw', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [] });
+      if (pair.b >= 0) {
+        const pb = this.players[pair.b];
+        pb.lastOutcome = 'draw';
+        pb.streak = 0;
+        pb.lastDamage = 0;
+        out.push({ idx: pb.idx, outcome: 'draw', damage: 0, hpAfter: pb.hp, eliminated: false, drops: [] });
+      }
+      return out;
+    }
+
+    // pair.a 在 swap 时位于 team 1，所以"a 是否获胜"要按交换后的队号判断
+    const aTeam: 0 | 1 = pair.swap ? 1 : 0;
+    const aWon = result.winner === aTeam;
+    const winnerTeam = result.winner as 0 | 1;
+    const dmg = this.damageOf(result, winnerTeam, aWon ? pa.board : opponentBoard);
+
+    if (aWon) {
+      this.applyWin(pa, out, pair.beast);
+    }
+    // 墨影战：赢了没人可掉血；输了照样掉血（否则墨影战 = 免费轮空）
+    if (pair.b >= 0) {
+      const pb = this.players[pair.b];
+      if (aWon) this.applyLoss(pb, dmg, out, pa);
+      else this.applyWin(pb, out);
+      // 败方的 applyLoss 会把伤害记到胜者名下，这里不要再累加一次
+    }
+    if (!aWon) this.applyLoss(pa, dmg, out, pair.b >= 0 ? this.players[pair.b] : null, pair.beast);
+
+    return out;
+  }
+
+  private applyWin(p: PlayerState, out: RoundOutcome[], beast = false): void {
+    p.wins++;
+    p.lastOutcome = 'win';
+    p.lastDamage = 0;
+    this.applyStreak(p, true);
+    const drops = beast ? this.rollItemDrops(p, true) : [];
+    out.push({ idx: p.idx, outcome: 'win', damage: 0, hpAfter: p.hp, eliminated: false, drops });
+  }
+
+  private applyLoss(
+    p: PlayerState,
+    dmg: number,
+    out: RoundOutcome[],
+    winner: PlayerState | null,
+    beast = false
+  ): void {
+    p.losses++;
+    p.lastOutcome = 'loss';
+    p.lastDamage = dmg;
+    p.hp = Math.max(0, p.hp - dmg);
+    this.applyStreak(p, false);
+    if (winner) winner.totalDamage += dmg;
+    const dead = p.hp <= 0 && p.alive;
+    if (dead) this.eliminate(p);
+    // 墨兽轮输了也给一件保底，否则弱势玩家会彻底断掉装备来源，雪崩无解
+    const drops = beast ? this.rollItemDrops(p, false) : [];
+    out.push({ idx: p.idx, outcome: 'loss', damage: dmg, hpAfter: p.hp, eliminated: dead, drops });
+  }
+
+  boardOfOpponent(pair: Pairing): readonly (UnitInstance | null)[] {
+    if (pair.beast) return this.beastBoard ?? emptyBoard();
+    return pair.b >= 0 ? this.players[pair.b].board : (this.ghosts.get(pair.ghost) ?? emptyBoard());
+  }
+
+  /** 某个队伍对应的玩家序号。-1 = 墨影（已淘汰玩家的残影） */
+  playerIdxOfTeam(pair: Pairing, team: 0 | 1): number {
+    const teamOfA: 0 | 1 = pair.swap ? 1 : 0;
+    if (team === teamOfA) return pair.a;
+    return pair.b; // 可能是 -1（墨影 / 轮空）
+  }
+
+
+  /**
+   * 墨兽轮掉落。
+   *
+   * 输了也给一件保底 —— 这不是仁慈，是防止雪崩：
+   * 装备差距一旦在早期拉开，弱势玩家会连输到再也拿不到装备，对局在中段就提前结束了。
+   */
+  private rollItemDrops(p: PlayerState, won: boolean): string[] {
+    const drops: string[] = [];
+    if (won) {
+      drops.push(this.rng.pick(COMPONENT_IDS));
+      if (this.rng.chance(0.35)) drops.push(this.rng.pick(COMPONENT_IDS));
+    } else if (this.rng.chance(0.4)) {
+      drops.push(this.rng.pick(COMPONENT_IDS));
+    }
+    for (const d of drops) addItem(p, d);
+    return drops;
+  }
+
+  /** AI 分配装备：把装备栏里的东西装到最合适的棋子上 */
+  equipItemsFor(p: PlayerState): void {
+    autoEquip(p);
+  }
+
+  private applyStreak(p: PlayerState, won: boolean): void {
+    if (won) {
+      p.streak = p.streak > 0 ? p.streak + 1 : 1;
+      if (p.streak > p.bestStreak) p.bestStreak = p.streak;
+    } else {
+      p.streak = p.streak < 0 ? p.streak - 1 : -1;
+    }
+  }
+
+  private eliminate(p: PlayerState): void {
+    this.snapshot(p);
+    p.alive = false;
+    // 淘汰名次 = 淘汰瞬间还活着的人数（含自己）
+    p.rank = this.aliveCount() + 1;
+    // 阵容回池：让玩家能感觉到"某某死了，他的牌回到池子里了"
+    for (const u of allUnits(p)) {
+      stripItems(p, u);
+      this.pool.giveUnit(u.defId, u.star);
+    }
+    p.board = emptyBoard();
+    p.bench = emptyBench();
+    if (p.isHuman) this.humanRank = p.rank;
+    this.log.push(`${p.name} 被淘汰 · 第 ${p.rank} 名`);
+  }
+
+  /** 每回合战斗全部结束后调用：快照阵容、推进阶段、判定游戏结束 */
+  endRound(): void {
+    for (const p of this.alivePlayers()) this.snapshot(p);
+    if (this.isOver()) {
+      this.phase = 'over';
+      const last = this.alivePlayers()[0];
+      if (last) {
+        last.rank = 1;
+        if (last.isHuman) this.humanRank = 1;
+        this.log.push(`${last.name} 获得胜利 · 第 1 名`);
+      }
+    } else {
+      this.phase = 'result';
+    }
+  }
+
+  // ── 存档 ──────────────────────────────────────────────
+
+  toJSON(): {
+    seed: number;
+    rngState: number;
+    round: number;
+    phase: Phase;
+    pool: Record<string, number>;
+    players: PlayerState[];
+    ghosts: [number, (UnitInstance | null)[]][];
+    /** 本回合的墨兽阵容 —— 不入存档的话，墨兽回合读档会变成打空场 */
+    beastBoard: (UnitInstance | null)[] | null;
+    settings: MatchSettings;
+    mode: 'normal' | 'daily';
+    battleSnapshots: BattleSnapshot[];
+    adventureOffer: AdventureOffer | null;
+  } {
+    return {
+      seed: this.seed,
+      rngState: this.rng.state,
+      round: this.round,
+      phase: this.phase,
+      pool: this.pool.snapshot(),
+      players: this.players,
+      ghosts: [...this.ghosts.entries()],
+      beastBoard: this.beastBoard ? cloneBoard(this.beastBoard) : null,
+      settings: this.settings,
+      mode: this.mode,
+      battleSnapshots: [...this.battleSnapshots],
+      adventureOffer: this.adventureOffer,
+    };
+  }
+
+  static fromJSON(data: ReturnType<Match['toJSON']>): Match {
+    const m = new Match(data.seed, '你', data.mode ?? 'normal');
+    m.rng.state = data.rngState;
+    m.round = data.round;
+    m.phase = data.phase;
+    m.pool.restore(data.pool);
+    m.players = data.players;
+    m.ghosts = new Map(data.ghosts);
+    m.beastBoard = data.beastBoard ? cloneBoard(data.beastBoard) : null;
+    m.settings = data.settings ?? { autoDeploy: true };
+    m.battleSnapshots = data.battleSnapshots ?? [];
+    m.adventureOffer = data.adventureOffer ?? null;
+    // iid 计数器必须扫到所有存活引用（含墨影快照与墨兽阵容），
+    // 否则读档后 createUnit 可能发出重复 iid，拖拽与视图绑定会串单位
+    let maxIid = 0;
+    for (const p of m.players) {
+      for (const u of allUnits(p)) if (u.iid > maxIid) maxIid = u.iid;
+    }
+    for (const [, board] of m.ghosts) {
+      for (const u of board) if (u && u.iid > maxIid) maxIid = u.iid;
+    }
+    if (m.beastBoard) {
+      for (const u of m.beastBoard) if (u && u.iid > maxIid) maxIid = u.iid;
+    }
+    bumpIidCounter(maxIid);
+    return m;
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "sensitivity-demo",
+  "note": "示例：三条轴各取三档，演示 OAT 灵敏度扫描的输出形态。跑完约 1-2 分钟。",
+  "axes": [
+    { "path": "champ.duanyue.skill.atk", "values": [2.2, 3.0] },
+    { "path": "champ.pan.base.armor", "values": [24, 44] },
+    { "path": "trait.jianzong.crit", "values": [0.12, 0.2] }
+  ]
+}

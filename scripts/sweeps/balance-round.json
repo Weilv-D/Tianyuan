@@ -1,0 +1,9 @@
+{
+  "name": "balance-round",
+  "desc": "综合极差压缩：后期(应龙)小削、快攻(刺客暴击)小增、机关(惊羽弹幕)小削，OAT 定量后择优",
+  "axes": [
+    { "path": "champ.yinglong.skill.sp", "values": [4.0, 4.15] },
+    { "path": "trait.assassin.crit", "values": [0.22, 0.24] },
+    { "path": "champ.jingyu.skill.atk", "values": [0.62, 0.66] }
+  ]
+}

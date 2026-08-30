@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#14110E" />
+    <title>百战天元 · Tian Yuan</title>
+    <style>
+      :root {
+        --ink-900: #14110e;
+        --ink-800: #201b17;
+        --ink-700: #2a241e;
+        --paper-100: #efe4cd;
+        --gilt: #9a7d3d;
+        --cinnabar: #a63a26;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ink-900);
+        font-family: 'Songti SC', 'STSong', 'Noto Serif SC', 'SimSun', serif;
+        color: var(--paper-100);
+        -webkit-font-smoothing: antialiased;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #app canvas {
+        display: block;
+        image-rendering: auto;
+        box-shadow: 0 0 48px rgba(0, 0, 0, 0.45);
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: radial-gradient(ellipse at 50% 45%, #2b231a 0%, #14110e 70%);
+        z-index: 10;
+        transition: opacity 420ms ease;
+      }
+      #boot h1 {
+        margin: 0;
+        font-family: 'Songti SC', 'STZhongsong', 'SimSun', serif;
+        font-size: 46px;
+        font-weight: 400;
+        letter-spacing: 16px;
+        text-indent: 16px;
+        color: #efe4cd;
+      }
+      #boot .sub {
+        font-family: Georgia, serif;
+        font-size: 12px;
+        letter-spacing: 8px;
+        color: #a89472;
+      }
+      #boot .bar {
+        width: 240px;
+        height: 2px;
+        background: #332c24;
+        overflow: hidden;
+      }
+      #boot .bar i {
+        display: block;
+        height: 100%;
+        width: 30%;
+        background: linear-gradient(90deg, transparent, #9a7d3d, transparent);
+        animation: sweep 1.1s ease-in-out infinite;
+      }
+      @keyframes sweep {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(340%); }
+      }
+      #boot.hidden { opacity: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="boot">
+      <h1>百战天元</h1>
+      <div class="sub">TIAN YUAN</div>
+      <div class="bar"><i></i></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
