@@ -22,3 +22,4 @@ sweep-out/*
 Thumbs.db
 .DS_Store
 *.tsbuildinfo
+.vite/

@@ -26,6 +26,16 @@ npm run build    # tsc 严格类型检查 + 生产构建 → dist/
 
 要点：游戏零外部素材（视觉音频全程序化、字体走系统宋体系），单文件形态无任何外链（发布脚本内置体检，残留外链即失败）；相对路径 `base './'`，任意子目录托管可用。存档（对局进度 / 每日挑战 / 偏好）保存在**玩家本机浏览器**的 localStorage，不随文件走。
 
+### GitHub Pages 在线版
+
+`gh-pages` 分支保存托管构建（v1.2.2 起随发布更新）。在仓库 **Settings → Pages → Deploy from a branch** 选择 `gh-pages / (root)` 保存后，游戏即上线：
+
+```
+https://<用户名>.github.io/Tianyuan/
+```
+
+更新线上版本：本地 `npm run release` 后把 `release/dist-web` 内容推到 `gh-pages` 分支即可。
+
 > 开发模式下 `window.__arena` 暴露 Phaser 实例；`window.__qa` 采集 console 的
 > 报错与警告（只抄不吞，原始 console 行为不变）。
 
