@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { FxKind } from '../core/events';
 import { CINNABAR, GILT, MOON, PAPER, SPIRIT, VOID } from './palette';
 import { TEX } from './textures';
+import { CELL as BOARD_CELL } from './BoardView';
 
 export interface FxRequest {
   kind: FxKind;
@@ -204,7 +205,7 @@ export class EffectsLayer {
 
   // ── 环爆：以自身为中心的冲击波 ──
   private nova(r: FxRequest): void {
-    const rad = (r.radius ?? 1) * 96;
+    const rad = (r.radius ?? 1) * BOARD_CELL;
     const tint = r.params?.hue === 2 ? VOID.light : r.tint ?? CINNABAR.light;
     for (let i = 0; i < 2; i++) {
       const ring = this.img(TEX.ring, r.x, r.y, tint);
@@ -237,7 +238,7 @@ export class EffectsLayer {
 
   // ── 范围爆发：落点先亮，再炸开 ──
   private burstFx(r: FxRequest): void {
-    const rad = (r.radius ?? 1) * 96 * 0.55;
+    const rad = (r.radius ?? 1) * BOARD_CELL * 0.55;
     const tint = r.params?.hue === 2 ? VOID.light : r.tint ?? GILT.light;
     const ring = this.img(TEX.ring, r.x, r.y, tint);
     ring.setDisplaySize(rad * 0.4, rad * 0.4).setAlpha(0.9);
@@ -393,7 +394,7 @@ export class EffectsLayer {
     pillar.setDisplaySize(30, 130).setAlpha(0.9);
     this.scene.tweens.add({
       targets: pillar,
-      displayWidth: 96,
+      displayWidth: 72,
       alpha: 0,
       duration: 620,
       ease: 'Cubic.easeOut',
@@ -448,7 +449,7 @@ export class EffectsLayer {
 
   /** 地面法阵：持续型区域，缓慢呼吸后消散 */
   private groundMark(r: FxRequest): void {
-    const rad = (r.radius ?? 1) * 96 * 0.62;
+    const rad = (r.radius ?? 1) * BOARD_CELL * 0.62;
     const telegraph = (r.params?.telegraph ?? 0) > 0;
     const dur = (r.params?.dur ?? (telegraph ? 1.2 : 2.6)) * 1000;
     const tint = telegraph ? CINNABAR.light : r.tint ?? VOID.base;

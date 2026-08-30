@@ -42,6 +42,14 @@
 
   <footer id="notes"></footer>
 
+  <script>
+    window.addEventListener('error', function (e) {
+      var d = document.createElement('div');
+      d.style.cssText = 'color:#ff8878;font-size:13px;margin-top:10px;font-family:Consolas,monospace';
+      d.textContent = 'JS错误: ' + e.message + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno;
+      document.body.appendChild(d);
+    });
+  </script>
   <script src="svg.js"></script>
   <script src="voxel.js"></script>
   <script src="pixel.js"></script>

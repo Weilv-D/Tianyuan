@@ -71,6 +71,8 @@ export class InputController {
       if (this.scene.phase !== 'prep' || this.scene.busy) return;
       // 点在奇遇面板上：卡片自己响应，不透传成棋盘/备战席的拖拽
       if (this.scene.adventure.contains(p.x, p.y)) return;
+      // 羁绊浮层开着：不透传棋盘交互（遮罩只挡对象事件，挡不住场景级 pointerdown）
+      if (this.scene.hud.traitModalOpen) return;
 
       // 1) 装备栏里的一格 → 开始拖这件装备
       const chip = this.hitItemChip(p.x, p.y);
@@ -142,6 +144,10 @@ export class InputController {
       }
       if (this.scene.debug.isOpen) {
         this.scene.debug.toggle();
+        return;
+      }
+      if (this.scene.hud.traitModalOpen) {
+        this.scene.hud.closeTraitModal();
         return;
       }
       if (this.scene.pauseScout.scoutPanel) {
@@ -323,7 +329,7 @@ export class InputController {
   }
 
   private updateHover(px: number, py: number): void {
-    if (this.scene.pauseScout.scoutPanel || this.scene.settingsPanel?.isOpen) {
+    if (this.scene.pauseScout.scoutPanel || this.scene.settingsPanel?.isOpen || this.scene.hud.traitModalOpen) {
       this.clearHover();
       this.itemTip.hide();
       return;

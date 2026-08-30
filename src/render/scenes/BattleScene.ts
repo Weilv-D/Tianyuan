@@ -211,18 +211,18 @@ export class BattleScene extends Phaser.Scene {
       mk('暂 停', 24, 96, () => this.togglePause());
       mk('快进到底', 132, 116, () => this.setSpeed(4));
     } else {
-      mk('重开对局', 24, 120, () => this.restart(), 'primary');
-      mk('暂 停', 156, 88, () => this.togglePause());
-      mk('重 播', 256, 88, () => this.replay());
+      mk('重开对局', 24, 110, () => this.restart(), 'primary');
+      mk('暂 停', 142, 80, () => this.togglePause());
+      mk('重 播', 230, 80, () => this.replay());
       // 阵容切换
-      mk('我方换阵', 368, 108, () => this.cycleComp('A'));
-      mk('敌方换阵', 488, 108, () => this.cycleComp('B'));
+      mk('我方换阵', 318, 100, () => this.cycleComp('A'));
+      mk('敌方换阵', 426, 100, () => this.cycleComp('B'));
     }
 
-    // 速度
+    // 速度（最右钮右缘对齐 pw-24；向左 44 步进）
     const speeds = [1, 2, 4];
     speeds.forEach((s, i) => {
-      const b = new Button(this, px + pw - 24 - (2 - i) * 44, y + 20, `${s}×`, () => this.setSpeed(s), {
+      const b = new Button(this, px + pw - 42 - (2 - i) * 44, y + 20, `${s}×`, () => this.setSpeed(s), {
         width: 36,
         height: 36,
         variant: s === 1 ? 'primary' : 'ghost',
@@ -333,7 +333,7 @@ export class BattleScene extends Phaser.Scene {
     this.running = true;
     this.paused = false;
     this.board.setPhase('prep');
-    this.phaseText.setText('备  战');
+    this.phaseText.setText('备 战');
     this.phaseText.setColor(css(SPIRIT.light));
 
     audio.unlock();
@@ -343,7 +343,7 @@ export class BattleScene extends Phaser.Scene {
     this.time.delayedCall(1600, () => {
       if (!this.running) return;
       this.board.setPhase('battle');
-      this.phaseText.setText('交  战');
+      this.phaseText.setText('交 战');
       this.phaseText.setColor(css(CINNABAR.light));
       audio.startBgm('battle');
       audio.play('warn');

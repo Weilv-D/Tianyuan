@@ -215,8 +215,8 @@ export class ResultScene extends Phaser.Scene {
   /** 冠位结算印：110px 朱底方印，竖排楷名「魁首」，盖落 + 微震 */
   private stampChampionSeal(): void {
     const size = 110;
-    const x = W / 2 + 660 / 2 - 92;
-    const y = H / 2 - 680 / 2 + 128;
+    const x = W / 2 + 660 / 2 - 72;
+    const y = H / 2 - 680 / 2 + 96;
     const seal = this.add.container(x, y).setDepth(820).setScale(2.0).setAlpha(0).setRotation(-0.05);
     const g = this.add.graphics();
     g.fillStyle(CINNABAR.deep, 0.96);

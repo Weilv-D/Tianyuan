@@ -42,10 +42,6 @@ export const GRID_Y = BOARD_Y + BOARD_PAD;
 export const GRID_W = CELL * 8;
 export const GRID_H = CELL * 8;
 
-// 兼容旧引用点（逐处迁移后删除）：旧 BOARD_W/H 现为整盘
-export const BOARD_W = BOARD_SIZE;
-export const BOARD_H = BOARD_SIZE;
-
 // ── 阶段条（盘下：— 备 战 — 开战 · 空格 00:30 —）─────
 export const PHASE_Y = BOARD_Y + BOARD_SIZE + 28; // 772 文字基线带中心
 

@@ -182,20 +182,23 @@ export class HudPanels {
 
     // ── 右侧数值（样稿 .stats：mono 值 + 小注）：回合 / 来金 / 生命 / 等级 ──
     const stat = (rightX: number, labelText: string): Phaser.GameObjects.Text => {
-      this.scene.add
-        .text(rightX - 24, 58, labelText, {
-          fontFamily: FONT.body,
-          fontSize: '9px',
-          color: css(INK[300]),
-          letterSpacing: 4,
-        })
-        .setOrigin(0.5, 0);
+      // 有动态小注的数值（来金）传空串，避免静态注与动态注同位重叠
+      if (labelText) {
+        this.scene.add
+          .text(rightX - 24, 58, labelText, {
+            fontFamily: FONT.body,
+            fontSize: '9px',
+            color: css(INK[300]),
+            letterSpacing: 4,
+          })
+          .setOrigin(0.5, 0);
+      }
       return this.scene.add.text(rightX, 22, '', { fontFamily: FONT.mono, fontSize: '17px', color: css(PAPER[100]) }).setOrigin(1, 0);
     };
     this.roundText = stat(W - 580, '回 合');
     this.goldText = stat(W - 470, '金');
     this.goldText.setColor(css(GILT.light));
-    this.streakText = stat(W - 360, '来 金');
+    this.streakText = stat(W - 360, '');
     this.streakText.setColor(css(GILT.base));
     this.streakLabel = this.scene.add
       .text(W - 360 - 24, 58, '来 金', {
@@ -245,9 +248,9 @@ export class HudPanels {
     });
 
     this.timerText = this.scene.add
-      .text(cx + 120, PHASE_Y, '', { fontFamily: FONT.mono, fontSize: '13px', color: css(GILT.base) })
+      .text(cx + 180, PHASE_Y, '', { fontFamily: FONT.mono, fontSize: '13px', color: css(GILT.base) })
       .setOrigin(0, 0.5);
-    this.timerBar = new Bar(this.scene, cx + 120, PHASE_Y + 12, 120, 2, GILT.base);
+    this.timerBar = new Bar(this.scene, cx + 180, PHASE_Y + 12, 120, 2, GILT.base);
   }
 
   // ══════════════ 商肆（样稿 .scard 窄卡 × 5） ══════════════
@@ -560,10 +563,18 @@ export class HudPanels {
     this.traitModalScroll = null;
   }
 
+  /** 羁绊浮层是否打开（输入层用它守卫棋盘交互与 ESC 链） */
+  get traitModalOpen(): boolean {
+    return this.traitModal !== null;
+  }
+
   /** nav「阵容」：直接侦查本轮对手（墨兽轮提示无可侦） */
   private scoutNextOpponent(): void {
     const pr = this.scene.match.pairings.find((x) => x.a === 0 || x.b === 0);
-    if (!pr) return;
+    if (!pr) {
+      this.scene.showToast('配对未定 · 开战后自动更新');
+      return;
+    }
     const other = pr.a === 0 ? pr.b : pr.a;
     if (pr.beast || other < 0) {
       this.scene.showToast(pr.beast ? '墨兽轮 · 无阵可侦' : '本轮无对手可侦查');
