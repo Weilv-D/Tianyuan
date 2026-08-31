@@ -8,7 +8,8 @@
 //   THIRD_PARTY_LICENSES.txt —— 典藏音乐出处清单（CC0，自愿署名）
 //   百战天元-<版本>-web.zip —— 上述全部打包，便于分发归档。
 //
-// 门禁：类型检查（--skip-typecheck 可跳过）+ 全量测试 + 音乐审计（sha256）。
+// 门禁：版本三处一致 + 类型检查（--skip-typecheck 可跳过）+ 全量测试 + 音乐审计（sha256）。
+// 构建全程写临时目录，成功后才原子替换 dist/ 与 release/ —— 中途失败时上一版产物完好。
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,21 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const run = (cmd) => execSync(cmd, { cwd: root, stdio: 'inherit', shell: true });
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
-console.log(`\n[1/5] 类型检查 + 全量测试`);
+// 版本一致性门禁：version.ts（界面落款/金种子元信息）与 package.json 必须同值，
+// 否则会出现"zip 是 1.4.0、界面显示 1.4.1"的错版分发
+const verTs = readFileSync(path.join(root, 'src/version.ts'), 'utf8');
+const gameVersion = /GAME_VERSION = '([^']+)'/.exec(verTs)?.[1];
+if (gameVersion !== version) {
+  console.error(`✗ 版本三处不一致：package.json=${version}，src/version.ts=${gameVersion}。发版前请同步两处。`);
+  process.exit(1);
+}
+
+const DIST = path.join(root, 'dist');
+const RELEASE = path.join(root, 'release');
+const distTmp = path.join(root, 'dist.tmp');
+const relTmp = path.join(root, 'release.tmp');
+
+console.log(`\n[1/5] 类型检查 + 全量测试（v${version}）`);
 // --skip-typecheck：并行线未收敛时的发布通道（产物走 esbuild 不查类型，仅跳过整仓卫生门，单测照跑）
 if (process.argv.includes('--skip-typecheck')) {
   console.log('  (--skip-typecheck: skip repo-wide typecheck)');
@@ -27,29 +42,22 @@ if (process.argv.includes('--skip-typecheck')) {
 }
 run('npx vitest run');
 
-console.log(`\n[2/5] 清理旧产物`);
-for (const d of ['dist', 'release']) {
-  if (existsSync(path.join(root, d))) rmSync(path.join(root, d), { recursive: true, force: true });
-}
-mkdirSync(path.join(root, 'release'), { recursive: true });
+console.log(`\n[2/5] 音乐审计（文件存在 + sha256 + CC0 口径）+ 静态托管构建 → dist.tmp/`);
+mkdirSync(relTmp, { recursive: true });
+run('node scripts/audit-music.mjs release.tmp/THIRD_PARTY_LICENSES.txt');
+run('npx vite build --outDir dist.tmp --emptyOutDir');
 
-console.log(`\n[3/5] 音乐审计（文件存在 + sha256 + CC0 口径）+ 静态托管构建 → dist/`);
-// 审计须在清理【之后】：它把 THIRD_PARTY_LICENSES.txt 写进 release/，
-// 先审计后清理会把授权清单删掉
-run('node scripts/audit-music.mjs');
-run('npx vite build');
-
-console.log(`\n[4/5] 单文件构建 → release/百战天元.html`);
-run('npx vite build --mode singlefile --outDir release/single --emptyOutDir');
-renameSync(path.join(root, 'release/single/index.html'), path.join(root, 'release/百战天元.html'));
-rmSync(path.join(root, 'release/single'), { recursive: true, force: true });
-cpSync(path.join(root, 'dist'), path.join(root, 'release/dist-web'), { recursive: true });
+console.log(`\n[3/5] 单文件构建 → release.tmp/百战天元.html`);
+run('npx vite build --mode singlefile --outDir release.tmp/single --emptyOutDir');
+renameSync(path.join(relTmp, 'single/index.html'), path.join(relTmp, '百战天元.html'));
+rmSync(path.join(relTmp, 'single'), { recursive: true, force: true });
+cpSync(distTmp, path.join(relTmp, 'dist-web'), { recursive: true });
 
 // 使用说明必须在打包【之前】落盘：zip 里的说明才是本次构建的说明（E2）
-const html = readFileSync(path.join(root, 'release/百战天元.html'), 'utf8');
+const html = readFileSync(path.join(relTmp, '百战天元.html'), 'utf8');
 const sizeMB = (Buffer.byteLength(html) / 1024 / 1024).toFixed(1);
 writeFileSync(
-  path.join(root, 'release/使用说明.txt'),
+  path.join(relTmp, '使用说明.txt'),
   [
     '百战天元 · 分发包使用说明',
     '',
@@ -69,15 +77,22 @@ writeFileSync(
   ].join('\r\n'),
 );
 
-console.log(`\n[5/5] 打包 zip`);
+console.log(`\n[4/5] 打包 zip`);
 const zip = `百战天元-${version}-web.zip`;
-run(`node scripts/zip.mjs "release/${zip}" "release/百战天元.html" "release/dist-web" "release/使用说明.txt" "release/THIRD_PARTY_LICENSES.txt"`);
+run(`node scripts/zip.mjs "release.tmp/${zip}" "release.tmp/百战天元.html" "release.tmp/dist-web" "release.tmp/使用说明.txt" "release.tmp/THIRD_PARTY_LICENSES.txt"`);
 
 // 产物体检：单文件不得残留任何外链资源（src=/href= 指向文件的引用）
 const external = html.match(/<(script|link)[^>]+(src|href)="(?!https?:|data:)[^"]+"/g) ?? [];
 if (external.length) {
   console.error('✗ 单文件仍引用外部资源：', external);
   process.exit(1);
+}
+
+console.log(`\n[5/5] 原子替换 dist/ 与 release/`);
+// 全部构建成功才走到这里：旧产物此刻才被替换，中途任何失败都不损上一版
+for (const [tmp, dest] of [[distTmp, DIST], [relTmp, RELEASE]]) {
+  if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
+  renameSync(tmp, dest);
 }
 
 console.log(`

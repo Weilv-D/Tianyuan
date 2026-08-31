@@ -204,7 +204,7 @@ export class CodexScene extends Phaser.Scene {
             fontFamily: FONT.body,
             fontSize: '13px',
             color: css(PAPER[500]),
-            wordWrap: { width: BODY_W - 180 },
+            wordWrap: { useAdvancedWrap: true, width: BODY_W - 180 },
           })
           .setOrigin(0, 0)
       );

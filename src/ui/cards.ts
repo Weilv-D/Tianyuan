@@ -380,7 +380,7 @@ export class TraitRow extends Phaser.GameObjects.Container {
     this.icon = scene.add.image(23, 21, '').setVisible(false).setDisplaySize(30, 30);
     this.nameText = scene.add.text(46, 4, '', { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 1 }).setOrigin(0, 0);
     this.countText = scene.add.text(w - 8, 5, '', { fontFamily: FONT.num, fontSize: '12px', color: css(GILT.base) }).setOrigin(1, 0);
-    this.descText = scene.add.text(46, 21, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]), wordWrap: { width: w - 60 } }).setOrigin(0, 0);
+    this.descText = scene.add.text(46, 21, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]), wordWrap: { useAdvancedWrap: true, width: w - 60 } }).setOrigin(0, 0);
     this.add([this.bg, this.icon, this.nameText, this.countText, this.descText]);
     scene.add.existing(this);
   }
@@ -462,7 +462,7 @@ export class UnitDetailCard {
     this.traitT = scene.add.text(14, 172, '', { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) }).setOrigin(0, 0);
     this.skillT = scene.add.text(14, 194, '', { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) }).setOrigin(0, 0);
     this.descT = scene.add
-      .text(14, 214, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { width: w - 28 } })
+      .text(14, 214, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { useAdvancedWrap: true, width: w - 28 } })
       .setOrigin(0, 0);
     this.container.add([this.nameT, this.subT, this.costT, ...this.statT, this.itemsRow, this.traitT, this.skillT, this.descT]);
   }

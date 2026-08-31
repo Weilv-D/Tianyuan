@@ -122,7 +122,7 @@ export class PauseScoutOverlay {
                 .map((t) => `${TRAIT_BY_ID[t.id]?.name ?? t.id} ${t.count}`)
                 .join(' · ')
             : '（未激活任何羁绊）',
-          { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[200]), wordWrap: { width: bw - 130 } }
+          { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[200]), wordWrap: { useAdvancedWrap: true, width: bw - 130 } }
         )
         .setOrigin(0, 0)
     );

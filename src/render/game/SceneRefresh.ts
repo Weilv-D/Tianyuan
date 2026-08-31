@@ -241,7 +241,7 @@ export class SceneRefresh {
             fontFamily: FONT.body,
             fontSize: '12px',
             color: css(color),
-            wordWrap: { width: L.w - 28 },
+            wordWrap: { useAdvancedWrap: true, width: L.w - 28 },
           })
           .setOrigin(0, 0)
       );
@@ -252,7 +252,7 @@ export class SceneRefresh {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[300]),
-          wordWrap: { width: L.w - 28 },
+          wordWrap: { useAdvancedWrap: true, width: L.w - 28 },
           lineSpacing: 4,
         })
         .setOrigin(0, 0)

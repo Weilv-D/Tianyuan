@@ -339,7 +339,7 @@ export class HudPanels {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[400]),
-        wordWrap: { width: gw + 16 },
+        wordWrap: { useAdvancedWrap: true, width: gw + 16 },
         lineSpacing: 3,
       })
       .setOrigin(0, 0);
@@ -468,7 +468,7 @@ export class HudPanels {
         fontFamily: FONT.body,
         fontSize: '13px',
         color: css(PAPER[300]),
-        wordWrap: { width: LOG_W },
+        wordWrap: { useAdvancedWrap: true, width: LOG_W },
         lineSpacing: 4,
       })
       .setOrigin(0, 0);
@@ -491,7 +491,7 @@ export class HudPanels {
         fontFamily: FONT.body,
         fontSize: '13px',
         color: css(PAPER[300]),
-        wordWrap: { width: 282 },
+        wordWrap: { useAdvancedWrap: true, width: 282 },
         lineSpacing: 5,
       })
       .setOrigin(0, 0);
@@ -528,7 +528,13 @@ export class HudPanels {
     const py = (1080 - panelH) / 2;
     const modal = makePanel(this.scene, px, py, panelW, panelH, { title: '羁 绊 全 览', accent: SPIRIT.base, alpha: 0.98 });
     modal.setDepth(561);
-    void shade;
+    // 遮罩点击关闭（点浮层本体不关）：shade 一直 setInteractive 却无响应，
+    // 玩家本能的点空白处关闭从未生效
+    shade.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const wx = p.x / this.scene.cameras.main.zoom;
+      const wy = p.y / this.scene.cameras.main.zoom;
+      if (wx < px || wx > px + panelW || wy < py || wy > py + panelH) this.openTraitModal();
+    });
 
     const bodyX = px + 20;
     const bodyY = py + PANEL_TITLE_H + 8;

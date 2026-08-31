@@ -86,7 +86,7 @@ export class Battle implements BattleApi {
     this.rng = new Rng(cfg.seed);
     this.sink = sink;
     this.recordEvents = recordEvents;
-    this.maxTicks = cfg.maxTicks ?? BATTLE_TIMEOUT_TICKS;
+    this.maxTicks = cfg.maxTicks && cfg.maxTicks > 0 ? cfg.maxTicks : BATTLE_TIMEOUT_TICKS;
 
     // 1) 建单位（uid 升序，保证遍历顺序确定）。
     //    输入校验与 createUnit 的「未知棋子即抛」同契约：重复 uid / 越界格 /
@@ -763,7 +763,10 @@ export class Battle implements BattleApi {
         }
       }
     }
-    if (!placed) this.occ[cellIndex(u.cell.c, u.cell.r)] = u.uid;
+    // 满盘兜底取消：无条件覆盖死格会与占据者双双幽灵化（occ 指复活者、
+    // 占据者的 cell 仍指此格，寻路可穿透）。复活是增益，没有格子就放弃，
+    // 单位保持死亡 —— 守恒与不变量优先于个体复活。
+    if (!placed) return;
     this.emit({ t: 'heal', tick: this.tick, srcUid: src.uid, dstUid: u.uid, amount: u.hp });
   }
 

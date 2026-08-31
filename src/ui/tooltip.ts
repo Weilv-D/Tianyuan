@@ -85,7 +85,7 @@ export class ItemTooltip {
         fontFamily: FONT.body,
         fontSize: '13px',
         color: css(PAPER[300]),
-        wordWrap: { width: w - 28 },
+        wordWrap: { useAdvancedWrap: true, width: w - 28 },
       })
       .setOrigin(0, 0);
     c.add(desc);
@@ -108,7 +108,7 @@ export class ItemTooltip {
           fontFamily: FONT.body,
           fontSize: '13px',
           color: css(GILT.base),
-          wordWrap: { width: w - 28 },
+          wordWrap: { useAdvancedWrap: true, width: w - 28 },
         })
         .setOrigin(0, 0);
       c.add(rec);

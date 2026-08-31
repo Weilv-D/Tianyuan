@@ -89,9 +89,13 @@ export function loadMatch(): Match | null {
     // 只有确认 v3 真正落盘后才清旧键 —— 写回失败时旧键是唯一数据源，
     // 删了就真丢了；留着等下次读档自动重试迁移。
     saveMatch(m);
+    // 成功判定回读并解析：配额异常时 setItem 可能留下半截载荷，
+    // 只判键存在会误报成功、下次启动重复迁移（回读失败 = 保留旧键重试）
     let migrated = false;
     try {
-      migrated = localStorage.getItem(KEY) !== null;
+      const w = JSON.parse(localStorage.getItem(KEY) ?? '0') as { data?: unknown };
+      migrated =
+        !!w && typeof w === 'object' && 'data' in w && Match.fromJSON(w.data as Parameters<typeof Match.fromJSON>[0]).round === m.round;
     } catch {
       migrated = false;
     }

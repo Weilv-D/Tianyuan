@@ -35,18 +35,21 @@ function starRim(star: number): string | null {
   return null;
 }
 
-/** 启动时预解码全部已就位的 AI 棋子图，返回成功张数 */
+/** 启动时预解码全部已就位的 AI 棋子图，返回成功张数。
+ *  单张 3s 超时：弱网/挂起请求下 onerror 不必然触发，裸 await 会永久挂起启动链。 */
 export async function preloadAiPieces(): Promise<number> {
   const urls = Object.entries(AI_PIECE_URL_MAP);
   await Promise.all(
     urls.map(([id, url]) =>
       new Promise<void>((resolve) => {
         const img = new Image();
+        const done = () => resolve();
+        window.setTimeout(done, 3000);
         img.onload = () => {
           cache.set(id, img);
-          resolve();
+          done();
         };
-        img.onerror = () => resolve();
+        img.onerror = done;
         img.src = url;
       }),
     ),
@@ -166,7 +169,26 @@ export function drawAiPiece(
 
   // 本体
   ctx.drawImage(art, ax, ay, aw, ah, dx, dy, dw, dh);
+  // 本体矩形登记：内容归一量的是"身体"，不是描边光晕 —— 光晕混进包围盒
+  // 会把 2★/3★ 的实际显示体量稀释掉一圈。解析矩形免像素扫描，启动也更快。
+  BODY_RECTS.set(`${defId}_s${star}`, { x: dx, y: dy, w: dw, h: dh });
   return true;
+}
+
+/** 已烘焙棋子的本体矩形（画布坐标系，键 `${defId}_s${star}`） */
+const BODY_RECTS = new Map<string, { x: number; y: number; w: number; h: number }>();
+
+/**
+ * 本体在剪影画布上的内容包围盒（脚底原点局部坐标）。
+ * 无记录（源图缺失 / 未走 AI 路径）返回 null，调用方回退像素扫描。
+ */
+export function aiBodyBounds(
+  defId: string,
+  star: number,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  const r = BODY_RECTS.get(`${defId}_s${star}`);
+  if (!r) return null;
+  return { minX: r.x - SIZE / 2, minY: r.y - FOOT, maxX: r.x + r.w - SIZE / 2, maxY: r.y + r.h - FOOT };
 }
 
 /** 烘焙画布尺寸常量（与 silhouetteFactory 的 SIL_W/H/FOOT 对齐） */

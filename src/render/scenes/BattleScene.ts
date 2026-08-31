@@ -391,7 +391,10 @@ export class BattleScene extends Phaser.Scene {
   private clearBattle(): void {
     for (const ev of this.pendingTimers) ev.remove(false);
     this.pendingTimers.clear();
+    // 先杀挂在每个视图上的补间再销毁：hopTo/playAttack/playHit 的补间回调
+    // 会碰视图子对象，拖着补间销毁等于对尸体发后事
     for (const v of this.views.values()) {
+      this.tweens.killTweensOf(v);
       if (v.scene) v.destroy();
     }
     this.views.clear();
@@ -434,7 +437,7 @@ export class BattleScene extends Phaser.Scene {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[500]),
-        wordWrap: { width: 280 },
+        wordWrap: { useAdvancedWrap: true, width: 280 },
       })
       .setOrigin(0, 0);
     container.add(desc);
@@ -514,10 +517,10 @@ export class BattleScene extends Phaser.Scene {
     container.add(this.add.text(0, y, title, { fontFamily: FONT.title, fontSize: '17px', color: css(PAPER[100]) }).setOrigin(0, 0));
     container.add(
       this.add
-        .text(72, y + 3, who, { fontFamily: FONT.body, fontSize: '12px', color: css(accent) })
+        .text(72, y + 4, who, { fontFamily: FONT.body, fontSize: '12px', color: css(accent) })
         .setOrigin(0, 0)
     );
-    y += 28;
+    y += 34;
 
     const active = traits.filter((t) => t.tier >= 0).sort((a, b) => b.tier - a.tier);
     const inactive = traits.filter((t) => t.tier < 0);
@@ -526,11 +529,13 @@ export class BattleScene extends Phaser.Scene {
       container.add(
         this.add.text(0, y, '（未激活任何羁绊）', { fontFamily: FONT.body, fontSize: '12px', color: css(INK[300]) }).setOrigin(0, 0)
       );
-      y += 24;
+      y += 26;
     }
     for (const t of active) {
       const def = TRAIT_BY_ID[t.id];
       const color = TRAIT_TIER_COLOR_HEX[Math.min(t.tier, 3)];
+      // 节奏：徽章行（22px 高）→ 效果行 → 14px 空隙 → 下一徽章。
+      // 行间留白必须大于元素自身的半高，否则相邻行在视觉上粘连。
       const chip = makeChip(this, 0, y, `${def?.name ?? t.id}`, color, true);
       container.add(chip);
       const label = this.add
@@ -541,26 +546,27 @@ export class BattleScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5);
       container.add(label);
-      y += 26;
-      // 效果文字独立成行：不与 chip 同行挤，宽度收在面板内容区内
+      y += 28;
+      // 效果文字独立成行：逐字换行（useAdvancedWrap，中文无空格可断），
+      // 宽度收在面板内容区内，绝不出血到棋盘
       const effect = this.add
-        .text(8, y, def?.effectText[Math.min(t.tier, def.effectText.length - 1)] ?? '', {
+        .text(10, y, def?.effectText[Math.min(t.tier, def.effectText.length - 1)] ?? '', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[300]),
-          wordWrap: { width: 280 },
-          lineSpacing: 3,
+          wordWrap: { useAdvancedWrap: true, width: 272 },
+          lineSpacing: 4,
         })
         .setOrigin(0, 0);
       container.add(effect);
-      y += effect.height + 10;
+      y += effect.height + 14;
     }
     if (inactive.length > 0) {
-      y += 6;
+      y += 8;
       container.add(
         this.add.text(0, y, '未满', { fontFamily: FONT.body, fontSize: '12px', color: css(INK[300]) }).setOrigin(0, 0)
       );
-      y += 20;
+      y += 24;
       for (const t of inactive) {
         const def = TRAIT_BY_ID[t.id];
         // 已超过全部断点时回退显示最后断点（此前会显示成 9/0）
@@ -575,7 +581,7 @@ export class BattleScene extends Phaser.Scene {
             })
             .setOrigin(0, 0)
         );
-        y += 18;
+        y += 21;
       }
     }
     return y;
@@ -1070,7 +1076,7 @@ export class BattleScene extends Phaser.Scene {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[400]),
-        wordWrap: { width: w - 28 },
+        wordWrap: { useAdvancedWrap: true, width: w - 28 },
       })
       .setOrigin(0, 0);
     // 技能描述钳在两行内：宁可省略号收尾，不许溢出卡底

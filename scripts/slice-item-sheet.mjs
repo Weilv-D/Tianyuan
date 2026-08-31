@@ -12,7 +12,7 @@
  * 运行：node scripts/slice-item-sheet.mjs
  */
 import { PNG } from 'pngjs';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 
 const SRC = 'design/items/item-sheet.png';
 const OUT = 'src/render/art/item/ai';
@@ -46,6 +46,10 @@ const MAP = {
   taixu: [3, 8],
 };
 
+if (!existsSync(SRC)) {
+  console.error(`源图不存在: ${SRC}`);
+  process.exit(1);
+}
 const png = PNG.sync.read(readFileSync(SRC));
 const cellW = png.width / COLS;
 const cellH = png.height / ROWS;
@@ -93,8 +97,16 @@ for (const [id, [r, c]] of Object.entries(MAP)) {
       out.data[di + 3] = png.data[si + 3];
     }
   }
-  writeFileSync(`${OUT}/${id}.png`, PNG.sync.write(out));
+  atomicWrite(`${OUT}/${id}.png`, PNG.sync.write(out));
   ok++;
   console.log(`${id}.png  ${w}x${h}`);
 }
 console.log(`入库 ${ok}/22；空格：${empty.length ? empty.join(' ') : '无'}`);
+
+/** 原子写：先落临时文件再改名，进程被杀不会留下半截 PNG */
+function atomicWrite(dest, data) {
+  const tmp = `${dest}.tmp`;
+  writeFileSync(tmp, data);
+  rmSync(dest, { force: true });
+  renameSync(tmp, dest);
+}

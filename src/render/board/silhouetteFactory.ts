@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { CHAMPION_BY_ID } from '../../data/champions';
 import { drawSilhouette, makeStyle } from './silhouettes';
 import { RARITY_COLOR, TEAM_COLOR, VOID, INK } from '../view/palette';
-import { hasAiPiece, drawAiPiece } from '../art/piece/aiBake';
+import { hasAiPiece, drawAiPiece, aiBodyBounds } from '../art/piece/aiBake';
 
 /**
  * 把 64 名棋子 × 3 套配色的立绘在启动时烘焙成纹理。
@@ -183,7 +183,8 @@ export function bakeSilhouettes(scene: Phaser.Scene): void {
           const ctx = canvas.getContext('2d');
           if (ctx && drawAiPiece(ctx, entry.id, team, star)) {
             if (team === 0) {
-              const b = scanCanvasBounds(ctx);
+              // 本体矩形是解析值（烘焙期登记），不含描边光晕 —— 像素扫描只作回退
+              const b = aiBodyBounds(entry.id, star) ?? scanCanvasBounds(ctx);
               if (b) CONTENT[`${entry.id}_s${star}`] = b;
             }
             addCanvasTexture(scene, key, canvas);

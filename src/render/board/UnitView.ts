@@ -7,11 +7,12 @@ import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TE
 import { TEX } from '../view/textures';
 
 const STAR_SCALE = [0, 0.9, 1.02, 1.16];
-const BAR_W = 40;
-/** 棋盘体量（内容高归一口径）：1★≈78% / 2★≈88% / 3★=100% 格高（格 72） */
-const CONTENT_H = 62;
+const BAR_W = 44;
+/** 棋盘体量（内容高归一口径）：1★≈94% / 2★≈107% / 3★≈121% 格高（格 72）。
+ *  内容高按"身体"量取（描边光晕不计入，见 aiBake BODY_RECTS），观感饱满。 */
+const CONTENT_H = 68;
 /** 宽体角色的宽度收口 */
-const CONTENT_W = 50;
+const CONTENT_W = 55;
 
 /**
  * 当前"我方"是哪一队。
@@ -104,11 +105,11 @@ export class UnitView extends Phaser.GameObjects.Container {
 
     // 投影：用灵光纹理压扁并染黑，比画椭圆更有"落在地上"的体积感
     this.shadow = scene.add.image(0, 0, TEX.glow).setTint(SHADE).setAlpha(0.5);
-    this.shadow.setDisplaySize(46, 18);
+    this.shadow.setDisplaySize(52, 20);
 
     // 底座：六边形身份牌，稀有度色 + 阵营色描边
     this.base = scene.add.image(0, 0, TEX.hex).setTint(rarity).setAlpha(0.92);
-    this.base.setDisplaySize(52, 52);
+    this.base.setDisplaySize(58, 58);
     this.base.setScale(this.base.scaleX, this.base.scaleY * 0.5);
 
     // 光环：4/5 费的"牌面"
@@ -214,11 +215,11 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.ty = y;
     this.moveT = 0;
     this.moveDur = Math.max(0.016, dur);
-    // 突进：拉出一道残影
+    // 突进：拉出一道残影（缩放 = 内容缩放 × 星级容器缩放，漏乘星级会让 3★ 残影偏小）
     const ghost = this.scene.add
       .image(this.x, this.y, silhouetteKey(this.defId, this.isBeast ? BEAST_TEAM : this.side, this.star))
       .setOrigin(0.5, SIL_ORIGIN_Y)
-      .setScale(this.sprite.scaleX)
+      .setScale(this.sprite.scaleX * this.scaleX, this.sprite.scaleY * this.scaleY)
       .setTint(TEAM_COLOR[this.side] ?? SPIRIT.base)
       .setAlpha(0.5)
       .setBlendMode(Phaser.BlendModes.ADD);
@@ -586,6 +587,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.killTweensOf(this.base);
     this.scene.tweens.killTweensOf(this.aura);
+    this.scene.tweens.killTweensOf(this.shadow);
     super.destroy(fromScene);
   }
 }

@@ -139,32 +139,49 @@ export class EffectsLayer {
   }
 
   // ── 命中反馈：一次打击的"句号" ──
+  // 语言：白核（瞬）→ 阵营色柔光晕（涨）→ 冲击环（散）→ 墨花（炸）。
+  // 每次命中带随机相位角，连续对拼不重样；暴击是同语言的放大 + 第二重追环。
   private impact(r: FxRequest): void {
     const crit = (r.params?.crit ?? 0) > 0;
     const hue = r.params?.hue ?? 0;
     const tint = hue === 2 ? VOID.light : hue === 3 ? GILT.light : crit ? CINNABAR.light : PAPER[100];
-    const base = crit ? 1.35 : 1;
+    const base = crit ? 1.3 : 1;
+    const spin = Math.random() * Math.PI * 2;
 
-    // 核心闪点
-    const flash = this.img(TEX.glow, r.x, r.y, tint);
-    flash.setDisplaySize(20 * base, 20 * base).setAlpha(0.95);
+    // 白核闪点：小而快，是"接触"的那一瞬
+    const flash = this.img(TEX.glow, r.x, r.y, PAPER[50]);
+    flash.setDisplaySize(14 * base, 14 * base).setAlpha(0.95);
     this.scene.tweens.add({
       targets: flash,
-      displayWidth: 74 * base,
-      displayHeight: 74 * base,
+      displayWidth: 46 * base,
+      displayHeight: 46 * base,
       alpha: 0,
-      duration: crit ? 260 : 180,
+      duration: crit ? 200 : 140,
       ease: 'Cubic.easeOut',
       onComplete: () => flash.destroy(),
     });
 
-    // 冲击环
+    // 阵营色柔光晕：垫在白核后面的体感层，负责"这一下有多大"
+    const halo = this.img(TEX.glow, r.x, r.y, tint);
+    halo.setDisplaySize(26 * base, 26 * base).setAlpha(0.55);
+    this.scene.tweens.add({
+      targets: halo,
+      displayWidth: 88 * base,
+      displayHeight: 88 * base,
+      alpha: 0,
+      duration: crit ? 300 : 210,
+      ease: 'Quad.easeOut',
+      onComplete: () => halo.destroy(),
+    });
+
+    // 冲击环：带随机旋向的细环，扩散时微微旋转
     const ring = this.img(TEX.ring, r.x, r.y, tint);
-    ring.setDisplaySize(26 * base, 26 * base).setAlpha(0.9);
+    ring.setDisplaySize(24 * base, 24 * base).setAlpha(0.85).setRotation(spin);
     this.scene.tweens.add({
       targets: ring,
-      displayWidth: (crit ? 132 : 92) * base,
-      displayHeight: (crit ? 132 : 92) * base,
+      displayWidth: (crit ? 128 : 88) * base,
+      displayHeight: (crit ? 128 : 88) * base,
+      rotation: spin + (Math.random() < 0.5 ? -0.5 : 0.5),
       alpha: 0,
       duration: crit ? 340 : 240,
       ease: 'Quad.easeOut',
@@ -174,16 +191,21 @@ export class EffectsLayer {
     // 墨点飞溅
     this.burst(r.x, r.y, crit ? 12 : 6, tint, crit ? 260 : 150, crit ? 0.24 : 0.16);
 
-    // 十字墨花：四向短刺，给闪点一个"炸开"的方向感
-    for (let i = 0; i < 4; i++) {
-      const a = Math.PI / 4 + (i * Math.PI) / 2;
-      const sp = this.img(TEX.spark, r.x + Math.cos(a) * 10, r.y + Math.sin(a) * 10, tint);
-      sp.setRotation(a).setDisplaySize(30 * base, 2.5).setAlpha(0.8);
+    // 六向墨花：随机起始角 + 飞行中自旋，给闪点"炸开"的方向感
+    const petals = crit ? 8 : 6;
+    for (let i = 0; i < petals; i++) {
+      const a = spin + (i / petals) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const reach = (crit ? 66 : 46) * base + Math.random() * 14;
+      const sp = this.img(TEX.spark, r.x + Math.cos(a) * 9, r.y + Math.sin(a) * 9, i % 2 ? tint : PAPER[100]);
+      sp.setRotation(a).setDisplaySize(34 * base, 2.2).setAlpha(0.85);
       this.scene.tweens.add({
         targets: sp,
-        displayWidth: 58 * base,
+        x: r.x + Math.cos(a) * reach,
+        y: r.y + Math.sin(a) * reach,
+        rotation: a + 0.9,
+        displayWidth: reach * 0.9,
         alpha: 0,
-        duration: 190,
+        duration: crit ? 260 : 190,
         ease: 'Cubic.easeOut',
         onComplete: () => sp.destroy(),
       });
@@ -192,17 +214,18 @@ export class EffectsLayer {
     // 暴击第二重冲击环：迟一拍追上去，双层扩散。
     // delayedCall 是场景级计时器，不随 layer 的子对象销毁而取消 ——
     // clear() 后 80ms 内重开战斗会让这只金环落进下一场（C1），
-    // 必须校验代际：clear() 已递增 gen，过期回调直接放弃。
+    // 必须校验代际；场景已关（Clock 之外的窗口期）同样放弃。
     if (crit) {
       const gen = this.gen;
       this.scene.time.delayedCall(80, () => {
-        if (gen !== this.gen) return;
+        if (gen !== this.gen || !this.scene.scene || !this.scene.scene.isActive()) return;
         const ring2 = this.img(TEX.ring, r.x, r.y, GILT.light);
-        ring2.setDisplaySize(40, 40).setAlpha(0.8);
+        ring2.setDisplaySize(40, 40).setAlpha(0.8).setRotation(spin);
         this.scene.tweens.add({
           targets: ring2,
-          displayWidth: 168,
-          displayHeight: 168,
+          displayWidth: 164,
+          displayHeight: 164,
+          rotation: spin + 0.6,
           alpha: 0,
           duration: 320,
           ease: 'Quad.easeOut',

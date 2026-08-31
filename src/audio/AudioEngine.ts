@@ -281,14 +281,17 @@ export class AudioEngine {
     return buf;
   }
 
-  /** 把已成形的 Gain 输出接到总线，可选声像与混响发送 */
-  private wireGain(g: GainNode, bus: Bus, pan: number, revSend: number): void {
+  /** 把已成形的 Gain 输出接到总线，可选声像与混响发送。
+   *  返回本调用新建的旁支节点（声像/混响发送），供发声结束时统一断链。 */
+  private wireGain(g: GainNode, bus: Bus, pan: number, revSend: number): AudioNode[] {
     const ctx = this.ctx!;
+    const extras: AudioNode[] = [];
     if (pan !== 0 && typeof ctx.createStereoPanner === 'function') {
       try {
         const panner = ctx.createStereoPanner();
         panner.pan.value = Math.max(-1, Math.min(1, pan));
         g.connect(panner).connect(this.buses[bus]);
+        extras.push(panner);
       } catch {
         g.connect(this.buses[bus]);
       }
@@ -299,6 +302,16 @@ export class AudioEngine {
       const send = ctx.createGain();
       send.gain.value = revSend;
       g.connect(send).connect(this.reverb);
+      extras.push(send);
+    }
+    return extras;
+  }
+
+  /** 发声结束后的断链：源 → 滤波 → 增益 → 旁支整链拆除（节点卫生，长会话不积链） */
+  private teardown(nodes: (AudioNode | null | undefined)[]): void {
+    for (const n of nodes) {
+      if (!n) continue;
+      try { n.disconnect(); } catch { /* 已断开/已停止 */ }
     }
   }
 
@@ -338,10 +351,12 @@ export class AudioEngine {
       f.frequency.setValueAtTime(cutoff, t);
       f.Q.value = q ?? 0.7;
       osc.connect(f).connect(g);
-      this.wireGain(g, bus, pan ?? 0, revSend ?? 0);
+      const extras = this.wireGain(g, bus, pan ?? 0, revSend ?? 0);
+      osc.onended = () => this.teardown([osc, f, g, ...extras]);
     } else {
       osc.connect(g);
-      this.wireGain(g, bus, pan ?? 0, revSend ?? 0);
+      const extras = this.wireGain(g, bus, pan ?? 0, revSend ?? 0);
+      osc.onended = () => this.teardown([osc, g, ...extras]);
     }
     osc.start(t);
     osc.stop(t + dur + 0.05);
@@ -371,7 +386,8 @@ export class AudioEngine {
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f).connect(g);
-    this.wireGain(g, bus, pan, revSend);
+    const extras = this.wireGain(g, bus, pan, revSend);
+    src.onended = () => this.teardown([src, f, g, ...extras]);
     src.start(t);
     src.stop(t + dur + 0.02);
   }
@@ -398,7 +414,8 @@ export class AudioEngine {
     g.gain.exponentialRampToValueAtTime(gain, t + dur * 0.12);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     osc.connect(g);
-    this.wireGain(g, bus, pan, revSend);
+    const extras = this.wireGain(g, bus, pan, revSend);
+    osc.onended = () => this.teardown([osc, g, ...extras]);
     osc.start(t);
     osc.stop(t + dur + 0.05);
   }
@@ -415,20 +432,37 @@ export class AudioEngine {
     if (!this.ready) return;
     const jitterPan = () => Math.random() * 0.36 - 0.18;
     switch (name) {
-      case 'hit':
-        this.tone('sfx', 150, 0.1, 'sine', 0.18, 0, 0.004, 0, 900, 0.8, jitterPan(), 0);
-        this.noise('sfx', 0.07, 0.26, 900, 1.0, 0, 'bandpass', jitterPan(), 0);
+      // 打击三件套（每次演奏微移音高，密集对拼不吵耳）：
+      // 瞬态"皮"（高频噪声click）→ 冲击"肉"（木质短敲）→ 落地"骨"（低频下坠）。
+      case 'hit': {
+        const p = jitterPan();
+        const k = 0.92 + Math.random() * 0.16;
+        this.noise('sfx', 0.035, 0.22, 2600 * k, 1.1, 0, 'highpass', p, 0);
+        this.tone('sfx', 210 * k, 0.07, 'triangle', 0.2, 0, 0.002, 0, 1400, 0.8, p, 0);
+        this.sweep('sfx', 180 * k, 64, 0.1, 0.2, 'sine', 0, p, 0);
         break;
-      case 'crit':
-        this.noise('sfx', 0.14, 0.42, 1800, 0.8, 0, 'bandpass', jitterPan(), 0);
-        this.sweep('sfx', 520, 80, 0.22, 0.24, 'sawtooth', 0, jitterPan(), 0);
-        this.tone('sfx', 70, 0.22, 'sine', 0.36, 0.02, 0.01, 0, 700, 0.7, jitterPan(), 0);
-        this.tone('sfx', 880, 0.14, 'triangle', 0.09, 0.06, 0.005, 0, 2200, 0.6, jitterPan(), 0);
+      }
+      case 'crit': {
+        const p = jitterPan();
+        const k = 0.94 + Math.random() * 0.12;
+        // 重锤：宽噪声撞击 + 深低频下坠 + 一对金属泛音收尾（亮而不炸）
+        this.noise('sfx', 0.13, 0.34, 1100 * k, 0.7, 0, 'bandpass', p, 0);
+        this.noise('sfx', 0.05, 0.2, 3400 * k, 1.2, 0, 'highpass', p, 0);
+        this.sweep('sfx', 150 * k, 46, 0.26, 0.32, 'sine', 0, p, 0);
+        this.tone('sfx', 72, 0.2, 'sine', 0.22, 0.02, 0.008, 0, 500, 0.7, p, 0);
+        this.tone('sfx', 1320 * k, 0.16, 'sine', 0.07, 0.03, 0.004, 0, 3600, 0.6, p * 0.6, 0);
+        this.tone('sfx', 1980 * k, 0.12, 'sine', 0.045, 0.045, 0.004, 0, 4200, 0.6, -p * 0.6, 0);
         break;
-      case 'shoot':
-        this.noise('sfx', 0.06, 0.2, 2800, 2.0, 0, 'highpass', jitterPan(), 0);
-        this.sweep('sfx', 900, 340, 0.09, 0.11, 'triangle', 0, jitterPan(), 0);
+      }
+      case 'shoot': {
+        const p = jitterPan();
+        const k = 0.92 + Math.random() * 0.16;
+        // 弓弦：弦振pluck + 离弦气声，收在"嗖"而不是"哔"
+        this.tone('sfx', 620 * k, 0.06, 'triangle', 0.16, 0, 0.002, 0, 2400, 0.7, p, 0);
+        this.sweep('sfx', 1300 * k, 420, 0.09, 0.06, 'sine', 0, p, 0);
+        this.noise('sfx', 0.08, 0.12, 2200 * k, 1.4, 0, 'bandpass', p, 0);
         break;
+      }
       case 'cast':
         this.sweep('sfx', 220, 920, 0.38, 0.15, 'sine', 0, 0, 0);
         this.tone('sfx', 660, 0.36, 'triangle', 0.08, 0.02, 0.006, 0, 1600, 0.7, 0, 0);
@@ -695,12 +729,14 @@ export class AudioEngine {
         panner.pan.value = Math.max(-1, Math.min(1, pan));
         osc.connect(g).connect(panner).connect(this.buses.bgm);
         this.noise('bgm', 0.05, gain * 0.26, 1600, 1.2, when, 'highpass', pan, 0.02);
+        osc.onended = () => this.teardown([osc, g, panner]);
         osc.start(t);
         osc.stop(t + 0.3);
         return;
       } catch {}
     }
     osc.connect(g).connect(this.buses.bgm);
+    osc.onended = () => this.teardown([osc, g]);
     osc.start(t);
     osc.stop(t + 0.3);
     this.noise('bgm', 0.05, gain * 0.26, 1600, 1.2, when, 'highpass', pan, 0.02);

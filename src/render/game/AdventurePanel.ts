@@ -153,7 +153,7 @@ export class AdventurePanel {
         fontFamily: FONT.title,
         fontSize: '15px',
         color: css(PAPER[100]),
-        wordWrap: { width: cardW - 58 },
+        wordWrap: { useAdvancedWrap: true, width: cardW - 58 },
       });
       // 标题钳在两行内，描述固定从 y=52 起 —— 长标题不再压进描述带
       while (title.height > 36 && title.text.length > 4) {
@@ -165,7 +165,7 @@ export class AdventurePanel {
           fontFamily: FONT.body,
           fontSize: '13px',
           color: css(PAPER[300]),
-          wordWrap: { width: cardW - 24 },
+          wordWrap: { useAdvancedWrap: true, width: cardW - 24 },
           lineSpacing: 3,
         })
       );

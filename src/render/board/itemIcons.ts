@@ -20,18 +20,21 @@ export function itemIconKey(id: string): string {
 
 const cache = new Map<string, HTMLImageElement>();
 
-/** 启动咽喉预解码全部装备图（异步只发生在这一步），返回成功张数 */
+/** 启动咽喉预解码全部装备图（异步只发生在这一步），返回成功张数。
+ *  单张 3s 超时：弱网/挂起请求下 onerror 不必然触发，裸 await 会永久挂起启动链。 */
 export async function preloadItemArt(): Promise<number> {
   await Promise.all(
     Object.entries(ITEM_AI_URL).map(
       ([id, url]) =>
         new Promise<void>((resolve) => {
           const img = new Image();
+          const done = () => resolve();
+          window.setTimeout(done, 3000);
           img.onload = () => {
             cache.set(id, img);
-            resolve();
+            done();
           };
-          img.onerror = () => resolve();
+          img.onerror = done;
           img.src = url;
         }),
     ),

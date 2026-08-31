@@ -174,10 +174,12 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
 }
 
 function paramOf(u: Unit, key: string): number {
+  // 与 itemEffects 的 params 聚合同一口径：多件同类钩子取最大值。
+  // 取"首个命中件"会在双持同钩装备时钩子实参小于聚合面（momentum 提前封顶等）。
+  let m = 0;
   for (const id of u.itemIds) {
-    const def = ITEM_BY_ID[id];
-    const v = def?.params?.[key];
-    if (v !== undefined) return v;
+    const v = ITEM_BY_ID[id]?.params?.[key];
+    if (v !== undefined) m = Math.max(m, v);
   }
-  return 0;
+  return m;
 }

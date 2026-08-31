@@ -34,8 +34,9 @@ export class Rng {
     return Math.floor(this.float(min, max + 1));
   }
 
-  /** [0, n) 整数 */
+  /** [0, n) 整数。n 非正数返回 0（负 n 会取出负下标，静默腐化下游取值） */
   intn(n: number): number {
+    if (!(n > 0)) return 0;
     return Math.floor(this.next() * n);
   }
 

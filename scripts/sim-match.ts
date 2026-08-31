@@ -184,24 +184,27 @@ for (const [arch, ranks] of [...stat.rankByArch.entries()].sort((a, b) => avg(a[
 
 console.log('\n座位公平性（各座位平均名次，理想值 4.5）：');
 const seatRanks: number[][] = Array.from({ length: 8 }, () => []);
-// 重新跑一次，专门统计座位（避免污染上面的统计）
-for (let i = 0; i < Math.min(N, 120); i++) {
-  const m = new Match((i * 40503) >>> 0);
-  m.human.ai = makeProfile('balanced');
-  let guard = 0;
-  while (!m.isOver() && guard < MAX_ROUNDS) {
-    m.beginRound();
-    if (m.isOver()) break;
-    if (m.human.alive) aiTakeTurn(m, m.human);
-    m.pairings = m.makePairings();
-    for (const pair of m.pairings) {
-      m.applyBattleResult(pair, m.runBattleHeadless(pair));
+// 重新跑一次，专门统计座位（避免污染上面的统计）。
+// 必须套同一份 --set 补丁：否则读数是基线座位分布，冒充不了补丁态的结论
+withOverrides(overrides, () => {
+  for (let i = 0; i < Math.min(N, 120); i++) {
+    const m = new Match((i * 40503) >>> 0);
+    m.human.ai = makeProfile('balanced');
+    let guard = 0;
+    while (!m.isOver() && guard < MAX_ROUNDS) {
+      m.beginRound();
+      if (m.isOver()) break;
+      if (m.human.alive) aiTakeTurn(m, m.human);
+      m.pairings = m.makePairings();
+      for (const pair of m.pairings) {
+        m.applyBattleResult(pair, m.runBattleHeadless(pair));
+      }
+      m.endRound();
+      guard++;
     }
-    m.endRound();
-    guard++;
+    for (const pl of m.players) seatRanks[pl.idx].push(pl.rank || 8);
   }
-  for (const p of m.players) seatRanks[p.idx].push(p.rank || 8);
-}
+});
 let seatLine = '  ';
 for (let i = 0; i < 8; i++) {
   seatLine += `${i === 0 ? '人类' : AI_ROSTER[i - 1].arch.slice(0, 4)}:${avg(seatRanks[i]).toFixed(2)}  `;

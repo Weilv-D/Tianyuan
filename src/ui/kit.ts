@@ -316,7 +316,8 @@ export class Bar extends Phaser.GameObjects.Container {
   }
 
   override destroy(fromScene?: boolean): void {
-    this.scene?.sys.updateList.remove(this);
+    // 场景先亡时 sys.updateList 已整体 shutdown（自然移除本条），不再手工摘
+    if (this.scene && this.scene.sys) this.scene.sys.updateList.remove(this);
     super.destroy(fromScene);
   }
 
@@ -406,17 +407,35 @@ export function divider(scene: Phaser.Scene, x: number, y: number, w: number): P
 }
 
 /**
- * 场景 SHUTDOWN 时复位自定义光标（C6）。
+ * 场景 SHUTDOWN 时复位自定义光标 + 自持悬停桥接（C6 / P1-1）。
  *
  * 画布光标 Phaser 会在 InputPlugin.shutdown 里自己重置，但 index.html 的
  * 金环光标（body.cur-hover）挂在 DOM 上：悬停高亮点亮时切场景，监听随场景
  * 消失而 cur-hover 类永远留在 body 上。各场景 create() 统一调用一次。
+ *
+ * 悬停桥接（gameobjectover/out → body.cur-hover）在 main.ts 里只于游戏
+ * ready 时挂一次，而 InputPlugin.shutdown() 会 removeAllListeners —— 首次
+ * 场景切换后金环的悬停放大态永久失效。这里把桥接改为场景自持：create 时挂，
+ * SHUTDOWN 后标记失效，场景再次 START 时重挂（与 main.ts 的初始桥接并存，
+ * classList 增删幂等）。
  */
 export function resetCursorOnShutdown(scene: Phaser.Scene): void {
-  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+  const flag = scene.input as unknown as { __curHoverBound?: boolean };
+  const attach = () => {
+    if (flag.__curHoverBound) return;
+    flag.__curHoverBound = true;
+    const doc = document.body.classList;
+    scene.input.on('gameobjectover', () => doc.add('cur-hover'));
+    scene.input.on('gameobjectout', () => doc.remove('cur-hover'));
+  };
+  attach();
+  // once 只覆盖第一次关闭：场景实例跨局复用，每次关闭都要复位光标与桥接标记
+  scene.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+    flag.__curHoverBound = false;
     scene.input.setDefaultCursor('default');
     document.body.classList.remove('cur-hover');
   });
+  scene.events.on(Phaser.Scenes.Events.START, attach);
 }
 
 /** 有变化守卫的 setText：文本栅格化只发生在字符串真正变化时 */

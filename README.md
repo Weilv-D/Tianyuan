@@ -11,7 +11,7 @@
 ```
 npm install      # 安装（仅 phaser 一个运行时依赖）
 npm run dev      # 开发服务器 → http://localhost:5199
-npm test         # 284 项回归测试（vitest）
+npm test         # 291 项回归测试（vitest）
 npm run build    # tsc 严格类型检查 + 生产构建 → dist/
 ```
 

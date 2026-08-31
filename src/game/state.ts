@@ -324,7 +324,7 @@ export function resolveMerges(p: PlayerState): MergeEvent[] {
         iid: keep.iid,
         defId,
         star: (star + 1) as Star,
-        items: keepUnit.items, // 留在场上的那张：装备原样保留
+        items: [...keepUnit.items], // 留在场上的那张：装备原样保留（拷贝，避免与被弃实例共享数组引用）
       };
       if (keep.where === 'board') {
         p.board[keep.slot] = merged;
@@ -340,32 +340,6 @@ export function resolveMerges(p: PlayerState): MergeEvent[] {
 }
 
 // ── 上场 / 下场 ─────────────────────────────────────────
-
-/**
- * 把备战席的棋子放上场。
- * 目标格被占则两者交换；同名棋子已在场上则拒绝（返回 false）。
- */
-export function deployUnit(p: PlayerState, iid: number, slot: number): boolean {
-  const u = findUnit(p, iid);
-  if (!u) return false;
-  const onBoardNow = p.board.some((x) => x !== null && x.iid === iid);
-  if (!onBoardNow && hasOnBoard(p, u.defId) && boardCount(p) >= 1) {
-    // 同名已在场 —— 需要先下场再上，这里直接拒绝，UI 层负责提示
-    return false;
-  }
-  const occupant = p.board[slot];
-  const from = p.board.indexOf(u) >= 0 ? ('board' as const) : ('bench' as const);
-  const fromSlot = from === 'board' ? p.board.indexOf(u) : p.bench.indexOf(u);
-
-  if (from === 'board') {
-    p.board[slot] = u;
-    p.board[fromSlot] = occupant;
-  } else {
-    p.board[slot] = u;
-    p.bench[fromSlot] = occupant;
-  }
-  return true;
-}
 
 /** 把场上棋子收回备战席。备战席满则返回 false。 */
 export function recallUnit(p: PlayerState, iid: number): boolean {

@@ -67,10 +67,19 @@ export class SettingsPanel {
     shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
     panel.add(shade);
 
+    // 面板高度由内容行推导（行高表：标题带 76 + 三滑杆 66×3 + 三个开关行 60×3
+    // + 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 20）。页脚贴着内容流排布，
+    // 不再用 bh 固定偏移 —— 此前「关闭」钮与快捷键/署名两行重叠的根源就是两者
+    // 各算各的坐标，行数一变就撞车。
     const bw = 440;
-    const bh = prefs && this.host.inMatch ? 646 : 546;
+    const inMatch = !!this.host.inMatch;
+    const closeRel = 76 + 66 * 3 + 60 * 3 + (inMatch ? 58 : 0);
+    const hotkeyRel = closeRel + 42 + 14;
+    const creditRel = hotkeyRel + 22;
+    const bh = creditRel + 20;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
+
     const g = scene.add.graphics();
     g.fillStyle(INK[800], 0.98);
     g.fillRect(bx, by, bw, bh);
@@ -211,9 +220,10 @@ export class SettingsPanel {
       new Button(scene, bx + 34, y, '关 闭', () => this.close(), { width: bw - 68, height: 42, variant: 'primary' })
     );
 
+    // 页脚贴内容流：跟着关闭钮走，行数增减永不与之重叠
     panel.add(
       scene.add
-        .text(W / 2, by + bh - 58, '快捷键：D 刷新　F 升级　E 布阵　空格 开战　Ctrl+Z 撤销　ESC 暂停', {
+        .text(W / 2, by + hotkeyRel, '快捷键：D 刷新　F 升级　E 布阵　空格 开战　Ctrl+Z 撤销　ESC 暂停', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[400]),
@@ -224,7 +234,7 @@ export class SettingsPanel {
     // 音乐出处（读 manifest 单一真源；正式发布说明见 design/music/CREDITS.md）
     panel.add(
       scene.add
-        .text(W / 2, by + bh - 36, musicCreditLine(), {
+        .text(W / 2, by + creditRel, musicCreditLine(), {
           fontFamily: FONT.body,
           fontSize: '11px',
           color: css(INK[300]),

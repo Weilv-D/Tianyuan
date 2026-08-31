@@ -93,6 +93,9 @@ export class Patcher {
 
   /** 逆序还原全部写入（含羁绊调参表） */
   reset(): void {
+    // 只在真正 apply 过（journal 非空）才还原 + 全局 resetTuning：
+    // 嵌套 withOverrides 时内层的无条件 reset 会把外层已打的补丁一并清掉
+    if (this.journal.length === 0) return;
     for (let i = this.journal.length - 1; i >= 0; i--) {
       const e = this.journal[i];
       if (e.had) e.obj[e.key] = e.prev;

@@ -9,7 +9,7 @@
  * 塔盾武士→镇岳、红幡→九原、龟蛇缠矛→玄武），行优先读格。
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,7 +39,12 @@ for (let i = 0; i < 64; i++) {
 }
 
 // ── 读图 ──
-const sheet = PNG.sync.read(readFileSync(join(root, 'design/pieces/sheet-8x8.png')));
+const SHEET = join(root, 'design/pieces/sheet-8x8.png');
+if (!existsSync(SHEET)) {
+  console.error(`源图不存在: ${SHEET}`);
+  process.exit(1);
+}
+const sheet = PNG.sync.read(readFileSync(SHEET));
 const { width: W, height: H, data } = sheet;
 const alphaAt = (x, y) => data[(y * W + x) * 4 + 3];
 
@@ -86,12 +91,20 @@ for (let i = 0; i < 64; i++) {
 
   const out = new PNG({ width: w, height: h });
   for (let y = 0; y < h; y++) {
-    const srcStart = ((y0 + y === 0 ? 0 : (cy0 + y)) * W + cx0) * 4;
+    const srcStart = ((cy0 + y) * W + cx0) * 4;
     data.copy(out.data, y * w * 4, srcStart, srcStart + w * 4);
   }
-  writeFileSync(join(outDir, `${GRID[i]}.png`), PNG.sync.write(out));
+  atomicWrite(join(outDir, `${GRID[i]}.png`), PNG.sync.write(out));
   report.push(`${GRID[i].padEnd(10)} (${row + 1},${col + 1}) ${w}x${h} 覆盖率${(coverage * 100).toFixed(0)}%`);
 }
 
 console.log(report.join('\n'));
 console.log(`\n已切分 64 张 → ${outDir}`);
+
+/** 原子写：先落临时文件再改名，进程被杀不会留下半截 PNG */
+function atomicWrite(dest, data) {
+  const tmp = `${dest}.tmp`;
+  writeFileSync(tmp, data);
+  rmSync(dest, { force: true });
+  renameSync(tmp, dest);
+}

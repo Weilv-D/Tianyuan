@@ -61,6 +61,18 @@ export class CardPool {
   }
 
   restore(data: Record<string, number>): void {
+    // 跨版本/脏档守卫：出现未知棋子 id 或非负整数之外的值，说明存档与本版
+    // 名单不一致 —— 逐项合并会凭空造卡/消卡（守恒破坏），整池重置回满池口径
+    // （与新开局同基线）。缺项 id（新版本新增棋子）按满池计入。
+    const known = new Set(CHAMPIONS.map((c) => c.id));
+    for (const [k, v] of Object.entries(data)) {
+      if (!known.has(k) || !Number.isInteger(v) || (v as number) < 0) {
+        // 整池重置回满池（与新开局同基线）
+        this.counts = new Map();
+        for (const c of CHAMPIONS) this.counts.set(c.id, POOL_COUNTS[c.cost] ?? 0);
+        return;
+      }
+    }
     for (const c of CHAMPIONS) {
       this.counts.set(c.id, data[c.id] ?? POOL_COUNTS[c.cost] ?? 0);
     }

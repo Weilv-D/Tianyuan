@@ -67,16 +67,29 @@ export function autoPlace(defIds: readonly string[], team: 0 | 1): Map<string, C
   for (const id of sorted) {
     const e = CHAMPION_BY_ID[id];
     const depth = DEPTH[e?.cls ?? 'warrior'] ?? 0.5;
-    let rowIdx = Math.min(3, Math.floor(depth * 4));
-    // 该行满了就往远离前排的方向挪
-    let guard = 0;
-    while (rowUsed[rowIdx].size >= BOARD_COLS && guard < 4) {
-      rowIdx = Math.min(3, rowIdx + 1);
-      guard++;
+    const preferred = Math.min(3, Math.floor(depth * 4));
+    // 行选择单调前进：偏好行起向远离前排方向找第一个未满行，到头回扫全表。
+    // 此前"满行原地 rowIdx+1 + guard 上限"会在 4 行全满时落回满行死循环
+    // （9 人同纵深即触发，页面冻结）。
+    let rowIdx = -1;
+    for (let r = preferred; r < 4; r++) {
+      if (rowUsed[r].size < BOARD_COLS) {
+        rowIdx = r;
+        break;
+      }
     }
+    if (rowIdx < 0) {
+      for (let r = 0; r < 4; r++) {
+        if (rowUsed[r].size < BOARD_COLS) {
+          rowIdx = r;
+          break;
+        }
+      }
+    }
+    if (rowIdx < 0) throw new Error(`autoPlace: 全表无空行（${sorted.length} 人）`);
     const used = rowUsed[rowIdx];
-    let c = COL_ORDER.find((cc) => !used.has(String(cc))) ?? 0;
-    while (used.has(String(c))) c = (c + 1) % BOARD_COLS;
+    const c = COL_ORDER.find((cc) => !used.has(String(cc)));
+    if (c === undefined) throw new Error(`autoPlace: 第 ${rowIdx} 行未满却无空列`);
     used.add(String(c));
     out.set(id, { c, r: rows[rowIdx] });
   }

@@ -94,6 +94,10 @@ export interface Unit {
 export function createUnit(input: BattleUnitInput): Unit {
   const entry = CHAMPION_BY_ID[input.defId];
   if (!entry) throw new Error(`未知棋子: ${input.defId}`);
+  // 星级入口校验：越界/NaN 星会让缩放表查空，maxHp/atk 全 NaN 沿链路静默传播
+  if (!Number.isInteger(input.star) || input.star < 1 || input.star > 3) {
+    throw new Error(`非法星级: ${input.star}（${input.defId}）`);
+  }
   const b = entry.base;
   const si = input.star - 1;
   const hpScale = STAR_HP_SCALE[si];

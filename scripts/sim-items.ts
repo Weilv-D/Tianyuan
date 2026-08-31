@@ -106,7 +106,8 @@ function measureItem(itemId: string): number {
 
 const COMPS = PRESET_COMPS.length;
 const PAIRS = COMPS * (COMPS - 1);
-const GAMES_PER_ITEM = PAIRS * N * 2;
+// 每个有序对每种子实际 4 场（带件/裸装 × 原位/镜像），总量按 4 计——此前按 2 计，吞吐与总量都与实测差一倍
+const GAMES_PER_ITEM = PAIRS * N * 4;
 
 console.log('═════════ 百战天元 · 装备强度专项模拟 ═════════\n');
 console.log(`配对设计：${COMPS} 套预设 × ${COMPS - 1} 个对手 × 双向 × ${N} 种子 = ${GAMES_PER_ITEM} 局/件${ONLY ? `（定向复测：${ONLY.join('、')}，跳过合成/曲线段）` : ''}\n`);
