@@ -445,6 +445,15 @@ export function setTextIf(t: Phaser.GameObjects.Text, s: string): void {
   if (t.text !== s) t.setText(s);
 }
 
+/** 文本按像素宽截断（末端省略号）。返回实际落地的字符串。 */
+export function clipToWidth(t: Phaser.GameObjects.Text, s: string, maxW: number): string {
+  t.setText(s);
+  while (t.width > maxW && t.text.length > 2) {
+    t.setText(t.text.slice(0, -2).trimEnd() + '…');
+  }
+  return t.text;
+}
+
 export function label(
   scene: Phaser.Scene,
   x: number,

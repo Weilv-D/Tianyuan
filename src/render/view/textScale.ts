@@ -10,8 +10,9 @@
  * 本模块是副作用模块：在 ui/kit.ts 顶部导入，保证任何场景建字之前已挂好。
  */
 import Phaser from 'phaser';
+import { TEXT_SCALE } from './textScaleBase';
 
-const SCALE = 1.12;
+const SCALE = TEXT_SCALE;
 
 {
   type TextFn = (this: unknown, ...a: unknown[]) => unknown;
@@ -41,4 +42,4 @@ const SCALE = 1.12;
   }
 }
 
-export { SCALE as TEXT_SCALE };
+export { TEXT_SCALE };

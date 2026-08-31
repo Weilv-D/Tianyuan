@@ -5,7 +5,7 @@ import { CHAMPION_BY_ID } from '../../data/champions';
 import { TRAIT_BY_ID } from '../../data/traits';
 import { boardCap, boardCount } from '../../game/state';
 import { interestOf, streakGold, xpToNext } from '../../game/economy';
-import { Bar, FONT, setTextIf } from '../../ui/kit';
+import { Bar, FONT, clipToWidth, setTextIf } from '../../ui/kit';
 import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
 import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, SIDE_W } from '../view/layout';
 import { traitIconKey } from '../board/traitIcons';
@@ -380,15 +380,16 @@ export class SceneRefresh {
           })
           .setOrigin(0, 0.5)
       );
-      row.add(
-        this.scene.add
-          .text(C.nameX, 13, p.name, {
-            fontFamily: FONT.body,
-            fontSize: `${C.nameSize}px`,
-            color: p.alive ? css(PAPER[100]) : css(PAPER[500]),
-          })
-          .setOrigin(0, 0.5)
-      );
+      // 名字超预算（7 全角 × 渲染字号）时截断加省略号，绝不压血条
+      const nameText = this.scene.add
+        .text(C.nameX, 13, p.name, {
+          fontFamily: FONT.body,
+          fontSize: `${C.nameSize}px`,
+          color: p.alive ? css(PAPER[100]) : css(PAPER[500]),
+        })
+        .setOrigin(0, 0.5);
+      clipToWidth(nameText, p.name, C.nameMaxW);
+      row.add(nameText);
       const bar = new Bar(this.scene, C.barX, 13, C.barW, 5, p.idx === 0 ? SPIRIT.base : CINNABAR.base);
       bar.setValue(p.hp / PLAYER_START_HP, false);
       row.add(bar);

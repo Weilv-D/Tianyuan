@@ -14,7 +14,7 @@ import { GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/vie
 import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/board/silhouetteFactory';
 import { traitIconKey } from '../render/board/traitIcons';
 import { itemIconKey } from '../render/board/itemIcons';
-import { FONT, RADIUS } from './kit';
+import { FONT, RADIUS, clipToWidth } from './kit';
 import { bakedTexture } from '../render/view/bake';
 import { portraitItemSlotRect } from '../render/view/hudLayout';
 import type { UnitInstance } from '../game/state';
@@ -399,15 +399,6 @@ export class ShopCard extends Phaser.GameObjects.Container {
     });
     this.bg.setTexture(key);
   }
-}
-
-/** 文本按像素宽截断（末端省略号） */
-function clipToWidth(t: Phaser.GameObjects.Text, s: string, maxW: number): string {
-  t.setText(s);
-  while (t.width > maxW && t.text.length > 2) {
-    t.setText(t.text.slice(0, -2).trimEnd() + '…');
-  }
-  return t.text;
 }
 
 /** 羁绊行：小篆徽章 + 名称 + 当前/下一档 + 档位色。行高随描述行数自适应，绝不压到下一行 */

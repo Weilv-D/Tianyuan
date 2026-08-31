@@ -7,6 +7,7 @@
  */
 
 import { LOG_Y, RAIL_PITCH, RAIL_Y, SIDE_W } from './layout';
+import { renderedSize } from './textScaleBase';
 
 /** 徽章外环半径（逻辑 px）。traitIcons 的烘焙与各应用位共用此口径。 */
 export const BADGE_R = 16;
@@ -65,6 +66,13 @@ export function railOverlapsLog(): boolean {
 }
 
 // ── 诸侯计分板行（右栏，行高 30）────────────────────────
+// 列位按**渲染字号**（textScale 放大后）定预算 —— 历史事故：按声明 13px 给
+// 名字列 92px 预算，字号基线放大后 7 全角名实际渲染 105px，静默压进血条。
+// 改字号基线时这里的列位随 renderedSize 自动重排，不必手同步。
+
+/** 渲染字号（textScale 放大后的实际值） */
+const NAME_RENDERED = renderedSize(13); // 15
+const LV_RENDERED = renderedSize(11); // 12
 
 export const REPORT_ROW = {
   rowH: 30,
@@ -72,16 +80,20 @@ export const REPORT_ROW = {
   hpSize: 12,
   nameX: 36,
   nameSize: 13,
-  /** 名字列预算：最长 7 个全角名恰好收进（7×13=91） */
-  nameMaxW: 92,
-  barX: 136,
+  /** 名字列预算：最长 7 个全角名按渲染字号收进，超出由渲染层 clipToWidth 截断 */
+  nameMaxW: 7 * NAME_RENDERED + 1,
+  barX: 36 + 7 * NAME_RENDERED + 1 + 6,
   barW: 72,
-  lvX: 216,
+  lvX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6,
   lvSize: 11,
-  streakX: 252,
+  streakX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6 + Math.ceil(4 * 0.55 * LV_RENDERED) + 2,
   streakSize: 11,
-  streakMaxW: 30,
+  /** 连胜注最宽（"胜9"两全角 × 渲染 12px） */
+  streakMaxW: 2 * renderedSize(11),
 } as const;
+
+/** 行尾不出右栏（导出供测试口径复算） */
+export const REPORT_ROW_END = REPORT_ROW.streakX + REPORT_ROW.streakMaxW;
 
 /** 行内元素矩形（y 为行局部坐标）。供场景与遮挡测试共用。 */
 export function reportRowRects(nameLen: number): {
@@ -93,9 +105,9 @@ export function reportRowRects(nameLen: number): {
   const C = REPORT_ROW;
   const cjk = (n: number, size: number): number => n * size;
   return {
-    name: { x: C.nameX, w: Math.min(cjk(nameLen, C.nameSize), C.nameMaxW + 8) },
+    name: { x: C.nameX, w: Math.min(cjk(nameLen, NAME_RENDERED), C.nameMaxW) },
     bar: { x: C.barX, w: C.barW },
-    lv: { x: C.lvX, w: cjk(4, 0.55 * C.lvSize) },
+    lv: { x: C.lvX, w: cjk(4, 0.55 * LV_RENDERED) },
     streak: { x: C.streakX, w: C.streakMaxW },
   };
 }

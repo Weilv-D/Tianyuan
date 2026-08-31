@@ -10,8 +10,9 @@ import {
   ACT_BTN_W,
   ACT_X,
   ACT_Y,
+  BENCH_W,
+  BENCH_X,
   BENCH_Y,
-  GRID_X,
   HEADER_H,
   ITEM_BAR_SLOTS,
   ITEM_BAR_W,
@@ -512,11 +513,13 @@ export class HudPanels {
       .setOrigin(0, 0);
   }
 
-  // ══════════════ 场上计数（备战席左） ══════════════
+  // ══════════════ 场上计数（备战席签条同带右端） ══════════════
 
   buildBoardCount(): void {
+    // 与「备 战 席」签同带两端分布：旧位（棋盘右缘下、y=BENCH_Y+32）撞进
+    // 卸载按钮行——器匣上方那条窄带只够放一个东西。
     this.boardCountText = this.scene.add
-      .text(GRID_X - 16, BENCH_Y + 32, '', {
+      .text(BENCH_X + BENCH_W - 6, BENCH_Y - 13, '', {
         fontFamily: FONT.mono,
         fontSize: '12px',
         color: css(PAPER[400]),
