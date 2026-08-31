@@ -4,6 +4,86 @@
 
 说明：`1.0.0` 版本号于 M2 锁版时启用；此前的工程阶段以里程碑代号（0 / F / R / M1，见 `UPGRADE.md` 五阶段升级计划）归档，全部完成于 2026-08-30。
 
+## [1.5.0] - 2026-08-31 · 全量修复：P0 三连修 + P1 五连修 + 生命周期/音频/工程清扫，典藏音乐上线
+
+### 修复（P0 正确性）
+
+- **DPR 坐标归一（A1）**：画布物理缓冲 1920K×1080K 下，场景级命中检测拿画布像素
+  比对世界常量，高分屏（125%/150%/200% 缩放）上棋盘/备战席/器匣/出售印的拖拽与
+  悬停整体 K 倍偏移失效。新增 `screenToWorld` 换算咽喉 + `hitTest` 纯函数抽取，
+  全部接入点（输入/滚轮视口/音量滑杆/战斗悬停/图鉴详情卡）统一走世界坐标；
+  天命之印、DEV 控制台、grainOverlay 改用 layout 逻辑常量（K=2 不再移出屏幕）。
+- **回合二次结算（A2）**：战斗结算落盘（phase='result'）后刷新页面会再次进入
+  备战并被二次结算（双倍掉血/重复淘汰/重复快照）。新增 `needsAdvanceOnLoad`，
+  result 档恢复先 `beginRound` 推进；终局档直接路由结算场景；人类已亡快进到底。
+- **结算顺序确定性（A3）**：渲染层人类战场最后结算、无头模拟按配对顺序结算，
+  墨兽轮掉落的 rng 消费顺序不同 → 同 seed 渲染局与模拟局事件流分叉。新增
+  `Match.settleRound`（全部战斗按配对顺序无头结算，含人类场），BattleScene 只做
+  演出与 `finalizeRound`（endRound + 落盘）——渲染与模拟 rng 流逐位一致。
+
+### 修复（P1 逻辑）
+
+- **AI 合并估值（B1）**：3★ 溢价（60 分）只在持有 ≥2 张 2★ **且** ≥2 张 1★ 时给
+  （买一张真能立刻凑出第三张 2★）；仅有两张 2★ 回落 18 分。
+- **满席买入即合（B2）**：满席 + 席上有同名 1★ 时买入走溢出位落子，合成必然发生
+  （3×1★→2★ 净腾席位）、卡池金币守恒；席上无 victim（两张同名都在场上）维持拒绝；
+  合成未发生（防御路径）整体回滚。旧代码此路径是永远失败的死代码。
+- **buy 结果类型化（B3）**：返回 `{ok, reason}`（none/gold/bench/pool）；
+  卡池不足保留商店格（缺货卡不再凭空消失），界面按原因提示。
+- **战斗输入校验（B4）**：构造时对重复 uid / 越界格 / 重叠格抛错（与「未知棋子即抛」
+  同契约），占位表不再静默腐坏——顺带揪出两处测试自带的坏输入（镜像队 uid 冲突、
+  金种子用例 (4,4) 重叠放置，后者自 M2 起一直带病入档）。
+- **超时裁定召唤物口径（B5）**：裁定与 finish 记录同口径剔除召唤物——冠军全灭
+  仅召唤物存活直接判负、双方仅召唤物平局；无召唤物的超时局逐位不变
+  （金种子五例仅重叠输入修正的 guard-grind 一例漂移，其余四例含超时局逐位不动）。
+
+### 修复（P2 资源生命周期）
+
+- EffectsLayer 代际计数：clear() 后 80ms 内重开战斗不再有幽灵金环落场；clear 先
+  killTweensOf 再 removeAll。羁绊浮层重开先销毁旧滚轮句柄；enableScroll.destroy
+  补销毁遮罩 Graphics 本体（GeometryMask.destroy 只置空引用，此前逐次累积）；
+  CodexScene/BattleScene SHUTDOWN 统一销毁 scroll 句柄；DebugConsole 场景重启
+  复位（isOpen 不再误真）；五场景 SHUTDOWN 复位光标并摘除 body.cur-hover。
+
+### 修复（P3 音频）
+
+- 挂起上下文音爆（D1）：scheduleBgm 挂起跳拍 + unlock 恢复重锚乐句时钟。
+- bgm 总线 gain 镜像（D2）：淡入淡出以最后写入值为起点，不再读 cancel 后的固有值。
+- tone() 无效分支返回 null（D3）。
+
+### 新增
+
+- **典藏音乐（D4）**：四曲 CC0-1.0（Kevin MacLeod / FreePD，站点关站后经
+  Internet Archive 取回）：menu《Night Vigil》/ prep《Think About It》/
+  battle《Battle Ready》/ final《Epic Boss Battle》，Ogg Vorbis 160k、
+  11.6MB。manifest 单一真源 + `?url` 双形态适配（托管落文件 / 单文件内联
+  data URL）；后台解码、代际防过期接管、失败自动回落程序化合成；设置面板
+  「典藏音乐」开关 + 出处脚注；`npm run audit:music` 发布门禁（存在性 +
+  sha256 + CC0 口径）+ `THIRD_PARTY_LICENSES.txt` 随包；完整出处见
+  `design/music/CREDITS.md`。
+
+### 工程与发布
+
+- release.mjs：tsc 不再跑两遍、`--skip-typecheck` 真正生效、[1/5] 实际执行测试；
+  使用说明先于 zip 落盘（此前 zip 内没有说明）；zip 改 Node（fflate，UTF-8
+  文件名）跨平台，替换 Windows-only 的 PowerShell Compress-Archive。
+- start.sh 按 uname 分支（Git Bash / macOS / Linux 各用本机工具，其余明确报错）。
+- vite 生产构建 `emptyOutDir: true`（裸 build 不再堆积旧 hash 资产）。
+- `.qa/probes` 导入路径修复（此前全断且不在 tsc include 内静默放行）并纳入
+  类型检查；删除根目录两枚 0 字节意外 shell 产物。
+- 文档全量同步：README / QA / 冒烟清单（平衡实测、测试数 284、技能 15 类
+  64 个、素材口径、DPR 交互验收、已知限制补 DPR 变化不重建）。
+
+### 已知
+
+- 流派矩阵极差 15.4% → **18.6%**（B5 剔除召唤物后机关召唤流 41.8% ↔ 亡语
+  60.3%；先手 48.2%）。如实记录，回落路径=机关召唤侧承受/掉落条件化，
+  属后续平衡专项（走 sim:sweep/sim:ab 框架）。
+- 运行期 DPR 变化不动态重建（跨屏拖动需刷新），记为已知限制。
+
+- 验证：tsc 零错；284 项回归全绿；sim:match 200 局无异常；双形态构建 +
+  发布全流程（含音乐门禁与 zip 内说明）通过。
+
 ## 工程整理 · 2026-08-31（文件结构与文档系统化，无功能变更）
 
 - 目录重组：`src/render` 平铺源码按职责归入 `view/`（视图基元）与 `board/`（棋盘与单位视觉）；

@@ -1,5 +1,5 @@
-import { CHAMPION_BY_ID } from '../src/data/champions';
-import { PRESET_COMPS } from '../src/game/comp';
+import { CHAMPION_BY_ID } from '../../src/data/champions';
+import { PRESET_COMPS } from '../../src/game/comp';
 for (let ci = 0; ci < PRESET_COMPS.length; ci++) {
   const comp = PRESET_COMPS[ci];
   const ids = Object.keys(comp.units);

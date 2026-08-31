@@ -1,5 +1,5 @@
-import { Battle } from '../src/core/battle';
-import { unitInput } from '../tests/helpers';
+import { Battle } from '../../src/core/battle';
+import { unitInput } from '../../tests/helpers';
 const b = new Battle({
   seed: 20260831,
   units: [unitInput('gongshu', 0, { c: 1, r: 6 }), unitInput('muji', 0, { c: 6, r: 6 }), unitInput('pan', 1, { c: 3, r: 1 }, { star: 2 })],

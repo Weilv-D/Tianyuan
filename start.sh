@@ -25,15 +25,50 @@ for arg in "$@"; do
   esac
 done
 
-# 从 Windows netstat 找到监听端口的进程 PID
+# ── 平台适配（E4）：Windows(Git Bash) / macOS / Linux 各用本机工具，其余明确报错 ──
+OS_KIND="$(uname -s)"
+case "$OS_KIND" in
+  MINGW*|MSYS*|CYGWIN*) OS_KIND="windows" ;;
+  Darwin*)              OS_KIND="macos" ;;
+  Linux*)               OS_KIND="linux" ;;
+  *)
+    echo "不支持的运行环境: $OS_KIND（支持 Windows Git Bash / macOS / Linux）"
+    exit 1
+    ;;
+esac
+
+# 找到监听端口的进程 PID
 port_pid() {
-  netstat -ano 2>/dev/null | grep -i tcp | grep -E ":$PORT[[:space:]]" | grep -i listening | awk '{print $NF}' | head -n 1
+  case "$OS_KIND" in
+    windows)
+      netstat -ano 2>/dev/null | grep -i tcp | grep -E ":$PORT[[:space:]]" | grep -i listening | awk '{print $NF}' | head -n 1
+      ;;
+    macos)
+      lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1
+      ;;
+    linux)
+      # 本机进程 ss 能给 pid=；拿不到（权限/回环绑定）再试 lsof
+      ss -ltnp 2>/dev/null | grep -E "[:.]$PORT[[:space:]]" | grep -oE 'pid=[0-9]+' | head -n 1 | cut -d= -f2         || lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1
+      ;;
+  esac
 }
 
 kill_pid_tree() {
   local pid="$1"
   [ -n "$pid" ] || return 0
-  taskkill //F //T //PID "$pid" >/dev/null 2>&1 || kill -9 "$pid" 2>/dev/null || true
+  if [ "$OS_KIND" = "windows" ]; then
+    taskkill //F //T //PID "$pid" >/dev/null 2>&1 || kill -9 "$pid" 2>/dev/null || true
+  else
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+}
+
+open_browser() {
+  case "$OS_KIND" in
+    windows) explorer.exe "$1" >/dev/null 2>&1 || true ;;
+    macos)   open "$1" >/dev/null 2>&1 || true ;;
+    linux)   xdg-open "$1" >/dev/null 2>&1 || true ;;
+  esac
 }
 
 stop() {
@@ -108,7 +143,7 @@ start() {
   echo "就绪：http://localhost:$PORT"
   echo "退出方式：按 Ctrl+C（自动停止服务器），或另开终端执行 bash start.sh stop"
   if [ "$OPEN_BROWSER" = 1 ]; then
-    explorer.exe "http://localhost:$PORT" >/dev/null 2>&1 || true
+    open_browser "http://localhost:$PORT"
   fi
   wait "$SERVER_PID" 2>/dev/null || true
   exit 0

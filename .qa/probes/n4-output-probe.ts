@@ -1,7 +1,7 @@
 /** N 线输出量探针：机关 vs 荆棘，扫描 fourthHitGiant/Crush 档位下机关全队 dealtDamage 总量变化 */
-import { Battle } from '../src/core/battle';
-import { PRESET_COMPS, buildTeam } from '../src/game/comp';
-import { withOverrides, type Overrides } from '../scripts/lib/patch';
+import { Battle } from '../../src/core/battle';
+import { PRESET_COMPS, buildTeam } from '../../src/game/comp';
+import { withOverrides, type Overrides } from '../../scripts/lib/patch';
 
 const N = 60;
 const seedBase = 20260829;
