@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { CHAMPION_BY_ID } from '../data/champions';
+import { CHAMPION_BY_ID } from '../../data/champions';
 import { silhouetteKey, SIL_ORIGIN_Y, silContentScale, silContentHeight, BEAST_TEAM } from './silhouetteFactory';
 import { itemIconKey } from './itemIcons';
-import { ITEM_BY_ID } from '../data/items';
-import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from './palette';
-import { TEX } from './textures';
+import { ITEM_BY_ID } from '../../data/items';
+import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from '../view/palette';
+import { TEX } from '../view/textures';
 
 const STAR_SCALE = [0, 0.9, 1.02, 1.16];
 const BAR_W = 40;

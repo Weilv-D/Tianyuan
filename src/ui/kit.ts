@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { css, CINNABAR, DANGER, GILT, INK, PAPER, UI } from '../render/palette';
-import { bakedTexture } from '../render/bake';
+import { css, CINNABAR, DANGER, GILT, INK, PAPER, UI } from '../render/view/palette';
+import { bakedTexture } from '../render/view/bake';
 import { audio } from '../audio/AudioEngine';
 
 /**

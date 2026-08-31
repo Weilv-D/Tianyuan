@@ -6,13 +6,13 @@ import { GAME_BUILD, GAME_VERSION } from '../../version';
 import { CHAMPIONS } from '../../data/champions';
 import { Button, FONT } from '../../ui/kit';
 import { SettingsPanel } from '../../ui/SettingsPanel';
-import { GILT, INK, PAPER, css } from '../palette';
-import { bakeItemIcons } from '../itemIcons';
-import { bakeSilhouettes, silhouetteKey } from '../silhouetteFactory';
-import { buildTextures, grainOverlay } from '../textures';
-import { baseZoom } from '../viewScale';
-import { H, W } from '../layout';
-import { motion } from '../motion';
+import { GILT, INK, PAPER, css } from '../view/palette';
+import { bakeItemIcons } from '../board/itemIcons';
+import { bakeSilhouettes, silhouetteKey } from '../board/silhouetteFactory';
+import { buildTextures, grainOverlay } from '../view/textures';
+import { baseZoom } from '../view/viewScale';
+import { H, W } from '../view/layout';
+import { motion } from '../view/motion';
 
 /**
  * 主菜单场景。

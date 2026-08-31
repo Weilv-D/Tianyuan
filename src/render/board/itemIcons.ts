@@ -1,16 +1,16 @@
 /**
  * 装备图标烘焙：AI 立绘优先，程序几何图兜底。
  *
- * AI 图（src/render/itemArt/ai/，22 张透明 PNG，已按内容裁边）在启动咽喉
+ * AI 图（src/render/art/item/ai/，22 张透明 PNG，已按内容裁边）在启动咽喉
  * `preloadItemArt()` 一次性解码，烘焙期同步 contain-fit 进 96px 画布 ——
  * 棋盘上 13px、器匣 46px 都由消费端 setDisplaySize 缩放，采样恒为缩小。
  * 缺图时回落到旧程序几何（drawGlyph），任何装备必有图。
  */
 
 import Phaser from 'phaser';
-import { ITEMS, type ItemGlyph } from '../data/items';
-import { GILT, INK, PAPER } from './palette';
-import { ITEM_AI_URL } from './itemArt/itemAiSource';
+import { ITEMS, type ItemGlyph } from '../../data/items';
+import { GILT, INK, PAPER } from '../view/palette';
+import { ITEM_AI_URL } from '../art/item/itemAiSource';
 
 export const ITEM_ICON_SIZE = 48;
 

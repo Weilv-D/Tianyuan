@@ -3,8 +3,8 @@ import Phaser from 'phaser';
 import { PLAYER_START_HP } from '../../core/config';
 import { FONT, Button } from '../../ui/kit';
 import { audio } from '../../audio/AudioEngine';
-import { INK, GILT, CINNABAR, SPIRIT, PAPER, SHADE, css } from '../palette';
-import { W, H } from '../layout';
+import { INK, GILT, CINNABAR, SPIRIT, PAPER, SHADE, css } from '../view/palette';
+import { W, H } from '../view/layout';
 import type { PlayerState } from '../../game/state';
 
 /**

@@ -3,8 +3,8 @@ import Phaser from 'phaser';
 import type { AdventureOffer } from '../../game/adventure';
 import { cornerTicks, FONT, TRACK } from '../../ui/kit';
 import { audio } from '../../audio/AudioEngine';
-import { INK, GILT, MOON, SPIRIT, VOID, PAPER, css } from '../palette';
-import { W } from '../layout';
+import { INK, GILT, MOON, SPIRIT, VOID, PAPER, css } from '../view/palette';
+import { W } from '../view/layout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

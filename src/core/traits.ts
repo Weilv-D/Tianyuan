@@ -346,7 +346,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
           //   fourthHitCrush —— 破甲冲击：按目标有效护甲追加（结算内禀
           //     自缩放 100A/(100+A)，对甲墙特异、低甲无感）。
           // N 残留专项扫档结论（scripts/ab-pair.ts，CRN n=250 --pairs 4，
-          // 另附 .qa/n4-output-probe.ts 输出量探针）：
+          // 另附 .qa/probes/n4-output-probe.ts 输出量探针）：
           //   A 档 0.010/0.015/0.020/0.05/0.10/0.20/0.30 与 B 档
           //   0.3/0.5/0.8/1.5/3.0/5.0/7.0 —— 「机关→荆棘」目标边全部
           //   0.0p（A@0.30 才首次 +0.2p），授权档位内机关总输出仅

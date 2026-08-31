@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { audio } from '../audio/AudioEngine';
 import { savePrefs, type Preferences } from '../game/save';
 import { Button, FONT } from './kit';
-import { GILT, INK, PAPER, SHADE, css } from '../render/palette';
-import { motion } from '../render/motion';
-import { H, W } from '../render/layout';
+import { GILT, INK, PAPER, SHADE, css } from '../render/view/palette';
+import { motion } from '../render/view/motion';
+import { H, W } from '../render/view/layout';
 
 /**
  * 设置面板（共享组件）。

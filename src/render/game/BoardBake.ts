@@ -2,9 +2,9 @@
 import Phaser from 'phaser';
 import { FONT } from '../../ui/kit';
 import { UnitPortrait } from '../../ui/cards';
-import { bakedImage, bakedTexture } from '../bake';
-import { bakeLacquerBoard, bakeLacquerGrid } from '../BoardView';
-import { INK, PAPER, css } from '../palette';
+import { bakedImage, bakedTexture } from '../view/bake';
+import { bakeLacquerBoard, bakeLacquerGrid } from '../board/BoardView';
+import { INK, PAPER, css } from '../view/palette';
 import {
   BENCH_CELL,
   BENCH_N,
@@ -17,7 +17,7 @@ import {
   GRID_X,
   GRID_Y,
   HALF_ROWS,
-} from '../layout';
+} from '../view/layout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

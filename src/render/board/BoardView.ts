@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import { BOARD_COLS, BOARD_ROWS } from '../core/config';
-import { BOARD_PAD } from './layout';
-import { CINNABAR, GILT, INK, MOON, PAPER, PAPER_TINT, SPIRIT } from './palette';
-import { TEX } from './textures';
+import { BOARD_COLS, BOARD_ROWS } from '../../core/config';
+import { BOARD_PAD } from '../view/layout';
+import { CINNABAR, GILT, INK, MOON, PAPER, PAPER_TINT, SPIRIT } from '../view/palette';
+import { TEX } from '../view/textures';
 
 /** 大漆盘：准备与战斗共用同一张 640 盘（样稿 min(62vh,46vw) 的落地值） */
 export const CELL = 72;

@@ -1,4 +1,4 @@
-import { GILT, MOON, css } from '../palette';
+import { GILT, MOON, css } from '../../view/palette';
 import { AI_PIECE_URL as AI_PIECE_URL_MAP } from './aiSource';
 
 /**

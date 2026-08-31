@@ -6,9 +6,9 @@ import { TRAIT_BY_ID } from '../../data/traits';
 import { boardCap, boardCount } from '../../game/state';
 import { interestOf, streakGold, xpToNext } from '../../game/economy';
 import { Bar, FONT, setTextIf } from '../../ui/kit';
-import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../palette';
-import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, SIDE_W } from '../layout';
-import { traitIconKey } from '../traitIcons';
+import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
+import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, SIDE_W } from '../view/layout';
+import { traitIconKey } from '../board/traitIcons';
 import {
   REPORT_ROW,
   railBadgeHit,
@@ -17,7 +17,7 @@ import {
   railPopupClampY,
   railPopupLayout,
   RAIL_POPUP_W,
-} from '../hudLayout';
+} from '../view/hudLayout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

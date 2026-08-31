@@ -3,8 +3,8 @@ import Phaser from 'phaser';
 import { REROLL_COST } from '../../core/config';
 import { Bar, Button, FONT, enableScroll, makePanel } from '../../ui/kit';
 import { ItemChip, ShopCard, TraitRow } from '../../ui/cards';
-import { bakedImage } from '../bake';
-import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, TRAIT_TIER_COLOR_HEX, css } from '../palette';
+import { bakedImage } from '../view/bake';
+import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
 import {
   ACT_BTN_H,
   ACT_BTN_W,
@@ -42,9 +42,9 @@ import {
   SHOP_X,
   SHOP_Y,
   W,
-} from '../layout';
+} from '../view/layout';
 import { TRAIT_BY_ID } from '../../data/traits';
-import { RAIL_VIEW_H, RAIL_VIEW_W } from '../hudLayout';
+import { RAIL_VIEW_H, RAIL_VIEW_W } from '../view/hudLayout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

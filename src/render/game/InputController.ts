@@ -5,8 +5,8 @@ import { canPlace, moveToSlot, sellValue, type UnitInstance } from '../../game/s
 import { audio } from '../../audio/AudioEngine';
 import { ItemTooltip } from '../../ui/tooltip';
 import { UnitPortrait, UnitDetailCard } from '../../ui/cards';
-import { itemIconKey } from '../itemIcons';
-import { GILT, CINNABAR } from '../palette';
+import { itemIconKey } from '../board/itemIcons';
+import { GILT, CINNABAR } from '../view/palette';
 import {
   BENCH_CELL,
   BENCH_W,
@@ -29,7 +29,7 @@ import {
   ITEM_SIZE,
   W,
   H,
-} from '../layout';
+} from '../view/layout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

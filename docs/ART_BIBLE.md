@@ -1,7 +1,7 @@
 # 百战天元 · 美术圣经（ART BIBLE · 夜宴）
 
 > 本文件是全项目视觉的**唯一真源**。任何颜色、字体、圆角、间距、特效语言都必须来自此处。
-> 代码镜像位于 `src/render/palette.ts` 与 `src/ui/kit.ts`，二者必须保持同步。
+> 代码镜像位于 `src/render/view/palette.ts` 与 `src/ui/kit.ts`，二者必须保持同步。
 > **禁止在组件内硬编码十六进制色值** —— 那是风格漂移的开始。
 >
 > **裁决：夜宴（Night Feast）**—— 以样稿为准：
@@ -134,8 +134,8 @@ Phaser 画布透明，场景内不再铺底色。
 ## 六、棋子表现规范（AI 立绘 · 程序化合成）
 
 棋子美术为 **AI 生成立绘**。源图 64 张：透明底 PNG，命名即棋子代号，
-位于 `src/render/pieceArt/ai/<defId>.png`（由 `scripts/slice-sheet.mjs` 自 8×8 原图
-`design/ai-pieces/sheet-8x8.png` 切分入库）。启动时 `preloadAiPieces()` 预解码，
+位于 `src/render/art/piece/ai/<defId>.png`（由 `scripts/slice-sheet.mjs` 自 8×8 原图
+`design/pieces/sheet-8x8.png` 切分入库）。启动时 `preloadAiPieces()` 预解码，
 烘焙期 `drawAiPiece()` 按源图**原生分辨率**落位到 208×208 纹理（脚底锚 (104, 184)），
 烘焙期零重采样；缺图棋子回退程序化剪影（`silhouettes.ts`），任何棋子必有图。
 
@@ -319,7 +319,7 @@ Phaser 画布透明，场景内不再铺底色。
 
 设计分辨率 **1920×1080**，`Scale.FIT + CENTER_BOTH`，缩放不错位不裁切；画布透明叠于夜色背景。
 
-**DPR 底座**（`render/viewScale.ts`）：画布物理缓冲 = 1920×1080 × K（K = clamp(devicePixelRatio, 1, 2)），
+**DPR 底座**（`render/view/viewScale.ts`）：画布物理缓冲 = 1920×1080 × K（K = clamp(devicePixelRatio, 1, 2)），
 各场景相机 `zoom = K` 并 `centerOn(W/2, H/2)` 钉住取景锚点 —— 逻辑坐标与 CSS 尺寸
 均与旧 1× 缓冲完全一致，1 逻辑 px 恰落 1 设备像素，高分屏 / 系统缩放屏整屏发糊归零。
 K=1 时逐字节等同旧渲染。文字 `resolution:2`、棋子原生分辨率烘焙在此底座上 1:1 落地。
@@ -352,7 +352,7 @@ K=1 时逐字节等同旧渲染。文字 `resolution:2`、棋子原生分辨率�
 - 计数随局变动，由调用处 Text 绘制（`resolution:2`），不烘焙；
 - 运行期只把**场上有子**（count>0）的羁绊挂上轨，无子羁绊不占位；
 - 轨几何（pitch 44、视口 76×660 完整收纳环右计数、不越记事栏）与计分板列位、悬停笺高度全部出自
-  `render/hudLayout.ts` 纯函数，`tests/hud-layout.test.ts` 钉死遮挡不变量 ——
+  `render/view/hudLayout.ts` 纯函数，`tests/hud-layout.test.ts` 钉死遮挡不变量 ——
   任何让文字出圈、压条、越栏的改动在 `npm test` 就地报警。
 
 ---

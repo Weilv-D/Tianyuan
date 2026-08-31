@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { GILT, PAPER, css } from './palette';
-import { BADGE_R, BADGE_SIZE } from './hudLayout';
-import sealFontUrl from '../assets/fonts/seal.woff2?url';
+import { GILT, PAPER, css } from '../view/palette';
+import { BADGE_R, BADGE_SIZE } from '../view/hudLayout';
+import sealFontUrl from '../../assets/fonts/seal.woff2?url';
 
 /**
  * 羁绊小篆徽章 · 烘焙管线

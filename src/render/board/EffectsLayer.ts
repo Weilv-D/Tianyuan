@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import type { FxKind } from '../core/events';
-import { CINNABAR, GILT, MOON, PAPER, SPIRIT, VOID } from './palette';
-import { TEX } from './textures';
+import type { FxKind } from '../../core/events';
+import { CINNABAR, GILT, MOON, PAPER, SPIRIT, VOID } from '../view/palette';
+import { TEX } from '../view/textures';
 import { CELL as BOARD_CELL } from './BoardView';
-import { motion } from './motion';
+import { motion } from '../view/motion';
 
 export interface FxRequest {
   kind: FxKind;

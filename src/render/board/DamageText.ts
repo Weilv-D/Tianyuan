@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { DAMAGE_OUTLINE, GILT, MOON, PAPER, SHADE, CINNABAR, SPIRIT, VOID, css } from './palette';
-import { FONT } from '../ui/kit';
-import { motion } from './motion';
+import { DAMAGE_OUTLINE, GILT, MOON, PAPER, SHADE, CINNABAR, SPIRIT, VOID, css } from '../view/palette';
+import { FONT } from '../../ui/kit';
+import { motion } from '../view/motion';
 
 export type DamageTier = 'normal' | 'crit' | 'skill' | 'true' | 'heal' | 'shield' | 'execute' | 'dot';
 

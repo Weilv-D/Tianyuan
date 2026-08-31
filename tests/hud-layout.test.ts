@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOG_Y, RAIL_X, RAIL_Y } from '../src/render/layout';
+import { LOG_Y, RAIL_X, RAIL_Y } from '../src/render/view/layout';
 import {
   BADGE_R,
   BADGE_SIZE,
@@ -17,7 +17,7 @@ import {
   railPopupLayout,
   reportRowFitsSide,
   reportRowRects,
-} from '../src/render/hudLayout';
+} from '../src/render/view/hudLayout';
 import { TRAITS } from '../src/data/traits';
 
 /**

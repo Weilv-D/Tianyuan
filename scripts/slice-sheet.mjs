@@ -2,8 +2,8 @@
  * 8×8 棋子原图切分器。
  *
  * 用法：node scripts/slice-sheet.mjs
- * 输入：design/ai-pieces/sheet-8x8.png（透明底，行优先 64 格）
- * 输出：src/render/pieceArt/ai/<defId>.png × 64（按内容包围盒裁边，保留 alpha）
+ * 输入：design/pieces/sheet-8x8.png（透明底，行优先 64 格）
+ * 输出：src/render/art/piece/ai/<defId>.png × 64（按内容包围盒裁边，保留 alpha）
  *
  * 分配表按"立绘气质 ↔ 棋子称号/职业"对位（如九尾狐→青丘、白翼→应龙、
  * 塔盾武士→镇岳、红幡→九原、龟蛇缠矛→玄武），行优先读格。
@@ -39,11 +39,11 @@ for (let i = 0; i < 64; i++) {
 }
 
 // ── 读图 ──
-const sheet = PNG.sync.read(readFileSync(join(root, 'design/ai-pieces/sheet-8x8.png')));
+const sheet = PNG.sync.read(readFileSync(join(root, 'design/pieces/sheet-8x8.png')));
 const { width: W, height: H, data } = sheet;
 const alphaAt = (x, y) => data[(y * W + x) * 4 + 3];
 
-const outDir = join(root, 'src/render/pieceArt/ai');
+const outDir = join(root, 'src/render/art/piece/ai');
 mkdirSync(outDir, { recursive: true });
 
 const cellW = W / 8;

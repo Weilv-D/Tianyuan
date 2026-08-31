@@ -1,6 +1,6 @@
 /**
- * 装备图切分：design/ai-items/item-sheet.png（8 列 × 3 行，透明底）
- *  → src/render/itemArt/ai/<itemId>.png（22 张；row1 = 8 组件，row2/3 = 成装 14 选 16）
+ * 装备图切分：design/items/item-sheet.png（8 列 × 3 行，透明底）
+ *  → src/render/art/item/ai/<itemId>.png（22 张；row1 = 8 组件，row2/3 = 成装 14 选 16）
  *
  * 映射按"外观语义 ↔ 装备机制"定（装备名已随图更名，见 data/items.ts）：
  *  r1: 翠玦(moren) 玉卷轴(fafu) 轻羽(yunlv) 灵珠(lingzhu)
@@ -14,8 +14,8 @@
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
-const SRC = 'design/ai-items/item-sheet.png';
-const OUT = 'src/render/itemArt/ai';
+const SRC = 'design/items/item-sheet.png';
+const OUT = 'src/render/art/item/ai';
 const COLS = 8;
 const ROWS = 3;
 const PAD = 3;

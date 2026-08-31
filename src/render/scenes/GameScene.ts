@@ -10,16 +10,16 @@ import { ITEM_BY_ID } from '../../data/items';
 import { clearSave, loadMatch, loadPrefs, saveMatch, type Preferences } from '../../game/save';
 import { audio } from '../../audio/AudioEngine';
 import { FONT } from '../../ui/kit';
-import { baseZoom, CAM_ZOOM } from '../viewScale';
+import { baseZoom, CAM_ZOOM } from '../view/viewScale';
 import { SettingsPanel } from '../../ui/SettingsPanel';
-import { bakeItemIcons } from '../itemIcons';
-import { bakeTraitIcons } from '../traitIcons';
-import { buildTextures, grainOverlay } from '../textures';
-import { playLegendaryStarFx } from '../LegendaryFx';
-import { bakeSilhouettes } from '../silhouetteFactory';
-import { INK, GILT, CINNABAR, SPIRIT, PAPER, css } from '../palette';
-import { W, H } from '../layout';
-import { motion } from '../motion';
+import { bakeItemIcons } from '../board/itemIcons';
+import { bakeTraitIcons } from '../board/traitIcons';
+import { buildTextures, grainOverlay } from '../view/textures';
+import { playLegendaryStarFx } from '../board/LegendaryFx';
+import { bakeSilhouettes } from '../board/silhouetteFactory';
+import { INK, GILT, CINNABAR, SPIRIT, PAPER, css } from '../view/palette';
+import { W, H } from '../view/layout';
+import { motion } from '../view/motion';
 
 // ── 渲染模块（R2 拆分）：场景只保留 create/update 主循环、场景切换与对局数据装配；
 //    覆盖层/面板/输入/刷新细节全部委托 src/render/game/ 下的模块。 ──

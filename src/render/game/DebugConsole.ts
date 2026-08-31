@@ -4,7 +4,7 @@ import { CHAMPIONS } from '../../data/champions';
 import { PLAYER_START_HP } from '../../core/config';
 import { newIid } from '../../game/state';
 import { FONT, Button } from '../../ui/kit';
-import { INK, GILT, PAPER, css } from '../palette';
+import { INK, GILT, PAPER, css } from '../view/palette';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

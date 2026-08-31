@@ -6,13 +6,13 @@
  * 发光只此一处 —— 全场最稀有的瞬间独享全场唯一的 ADD 光。
  */
 import Phaser from 'phaser';
-import { CINNABAR, GILT, PAPER, SHADE, css } from './palette';
-import { TEX } from './textures';
+import { CINNABAR, GILT, PAPER, SHADE, css } from '../view/palette';
+import { TEX } from '../view/textures';
 import { silhouetteKey } from './silhouetteFactory';
-import { FONT } from '../ui/kit';
-import { CHAMPION_BY_ID } from '../data/champions';
-import { audio } from '../audio/AudioEngine';
-import { motion } from './motion';
+import { FONT } from '../../ui/kit';
+import { CHAMPION_BY_ID } from '../../data/champions';
+import { audio } from '../../audio/AudioEngine';
+import { motion } from '../view/motion';
 
 export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
   const W = scene.scale.width;

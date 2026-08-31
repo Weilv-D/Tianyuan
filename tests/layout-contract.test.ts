@@ -25,8 +25,8 @@ import {
   SHOP_X,
   SHOP_Y,
   W,
-} from '../src/render/layout';
-import { CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, TEAM_COLOR } from '../src/render/palette';
+} from '../src/render/view/layout';
+import { CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, TEAM_COLOR } from '../src/render/view/palette';
 
 /**
  * 布局契约测试（夜宴重排后的不变量）。

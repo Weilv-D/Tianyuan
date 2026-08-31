@@ -6,13 +6,13 @@ import { audio } from '../../audio/AudioEngine';
 import { Button, enableScroll, FONT, makePanel, type ScrollHandle } from '../../ui/kit';
 import { ItemTooltip } from '../../ui/tooltip';
 import { ItemChip, UnitDetailCard, UnitPortrait } from '../../ui/cards';
-import { GILT, INK, PAPER, RARITY_COLOR, TRAIT_TIER_COLOR_HEX, css } from '../palette';
-import { itemIconKey, bakeItemIcons } from '../itemIcons';
-import { traitIconKey, bakeTraitIcons } from '../traitIcons';
-import { bakeSilhouettes } from '../silhouetteFactory';
-import { buildTextures, grainOverlay } from '../textures';
-import { baseZoom } from '../viewScale';
-import { H, W } from '../layout';
+import { GILT, INK, PAPER, RARITY_COLOR, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
+import { itemIconKey, bakeItemIcons } from '../board/itemIcons';
+import { traitIconKey, bakeTraitIcons } from '../board/traitIcons';
+import { bakeSilhouettes } from '../board/silhouetteFactory';
+import { buildTextures, grainOverlay } from '../view/textures';
+import { baseZoom } from '../view/viewScale';
+import { H, W } from '../view/layout';
 
 /**
  * 图鉴场景（离对局浏览）。

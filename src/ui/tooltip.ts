@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ITEMS, ITEM_BY_ID } from '../data/items';
-import { itemIconKey } from '../render/itemIcons';
-import { GILT, INK, PAPER, css } from '../render/palette';
+import { itemIconKey } from '../render/board/itemIcons';
+import { GILT, INK, PAPER, css } from '../render/view/palette';
 import { FONT } from './kit';
 
 /**

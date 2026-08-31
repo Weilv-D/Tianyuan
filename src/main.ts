@@ -5,10 +5,10 @@ import { BattleScene } from './render/scenes/BattleScene';
 import { ResultScene } from './render/scenes/ResultScene';
 import { CodexScene } from './render/scenes/CodexScene';
 import { audio } from './audio/AudioEngine';
-import { preloadAiPieces } from './render/pieceArt/aiBake';
-import { preloadItemArt } from './render/itemIcons';
-import { preloadSealFont } from './render/traitIcons';
-import { VIEW_K } from './render/viewScale';
+import { preloadAiPieces } from './render/art/piece/aiBake';
+import { preloadItemArt } from './render/board/itemIcons';
+import { preloadSealFont } from './render/board/traitIcons';
+import { VIEW_K } from './render/view/viewScale';
 
 /**
  * 直角体系（ART_BIBLE §9.2）：全项目禁用圆角矩形。
@@ -84,7 +84,7 @@ import { VIEW_K } from './render/viewScale';
  *
  * 设计分辨率固定 1920×1080，用 Scale.FIT 等比适配任意 16:9 窗口 ——
  * 缩放不错位、不裁切，逻辑坐标永远是 1920×1080。物理缓冲再乘 VIEW_K
- * （见 render/viewScale）：HiDPI 与系统缩放屏上 1 逻辑 px = 1 设备 px，
+ * （见 render/view/viewScale）：HiDPI 与系统缩放屏上 1 逻辑 px = 1 设备 px，
  * 整屏不再被 CSS 拉大发糊；相机 zoom = 1/K 由各场景 baseZoom 钉住。
  */
 const config: Phaser.Types.Core.GameConfig = {

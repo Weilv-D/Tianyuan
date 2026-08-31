@@ -10,12 +10,12 @@ import Phaser from 'phaser';
 import { CHAMPION_BY_ID, formatSkillDesc } from '../data/champions';
 import { ITEM_BY_ID } from '../data/items';
 import { TRAIT_BY_ID } from '../data/traits';
-import { GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/palette';
-import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/silhouetteFactory';
-import { traitIconKey } from '../render/traitIcons';
-import { itemIconKey } from '../render/itemIcons';
+import { GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/view/palette';
+import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/board/silhouetteFactory';
+import { traitIconKey } from '../render/board/traitIcons';
+import { itemIconKey } from '../render/board/itemIcons';
 import { FONT, RADIUS } from './kit';
-import { bakedTexture } from '../render/bake';
+import { bakedTexture } from '../render/view/bake';
 import type { UnitInstance } from '../game/state';
 import type { Star } from '../core/types';
 

@@ -2,8 +2,8 @@
 import Phaser from 'phaser';
 import { FONT, Button } from '../../ui/kit';
 import { audio } from '../../audio/AudioEngine';
-import { INK, GILT, CINNABAR, PAPER, SHADE, css } from '../palette';
-import { W, H } from '../layout';
+import { INK, GILT, CINNABAR, PAPER, SHADE, css } from '../view/palette';
+import { W, H } from '../view/layout';
 import type { PlayerState } from '../../game/state';
 
 /**

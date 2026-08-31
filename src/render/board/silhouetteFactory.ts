@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
-import { CHAMPION_BY_ID } from '../data/champions';
+import { CHAMPION_BY_ID } from '../../data/champions';
 import { drawSilhouette, makeStyle } from './silhouettes';
-import { RARITY_COLOR, TEAM_COLOR, VOID, INK } from './palette';
-import { hasAiPiece, drawAiPiece } from './pieceArt/aiBake';
+import { RARITY_COLOR, TEAM_COLOR, VOID, INK } from '../view/palette';
+import { hasAiPiece, drawAiPiece } from '../art/piece/aiBake';
 
 /**
  * 把 64 名棋子 × 3 套配色的立绘在启动时烘焙成纹理。
@@ -14,7 +14,7 @@ import { hasAiPiece, drawAiPiece } from './pieceArt/aiBake';
 
 /**
  * 纹理物理尺寸：208×208、脚底 y=184 —— 与 AI 原生分辨率烘焙对齐
- * （源内容 ~150px + 柔光余量，见 pieceArt/aiBake）。旧版 Graphics 剪影
+ * （源内容 ~150px + 柔光余量，见 art/piece/aiBake）。旧版 Graphics 剪影
  * 以脚底为原点作画，经 rt.draw 落到同一锚点，天然兼容更大画布。
  */
 export const SIL_W = 208;

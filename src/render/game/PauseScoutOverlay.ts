@@ -4,8 +4,8 @@ import { TRAIT_BY_ID } from '../../data/traits';
 import { FONT, Button } from '../../ui/kit';
 import { UnitPortrait } from '../../ui/cards';
 import { audio } from '../../audio/AudioEngine';
-import { INK, CINNABAR, GILT, PAPER, SHADE, css } from '../palette';
-import { W, H } from '../layout';
+import { INK, CINNABAR, GILT, PAPER, SHADE, css } from '../view/palette';
+import { W, H } from '../view/layout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**

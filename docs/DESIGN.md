@@ -400,7 +400,7 @@ AI 分配装备的判据只有一条：**装备应该放大这个棋子本来就
 ### 工程注记：Phaser 的 Graphics 没有缓存
 
 WebGL 下 `Graphics` 每帧重放整个命令缓冲，一个 `fillRoundedRect` ≈ 45 条命令。
-纪律：**形态不随帧变化的图形一律烤成纹理**（`render/bake.ts`），
+纪律：**形态不随帧变化的图形一律烤成纹理**（`render/view/bake.ts`），
 只有数值条填充、拖拽高亮等少数元素保留实时 Graphics。
 该纪律把战斗场景从 67 FPS 上限（9,848 条指令独占 8.6ms/帧）带到 181 FPS。
 

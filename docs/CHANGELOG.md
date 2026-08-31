@@ -4,6 +4,18 @@
 
 说明：`1.0.0` 版本号于 M2 锁版时启用；此前的工程阶段以里程碑代号（0 / F / R / M1，见 `UPGRADE.md` 五阶段升级计划）归档，全部完成于 2026-08-30。
 
+## 工程整理 · 2026-08-31（文件结构与文档系统化，无功能变更）
+
+- 目录重组：`src/render` 平铺源码按职责归入 `view/`（视图基元）与 `board/`（棋盘与单位视觉）；
+  美术资产统一收进 `src/render/art/{item,piece}/`；`design/{ai-items,ai-pieces}` 对齐为 `design/{items,pieces}`。
+- 文档系统化：DESIGN / QA / ART_BIBLE / UPGRADE / CHANGELOG 迁入 `docs/`，根目录仅留 README 入口；
+  新增 `docs/README.md` 导航索引；修复 QA 章节编号（9/9/10 → 9/10/11）；UPGRADE 标注执行归档；
+  全库 markdown 链接体检通过。
+- 清理：`.qa` 证据按 `evidence/`（模拟输出 txt）与 `probes/`（探针脚本）归整；
+  删除已吸收进管线的临时探针脚本；切片脚本路径同步新目录。
+- 版本契约：package-lock.json 同步至 1.4.1（与 package.json / `src/version.ts` / CHANGELOG 一致）。
+- 验证：tsc / 233 项回归 / 生产构建全绿；构建产物 hash 与整理前一致（纯路径与文档变更，无行为变化）。
+
 ## [1.4.1] - 2026-08-31 · 全库复核修复：27 处缺陷清扫（正确性 + 资源生命周期）
 
 ### 修复
@@ -141,7 +153,7 @@
 
 ### 文档
 
-- `ART_BIBLE.md` 重写为 **v3 夜宴版**（v1 备份于 `.qa/ART_BIBLE.v1.backup.md`）：
+- `ART_BIBLE.md` 重写为 **v3 夜宴版**（v1 备份于 `../.qa/ART_BIBLE.v1.backup.md`）：
   夜宴色板/字体五线/大漆盘构成/夜宴编排/印章白名单 3 处/占位零混入验收项。
 
 ### 验收
@@ -280,7 +292,7 @@
 
 ### 新增
 
-- `src/render/layout.ts`：分区坐标与间距的唯一真源，GameScene / BattleScene 全部布局常量迁入。
+- `src/render/view/layout.ts`：分区坐标与间距的唯一真源，GameScene / BattleScene 全部布局常量迁入。
 - 器匣装备名悬停提示卡（`ui/tooltip.ts`）：名 + 效果 + 组件 / 可合成去向；棋子悬停详情卡补已穿装备行。
 
 ### 变更（性能）

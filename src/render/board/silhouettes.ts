@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import type { SilhouetteKey } from '../core/types';
-import { GILT, INK, PAPER, VOID, mix } from './palette';
+import type { SilhouetteKey } from '../../core/types';
+import { GILT, INK, PAPER, VOID, mix } from '../view/palette';
 
 /**
  * 程序化棋子剪影。

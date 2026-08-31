@@ -232,4 +232,4 @@ export const TRAIT_BY_ID: Record<string, TraitDef> = Object.fromEntries(
   TRAITS.map((t) => [t.id, t]),
 );
 
-// 羁绊档位色（铜 / 银 / 金 / 虹）的唯一真源在 src/render/palette.ts 的 TRAIT_TIER_COLOR_HEX。
+// 羁绊档位色（铜 / 银 / 金 / 虹）的唯一真源在 src/render/view/palette.ts 的 TRAIT_TIER_COLOR_HEX。

@@ -4,10 +4,10 @@ import { clearSave } from '../../game/save';
 import { loadDailyBest, recordDailyResult } from '../../game/daily';
 import { audio } from '../../audio/AudioEngine';
 import { Button, FONT } from '../../ui/kit';
-import { GILT, INK, CINNABAR, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } from '../palette';
-import { buildTextures, grainOverlay, TEX } from '../textures';
-import { H, W } from '../layout';
-import { baseZoom } from '../viewScale';
+import { GILT, INK, CINNABAR, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
+import { buildTextures, grainOverlay, TEX } from '../view/textures';
+import { H, W } from '../view/layout';
+import { baseZoom } from '../view/viewScale';
 
 /**
  * 终局结算场景。
