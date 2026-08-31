@@ -329,18 +329,17 @@ export class GameScene extends Phaser.Scene {
     const before = p.gold;
     const starsBefore = this.snapshotStars();
     this.pushUndo('买入');
-    if (this.match.buy(p, slot)) {
+    const r = this.match.buy(p, slot);
+    if (r.ok) {
       audio.play('coin');
       this.detectThreeStar(starsBefore);
       this.showToast(`花费 ${before - p.gold} 金`);
     } else {
       this.undoStack.pop();
-      const id = p.shop[slot];
-      if (id && CHAMPION_BY_ID[id] && p.gold < CHAMPION_BY_ID[id]!.cost) {
-        this.showToast('金币不足', true);
-      } else if (id) {
-        this.showToast('备战席已满', true);
-      }
+      if (r.reason === 'gold') this.showToast('金币不足', true);
+      else if (r.reason === 'pool') this.showToast('卡池不足', true);
+      else if (r.reason === 'bench') this.showToast('备战席已满', true);
+      else this.showToast('没有可买的卡', true);
       audio.play('warn');
     }
     this.afterAction();

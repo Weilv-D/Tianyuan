@@ -24,19 +24,19 @@
     },
     "guard-grind-vs-youming": {
       "winner": 1,
-      "ticks": 945,
+      "ticks": 1050,
       "timeout": false,
       "takenDamage": {
-        "0": 53978.2793432426,
-        "1": 9049.479628334617
+        "0": 27390.319293631415,
+        "1": 9410.591939067204
       },
-      "takenDamageTotal": 63027.75897157721,
+      "takenDamageTotal": 36800.91123269862,
       "survivorCount": {
         "0": 0,
-        "1": 3
+        "1": 5
       },
-      "eventCount": 1420,
-      "eventsDigest": "sha256:d0f1ba8ec43411c912e5ac82717168a4ffedcfa382099f1c485db40b82afba90"
+      "eventCount": 1629,
+      "eventsDigest": "sha256:4860b13e779399f77edd39f842332f5ea21937a673bc6660632528543bb4feb7"
     },
     "mirror-danding-trio": {
       "winner": 0,

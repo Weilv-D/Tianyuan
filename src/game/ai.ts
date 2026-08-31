@@ -38,8 +38,8 @@ export interface AiWorld {
   round: number;
   pool: CardPool;
   rng: Rng;
-  /** 买入商店第 slot 张牌 */
-  buy(p: PlayerState, slot: number): boolean;
+  /** 买入商店第 slot 张牌（返回结构含 ok，Match 实现另带失败原因） */
+  buy(p: PlayerState, slot: number): { ok: boolean };
   /** 刷新商店 */
   reroll(p: PlayerState): boolean;
   /** 花 4 金买 4 经验 */
@@ -178,10 +178,13 @@ function copiesOf(p: PlayerState, defId: string, star: number): number {
  * 会被 `one === 1` 提前拦下只拿到 8 分，而实际上这张牌是通往**第二个** 2★ 的进度，
  * 价值远高于一张孤立的一星。
  */
-function mergeValue(p: PlayerState, defId: string): number {
+export function mergeValue(p: PlayerState, defId: string): number {
   const two = copiesOf(p, defId, 2);
   const one = copiesOf(p, defId, 1);
-  if (two >= 2) return 60; // 买进来立刻 3★ —— 高光时刻
+  // 买进一张 1★ 只在 one>=2 时才立刻凑出第三张 2★ → 3★；
+  // 仅有两张 2★（one<2）时这张牌离 3★ 还差两张 1★，是进度不是高光
+  if (two >= 2 && one >= 2) return 60; // 买进来立刻 3★ —— 高光时刻
+  if (two >= 2) return 18; // 已有两张 2★：这张 1★ 是通往第三张 2★ 的进度
   if (two === 1) return 18; // 已有 2★，这张是通往第二个 2★ 的进度
   if (one >= 2) return 26; // 买进来立刻变 2★
   if (one === 1) return 8;
@@ -347,7 +350,7 @@ export function aiTakeTurn(w: AiWorld, p: PlayerState): void {
       // 阈值随危机感下降：血少了，什么都买（先活下来再说）
       const threshold = 26 - urgency * 14 + (1 - aggression) * 8;
       if (want >= threshold) {
-        if (w.buy(p, s)) bought = true;
+        if (w.buy(p, s).ok) bought = true;
       }
     }
 

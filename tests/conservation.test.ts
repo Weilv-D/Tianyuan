@@ -139,20 +139,40 @@ describe('Match 买入 / 卖出', () => {
     p.gold = 50;
     p.board = emptyBoard();
     p.bench = emptyBench();
-    // 备战席 9 格全满，其中 2 张磐一星 → 通过"即将合成"预检，但新子实际落不下
-    for (let i = 0; i < BENCH_SLOTS; i++) {
-      p.bench[i] = i < 2 ? createUnit('pan') : createUnit('ajiu');
-    }
+    // 备战席 9 格全满且席上无同名 1★（同名 0 张 < 2，预检直接拒绝）
+    for (let i = 0; i < BENCH_SLOTS; i++) p.bench[i] = createUnit('ajiu');
     p.shop[0] = 'pan';
     const goldBefore = p.gold;
     const poolBefore = m.pool.snapshot();
 
-    expect(m.buy(p, 0)).toBe(false);
+    const r = m.buy(p, 0);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('bench');
 
     expect(p.gold).toBe(goldBefore);
     expect(p.shop[0]).toBe('pan');
     expect(m.pool.snapshot()).toEqual(poolBefore);
     expect(p.bench.filter(Boolean).length).toBe(BENCH_SLOTS);
+  });
+
+  it('满席且两张同名都在场上（席上无 victim）→ 维持拒绝并整体回滚', () => {
+    const m = new Match(2030);
+    const p = m.players[0];
+    p.gold = 50;
+    p.board = emptyBoard();
+    p.bench = emptyBench();
+    p.board[0] = createUnit('pan');
+    p.board[1] = createUnit('pan');
+    for (let i = 0; i < BENCH_SLOTS; i++) p.bench[i] = createUnit('ajiu');
+    p.shop[0] = 'pan';
+    const poolBefore = m.pool.snapshot();
+
+    const r = m.buy(p, 0);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('bench');
+    expect(m.pool.snapshot()).toEqual(poolBefore);
+    expect(p.gold).toBe(50);
+    expect(p.shop[0]).toBe('pan');
   });
 
   it('正常买入扣钱扣池，卖出按星级回卡回钱', () => {
@@ -164,7 +184,7 @@ describe('Match 买入 / 卖出', () => {
     p.shop[0] = 'pan';
     const poolBefore = m.pool.snapshot();
 
-    expect(m.buy(p, 0)).toBe(true);
+    expect(m.buy(p, 0).ok).toBe(true);
     expect(p.gold).toBe(50 - 1);
     expect(p.shop[0]).toBeNull();
     expect(m.pool.remaining('pan')).toBe((poolBefore.pan ?? 0) - 1);

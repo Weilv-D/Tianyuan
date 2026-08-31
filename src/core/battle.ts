@@ -88,14 +88,27 @@ export class Battle implements BattleApi {
     this.recordEvents = recordEvents;
     this.maxTicks = cfg.maxTicks ?? BATTLE_TIMEOUT_TICKS;
 
-    // 1) 建单位（uid 升序，保证遍历顺序确定）
+    // 1) 建单位（uid 升序，保证遍历顺序确定）。
+    //    输入校验与 createUnit 的「未知棋子即抛」同契约：重复 uid / 越界格 /
+    //    重叠格立刻抛错。静默跳过会腐坏 occ 占位表，寻路与命中全盘错位且事后无从查起。
     const inputs = [...cfg.units].sort((a, b) => a.uid - b.uid);
+    const seenUid = new Set<number>();
     for (const input of inputs) {
+      if (seenUid.has(input.uid)) {
+        throw new Error(`战斗输入重复 uid: ${input.uid}（${input.defId}）`);
+      }
+      seenUid.add(input.uid);
+      if (!inBounds(input.cell.c, input.cell.r)) {
+        throw new Error(`战斗输入越界格: (${input.cell.c},${input.cell.r}) ${input.defId}`);
+      }
+      const i = cellIndex(input.cell.c, input.cell.r);
+      if (this.occ[i] !== -1) {
+        throw new Error(`战斗输入重叠格: (${input.cell.c},${input.cell.r}) ${input.defId} 与 uid ${this.occ[i]} 冲突`);
+      }
       const u = createUnit(input);
       this.units.push(u);
       this.nextUid = Math.max(this.nextUid, u.uid + 1);
-      const i = cellIndex(u.cell.c, u.cell.r);
-      if (this.occ[i] === -1) this.occ[i] = u.uid;
+      this.occ[i] = u.uid;
     }
 
     // 2) 套用羁绊（按队伍字典序，先数值后钩子）
@@ -1082,10 +1095,13 @@ export class Battle implements BattleApi {
       return;
     }
     if (this.tick >= this.maxTicks) {
-      // 超时：按剩余生命比例裁定
+      // 超时裁定。口径与 finish 的记录一致：只算非召唤物（isMinion）——
+      // 召唤物撑血不能算赢，冠军全灭也不能靠召唤物续命。
       const ratio: Record<number, number> = {};
+      const champAlive = new Map<TeamId, number>();
       for (const [team] of aliveByTeam) {
-        const units = this.units.filter((u) => u.team === team);
+        const units = this.units.filter((u) => u.team === team && !u.isMinion);
+        champAlive.set(team, units.filter((u) => u.alive).length);
         const cur = units.reduce((s, u) => s + Math.max(0, u.hp), 0);
         const max = units.reduce((s, u) => s + u.maxHp, 0);
         ratio[team] = max > 0 ? cur / max : 0;
@@ -1093,7 +1109,16 @@ export class Battle implements BattleApi {
       // 按剩余生命比例裁定。排序必须按 ratio 本身 —— 按队伍号排会把
       // "低号队伍血量领先"的超时局全部误判成平局，污染所有平衡数据
       const teams = Object.keys(ratio).map(Number).sort((a, b) => ratio[b] - ratio[a]);
-      const winner = ratio[teams[0]] - ratio[teams[1]] > TIMEOUT_WIN_RATIO ? teams[0] : null;
+      let winner: TeamId | null;
+      if (teams.length < 2) {
+        // 防御（ratio 对每个在场队恒有键，此分支正常不可达）：现存队冠军有活口才判胜
+        winner = teams.length === 1 && (champAlive.get(teams[0]) ?? 0) > 0 ? teams[0] : null;
+      } else if ((champAlive.get(teams[0]) ?? 0) > 0 && (champAlive.get(teams[1]) ?? 0) === 0) {
+        // 一方冠军全灭、仅召唤物存活：冠军存活方直接胜，不比血量比例
+        winner = teams[0];
+      } else {
+        winner = ratio[teams[0]] - ratio[teams[1]] > TIMEOUT_WIN_RATIO ? teams[0] : null;
+      }
       this.finish(winner, true);
     }
   }

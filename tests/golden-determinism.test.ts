@@ -123,7 +123,9 @@ const CASES: CaseSpec[] = [
         U(103, 'dasiming', 1, { c: 4, r: 4 }, 2),
         U(104, 'shidian', 1, { c: 5, r: 5 }, 2),
         U(105, 'jiuying', 1, { c: 3, r: 6 }, 2),
-        U(106, 'xuanwu', 1, { c: 4, r: 4 }, 2),
+        // (4,4) 已被 dasiming 占据：旧版本此处与 dasiming 重叠放置，occ 表被
+        // 静默腐坏（xuanwu 无占位记录）。B4 输入校验落地后显式暴露，挪至空格
+        U(106, 'xuanwu', 1, { c: 5, r: 4 }, 2),
       ],
       traits: {
         0: computeTraits(['pan', 'lingxiao', 'xuanwu', 'budong', 'zhenyue']),

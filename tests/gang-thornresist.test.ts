@@ -140,8 +140,12 @@ describe('围攻·破阵：追加火力锁定在 t2 金甲阵', () => {
 describe('2v4 定档数据钉', () => {
   it('机关成员定档：thornResist 0.65（tuning 表为空的生产默认）', () => {
     const a = buildTeam(PRESET_COMPS[4], 0, 1);
+    // 镜像对手必须走 buildTeam 的 team=1 路径（uid 换段、行翻到上半场）——
+    // 旧写法直接复制 a.inputs 只换 team 号，uid 与格子双重冲突，
+    // 在 B4 输入校验（battle.ts 构造抛错）落地后显式暴露
+    const b = buildTeam(PRESET_COMPS[4], 1, 101);
     const battle = new Battle(
-      { seed: 1, units: [...a.inputs, ...a.inputs.map((u) => ({ ...u, team: 1 as const, cell: { c: u.cell.c, r: u.cell.r } }))], traits: { 0: a.traits, 1: a.traits } },
+      { seed: 1, units: [...a.inputs, ...b.inputs], traits: { 0: a.traits, 1: b.traits } },
       null,
       true,
     );
