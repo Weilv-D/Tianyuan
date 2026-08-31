@@ -9,7 +9,7 @@ import { autoEquip, equipItem, unequipItem, MAX_ITEMS_PER_UNIT } from '../../gam
 import { ITEM_BY_ID } from '../../data/items';
 import { clearSave, loadMatch, loadPrefs, saveMatch, type Preferences } from '../../game/save';
 import { audio } from '../../audio/AudioEngine';
-import { FONT } from '../../ui/kit';
+import { FONT, resetCursorOnShutdown } from '../../ui/kit';
 import { baseZoom, CAM_ZOOM } from '../view/viewScale';
 import { SettingsPanel } from '../../ui/SettingsPanel';
 import { bakeItemIcons } from '../board/itemIcons';
@@ -112,6 +112,7 @@ export class GameScene extends Phaser.Scene {
 
   create(data: SceneData): void {
     baseZoom(this);
+    resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);
@@ -145,6 +146,9 @@ export class GameScene extends Phaser.Scene {
     this.prefs = loadPrefs();
     motion.calm = this.prefs.calm;
     this.inputCtl.resetForCreate();
+    // DEV 控制台随场景实例存活：panel 若在上一场关闭时还开着，现在指向
+    // 已销毁的容器（isOpen 恒真）—— create 时统一复位（C5）
+    this.debug.reset();
     this.saveTimer?.remove();
     this.saveTimer = null;
 

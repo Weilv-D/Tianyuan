@@ -3,7 +3,7 @@ import type { Match } from '../../game/match';
 import { clearSave } from '../../game/save';
 import { loadDailyBest, recordDailyResult } from '../../game/daily';
 import { audio } from '../../audio/AudioEngine';
-import { Button, FONT } from '../../ui/kit';
+import { Button, FONT, resetCursorOnShutdown } from '../../ui/kit';
 import { GILT, INK, CINNABAR, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
 import { buildTextures, grainOverlay, TEX } from '../view/textures';
 import { H, W } from '../view/layout';
@@ -22,6 +22,7 @@ export class ResultScene extends Phaser.Scene {
 
   create(data: { match?: Match }): void {
     baseZoom(this);
+    resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
     const match = data.match;

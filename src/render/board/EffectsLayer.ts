@@ -34,6 +34,8 @@ export class EffectsLayer {
    */
   private readonly strays = new Set<Phaser.GameObjects.GameObject>();
   private shakeAccum = 0;
+  /** 代际计数：clear() 递增；迟到的延时回调据此自杀（C1） */
+  private gen = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -187,9 +189,14 @@ export class EffectsLayer {
       });
     }
 
-    // 暴击第二重冲击环：迟一拍追上去，双层扩散
+    // 暴击第二重冲击环：迟一拍追上去，双层扩散。
+    // delayedCall 是场景级计时器，不随 layer 的子对象销毁而取消 ——
+    // clear() 后 80ms 内重开战斗会让这只金环落进下一场（C1），
+    // 必须校验代际：clear() 已递增 gen，过期回调直接放弃。
     if (crit) {
+      const gen = this.gen;
       this.scene.time.delayedCall(80, () => {
+        if (gen !== this.gen) return;
         const ring2 = this.img(TEX.ring, r.x, r.y, GILT.light);
         ring2.setDisplaySize(40, 40).setAlpha(0.8);
         this.scene.tweens.add({
@@ -625,6 +632,12 @@ export class EffectsLayer {
   }
 
   clear(): void {
+    // 代际 +1：让还在飞行的延时回调（crit 第二环等）知道自己是上一场的
+    this.gen++;
+    // 先杀补间再移除（对齐 DamageTextLayer 范式）：补间的 onComplete 会
+    // destroy 目标，若目标已被 removeAll(true) 销毁，就是对尸体发后事
+    const children = [...this.layer.getAll(), ...this.upper.getAll()];
+    if (children.length > 0) this.scene.tweens.killTweensOf(children);
     this.layer.removeAll(true);
     this.upper.removeAll(true);
     for (const s of [...this.strays]) s.destroy();

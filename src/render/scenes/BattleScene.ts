@@ -16,7 +16,7 @@ import { EffectsLayer } from '../board/EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../board/DamageText';
 import { motion } from '../view/motion';
 import { audio } from '../../audio/AudioEngine';
-import { Button, enableScroll, FONT, makeChip, makePanel, type ScrollHandle } from '../../ui/kit';
+import { Button, enableScroll, FONT, makeChip, makePanel, resetCursorOnShutdown, type ScrollHandle } from '../../ui/kit';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../../game/comp';
 import type { Match, Pairing } from '../../game/match';
 import { saveMatch } from '../../game/save';
@@ -123,6 +123,7 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     baseZoom(this);
+    resetCursorOnShutdown(this);
     buildTextures(this);
     bakeSilhouettes(this);
     bakeItemIcons(this);
@@ -130,6 +131,17 @@ export class BattleScene extends Phaser.Scene {
 
     // Scene 实例被复用，上次进入场景时登记的按钮引用必须清掉，否则会越积越多
     this.speedBtns = [];
+
+    // 侧栏滚动句柄与战斗残留随 SHUTDOWN 统一清理：scroll 的遮罩 Graphics
+    // 不在显示列表，场景关闭不回收（C4）。战斗中关页/切场景的语义：
+    // 开战前 flushSave 落的是结算前快照，回来后整回合确定性重放，无数据损坏。
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.clearBattle();
+      this.scrollA?.destroy();
+      this.scrollB?.destroy();
+      this.scrollA = null;
+      this.scrollB = null;
+    });
 
     // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
 

@@ -94,7 +94,15 @@ export class HudPanels {
   private traitModal: Phaser.GameObjects.Container | null = null;
   private traitModalScroll: ReturnType<typeof enableScroll> | null = null;
 
-  constructor(private scene: GameScene) {}
+  constructor(private scene: GameScene) {
+    // 浮层开着时切场景（如开着羁绊全览直接开战）：容器随场景销毁，
+    // 但 scroll 的遮罩 Graphics 不在显示列表 —— SHUTDOWN 统一回收
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.traitModalScroll?.destroy();
+      this.traitModalScroll = null;
+      this.traitModal = null;
+    });
+  }
 
   // ══════════════ 背景 ══════════════
 
@@ -507,6 +515,9 @@ export class HudPanels {
     if (this.traitModal) {
       this.traitModal.destroy();
       this.traitModal = null;
+      // 先销毁滚轮句柄再置空：scroll 的遮罩 Graphics 不在显示列表，
+      // 不 destroy 会随每次开关累积一枚（C2）
+      this.traitModalScroll?.destroy();
       this.traitModalScroll = null;
       return;
     }

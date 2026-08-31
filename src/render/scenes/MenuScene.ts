@@ -4,7 +4,7 @@ import { loadMatch, loadPrefs } from '../../game/save';
 import { dailySeedFor, loadDailyBest, todayKey } from '../../game/daily';
 import { GAME_BUILD, GAME_VERSION } from '../../version';
 import { CHAMPIONS } from '../../data/champions';
-import { Button, FONT } from '../../ui/kit';
+import { Button, FONT, resetCursorOnShutdown } from '../../ui/kit';
 import { SettingsPanel } from '../../ui/SettingsPanel';
 import { GILT, INK, PAPER, css } from '../view/palette';
 import { bakeItemIcons } from '../board/itemIcons';
@@ -29,6 +29,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     baseZoom(this);
+    resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);

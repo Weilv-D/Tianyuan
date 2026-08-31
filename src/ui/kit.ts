@@ -405,6 +405,20 @@ export function divider(scene: Phaser.Scene, x: number, y: number, w: number): P
   return g;
 }
 
+/**
+ * 场景 SHUTDOWN 时复位自定义光标（C6）。
+ *
+ * 画布光标 Phaser 会在 InputPlugin.shutdown 里自己重置，但 index.html 的
+ * 金环光标（body.cur-hover）挂在 DOM 上：悬停高亮点亮时切场景，监听随场景
+ * 消失而 cur-hover 类永远留在 body 上。各场景 create() 统一调用一次。
+ */
+export function resetCursorOnShutdown(scene: Phaser.Scene): void {
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    scene.input.setDefaultCursor('default');
+    document.body.classList.remove('cur-hover');
+  });
+}
+
 /** 有变化守卫的 setText：文本栅格化只发生在字符串真正变化时 */
 export function setTextIf(t: Phaser.GameObjects.Text, s: string): void {
   if (t.text !== s) t.setText(s);
@@ -479,6 +493,10 @@ export function enableScroll(
     destroy(): void {
       scene.input.off('wheel', onWheel);
       container.clearMask(true);
+      // GeometryMask.destroy() 只置空引用，遮罩 Graphics 本体必须自己销毁 ——
+      // 它由 make.graphics(addToScene=false) 创建、不在显示列表，
+      // 场景关闭不会回收它，不销毁就随每次面板开关累积一枚
+      g.destroy();
     },
   };
 }

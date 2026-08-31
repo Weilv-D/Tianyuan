@@ -21,6 +21,15 @@ export class DebugConsole {
     return this.panel !== null;
   }
 
+  /**
+   * 场景重启复位（C5）：panel 指向的容器随场景关闭已销毁，不置空的话
+   * isOpen 恒真（ESC 分支会误以为控制台开着）、toggle() 也会对尸体操作。
+   */
+  reset(): void {
+    if (this.panel && this.panel.scene) this.panel.destroy();
+    this.panel = null;
+  }
+
   toggle(): void {
     if (this.panel) { this.panel.destroy(); this.panel = null; return; }
     this.open();

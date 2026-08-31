@@ -3,7 +3,7 @@ import { CHAMPIONS, CHAMPION_BY_ID } from '../../data/champions';
 import { TRAITS } from '../../data/traits';
 import { ITEMS, ITEM_BY_ID } from '../../data/items';
 import { audio } from '../../audio/AudioEngine';
-import { Button, enableScroll, FONT, makePanel, type ScrollHandle } from '../../ui/kit';
+import { Button, enableScroll, FONT, makePanel, resetCursorOnShutdown, type ScrollHandle } from '../../ui/kit';
 import { ItemTooltip } from '../../ui/tooltip';
 import { ItemChip, UnitDetailCard, UnitPortrait } from '../../ui/cards';
 import { GILT, INK, PAPER, RARITY_COLOR, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
@@ -51,6 +51,7 @@ export class CodexScene extends Phaser.Scene {
 
   create(data: { from?: 'Menu' | 'Game' }): void {
     baseZoom(this);
+    resetCursorOnShutdown(this);
     // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）
     this.backTo = data.from === 'Game' ? 'Game' : 'Menu';
     buildTextures(this);
@@ -62,6 +63,14 @@ export class CodexScene extends Phaser.Scene {
     this.detailCard = null;
     this.contents = { champs: null, traits: null, items: null };
     this.scrolls = { champs: null, traits: null, items: null };
+    // 每次进入 create 都会重建三柄 scroll：SHUTDOWN 时统一销毁，
+    // 否则不入显示列表的遮罩 Graphics 逐次累积（C3）
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      for (const k of ['champs', 'traits', 'items'] as CodexTab[]) {
+        this.scrolls[k]?.destroy();
+        this.scrolls[k] = null;
+      }
+    });
 
     // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
 
