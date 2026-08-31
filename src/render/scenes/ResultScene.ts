@@ -7,6 +7,7 @@ import { Button, FONT } from '../../ui/kit';
 import { GILT, INK, CINNABAR, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } from '../palette';
 import { buildTextures, grainOverlay, TEX } from '../textures';
 import { H, W } from '../layout';
+import { baseZoom } from '../viewScale';
 
 /**
  * 终局结算场景。
@@ -20,6 +21,7 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(data: { match?: Match }): void {
+    baseZoom(this);
     buildTextures(this);
     grainOverlay(this);
     const match = data.match;
@@ -86,7 +88,7 @@ export class ResultScene extends Phaser.Scene {
     panel.add(placeTxt);
     panel.add(
       this.add
-        .text(0, by + 106, `${human.wins} 胜 ${human.losses} 负　最佳连胜 ${human.bestStreak}　累计输出 ${Math.round(human.totalDamage)}　终局 ${human.level} 级`, {
+        .text(0, by + 106, `${human.wins} 胜 ${human.losses} 负　最佳连胜 ${human.bestStreak}　胜局累计输出 ${Math.round(human.totalDamage)}　终局 ${human.level} 级`, {
           fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]),
         })
         .setOrigin(0.5, 0)
@@ -216,7 +218,7 @@ export class ResultScene extends Phaser.Scene {
   private stampChampionSeal(): void {
     const size = 110;
     const x = W / 2 + 660 / 2 - 72;
-    const y = H / 2 - 680 / 2 + 96;
+    const y = H / 2 - 680 / 2 + 90; // 印底与第一名行顶保持 6px，不再贴脸
     const seal = this.add.container(x, y).setDepth(820).setScale(2.0).setAlpha(0).setRotation(-0.05);
     const g = this.add.graphics();
     g.fillStyle(CINNABAR.deep, 0.96);

@@ -10,8 +10,9 @@ import Phaser from 'phaser';
 import { CHAMPION_BY_ID, formatSkillDesc } from '../data/champions';
 import { ITEM_BY_ID } from '../data/items';
 import { TRAIT_BY_ID } from '../data/traits';
-import { GILT, INK, PAPER, RARITY_COLOR, RARITY_NAME, SPIRIT, VOID, css } from '../render/palette';
+import { GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/palette';
 import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/silhouetteFactory';
+import { traitIconKey } from '../render/traitIcons';
 import { itemIconKey } from '../render/itemIcons';
 import { FONT, RADIUS } from './kit';
 import { bakedTexture } from '../render/bake';
@@ -81,7 +82,7 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
     this.sil = scene.add.image(size / 2, size, '').setVisible(false);
     this.starRow = scene.add.container(0, 0);
     this.nameText = scene.add
-      .text(size / 2, size - 14, '', {
+      .text(size / 2, size - 18, '', {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[200]),
@@ -107,8 +108,9 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
     const key = silhouetteKey(u.defId, team, u.star);
     if (this.scene.textures.exists(key)) {
       this.sil.setTexture(key);
-      // 按墨迹可见内容高缩放（不同原型在纹理里的占框差异大），脚底贴格子下沿留 4px
-      const scale = silContentScale(u.defId, u.star, this.sz * 0.64, this.sz * 0.82);
+      // 按墨迹可见内容高缩放（不同原型在纹理里的占框差异大），脚底贴格子下沿留 4px。
+      // 0.82/0.94 是"看得清"口径：旧 0.72/0.84 让棋子缩在格里，盘面读不清眉眼
+      const scale = silContentScale(u.defId, u.star, this.sz * 0.82, this.sz * 0.94);
       this.sil.setScale(scale).setOrigin(0.5, SIL_ORIGIN_Y);
       this.sil.setPosition(this.sz / 2, this.sz - 4);
       this.sil.setVisible(true);
@@ -189,9 +191,8 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
     this.chrome.setTexture(key).setVisible(true);
 
     // 星级：底部居中实星，用烘焙好的单星贴图摆出来。
-    // 星星贴着格子最底沿，名字底边抬高到 size-14 —— 两者各占底部 14px，
-    // 互不越界（此前同在中心线上压盖约 4px）
-    const r = Math.max(3, s * 0.055);
+    // 星顶至多到 size-16，名字底边在 size-18 —— 各占底部一条带，互不相交
+    const r = Math.min(7, Math.max(3, s * 0.055));
     const gap = r * 2.5;
     const totalW = (star - 1) * gap;
     const starKey = starTexKey(this.scene, r, star >= 3 ? GILT.light : PAPER[100]);
@@ -226,7 +227,6 @@ export class ShopCard extends Phaser.GameObjects.Container {
   private readonly bg: Phaser.GameObjects.Image;
   private readonly sil: Phaser.GameObjects.Image;
   private readonly nameText: Phaser.GameObjects.Text;
-  private readonly titleText: Phaser.GameObjects.Text;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly traitText: Phaser.GameObjects.Text;
   private defId: string | null = null;
@@ -238,20 +238,18 @@ export class ShopCard extends Phaser.GameObjects.Container {
     this.cardH = h;
     this.baseY = y;
     this.bg = scene.add.image(-1, -1, '__shop').setOrigin(0);
-    this.sil = scene.add.image(w / 2, h - 66, '').setVisible(false);
+    this.sil = scene.add.image(w / 2, h - 62, '').setVisible(false);
+    // 底部信息带只留决策三行：名 / 羁绊 / 价 —— 品阶由底框色表达，称号是冗余文字
     this.nameText = scene.add
-      .text(w / 2, h - 62, '', { fontFamily: FONT.title, fontSize: '13px', color: css(PAPER[100]), letterSpacing: 4 })
-      .setOrigin(0.5, 0);
-    this.titleText = scene.add
-      .text(w / 2, h - 44, '', { fontFamily: FONT.body, fontSize: '11px', color: css(PAPER[400]) })
+      .text(w / 2, h - 54, '', { fontFamily: FONT.title, fontSize: '13px', color: css(PAPER[100]), letterSpacing: 4 })
       .setOrigin(0.5, 0);
     this.traitText = scene.add
-      .text(w / 2, h - 30, '', { fontFamily: FONT.body, fontSize: '11px', color: css(PAPER[300]) })
+      .text(w / 2, h - 35, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
       .setOrigin(0.5, 0);
     this.costText = scene.add
-      .text(w / 2, h - 15, '', { fontFamily: FONT.mono, fontSize: '11px', color: css(GILT.light) })
+      .text(w / 2, h - 17, '', { fontFamily: FONT.mono, fontSize: '12px', color: css(GILT.light) })
       .setOrigin(0.5, 0);
-    this.add([this.bg, this.sil, this.nameText, this.titleText, this.traitText, this.costText]);
+    this.add([this.bg, this.sil, this.nameText, this.traitText, this.costText]);
     this.setSize(w, h);
     this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
     this.on('pointerover', () => {
@@ -282,7 +280,6 @@ export class ShopCard extends Phaser.GameObjects.Container {
     if (!defId) {
       this.sil.setVisible(false);
       this.nameText.setText('');
-      this.titleText.setText('');
       this.costText.setText('');
       this.traitText.setText('');
       this.redraw(false);
@@ -296,13 +293,11 @@ export class ShopCard extends Phaser.GameObjects.Container {
       // 按墨迹可见内容高缩放：所有卡片的棋子占卡面同一比例，不再随原型忽大忽小
       const scale = silContentScale(defId, 1, 62, this.cardW * 0.76);
       this.sil.setScale(scale).setOrigin(0.5, SIL_ORIGIN_Y);
-      this.sil.setPosition(this.cardW / 2, this.cardH - 66);
+      this.sil.setPosition(this.cardW / 2, this.cardH - 62);
       this.sil.setVisible(true);
     }
     this.nameText.setText(def.name);
-    // 品阶 · 称号 / 羁绊名：单行截断，宁可少字不可溢出
-    const title = `${RARITY_NAME[def.cost]} · ${def.title}`;
-    this.titleText.setText(clipToWidth(this.titleText, title, this.cardW - 12));
+    // 羁绊名：单行截断，宁可少字不可溢出
     const names = [...def.origins, ...def.classes]
       .map((t) => TRAIT_BY_ID[t]?.name ?? t)
       .join(' · ');
@@ -338,12 +333,14 @@ export class ShopCard extends Phaser.GameObjects.Container {
       g.lineStyle(1, def ? GILT.base : INK[500], def ? 0.16 : 0.25);
       g.strokeRect(0, 0, w, h);
       if (def) {
-        // 顶部稀有度刻线：22px 居中短线（样稿 .scard::before）
-        g.fillStyle(col, 0.9);
-        g.fillRect(w / 2 - 11, 0, 22, 1.5);
+        // 顶部稀有度通栏色带：满宽 3px —— 远看也认得出费用档位（旧 22px 短线太隐晦）
+        g.fillStyle(col, 0.95);
+        g.fillRect(0, 0, w, 3);
+        g.fillStyle(col, 0.35);
+        g.fillRect(0, 3, w, 1.5);
         // 剪影脚下的一道稀有度微染：站位的"地"，代替此前的占位圆碟
         g.fillStyle(col, 0.14);
-        g.fillRect(w / 2 - 26, h - 68, 52, 2);
+        g.fillRect(w / 2 - 26, h - 64, 52, 2);
       }
       if (hoverOn) {
         g.fillStyle(PAPER[100], 0.05);
@@ -365,30 +362,35 @@ function clipToWidth(t: Phaser.GameObjects.Text, s: string, maxW: number): strin
   return t.text;
 }
 
-/** 羁绊行：名称 + 当前/下一档 + 档位色。行高随描述行数自适应，绝不压到下一行 */
+/** 羁绊行：小篆徽章 + 名称 + 当前/下一档 + 档位色。行高随描述行数自适应，绝不压到下一行 */
 export class TraitRow extends Phaser.GameObjects.Container {
   private readonly cardW: number;
   private readonly bg: Phaser.GameObjects.Image;
+  private readonly icon: Phaser.GameObjects.Image;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly countText: Phaser.GameObjects.Text;
   private readonly descText: Phaser.GameObjects.Text;
   /** 本行实际高度（含底部呼吸间距），排布方用它在纵轴上堆叠 */
-  rowHeight = 38;
+  rowHeight = 46;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number) {
     super(scene, x, y);
     this.cardW = w;
     this.bg = scene.add.image(0, 0, '__trow').setOrigin(0);
-    this.nameText = scene.add.text(30, 4, '', { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 1 }).setOrigin(0, 0);
+    this.icon = scene.add.image(23, 21, '').setVisible(false).setDisplaySize(30, 30);
+    this.nameText = scene.add.text(46, 4, '', { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 1 }).setOrigin(0, 0);
     this.countText = scene.add.text(w - 8, 5, '', { fontFamily: FONT.num, fontSize: '12px', color: css(GILT.base) }).setOrigin(1, 0);
-    this.descText = scene.add.text(30, 21, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]), wordWrap: { width: w - 44 } }).setOrigin(0, 0);
-    this.add([this.bg, this.nameText, this.countText, this.descText]);
+    this.descText = scene.add.text(46, 21, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]), wordWrap: { width: w - 60 } }).setOrigin(0, 0);
+    this.add([this.bg, this.icon, this.nameText, this.countText, this.descText]);
     scene.add.existing(this);
   }
 
   set(id: string, count: number, tier: number, nextBreak: number, tierColor: number, desc: string): void {
     const def = TRAIT_BY_ID[id];
     const active = tier >= 0;
+    if (this.scene.textures.exists(traitIconKey(id, active ? Math.min(tier, 3) : 0))) {
+      this.icon.setTexture(traitIconKey(id, active ? Math.min(tier, 3) : 0)).setVisible(true);
+    }
     this.nameText.setText(def?.name ?? id);
     this.nameText.setColor(active ? css(tierColor) : css(INK[300]));
     this.countText.setText(`${count}/${nextBreak}`);
@@ -400,11 +402,11 @@ export class TraitRow extends Phaser.GameObjects.Container {
     while (this.descText.height > 32 && this.descText.text.length > 4) {
       this.descText.setText(this.descText.text.slice(0, -2).trimEnd() + '…');
     }
-    const h = Math.max(34, 21 + this.descText.height + 3);
+    const h = Math.max(46, 21 + this.descText.height + 6);
     this.rowHeight = h;
 
-    // 底板 + 左侧档位指示块一并烘焙：形态只由（宽 × 高 × 激活 × 档位色 × 档数）决定
-    const key = `trow_${this.cardW}x${h}_${active ? 1 : 0}_${tierColor.toString(16)}_${tier}`;
+    // 底板烘焙：形态只由（宽 × 高 × 激活 × 档位色）决定；档位语言由徽章金线表达
+    const key = `trow_${this.cardW}x${h}_${active ? 1 : 0}_${tierColor.toString(16)}`;
     bakedTexture(this.scene!, key, this.cardW, h, (g) => {
       g.fillStyle(active ? INK[700] : INK[850], active ? 0.9 : 0.5);
       g.fillRoundedRect(0, 0, this.cardW, h, 6);
@@ -413,12 +415,6 @@ export class TraitRow extends Phaser.GameObjects.Container {
         g.fillRoundedRect(0, 0, this.cardW, h, 6);
         g.lineStyle(1.2, tierColor, 0.6);
         g.strokeRoundedRect(0, 0, this.cardW, h, 6);
-      }
-      // 左侧档位指示块：几档就几格亮
-      for (let i = 0; i < 3; i++) {
-        const on = i <= tier;
-        g.fillStyle(on ? tierColor : INK[600], on ? 0.9 : 0.5);
-        g.fillRoundedRect(6, 7 + i * 8, 16, 5, 2);
       }
     });
     this.bg.setTexture(key);

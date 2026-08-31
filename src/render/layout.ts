@@ -2,7 +2,7 @@
  * 全局布局常量 —— 分区坐标与间距的唯一真源（v1.3.0「夜宴」重排）。
  *
  * 编排取自夜宴样稿：顶栏 92px（导航/品牌/数值）→ 居中大漆盘 → 盘下阶段条 →
- * 备战席细条 → 底部牌铺（器匣 | 商肆 | 操作列）；左轨羁络、右栏敌情。
+ * 备战席细条 → 底部牌铺（器匣 | 商肆 | 操作列）；左轨羁绊、右栏敌情。
  * 任何分区的位置与尺寸只在这里定义；场景内只允许引用，不允许再写裸坐标。
  *
  * 关键裁决：准备与战斗共用同一张 640px 大漆盘（样稿 min(62vh,46vw) 的落地值），
@@ -50,7 +50,7 @@ export const BENCH_CELL = 64;
 export const BENCH_N = 9;
 export const BENCH_W = BENCH_CELL * BENCH_N; // 576 = 格线宽
 export const BENCH_X = GRID_X; // 672
-export const BENCH_Y = PHASE_Y + 22; // 794
+export const BENCH_Y = PHASE_Y + 40; // 812：框顶（BENCH_Y-24=788）须避开阶段条计时条（至 PHASE_Y+14）
 
 // ── 商店（样稿 .scard 窄卡 × 5，宽对齐备战席带）───────
 export const SHOP_CW = 120;
@@ -58,7 +58,7 @@ export const SHOP_CH = 170;
 export const SHOP_GAP = 12;
 export const SHOP_W = SHOP_CW * 5 + SHOP_GAP * 4; // 648
 export const SHOP_X = (W - SHOP_W) / 2; // 636
-export const SHOP_Y = 874;
+export const SHOP_Y = 892;
 
 // ── 器匣（店左 2×5 网格）──────────────────────────────
 export const ITEM_SIZE = 46;
@@ -71,19 +71,20 @@ export const ITEM_BAR_X = 356;
 export const ITEM_BAR_Y = 900;
 
 // ── 操作列（店右 2×3）与出售印 ─────────────────────────
+// ACT_Y 896：出售印底缘（SELL_Y+SELL_SIZE=878）与首行按钮净距 18px
 export const ACT_X = 1304;
-export const ACT_Y = 880;
+export const ACT_Y = 896;
 export const ACT_BTN_W = 132;
 export const ACT_BTN_H = 46;
 /** 出售朱印：与备战席同带（把棋子拖到印上卖出） */
 export const SELL_X = 1300;
-export const SELL_Y = 794;
+export const SELL_Y = BENCH_Y;
 export const SELL_SIZE = 66;
 
-// ── 羁络轨（左，样稿 rail）─────────────────────────────
+// ── 羁绊轨（左，样稿 rail）─────────────────────────────
 export const RAIL_X = 66; // 圆环中心 x
 export const RAIL_Y = 158; // 首环中心 y
-export const RAIL_PITCH = 38; // 环心距
+export const RAIL_PITCH = 44; // 环心距：必须 ≥ 徽章显示尺寸 40 + 净距，否则圆环叠压
 
 // ── 敌情（右上）与战报（右下） ─────────────────────────
 export const INTEL_X = W - 48; // 右缘对齐

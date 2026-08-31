@@ -1,13 +1,17 @@
 import Phaser from 'phaser';
 import { CHAMPION_BY_ID } from '../data/champions';
-import { silhouetteKey, SIL_ORIGIN_Y, silContentScale, BEAST_TEAM } from './silhouetteFactory';
+import { silhouetteKey, SIL_ORIGIN_Y, silContentScale, silContentHeight, BEAST_TEAM } from './silhouetteFactory';
 import { itemIconKey } from './itemIcons';
 import { ITEM_BY_ID } from '../data/items';
 import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from './palette';
 import { TEX } from './textures';
 
-const STAR_SCALE = [0, 0.94, 1.0, 1.14];
+const STAR_SCALE = [0, 0.9, 1.02, 1.16];
 const BAR_W = 40;
+/** 棋盘体量（内容高归一口径）：1★≈78% / 2★≈88% / 3★=100% 格高（格 72） */
+const CONTENT_H = 62;
+/** 宽体角色的宽度收口 */
+const CONTENT_W = 50;
 
 /**
  * 当前"我方"是哪一队。
@@ -59,6 +63,8 @@ export class UnitView extends Phaser.GameObjects.Container {
   private readonly itemRow: Phaser.GameObjects.Container;
   private readonly pips: Phaser.GameObjects.Graphics;
   private readonly castRing: Phaser.GameObjects.Graphics;
+  /** 归一后的内容高（1★ 基准逻辑 px）：血条 / 星标等头顶锚件的唯一依据 */
+  private readonly contentH: number;
 
   // 位置插值
   private px: number;
@@ -115,7 +121,8 @@ export class UnitView extends Phaser.GameObjects.Container {
       .setOrigin(0.5, SIL_ORIGIN_Y);
     // 内容归一：不同原型的墨迹占框差异大，按可见内容高统一体量，
     // 星级体量差仍由容器级 STAR_SCALE 表达
-    this.sprite.setScale(silContentScale(defId, star, 54, 49));
+    this.sprite.setScale(silContentScale(defId, star, CONTENT_H, CONTENT_W));
+    this.contentH = silContentHeight(defId, star, CONTENT_H, CONTENT_W);
     this.castRing = scene.add.graphics();
     this.crown = scene.add.graphics();
     this.bars = scene.add.graphics();
@@ -237,11 +244,17 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.drawPips();
   }
 
+  /** 头顶锚件（血条/星标）的 y：贴着内容顶留 9px，随星级体量联动 */
+  private overheadY(): number {
+    const s = STAR_SCALE[this.star] ?? 1;
+    return -(this.contentH * s + 9);
+  }
+
   private drawBars(): void {
     const g = this.bars;
     g.clear();
     if (this.dead) return;
-    const y = -78;
+    const y = this.overheadY();
     const h = 4.5;
     const hpRatio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
     const shieldRatio = Phaser.Math.Clamp(this.shield / this.maxHp, 0, 1);
@@ -252,9 +265,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     g.fillStyle(INK[600], 1);
     g.fillRect(-BAR_W / 2, y, BAR_W, h);
 
-    // 生命：友方灵青 → 敌方朱砂；残血转朱砂闪烁语义
+    // 生命：我方玉青恒色（低血不变色）；敌方朱砂，残血提亮
     const low = hpRatio < 0.3;
-    const hpColor = this.friendly ? (low ? CINNABAR.base : SPIRIT.base) : low ? CINNABAR.light : CINNABAR.base;
+    const hpColor = this.friendly ? SPIRIT.base : low ? CINNABAR.light : CINNABAR.base;
     g.fillStyle(hpColor, 1);
     g.fillRect(-BAR_W / 2, y, BAR_W * hpRatio, h);
     g.fillStyle(PAPER[50], 0.22);
@@ -293,7 +306,7 @@ export class UnitView extends Phaser.GameObjects.Container {
   private drawPips(): void {
     const g = this.pips;
     g.clear();
-    const y = -88;
+    const y = this.overheadY() - 10;
     const size = 3.6;
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 10;

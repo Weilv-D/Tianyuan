@@ -10,6 +10,7 @@ import { GILT, INK, PAPER, css } from '../palette';
 import { bakeItemIcons } from '../itemIcons';
 import { bakeSilhouettes, silhouetteKey } from '../silhouetteFactory';
 import { buildTextures, grainOverlay } from '../textures';
+import { baseZoom } from '../viewScale';
 import { H, W } from '../layout';
 import { motion } from '../motion';
 
@@ -27,6 +28,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    baseZoom(this);
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);

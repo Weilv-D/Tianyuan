@@ -74,7 +74,7 @@ export class EliminatedOverlay {
 
     panel.add(
       this.scene.add
-        .text(0, -bh / 2 + 200, `战绩 ${p.wins} 胜 ${p.losses} 负　最佳连胜 ${p.bestStreak}　累计输出 ${Math.round(p.totalDamage)}`, {
+        .text(0, -bh / 2 + 200, `战绩 ${p.wins} 胜 ${p.losses} 负　最佳连胜 ${p.bestStreak}　胜局累计输出 ${Math.round(p.totalDamage)}`, {
           fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]),
         })
         .setOrigin(0.5, 0)

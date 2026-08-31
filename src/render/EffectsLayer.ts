@@ -156,16 +156,52 @@ export class EffectsLayer {
 
     // 墨点飞溅
     this.burst(r.x, r.y, crit ? 12 : 6, tint, crit ? 260 : 150, crit ? 0.24 : 0.16);
+
+    // 十字墨花：四向短刺，给闪点一个"炸开"的方向感
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + (i * Math.PI) / 2;
+      const sp = this.img(TEX.spark, r.x + Math.cos(a) * 10, r.y + Math.sin(a) * 10, tint);
+      sp.setRotation(a).setDisplaySize(30 * base, 2.5).setAlpha(0.8);
+      this.scene.tweens.add({
+        targets: sp,
+        displayWidth: 58 * base,
+        alpha: 0,
+        duration: 190,
+        ease: 'Cubic.easeOut',
+        onComplete: () => sp.destroy(),
+      });
+    }
+
+    // 暴击第二重冲击环：迟一拍追上去，双层扩散
+    if (crit) {
+      this.scene.time.delayedCall(80, () => {
+        const ring2 = this.img(TEX.ring, r.x, r.y, GILT.light);
+        ring2.setDisplaySize(40, 40).setAlpha(0.8);
+        this.scene.tweens.add({
+          targets: ring2,
+          displayWidth: 168,
+          displayHeight: 168,
+          alpha: 0,
+          duration: 320,
+          ease: 'Quad.easeOut',
+          onComplete: () => ring2.destroy(),
+        });
+      });
+    }
     this.shakeAccum += crit ? 0.5 : 0.12;
   }
 
-  // ── 近战斩击：一条有方向的弧 ──
+  // ── 近战斩击：交叉双弧 + 冲势速度线 ──
   private slash(r: FxRequest): void {
     const tx = r.tx ?? r.x;
     const ty = r.ty ?? r.y - 40;
     const ang = Math.atan2(ty - r.y, tx - r.x);
     const tint = r.tint ?? PAPER[100];
-    const s = this.img(TEX.slash, (r.x + tx) / 2, (r.y + ty) / 2 - 26, tint);
+    const mx = (r.x + tx) / 2;
+    const my = (r.y + ty) / 2 - 26;
+
+    // 主弧
+    const s = this.img(TEX.slash, mx, my, tint);
     s.setRotation(ang).setDisplaySize(150, 150).setAlpha(0);
     this.scene.tweens.add({
       targets: s,
@@ -178,14 +214,56 @@ export class EffectsLayer {
     });
     this.scene.tweens.add({
       targets: s,
-      displayWidth: 190,
-      displayHeight: 190,
+      displayWidth: 200,
+      displayHeight: 200,
       duration: 200,
       ease: 'Cubic.easeOut',
     });
+
+    // 副弧：反向 25° 交叉斩，迟 40ms 错拍
+    const s2 = this.img(TEX.slash, mx, my, tint);
+    s2.setRotation(ang - 0.45).setDisplaySize(112, 112).setAlpha(0);
+    this.scene.time.delayedCall(40, () => {
+      if (!s2.active) return;
+      this.scene.tweens.add({
+        targets: s2,
+        alpha: 0.6,
+        duration: 60,
+        yoyo: true,
+        hold: 20,
+        ease: 'Quad.easeOut',
+        onComplete: () => s2.destroy(),
+      });
+      this.scene.tweens.add({
+        targets: s2,
+        displayWidth: 152,
+        displayHeight: 152,
+        duration: 190,
+        ease: 'Cubic.easeOut',
+      });
+    });
+
+    // 冲势速度线：三道细线沿攻击方向掠过，制造"扑出去"的动量
+    for (let i = 0; i < 3; i++) {
+      const off = (i - 1) * 14;
+      const bx = r.x - Math.cos(ang) * 26 + Math.cos(ang + Math.PI / 2) * off;
+      const by = r.y - 30 - Math.sin(ang) * 26 + Math.sin(ang + Math.PI / 2) * off;
+      const line = this.img(TEX.spark, bx, by, PAPER[100]);
+      line.setRotation(ang).setDisplaySize(44, 2.5).setAlpha(0.55);
+      this.scene.tweens.add({
+        targets: line,
+        x: bx + Math.cos(ang) * 52,
+        y: by + Math.sin(ang) * 52,
+        alpha: 0,
+        duration: 180,
+        delay: i * 25,
+        ease: 'Cubic.easeOut',
+        onComplete: () => line.destroy(),
+      });
+    }
   }
 
-  // ── 远程穿刺：细长光束 ──
+  // ── 远程穿刺：光束 + 弹尾拖影 ──
   private pierce(r: FxRequest): void {
     const tx = r.tx ?? r.x;
     const ty = r.ty ?? r.y;
@@ -201,6 +279,18 @@ export class EffectsLayer {
       duration: 180,
       ease: 'Quad.easeOut',
       onComplete: () => s.destroy(),
+    });
+    // 弹尾拖影：迟 60ms 的一道更细更淡的余线，拉出"射出去"的纵深
+    const t2 = this.img(TEX.spark, r.x - Math.cos(ang) * 10, r.y - 30 - Math.sin(ang) * 10, tint);
+    t2.setRotation(ang).setDisplaySize(dist * 0.66, 4.5).setAlpha(0.5);
+    this.scene.tweens.add({
+      targets: t2,
+      alpha: 0,
+      displayHeight: 1,
+      duration: 230,
+      delay: 60,
+      ease: 'Quad.easeOut',
+      onComplete: () => t2.destroy(),
     });
   }
 

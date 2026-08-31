@@ -149,16 +149,19 @@ export class AdventurePanel {
           })
           .setOrigin(0.5)
       );
+      const title = this.scene.add.text(46, 12, opt.title, {
+        fontFamily: FONT.title,
+        fontSize: '15px',
+        color: css(PAPER[100]),
+        wordWrap: { width: cardW - 58 },
+      });
+      // 标题钳在两行内，描述固定从 y=52 起 —— 长标题不再压进描述带
+      while (title.height > 36 && title.text.length > 4) {
+        title.setText(title.text.slice(0, -2).trimEnd() + '…');
+      }
+      card.add(title);
       card.add(
-        this.scene.add.text(46, 12, opt.title, {
-          fontFamily: FONT.title,
-          fontSize: '15px',
-          color: css(PAPER[100]),
-          wordWrap: { width: cardW - 58 },
-        })
-      );
-      card.add(
-        this.scene.add.text(12, 44, opt.desc, {
+        this.scene.add.text(12, 52, opt.desc, {
           fontFamily: FONT.body,
           fontSize: '13px',
           color: css(PAPER[300]),

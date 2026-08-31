@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Battle } from '../../core/battle';
 import { DT } from '../../core/config';
 import type { BattleEvent } from '../../core/events';
+import { effArmor, effAspd, effAtk, effMr } from '../../core/unit';
 import { CHAMPION_BY_ID, formatSkillDesc } from '../../data/champions';
 import { TRAIT_BY_ID } from '../../data/traits';
 import { SHADE, TRAIT_TIER_COLOR_HEX, CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../palette';
@@ -10,6 +11,7 @@ import { bakeSilhouettes } from '../silhouetteFactory';
 import { BOARD_H, BOARD_W, BoardView, CELL } from '../BoardView';
 import { UnitView, setFriendlyTeam } from '../UnitView';
 import { bakeItemIcons } from '../itemIcons';
+import { baseZoom } from '../viewScale';
 import { EffectsLayer } from '../EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../DamageText';
 import { motion } from '../motion';
@@ -24,9 +26,9 @@ import type { ActiveTrait, BattleConfig } from '../../core/types';
 const W = 1920;
 const H = 1080;
 const BOARD_X = (W - BOARD_W) / 2;
-/** 悬停单位卡尺寸（updateHoverCard 与 makeUnitCard 共用） */
+/** 悬停单位卡尺寸（updateHoverCard 与 makeUnitCard 共用）；高度容纳两行技能描述 */
 const UNIT_CARD_W = 268;
-const UNIT_CARD_H = 176;
+const UNIT_CARD_H = 184;
 const BOARD_Y = 176;
 
 interface Projectile {
@@ -99,6 +101,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
+    baseZoom(this);
     buildTextures(this);
     bakeSilhouettes(this);
     bakeItemIcons(this);
@@ -152,7 +155,7 @@ export class BattleScene extends Phaser.Scene {
     this.add
       .text(48, 56, 'NIGHT FEAST', {
         fontFamily: FONT.mono,
-        fontSize: '8px',
+        fontSize: '10px',
         color: css(INK[300]),
         letterSpacing: 6,
       })
@@ -487,17 +490,27 @@ export class BattleScene extends Phaser.Scene {
       const color = TRAIT_TIER_COLOR_HEX[Math.min(t.tier, 3)];
       const chip = makeChip(this, 0, y, `${def?.name ?? t.id}`, color, true);
       container.add(chip);
+      const label = this.add
+        .text(70, y, `${t.count}　第${t.tier + 1}档`, {
+          fontFamily: FONT.body,
+          fontSize: '12px',
+          color: css(PAPER[100]),
+        })
+        .setOrigin(0, 0.5);
+      container.add(label);
+      y += 26;
+      // 效果文字独立成行：不与 chip 同行挤，宽度收在面板内容区内
       const effect = this.add
-        .text(64, y, `${t.count}　${def?.effectText[Math.min(t.tier, def.effectText.length - 1)] ?? ''}`, {
+        .text(8, y, def?.effectText[Math.min(t.tier, def.effectText.length - 1)] ?? '', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[300]),
-          wordWrap: { width: 212 },
+          wordWrap: { width: 280 },
+          lineSpacing: 3,
         })
-        .setOrigin(0, 0.5);
+        .setOrigin(0, 0);
       container.add(effect);
-      // 行距随文案实际行数走：两行效果的行位下移，不再与邻行互压
-      y += Math.max(30, effect.height + 8);
+      y += effect.height + 10;
     }
     if (inactive.length > 0) {
       y += 6;
@@ -647,6 +660,7 @@ export class BattleScene extends Phaser.Scene {
         const t = this.unitAnchor(e.uid);
         if (!t) break;
         this.dmgText.spawn(t.x, t.y, e.amount, 'shield', '+');
+        audio.play('shield');
         break;
       }
 
@@ -915,14 +929,23 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  /** 悬停期间的数值行： setText 有变化守卫，栅格化只发生在数字真正变化时 */
+  /** 悬停期间的数值行：有效值与基础值并列，buff/debuff 实时可感（M1） */
   private syncHoverStats(u: Unit): void {
     if (this.hoverStatTexts.length !== 4) return;
+    const atk = Math.round(effAtk(u));
+    const armor = Math.round(effArmor(u));
+    const mr = Math.round(effMr(u));
+    const aspd = effAspd(u).toFixed(2);
+    const atkLine = atk !== u.atk ? `攻击 ${atk}（${u.atk}）` : `攻击 ${u.atk}`;
+    const armorLine = armor !== Math.round(u.baseArmor) ? `护甲 ${armor}（${Math.round(u.baseArmor)}）` : `护甲 ${Math.round(u.baseArmor)}`;
+    const mrLine = mr !== Math.round(u.baseMr) ? `魔抗 ${mr}（${Math.round(u.baseMr)}）` : `魔抗 ${Math.round(u.baseMr)}`;
+    const baseAspdStr = (u.baseAspd * (1 + u.permAspdPct)).toFixed(2);
+    const aspdLine = aspd !== baseAspdStr ? `攻速 ${aspd}（${baseAspdStr}）` : `攻速 ${aspd}`;
     const stats = [
       `生命 ${Math.round(u.hp)} / ${u.maxHp}`,
-      `攻击 ${Math.round(u.atk)}　法强 ${Math.round(u.sp)}`,
-      `护甲 ${Math.round(u.baseArmor)}　魔抗 ${Math.round(u.baseMr)}`,
-      `攻速 ${(u.baseAspd * (1 + u.permAspdPct)).toFixed(2)}　射程 ${u.range}`,
+      `${atkLine}　法强 ${Math.round(u.sp)}`,
+      `${armorLine}　${mrLine}`,
+      `${aspdLine}　射程 ${u.range}`,
     ];
     for (let i = 0; i < 4; i++) {
       if (this.hoverStatTexts[i].text !== stats[i]) this.hoverStatTexts[i].setText(stats[i]);
@@ -962,36 +985,50 @@ export class BattleScene extends Phaser.Scene {
         .setOrigin(1, 0),
     );
 
-    const stats = [
-      `生命 ${Math.round(u.hp)} / ${u.maxHp}`,
-      `攻击 ${Math.round(u.atk)}　法强 ${Math.round(u.sp)}`,
-      `护甲 ${Math.round(u.baseArmor)}　魔抗 ${Math.round(u.baseMr)}`,
-      `攻速 ${(u.baseAspd * (1 + u.permAspdPct)).toFixed(2)}　射程 ${u.range}`,
-    ];
-    stats.forEach((s, i) => {
-      const t = this.add
-        .text(14, 62 + i * 18, s, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
-        .setOrigin(0, 0);
-      c.add(t);
-      this.hoverStatTexts.push(t);
-    });
+    {
+      const atk0 = Math.round(effAtk(u));
+      const armor0 = Math.round(effArmor(u));
+      const mr0 = Math.round(effMr(u));
+      const aspd0 = effAspd(u).toFixed(2);
+      const atkLine0 = atk0 !== u.atk ? `攻击 ${atk0}（${u.atk}）` : `攻击 ${u.atk}`;
+      const armorLine0 = armor0 !== Math.round(u.baseArmor) ? `护甲 ${armor0}（${Math.round(u.baseArmor)}）` : `护甲 ${Math.round(u.baseArmor)}`;
+      const mrLine0 = mr0 !== Math.round(u.baseMr) ? `魔抗 ${mr0}（${Math.round(u.baseMr)}）` : `魔抗 ${Math.round(u.baseMr)}`;
+      const baseAspdStr0 = (u.baseAspd * (1 + u.permAspdPct)).toFixed(2);
+      const aspdLine0 = aspd0 !== baseAspdStr0 ? `攻速 ${aspd0}（${baseAspdStr0}）` : `攻速 ${aspd0}`;
+      const stats0 = [
+        `生命 ${Math.round(u.hp)} / ${u.maxHp}`,
+        `${atkLine0}　法强 ${Math.round(u.sp)}`,
+        `${armorLine0}　${mrLine0}`,
+        `${aspdLine0}　射程 ${u.range}`,
+      ];
+      stats0.forEach((s, i) => {
+        const t = this.add
+          .text(14, 62 + i * 18, s, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
+          .setOrigin(0, 0);
+        c.add(t);
+        this.hoverStatTexts.push(t);
+      });
+    }
 
     const sk = e.skillSpec;
     c.add(
       this.add
-        .text(14, 138, `${sk.name}`, { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) })
+        .text(14, 134, `${sk.name}`, { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) })
         .setOrigin(0, 0),
     );
-    c.add(
-      this.add
-        .text(14, 156, formatSkillDesc(sk.desc, sk.params), {
-          fontFamily: FONT.body,
-          fontSize: '12px',
-          color: css(PAPER[400]),
-          wordWrap: { width: w - 28 },
-        })
-        .setOrigin(0, 0),
-    );
+    const desc = this.add
+      .text(14, 152, formatSkillDesc(sk.desc, sk.params), {
+        fontFamily: FONT.body,
+        fontSize: '12px',
+        color: css(PAPER[400]),
+        wordWrap: { width: w - 28 },
+      })
+      .setOrigin(0, 0);
+    // 技能描述钳在两行内：宁可省略号收尾，不许溢出卡底
+    while (desc.height > 30 && desc.text.length > 4) {
+      desc.setText(desc.text.slice(0, -2).trimEnd() + '…');
+    }
+    c.add(desc);
     return c;
   }
 

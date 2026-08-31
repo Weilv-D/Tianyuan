@@ -10,8 +10,10 @@ import { ITEM_BY_ID } from '../../data/items';
 import { clearSave, loadMatch, loadPrefs, saveMatch, type Preferences } from '../../game/save';
 import { audio } from '../../audio/AudioEngine';
 import { FONT } from '../../ui/kit';
+import { baseZoom, CAM_ZOOM } from '../viewScale';
 import { SettingsPanel } from '../../ui/SettingsPanel';
 import { bakeItemIcons } from '../itemIcons';
+import { bakeTraitIcons } from '../traitIcons';
 import { buildTextures, grainOverlay } from '../textures';
 import { playLegendaryStarFx } from '../LegendaryFx';
 import { bakeSilhouettes } from '../silhouetteFactory';
@@ -105,10 +107,12 @@ export class GameScene extends Phaser.Scene {
   // ══════════════ 生命周期 ══════════════
 
   create(data: SceneData): void {
+    baseZoom(this);
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);
     bakeItemIcons(this);
+    bakeTraitIcons(this);
 
     // Phaser 复用 Scene 实例，类字段初始化只在构造函数里跑一次。
     // 场景重启（准备 → 战斗 → 准备）时这些状态还残留着上一轮的已销毁对象，
@@ -174,7 +178,7 @@ export class GameScene extends Phaser.Scene {
     this.inputCtl.bindInput();
 
     audio.unlock();
-    audio.startBgm(this.match.round >= 12 ? 'final' : 'prep');
+    audio.startBgm(this.match.round >= 14 ? 'final' : 'prep');
 
     if (data.resultPending) {
       // 从战斗场景返回：结果已由 BattleScene 写回 Match，这里只负责展示与推进
@@ -457,8 +461,9 @@ export class GameScene extends Phaser.Scene {
       const [r, g, b] = rgbOf(color);
       this.cameras.main.flash(isBig ? 420 : 260, r, g, b);
       if (isBig) {
-        this.cameras.main.zoomTo(1.012, 90);
-        this.time.delayedCall(220, () => this.cameras.main.zoomTo(1, 220));
+        // zoom 是绝对值：在 DPR 底座上 punch 相对基准 CAM_ZOOM，而不是相对 1
+        this.cameras.main.zoomTo(CAM_ZOOM * 1.012, 90);
+        this.time.delayedCall(220, () => this.cameras.main.zoomTo(CAM_ZOOM, 220));
       }
     }
 

@@ -1,4 +1,4 @@
-/** 职责：对局场景静态 HUD 的构建——顶栏导航/阶段条/商肆/器匣/操作列/朱印/羁络轨/敌情/记事/战报，只建不改。 */
+/** 职责：对局场景静态 HUD 的构建——顶栏导航/阶段条/商肆/器匣/操作列/朱印/羁绊轨/敌情/记事/战报，只建不改。 */
 import Phaser from 'phaser';
 import { REROLL_COST } from '../../core/config';
 import { Bar, Button, FONT, enableScroll, makePanel } from '../../ui/kit';
@@ -44,10 +44,11 @@ import {
   W,
 } from '../layout';
 import { TRAIT_BY_ID } from '../../data/traits';
+import { RAIL_VIEW_H, RAIL_VIEW_W } from '../hudLayout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
- * 夜宴 HUD。左轨羁络、右栏敌情/八方/战报、中央大漆盘 + 盘下阶段条 + 底部牌铺。
+ * 夜宴 HUD。左轨羁绊、右栏敌情/八方/战报、中央大漆盘 + 盘下阶段条 + 底部牌铺。
  * 创建顺序由场景 create() 保持；产出的控件挂在本模块上，场景经 scene.hud.* 读取。
  */
 export class HudPanels {
@@ -126,7 +127,7 @@ export class HudPanels {
       const enT = this.scene.add
         .text(0, 24, en, {
           fontFamily: FONT.mono,
-          fontSize: '9px',
+          fontSize: '10px',
           color: css(INK[300]),
           letterSpacing: 3,
         })
@@ -169,7 +170,7 @@ export class HudPanels {
     this.scene.add
       .text(W / 2, 54, 'NIGHT FEAST', {
         fontFamily: FONT.mono,
-        fontSize: '8px',
+        fontSize: '9px',
         color: css(INK[300]),
         letterSpacing: 8,
       })
@@ -182,12 +183,12 @@ export class HudPanels {
 
     // ── 右侧数值（样稿 .stats：mono 值 + 小注）：回合 / 来金 / 生命 / 等级 ──
     const stat = (rightX: number, labelText: string): Phaser.GameObjects.Text => {
-      // 有动态小注的数值（来金）传空串，避免静态注与动态注同位重叠
+      // 有动态小注的数值（来金）传空串，避免静态小注与动态小注同位重叠
       if (labelText) {
         this.scene.add
-          .text(rightX - 24, 58, labelText, {
+          .text(rightX - 24, 56, labelText, {
             fontFamily: FONT.body,
-            fontSize: '9px',
+            fontSize: '10px',
             color: css(INK[300]),
             letterSpacing: 4,
           })
@@ -201,9 +202,9 @@ export class HudPanels {
     this.streakText = stat(W - 360, '');
     this.streakText.setColor(css(GILT.base));
     this.streakLabel = this.scene.add
-      .text(W - 360 - 24, 58, '来 金', {
+      .text(W - 360 - 24, 56, '来 金', {
         fontFamily: FONT.body,
-        fontSize: '9px',
+        fontSize: '10px',
         color: css(INK[300]),
         letterSpacing: 4,
       })
@@ -215,7 +216,7 @@ export class HudPanels {
     this.hpBar = new Bar(this.scene, W - 250 - 56, 70, 56, 3, SPIRIT.base);
     this.xpBar = new Bar(this.scene, W - 140 - 56, 70, 56, 3, VOID.base);
     this.xpText = this.scene.add
-      .text(W - 140 - 64, 70, '', { fontFamily: FONT.mono, fontSize: '9px', color: css(INK[300]) })
+      .text(W - 140 - 64, 70, '', { fontFamily: FONT.mono, fontSize: '10px', color: css(INK[300]) })
       .setOrigin(1, 0.5);
 
     // 设置入口
@@ -240,7 +241,7 @@ export class HudPanels {
       })
       .setOrigin(0.5);
 
-    new Button(this.scene, cx + 20, PHASE_Y - 16, '开 战 · 空格', () => this.scene.startBattlePhase(), {
+    new Button(this.scene, cx + 20, PHASE_Y - 12, '开 战 · 空格', () => this.scene.startBattlePhase(), {
       width: 140,
       height: 32,
       variant: 'primary',
@@ -256,8 +257,9 @@ export class HudPanels {
   // ══════════════ 商肆（样稿 .scard 窄卡 × 5） ══════════════
 
   buildShop(): void {
+    // 注脚放卡下一行：卡上方紧贴备战席框底，旧「卡上标题」压进框底带是备战区视觉混乱的一处根因
     this.scene.add
-      .text(SHOP_X, SHOP_Y - 22, '商 肆', {
+      .text(SHOP_X, SHOP_Y + SHOP_CH + 2, '商 肆', {
         fontFamily: FONT.title,
         fontSize: '13px',
         color: css(PAPER[300]),
@@ -265,12 +267,12 @@ export class HudPanels {
       })
       .setOrigin(0, 0);
     this.scene.add
-      .text(SHOP_X + SHOP_W, SHOP_Y - 22, `刷新 ${REROLL_COST} 金 · 锁定后下回合保留`, {
+      .text(SHOP_X + SHOP_W, SHOP_Y + SHOP_CH + 2, `刷新 · ${REROLL_COST} 金`, {
         fontFamily: FONT.body,
-        fontSize: '11px',
+        fontSize: '12px',
         color: css(PAPER[400]),
       })
-      .setOrigin(1, 0);
+      .setOrigin(0, 0);
 
     for (let i = 0; i < 5; i++) {
       const card = new ShopCard(
@@ -327,7 +329,7 @@ export class HudPanels {
     this.itemHint = this.scene.add
       .text(ITEM_BAR_X - 8, ITEM_BAR_Y + gh + 16, '', {
         fontFamily: FONT.body,
-        fontSize: '11px',
+        fontSize: '12px',
         color: css(PAPER[400]),
         wordWrap: { width: gw + 16 },
         lineSpacing: 3,
@@ -386,25 +388,17 @@ export class HudPanels {
         letterSpacing: 5,
       })
       .setOrigin(0.5);
-    this.scene.add
-      .text(SELL_X + SELL_SIZE / 2, SELL_Y + SELL_SIZE + 10, '拖 入 出 售', {
-        fontFamily: FONT.body,
-        fontSize: '10px',
-        color: css(CINNABAR.light),
-        letterSpacing: 3,
-      })
-      .setOrigin(0.5, 0)
-      .setAlpha(0.8);
+    // 朱印自带「出售」二字，操作自明 —— 不再加说明行（曾与操作列首行按钮叠压）
     this.sellRect = new Phaser.Geom.Rectangle(SELL_X, SELL_Y, SELL_SIZE, SELL_SIZE);
   }
 
-  // ══════════════ 羁络轨（左） ══════════════
+  // ══════════════ 羁绊轨（左） ══════════════
 
   buildTraitRail(): void {
-    // 竖排帽「羁 络」
-    ['羁', '络'].forEach((ch, i) => {
+    // 竖排帽「羁 绊」：底缘（102+20+15=137）与首圆上缘（RAIL_Y−16=142）净距 5px
+    ['羁', '绊'].forEach((ch, i) => {
       this.scene.add
-        .text(RAIL_X, 112 + i * 20, ch, {
+        .text(RAIL_X, 102 + i * 20, ch, {
           fontFamily: FONT.kai,
           fontSize: '13px',
           color: css(PAPER[400]),
@@ -412,17 +406,17 @@ export class HudPanels {
         .setOrigin(0.5, 0);
     });
     this.traitContainer = this.scene.add.container(RAIL_X, RAIL_Y);
-    // 17 条 × 38px ≈ 646：可视区给足，超出才滚
-    this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_X - 24, RAIL_Y - 20, 48, 660);
+    // 视口一窗收全「徽章 40 + 右侧计数」；旧宽 48 只罩圆环，计数被遮罩裁成半截
+    this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_X - 24, RAIL_Y - 20, RAIL_VIEW_W, RAIL_VIEW_H);
   }
 
   // ══════════════ 敌情（右上） ══════════════
 
   buildIntel(): void {
     this.scene.add
-      .text(REPORT_X + 0, 140, '敌 情 · 本 轮 对 手', {
+      .text(REPORT_X + 0, 140, '敌 情', {
         fontFamily: FONT.body,
-        fontSize: '10px',
+        fontSize: '11px',
         color: css(INK[300]),
         letterSpacing: 4,
       })
@@ -437,9 +431,9 @@ export class HudPanels {
 
   buildScoreboard(): void {
     this.scene.add
-      .text(REPORT_X, 316, '八 方 诸 侯 · 点 击 侦 查', {
+      .text(REPORT_X, 316, '八 方 诸 侯', {
         fontFamily: FONT.body,
-        fontSize: '10px',
+        fontSize: '11px',
         color: css(INK[300]),
         letterSpacing: 4,
       })
@@ -456,7 +450,7 @@ export class HudPanels {
     this.scene.add
       .text(LOG_X, LOG_Y + 12, '对 局 记 事', {
         fontFamily: FONT.body,
-        fontSize: '10px',
+        fontSize: '11px',
         color: css(INK[300]),
         letterSpacing: 4,
       })
@@ -479,7 +473,7 @@ export class HudPanels {
     this.scene.add
       .text(REPORT_X, REPORT_Y + 12, '上 回 合 战 报', {
         fontFamily: FONT.body,
-        fontSize: '10px',
+        fontSize: '11px',
         color: css(INK[300]),
         letterSpacing: 4,
       })
@@ -501,7 +495,7 @@ export class HudPanels {
     this.boardCountText = this.scene.add
       .text(GRID_X - 16, BENCH_Y + 32, '', {
         fontFamily: FONT.mono,
-        fontSize: '11px',
+        fontSize: '12px',
         color: css(PAPER[400]),
       })
       .setOrigin(1, 0.5);
@@ -541,9 +535,10 @@ export class HudPanels {
       const row = new TraitRow(this.scene, 0, y, panelW - 40);
       row.set(def.id, count, tier, nextBreak, color, desc);
       content.add(row);
-      y += row.rowHeight + 4;
+      y += row.rowHeight + 8;
     }
-    this.traitModalScroll = enableScroll(this.scene, content, bodyX, bodyY, panelW - 40, panelH - PANEL_TITLE_H - 60);
+    // 视口收到 600：底缘 828 与关闭键顶缘 850 之间留 22px，键不再贴住滚动区
+    this.traitModalScroll = enableScroll(this.scene, content, bodyX, bodyY, panelW - 40, panelH - PANEL_TITLE_H - 80);
     this.traitModalScroll.setHeight(y);
 
     const close = new Button(this.scene, px + panelW / 2, py + panelH - 30, '关 闭', () => this.closeTraitModal(), {

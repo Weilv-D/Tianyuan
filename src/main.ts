@@ -5,6 +5,10 @@ import { BattleScene } from './render/scenes/BattleScene';
 import { ResultScene } from './render/scenes/ResultScene';
 import { CodexScene } from './render/scenes/CodexScene';
 import { audio } from './audio/AudioEngine';
+import { preloadAiPieces } from './render/pieceArt/aiBake';
+import { preloadItemArt } from './render/itemIcons';
+import { preloadSealFont } from './render/traitIcons';
+import { VIEW_K } from './render/viewScale';
 
 /**
  * 直角体系（ART_BIBLE §9.2）：全项目禁用圆角矩形。
@@ -79,20 +83,22 @@ import { audio } from './audio/AudioEngine';
  * 启动入口。
  *
  * 设计分辨率固定 1920×1080，用 Scale.FIT 等比适配任意 16:9 窗口 ——
- * 缩放不错位、不裁切，逻辑坐标永远是 1920×1080。
+ * 缩放不错位、不裁切，逻辑坐标永远是 1920×1080。物理缓冲再乘 VIEW_K
+ * （见 render/viewScale）：HiDPI 与系统缩放屏上 1 逻辑 px = 1 设备 px，
+ * 整屏不再被 CSS 拉大发糊；相机 zoom = 1/K 由各场景 baseZoom 钉住。
  */
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: 'app',
-  width: GAME_SCENE_W,
-  height: GAME_SCENE_H,
+  width: GAME_SCENE_W * VIEW_K,
+  height: GAME_SCENE_H * VIEW_K,
   // 画布透明：夜色山海（index.html #bg）作为全窗底，Phaser 只画内容层
   transparent: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: GAME_SCENE_W,
-    height: GAME_SCENE_H,
+    width: GAME_SCENE_W * VIEW_K,
+    height: GAME_SCENE_H * VIEW_K,
     autoRound: true,
   },
   render: {
@@ -114,7 +120,21 @@ const config: Phaser.Types.Core.GameConfig = {
   disableContextMenu: true,
 };
 
+// 启动期唯一的几步异步：篆体子集 + AI 棋子图 + 装备图预解码。此后场景烘焙全同步。
+// 零字体 / 零图时立即通过，互不阻塞。
+await preloadSealFont();
+await preloadAiPieces();
+await preloadItemArt();
+
 const game = new Phaser.Game(config);
+
+// E2E/截图直入备战层：?autostart=1 跳过菜单（仅 DEV）
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('autostart')) {
+  game.events.once('ready', () => {
+    game.scene.stop('Menu');
+    game.scene.start('Game', { fresh: true });
+  });
+}
 
 // 开发期把 game 挂到 window，方便在控制台/自动化里检视场景状态与驱动对局
 if (import.meta.env.DEV) {

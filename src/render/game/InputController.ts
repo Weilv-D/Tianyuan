@@ -61,6 +61,11 @@ export class InputController {
     this.dragGhost = null;
     this.dragUnit = null;
     this.dragFrom = null;
+    this.dragItemId = null;
+    if (this.dragItemGhost) {
+      this.dragItemGhost.destroy();
+      this.dragItemGhost = null;
+    }
   }
 
   // ══════════════ 输入 ══════════════
@@ -124,6 +129,15 @@ export class InputController {
         return;
       }
       if (this.dragGhost) this.endDrag(p.x, p.y);
+    });
+    // L31：画布外释放兜底（Phaser pointerupoutside / gameout）
+    this.scene.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => {
+      if (this.dragItemGhost) this.endItemDrag(p.x, p.y);
+      else if (this.dragGhost) this.endDrag(p.x, p.y);
+    });
+    this.scene.game.events.once('hidden', () => {
+      if (this.dragGhost) this.endDrag(0, 0);
+      if (this.dragItemGhost) { this.dragItemGhost.destroy(); this.dragItemGhost = null; this.dragItemId = null; }
     });
 
     // 快捷键

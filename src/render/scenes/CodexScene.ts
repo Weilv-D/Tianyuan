@@ -8,8 +8,10 @@ import { ItemTooltip } from '../../ui/tooltip';
 import { ItemChip, UnitDetailCard, UnitPortrait } from '../../ui/cards';
 import { GILT, INK, PAPER, RARITY_COLOR, TRAIT_TIER_COLOR_HEX, css } from '../palette';
 import { itemIconKey, bakeItemIcons } from '../itemIcons';
+import { traitIconKey, bakeTraitIcons } from '../traitIcons';
 import { bakeSilhouettes } from '../silhouetteFactory';
 import { buildTextures, grainOverlay } from '../textures';
+import { baseZoom } from '../viewScale';
 import { H, W } from '../layout';
 
 /**
@@ -48,12 +50,14 @@ export class CodexScene extends Phaser.Scene {
   }
 
   create(data: { from?: 'Menu' | 'Game' }): void {
+    baseZoom(this);
     // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）
     this.backTo = data.from === 'Game' ? 'Game' : 'Menu';
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);
     bakeItemIcons(this);
+    bakeTraitIcons(this);
     this.itemTip = new ItemTooltip(this, 460);
     this.detailCard = null;
     this.contents = { champs: null, traits: null, items: null };
@@ -171,29 +175,38 @@ export class CodexScene extends Phaser.Scene {
       const row = this.add.container(0, y);
       const g = this.add.graphics();
       g.fillStyle(INK[800], 0.6);
-      g.fillRect(0, 0, BODY_W - 16, 96);
+      g.fillRect(0, 0, BODY_W - 16, 106);
       g.lineStyle(1, INK[500], 0.7);
-      g.strokeRect(0, 0, BODY_W - 16, 96);
+      g.strokeRect(0, 0, BODY_W - 16, 106);
       row.add(g);
+      // 小篆徽章（未激活态）：羁绊册的视觉锚点，与对局内羁绊轨同语汇
+      const icon = this.add.image(34, 30, traitIconKey(t.id, 0));
+      icon.setDisplaySize(44, 44);
+      row.add(icon);
       row.add(
         this.add
-          .text(14, 10, t.name, { fontFamily: FONT.title, fontSize: '18px', color: css(PAPER[100]) })
+          .text(66, 8, t.name, { fontFamily: FONT.title, fontSize: '18px', color: css(PAPER[100]) })
           .setOrigin(0, 0)
       );
       row.add(
         this.add
-          .text(80, 15, t.description, { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[500]) })
+          .text(66, 26, t.description, {
+            fontFamily: FONT.body,
+            fontSize: '13px',
+            color: css(PAPER[500]),
+            wordWrap: { width: BODY_W - 180 },
+          })
           .setOrigin(0, 0)
       );
       // 档位标记：几档亮几格（与对局内羁绊行同语汇）
       for (let i = 0; i < t.breakpoints.length; i++) {
         g.fillStyle(TRAIT_TIER_COLOR_HEX[Math.min(i, 3)], 0.85);
-        g.fillRect(14 + i * 22, 40, 16, 5);
+        g.fillRect(66 + i * 22, 44, 16, 5);
       }
       t.breakpoints.forEach((bp, i) => {
         row.add(
           this.add
-            .text(14, 52 + i * 17, `${bp} 人：${t.effectText[i]}`, {
+            .text(66, 56 + i * 16, `${bp} 人：${t.effectText[i]}`, {
               fontFamily: FONT.body,
               fontSize: '12px',
               color: css(i === t.breakpoints.length - 1 ? TRAIT_TIER_COLOR_HEX[Math.min(i, 3)] : PAPER[300]),
@@ -211,7 +224,7 @@ export class CodexScene extends Phaser.Scene {
           .setOrigin(1, 0)
       );
       c.add(row);
-      y += 108;
+      y += 118;
     }
     this.scrolls.traits = enableScroll(this, c, BODY_X, BODY_Y, BODY_W, BODY_H);
     this.scrolls.traits.setHeight(y);
