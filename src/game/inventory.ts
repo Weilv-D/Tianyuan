@@ -99,6 +99,11 @@ export function unequipItem(p: PlayerState, iid: number, itemId: string): boolea
  * 卸载器通道：把一个棋子的装备全部卸回器匣。
  * 成品同样拆回两个组件；器匣容量不足时**整体拒绝**（all-or-nothing）——
  * 卸到一半放不下会制造"以为卸完了"的错觉，比一次失败更糟。
+ *
+ * 容量分层（与 stripItems 的口径差异是有意的）：
+ * - 本函数（玩家主动卸装）：严守 ITEM_BAR_SLOTS，放不下即整体拒绝；
+ * - stripItems（卖出/淘汰/布阵溢出）：允许溢出——装备不该因卖牌蒸发，
+ *   守恒优先于容量；超出版面格数的装备只是不可见，仍在存档内。
  */
 export function unequipAll(p: PlayerState, iid: number): { ok: boolean; count: number; reason?: string } {
   const u = findUnit(p, iid);

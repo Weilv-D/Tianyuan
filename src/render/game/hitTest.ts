@@ -26,6 +26,7 @@ import {
   ITEM_ROWS,
   ITEM_SIZE,
 } from '../view/layout';
+import { portraitItemSlotRect } from '../view/hudLayout';
 
 export interface HitSlot {
   where: 'board' | 'bench';
@@ -70,7 +71,7 @@ export function hitItemChip(x: number, y: number): number {
   return x >= left && x <= left + ITEM_SIZE && y >= top && y <= top + ITEM_SIZE ? i : -1;
 }
 
-/** 棋子身上装备图标（与 ui/cards.ts 的绘制几何同源）的点选，-1 表示没点中。 */
+/** 棋子身上装备图标（几何真源 hudLayout.portraitItemSlotRect，与 ui/cards.ts 的绘制同源）的点选，-1 表示没点中。 */
 export function hitUnitItemSlot(
   x: number,
   y: number,
@@ -79,15 +80,14 @@ export function hitUnitItemSlot(
 ): number {
   if (itemCount === 0) return -1;
   const size = where.where === 'board' ? CELL - 6 : BENCH_CELL - 6;
+  // UnitPortrait 挂在格左上 +3px（BoardBake），图标再从卡内 PAD 起排
   const px =
     (where.where === 'board' ? GRID_X + (where.slot % 8) * CELL : BENCH_X + where.slot * BENCH_CELL) + 3;
   const py =
     (where.where === 'board' ? GRID_Y + (Math.floor(where.slot / 8) + HALF_ROWS) * CELL : BENCH_Y) + 3;
-  const isz = Math.max(11, Math.round(size * 0.17));
-  const gap = 2;
   for (let i = 0; i < Math.min(3, itemCount); i++) {
-    const ix = px + 4 + i * (isz + gap);
-    if (x >= ix && x <= ix + isz && y >= py + 5 && y <= py + 5 + isz) return i;
+    const r = portraitItemSlotRect(i, size);
+    if (x >= px + r.x && x <= px + r.x + r.w && y >= py + r.y && y <= py + r.y + r.h) return i;
   }
   return -1;
 }

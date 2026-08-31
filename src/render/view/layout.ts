@@ -66,9 +66,11 @@ export const ITEM_GAP = 6;
 export { ITEM_BAR_SLOTS } from '../../core/config';
 export const ITEM_COLS = 5;
 export const ITEM_ROWS = 2;
-export const ITEM_BAR_W = ITEM_COLS * (ITEM_SIZE + ITEM_GAP) - ITEM_GAP; // 262
-export const ITEM_BAR_X = 334; // 右缘 618 对齐备战席右端；左缘 334 与记事栏（至 330）脱开
+export const ITEM_BAR_W = ITEM_COLS * (ITEM_SIZE + ITEM_GAP) - ITEM_GAP; // 284
+export const ITEM_BAR_X = 334; // 框左缘 324（外扩 10）须与记事栏右缘（LOG_X+LOG_W=312）净距 ≥ 4
 export const ITEM_BAR_Y = 900;
+/** 卸载按钮：器匣框顶（ITEM_BAR_Y-24）上方的独立行，绘制底缘与框顶净距 6、命中区（Button 外扩 5）不触框 */
+export const UNLOAD_BTN_DY = -56;
 
 // ── 操作列（店右 2×3）与出售印 ─────────────────────────
 // ACT_Y 896：出售印底缘（SELL_Y+SELL_SIZE=878）与首行按钮净距 18px
@@ -94,9 +96,11 @@ export const REPORT_X = W - 48 - SIDE_W; // 1590
 export const REPORT_Y = 620;
 
 // ── 记事（左下） ────────────────────────────────────────
+// 宽 264：右缘 312，给器匣烘焙框（左缘 324）让出 12px 净距——
+// 旧 282（右缘 330）被框/签/提示行压住 4~6px。实际最宽行 ≈135px，收窄无换行风险。
 export const LOG_X = 48;
 export const LOG_Y = 820;
-export const LOG_W = 282;
+export const LOG_W = 264;
 export const LOG_H = 224;
 
 // ── 悬停详情卡 ─────────────────────────────────────────

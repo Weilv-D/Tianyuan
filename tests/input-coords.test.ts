@@ -29,6 +29,7 @@ import {
   SELL_SIZE,
   HALF_ROWS,
 } from '../src/render/view/layout';
+import { portraitItemSlotRect } from '../src/render/view/hudLayout';
 
 /** hitTarget 只依赖 contains 结构（HudPanels 传的是 Phaser.Geom.Rectangle 实例） */
 const sellRectOf = () => ({
@@ -138,21 +139,26 @@ describe('hitUnitItemSlot（棋子装备图标，与 cards.ts 绘制几何同源
   it('场上棋子第 1~3 件可点中，件间缝隙不误命中', () => {
     const where = { where: 'board' as const, slot: 3 * 8 + 4 };
     const size = CELL - 6;
-    const isz = Math.max(11, Math.round(size * 0.17));
     const px = GRID_X + 4 * CELL + 3;
     const py = GRID_Y + (3 + HALF_ROWS) * CELL + 3;
-    expect(hitUnitItemSlot(px + 4 + isz / 2, py + 5 + isz / 2, where, 3)).toBe(0);
-    expect(hitUnitItemSlot(px + 4 + 2 * (isz + 2) + isz / 2, py + 5 + isz / 2, where, 3)).toBe(2);
+    // 期望值从几何真源 hudLayout.portraitItemSlotRect 推出，与绘制共用一份公式
+    const r0 = portraitItemSlotRect(0, size);
+    const r2 = portraitItemSlotRect(2, size);
+    expect(hitUnitItemSlot(px + r0.x + r0.w / 2, py + r0.y + r0.h / 2, where, 3)).toBe(0);
+    expect(hitUnitItemSlot(px + r2.x + r2.w / 2, py + r2.y + r2.h / 2, where, 3)).toBe(2);
+    // 两件之间的缝隙不命中
+    expect(hitUnitItemSlot(px + r0.x + r0.w + 1, py + r0.y + r0.h / 2, where, 3)).toBe(-1);
     // 第 4 件不渲染（Math.min(3, n)）：
-    expect(hitUnitItemSlot(px + 4 + 3 * (isz + 2) + isz / 2, py + 5 + isz / 2, where, 4)).toBe(-1);
+    const r3 = portraitItemSlotRect(3, size);
+    expect(hitUnitItemSlot(px + r3.x + r3.w / 2, py + r3.y + r3.h / 2, where, 4)).toBe(-1);
   });
 
   it('备战席棋子的图标几何按 BENCH_CELL 缩小', () => {
     const where = { where: 'bench' as const, slot: 2 };
     const size = 64 - 6;
-    const isz = Math.max(11, Math.round(size * 0.17));
     const px = BENCH_X + 2 * 64 + 3;
-    expect(hitUnitItemSlot(px + 4 + isz / 2, BENCH_Y + 3 + 5 + isz / 2, where, 1)).toBe(0);
+    const r0 = portraitItemSlotRect(0, size);
+    expect(hitUnitItemSlot(px + r0.x + r0.w / 2, BENCH_Y + 3 + r0.y + r0.h / 2, where, 1)).toBe(0);
   });
 
   it('无装备直接 -1', () => {

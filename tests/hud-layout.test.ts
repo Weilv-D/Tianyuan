@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { LOG_Y, RAIL_X, RAIL_Y } from '../src/render/view/layout';
+import {
+  ITEM_BAR_W,
+  ITEM_BAR_X,
+  ITEM_BAR_Y,
+  ITEM_GAP,
+  ITEM_ROWS,
+  ITEM_SIZE,
+  LOG_W,
+  LOG_X,
+  LOG_Y,
+  RAIL_X,
+  RAIL_Y,
+  UNLOAD_BTN_DY,
+} from '../src/render/view/layout';
 import {
   BADGE_R,
   BADGE_SIZE,
@@ -106,5 +119,37 @@ describe('羁绊悬停笺', () => {
     const L = railPopupLayout(5, 3);
     const py = railPopupClampY(railBadgeY(0), L.h);
     expect(py + L.h).toBeLessThanOrEqual(860);
+  });
+});
+
+describe('底部牌铺重合不变量（器匣 × 记事栏 × 卸载钮）', () => {
+  // 烘焙框与按钮命中区都向外扩 5~10px，矩形审计必须用外扩后的真实施画范围
+  const ITEM_FRAME = {
+    x: ITEM_BAR_X - 10,
+    y: ITEM_BAR_Y - 24,
+    w: ITEM_BAR_W + 20,
+    h: ITEM_ROWS * (ITEM_SIZE + ITEM_GAP) - ITEM_GAP + 34,
+  };
+  const UNLOAD_BTN = {
+    x: ITEM_BAR_X + ITEM_BAR_W - 84,
+    y: ITEM_BAR_Y + UNLOAD_BTN_DY,
+    w: 84,
+    h: 26,
+  };
+  const BTN_HIT_PAD = 5; // kit.Button setInteractive 的命中外扩
+
+  it('记事栏右缘与器匣整组（框/签/提示行）净距 ≥ 4px', () => {
+    const logRight = LOG_X + LOG_W;
+    expect(ITEM_FRAME.x).toBeGreaterThanOrEqual(logRight + GAP);
+    expect(ITEM_BAR_X - 8).toBeGreaterThanOrEqual(logRight + GAP); // 「器 匣」签 / itemHint
+  });
+
+  it('卸载按钮绘制体完全在器匣烘焙框之外', () => {
+    expect(UNLOAD_BTN.y + UNLOAD_BTN.h + GAP).toBeLessThanOrEqual(ITEM_FRAME.y);
+  });
+
+  it('卸载按钮命中区（外扩 5px）不触器匣框顶、不侵首行格', () => {
+    expect(UNLOAD_BTN.y + UNLOAD_BTN.h + BTN_HIT_PAD).toBeLessThanOrEqual(ITEM_FRAME.y + 1);
+    expect(UNLOAD_BTN.y + UNLOAD_BTN.h + BTN_HIT_PAD).toBeLessThanOrEqual(ITEM_BAR_Y);
   });
 });

@@ -54,7 +54,9 @@ export function autoArrange(p: PlayerState, pool: CardPool): number {
   const owned = allUnits(p);
   if (owned.length === 0) return 0;
 
-  // 同名只保留最强的那张上场
+  // 同名只保留最强的那张上场。1.7.0 手动可同名堆场（canPlace 放开），
+  // 但"布阵"的语义仍是去冗余：羁绊按唯一计数，同名第二张零羁绊收益，
+  // 撤回备战席正好充当 resolveMerges 的合成料——这不是旧契约残留，是整理本身。
   const bestByName = new Map<string, UnitInstance>();
   for (const u of owned) {
     const cur = bestByName.get(u.defId);

@@ -19,8 +19,10 @@ const SCALE = 1.12;
     Phaser.GameObjects.GameObjectFactory.prototype,
     Phaser.GameObjects.GameObjectCreator.prototype,
   ] as unknown as Record<string, TextFn>[]) {
-    const orig = proto.text;
-    proto.text = function (this: unknown, ...args: unknown[]) {
+    // 幂等守卫：Vite HMR 会重读本模块，不判重就在旧包装上再缠一层 ×1.12
+    const prev = proto.text as TextFn & { __textScaled?: boolean };
+    if (prev?.__textScaled) break;
+    const wrapped = function (this: unknown, ...args: unknown[]) {
       const [x, y, text, style, ...rest] = args as [number, number, string, Phaser.Types.GameObjects.Text.TextStyle | undefined, unknown[]];
       let s = style;
       if (s) {
@@ -32,8 +34,10 @@ const SCALE = 1.12;
           s = { ...s, fontSize: Math.round(fs * SCALE) };
         }
       }
-      return orig.call(this, x, y, text, s, ...rest);
-    };
+      return prev.call(this, x, y, text, s, ...rest);
+    } as TextFn & { __textScaled?: boolean };
+    wrapped.__textScaled = true;
+    proto.text = wrapped;
   }
 }
 

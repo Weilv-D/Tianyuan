@@ -16,6 +16,7 @@ import { traitIconKey } from '../render/board/traitIcons';
 import { itemIconKey } from '../render/board/itemIcons';
 import { FONT, RADIUS } from './kit';
 import { bakedTexture } from '../render/view/bake';
+import { portraitItemSlotRect } from '../render/view/hudLayout';
 import type { UnitInstance } from '../game/state';
 import type { Star } from '../core/types';
 
@@ -128,19 +129,20 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
   /**
    * 在卡片左上角显示已装备的东西。
    * 棋盘上的棋子只有 94px，图标必须小到不遮挡剪影，又大到能数清件数。
+   * 几何真源在 hudLayout.portraitItemSlotRect —— hitTest 的点选命中与此共用，
+   * 两处分写曾造成"点装备卸单件错位 4~6px"。
    */
   setItems(itemIds: readonly string[]): void {
     if (!this.scene) return;
     this.itemRow.removeAll(true);
     const n = Math.min(3, itemIds.length);
     if (n === 0) return;
-    const size = Math.max(13, Math.round(this.sz * 0.22));
-    const gap = 3;
     for (let i = 0; i < n; i++) {
       const key = itemIconKey(itemIds[i]);
       if (!this.scene.textures.exists(key)) continue;
-      const img = this.scene.add.image(4 + i * (size + gap) + size / 2, 5 + size / 2, key);
-      img.setDisplaySize(size, size);
+      const r = portraitItemSlotRect(i, this.sz);
+      const img = this.scene.add.image(r.x + r.w / 2, r.y + r.h / 2, key);
+      img.setDisplaySize(r.w, r.h);
       this.itemRow.add(img);
     }
   }
@@ -232,6 +234,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
   private defId: string | null = null;
   private affordable = true;
   private owned = false;
+  private hovered = false;
   private ownedTween: Phaser.Tweens.Tween | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number, onClick: () => void) {
@@ -255,11 +258,13 @@ export class ShopCard extends Phaser.GameObjects.Container {
     this.setSize(w, h);
     this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
     this.on('pointerover', () => {
+      this.hovered = true;
       if (this.defId) scene.input.setDefaultCursor('pointer');
       scene.tweens.add({ targets: this, y: this.baseY - 8, duration: 320, ease: 'Quad.easeOut' });
       this.redraw(true);
     });
     this.on('pointerout', () => {
+      this.hovered = false;
       scene.input.setDefaultCursor('default');
       scene.tweens.add({ targets: this, y: this.baseY, duration: 320, ease: 'Quad.easeOut' });
       this.redraw(false);
@@ -336,7 +341,8 @@ export class ShopCard extends Phaser.GameObjects.Container {
         ease: 'Sine.easeInOut',
       });
     }
-    if (this.defId) this.redraw(false);
+    // 重烘沿用当前悬停态：指针停在卡上时 owned 变化（买了另一张同名）不跳回常态
+    if (this.defId) this.redraw(this.hovered);
   }
 
   override destroy(fromScene?: boolean): void {

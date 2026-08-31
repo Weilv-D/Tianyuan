@@ -351,6 +351,13 @@ export class InputController {
       this.itemTip.hide();
       return;
     }
+    if (this.scene.unloadMode) {
+      // 卸载模式的语境是"点棋子全身回匣"，此时弹出"这件装备效果是…"的
+      // 器匣悬停卡会误导点击预期；详情卡保留（看棋子穿什么正是卸载前的自然需求）
+      this.clearHover();
+      this.itemTip.hide();
+      return;
+    }
     // 器匣装备：悬停出提示卡（名 + 效果 + 合成路径）
     const chipIdx = hitItemChip(px, py);
     const chipItem = chipIdx >= 0 ? this.scene.itemAt(chipIdx) : null;

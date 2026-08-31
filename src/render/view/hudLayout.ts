@@ -131,3 +131,22 @@ export function railPopupClampY(railY: number, h: number): number {
 export function reportRowFitsSide(): boolean {
   return REPORT_ROW.streakX + REPORT_ROW.streakMaxW <= SIDE_W;
 }
+
+// ── 棋子卡装备图标（UnitPortrait 绘制与 hitTest 命中共用此几何）──────
+// 历史事故：cards.ts 放大图标（0.17→0.22）后 hitTest 未同步，点装备卸单件
+// 错位 4~6px。公式收拢到这里，两侧只许引用、不许再各写一份。
+
+/** 单枚装备图标的边长（sz = 棋子卡边长） */
+export function portraitItemSlotSize(sz: number): number {
+  return Math.max(13, Math.round(sz * 0.22));
+}
+
+/** 图标间缝与卡内左上起点 */
+export const PORTRAIT_ITEM_GAP = 3;
+export const PORTRAIT_ITEM_PAD = { x: 4, y: 5 } as const;
+
+/** 第 i 枚图标的矩形（卡局部坐标，左上原点）。供 cards.ts 定位与 hitTest 命中。 */
+export function portraitItemSlotRect(i: number, sz: number): { x: number; y: number; w: number; h: number } {
+  const w = portraitItemSlotSize(sz);
+  return { x: PORTRAIT_ITEM_PAD.x + i * (w + PORTRAIT_ITEM_GAP), y: PORTRAIT_ITEM_PAD.y, w, h: w };
+}

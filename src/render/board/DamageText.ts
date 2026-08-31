@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DAMAGE_OUTLINE, GILT, MOON, PAPER, SHADE, CINNABAR, SPIRIT, VOID, css } from '../view/palette';
 import { FONT } from '../../ui/kit';
+import { TEXT_SCALE } from '../view/textScale';
 import { motion } from '../view/motion';
 
 export type DamageTier = 'normal' | 'crit' | 'skill' | 'true' | 'heal' | 'shield' | 'execute' | 'dot';
@@ -65,7 +66,9 @@ export class DamageTextLayer {
     const jitter = stacked ? (Math.random() - 0.5) * 46 : (Math.random() - 0.5) * 12;
 
     t.setText(`${prefix}${Math.round(amount)}`);
-    t.setStyle({ fontSize: `${cfg.size}px`, fontStyle: cfg.bold ? 'bold' : 'normal' });
+    // 飘字跟随全局字号基线（textScale 只拦 add.text 创建入口，
+    // setStyle 是旁路 —— 不乘的话浮字恒比其它 UI 文本小 12%）
+    t.setStyle({ fontSize: `${Math.round(cfg.size * TEXT_SCALE)}px`, fontStyle: cfg.bold ? 'bold' : 'normal' });
     t.setColor(cfg.color);
     t.setStroke(cfg.stroke, cfg.strokeWidth);
     t.setShadow(cfg.glow ? 0 : 2, cfg.glow ? 0 : 2, css(SHADE), cfg.glow ? 0 : 6, true, true);

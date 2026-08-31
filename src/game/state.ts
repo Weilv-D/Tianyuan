@@ -12,7 +12,7 @@
  *    带来的代价（少了一种堆叠玩法）远小于收益。
  */
 
-import { BENCH_SLOTS, BOARD_COLS, ROWS_PER_SIDE } from '../core/config';
+import { BENCH_SLOTS, BOARD_COLS, LEGEND_T3, ROWS_PER_SIDE } from '../core/config';
 import { CHAMPION_BY_ID } from '../data/champions';
 import type { Star } from '../core/types';
 import type { AdventureKind } from './adventure';
@@ -187,11 +187,6 @@ export function boardCap(p: PlayerState): number {
   return p.level;
 }
 
-/** 场上是否已有同名棋子 */
-export function hasOnBoard(p: PlayerState, defId: string): boolean {
-  return p.board.some((u) => u !== null && u.defId === defId);
-}
-
 /** 卖出返还。2★ = 三张 1★ 的价值 - 1，鼓励"合成即锁定价值" */
 export function sellValue(u: UnitInstance): number {
   const def = CHAMPION_BY_ID[u.defId];
@@ -207,11 +202,18 @@ export function powerScore(u: UnitInstance): number {
   const def = CHAMPION_BY_ID[u.defId];
   if (!def) return 0;
   const s = u.star;
-  const hp = def.base.hp * (s === 1 ? 1 : s === 2 ? 1.8 : 3.24);
-  const atk = def.base.atk * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1);
-  const sp = def.base.sp * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1);
+  // 3★ 五费·天命：估值与 core/config.LEGEND_T3 同源——不乘的话 AI 对天命
+  // 低估约三成，搜牌/追三的欲望被系统性压价（AI 不会贱卖它，但会少追它）
+  const legend = def.cost === 5 && s === 3;
+  const hpM = legend ? LEGEND_T3.hpMult : 1;
+  const powM = legend ? LEGEND_T3.powerMult : 1;
+  const hp = def.base.hp * (s === 1 ? 1 : s === 2 ? 1.8 : 3.24) * hpM;
+  const atk = def.base.atk * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1) * powM;
+  const sp = def.base.sp * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1) * powM;
   // 生命按 0.35 折算成"战力"，避免纯肉棋子在估值里虚高
-  return hp * 0.012 + atk * 1.0 + sp * 0.8 + (def.base.range >= 3 ? 4 : 0) + s * 6;
+  return hp * 0.012 + atk * 1.0 + sp * 0.8 + (def.base.range >= 3 ? 4 : 0) + s * 6
+    // 机制包（25% 开战盾 + 15% 全能吸血 + 免控）的粗估常量
+    + (legend ? 60 : 0);
 }
 
 // ── 增删 ────────────────────────────────────────────────

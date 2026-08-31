@@ -41,6 +41,7 @@ import {
   SHOP_W,
   SHOP_X,
   SHOP_Y,
+  UNLOAD_BTN_DY,
   W,
 } from '../view/layout';
 import { TRAIT_BY_ID } from '../../data/traits';
@@ -335,11 +336,13 @@ export class HudPanels {
       this.itemChips.push(chip);
     }
 
-    // 卸载器（开局可用）：点选 → 点棋子 → 全身装备回器匣
+    // 卸载器（开局可用）：点选 → 点棋子 → 全身装备回器匣。
+    // 挂器匣框顶上方的独立行（UNLOAD_BTN_DY），不叠框线——
+    // 旧位 y-26 压在框顶线上，且按钮命中区（kit 外扩 5px）侵入首行格 5px。
     this.unloadBtn = new Button(
       this.scene,
       ITEM_BAR_X + ITEM_BAR_W - 84,
-      ITEM_BAR_Y - 26,
+      ITEM_BAR_Y + UNLOAD_BTN_DY,
       '卸 载',
       () => this.scene.onToggleUnload(),
       { width: 84, height: 26 },

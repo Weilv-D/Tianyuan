@@ -108,7 +108,9 @@ export function createUnit(input: BattleUnitInput): Unit {
 
   // 五费三星·天命（LEGEND_T3）：数值在天命层再乘，附免疫控制/开战护盾/全能吸血。
   // 三星五费是终局单位，常规三星倍率不足以表达"无敌"的玩家预期。
-  const legend = entry.cost === 5 && input.star === 3;
+  // monster（墨兽轮）排除：beast 后期池含五费且 16 轮后有 3★ 概率，
+  // 不排除的话 PvE 会静默拿到天命包，难度尖峰绕过平衡前提。
+  const legend = entry.cost === 5 && input.star === 3 && !input.monster;
   const legendHp = legend ? LEGEND_T3.hpMult : 1;
   const legendPow = legend ? LEGEND_T3.powerMult : 1;
 
@@ -150,6 +152,9 @@ export function createUnit(input: BattleUnitInput): Unit {
     moveT: 0,
     moveDur: 0,
 
+    // 开战护盾（无 shield 状态 → 永不到期，只能被伤害打掉）。
+    // 口径钉死：battle 受击回蓝把护盾吸收额计入 final（battle.ts dealDamage），
+    // 因此 25% 大盾会让受击者开局回蓝大涨 —— 与 TFT 同款的有意行为，勿改口径。
     shield: legend ? Math.round(maxHp * LEGEND_T3.startShieldPct) : 0,
     statuses: [],
     permAtkPct: 0,

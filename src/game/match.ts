@@ -539,7 +539,9 @@ export class Match implements AiWorld {
     const slot = p.bench.findIndex((u) => u !== null && u.iid === iid);
     if (slot < 0) return false;
     const u = p.bench[slot]!;
-    // 同名已在场 → 不上
+    // 同名已在场 → 不上。1.7.0 手动拖拽已放开同名（canPlace），
+    // 但自动上场保持单张口径：堆场是玩家的战术决定，不该由"买后即上"替新手做；
+    // 合成料留在备战席照样参与 resolveMerges。
     if (p.board.some((x) => x !== null && x.defId === u.defId)) return false;
     const target = this.suggestSlot(p, u.defId);
     p.bench[slot] = null;

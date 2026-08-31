@@ -268,11 +268,14 @@ export class GameScene extends Phaser.Scene {
     if (!id) return;
     // 点一下选中，再点棋子装上；拖也行。两条路都留着，
     // 因为拖拽对触屏和手抖的人并不友好，而"点选"永远不会拖错地方。
+    // 选中与卸载两模式互斥：留下任何一侧都会让 InputController 的
+    // 卸载分支抢在装配分支之前吃掉点击，装备永远装不上。
     if (this.selectedItem === id) {
       this.selectedItem = null;
-    this.unloadMode = false;
+      this.exitUnloadMode();
     } else {
       this.selectedItem = id;
+      this.exitUnloadMode();
       audio.play('ui');
     }
     this.refreshAll();
@@ -289,7 +292,7 @@ export class GameScene extends Phaser.Scene {
       audio.play('warn');
     } else {
       this.selectedItem = null;
-    this.unloadMode = false;
+      this.exitUnloadMode();
       audio.play('coin');
       if (r.combined) {
         // 合成神装是这局的高光之一，值得一次演出
@@ -299,6 +302,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.afterAction();
+  }
+
+  /** 退出卸载模式：状态与按钮态必须同进同退，否则按钮文字卡在「卸载中…」 */
+  private exitUnloadMode(): void {
+    this.unloadMode = false;
+    this.hud.setUnloadMode(false);
   }
 
   /** 卸载器开关（器匣右上「卸 载」钮）：仅备战阶段可用 */
@@ -313,8 +322,7 @@ export class GameScene extends Phaser.Scene {
 
   /** 卸载器执行：全身装备整体回器匣（成品拆回组件；容量不足整体拒绝） */
   onUnequipAll(u: UnitInstance): void {
-    this.unloadMode = false;
-    this.hud.setUnloadMode(false);
+    this.exitUnloadMode();
     this.pushUndo('卸载全部');
     const r = unequipAll(this.match.human, u.iid);
     if (r.ok) {
@@ -352,7 +360,7 @@ export class GameScene extends Phaser.Scene {
     this.pushUndo('一键装备');
     autoEquip(this.match.human);
     this.selectedItem = null;
-    this.unloadMode = false;
+    this.exitUnloadMode();
     audio.play('uiBig');
     this.showToast('已自动分配装备');
     this.afterAction();
@@ -429,6 +437,8 @@ export class GameScene extends Phaser.Scene {
   onUndo(): void {
     // 开战/结算期间撤销会把"战前快照"盖回已结算的状态（血量/金币已变），必须禁止
     if (this.phase !== 'prep' || this.busy) return;
+    // 撤销恢复的是快照时刻的阵容，卸载模式的"点棋子卸全身"语境已失效，回中性态
+    this.exitUnloadMode();
     const e = this.undoStack.pop();
     if (!e) {
       this.showToast('没有可撤销的操作', true);
@@ -601,8 +611,7 @@ export class GameScene extends Phaser.Scene {
   /** 准备阶段结束 → 战斗 */
   startBattlePhase(): void {
     if (this.busy || this.phase !== 'prep') return;
-    this.unloadMode = false;
-    this.hud.setUnloadMode(false);
+    this.exitUnloadMode();
     this.pauseScout.setPaused(false);
     this.pauseScout.closeScout();
     this.busy = true;

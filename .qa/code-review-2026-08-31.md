@@ -210,3 +210,49 @@
   迭代统一执行；`noUncheckedIndexedAccess` 专开改造 —— 30+ 处索引访问，独立任务；
   `noUncheckedIndexedAccess` 之外的 `viewScale` 静态 VIEW_K 为 D5 ADR 既定口径；
   tooltip 超高卡恒 12px 钳制为可接受降级。
+
+---
+
+## 8. 增量复审（2026-09-01 · 1.7.0 在途特性包）
+
+> 范围：未提交的 1.7.0 改动（天命 LEGEND_T3 / 同名放开 / 卸载器 / 商店同名高亮 /
+> 器匣 52px / textScale 字号基线）与其全部联动面；两路并行深审（渲染层 + 内核层），
+> 高危结论逐条回源码核实。基线修复后：tsc 0 错误、vitest 303/303 绿。
+
+### 已修复
+
+| 级 | 问题 | 落点 |
+|---|---|---|
+| P1 | 野兽轮 3★ 五费误得天命包（beast 后期池含 5 个五费、16 轮起 12~30% 出 3★，PvE 难度尖峰绕过平衡前提） | `core/unit.ts` legend 判定加 `!input.monster`（BattleUnitInput.monster 现成标记） |
+| P1 | hitUnitItemSlot 与 UnitPortrait 图标几何脱节（旧 0.17/gap2 vs 新 0.22/gap3），点装备卸单件错位 4~6px | 几何收拢 `view/hudLayout.portraitItemSlotRect`，cards.ts 绘制与 hitTest 命中共用；input-coords 测试同源化 |
+| P1 | 器匣点选与卸载模式双模互锁：选中分支未清 unloadMode，卸载分支抢先吃点击，装备永远装不上 | `GameScene.exitUnloadMode()` 统一出口（onItemChipClick 两分支/onEquip/onAutoEquip/onUnequipAll/onUndo/startBattlePhase），顺带修两处缩进错位 |
+| P1 | tests/legend-qol.test.ts 两处 `star` 字面量类型错误（tsc 拦 build/release） | `as Star` 标注（用户同步修正） |
+| P1 | 卸载按钮叠在器匣框顶线上、命中区（外扩 5px）侵入首行格 5px；器匣整组（框/签/提示行）压记事栏右缘 4~6px —— 用户实测反馈 | 按钮移框顶上方独立行（`layout.UNLOAD_BTN_DY=-56`）；记事栏 LOG_W 282→264 让出净距；3 条重合不变量钉进 tests/hud-layout |
+| P2 | DamageText spawn 的 setStyle 旁路 textScale，飘字恒比全局基线小 12% | fontSize 乘 `TEXT_SCALE`（textScale 只拦 add.text 创建入口） |
+| P2 | textScale HMR 重载在旧包装上再缠一层 ×1.12 | `__textScaled` 幂等守卫 |
+| P2 | ShopCard.setOwned 中途触发时 redraw(false) 丢悬停态，指针停在卡上提亮跳变 | `hovered` 字段 + redraw(this.hovered) |
+| P2 | 卸载模式下 updateHover 仍弹器匣装备提示卡，误导点击预期 | updateHover 头部 unloadMode 守卫（详情卡保留） |
+| P2 | powerScore 无天命项，AI 对 3★ 五费低估约三成（搜牌/追三欲望被系统性压价；不会贱卖） | hp/atk/sp 乘 LEGEND_T3 同源倍率 + 机制包常量 60 |
+| P2 | onUndo 后卸载模式残留（快照已恢复、语境失效） | onUndo 走 exitUnloadMode |
+| P3 | layout.ts 器匣注释过时（"262"、错误的"对齐备战席右端"） | 注释修正为真实对齐关系 |
+| P3 | hasOnBoard 零调用方死代码 | 删除 |
+| P3 | 天命开战盾的受击回蓝放大、unequipAll/stripItems 容量口径分层、tryAutoDeploy/autoArrange 同名单张口径 | 注释钉死（有意行为/有意差异，防后人误修） |
+
+### 复核确认无缺陷（防止误报扩散）
+
+- 同名放开三链路安全：对局层 computeTraits `Set` 去重；战斗层 computeActiveTraits 再按
+  `Set(entry.id)` 防御；resolveMerges 按 (defId,star) 全表分组支持跨区合成；buildBattleConfig
+  逐槽位独立 uid/cell；moveToSlot 交换语义人口守恒。
+- ccImmune=1e9 无任何递减/清零路径（tickStatuses 只递减 statuses[].ticks；revive 不碰它）。
+- 召唤物 createMinion 硬编码 1★，不可能误得天命。
+- ownedTween 生命周期：destroy remove + TweenManager.shutdown killAll，无泄漏。
+
+### 顺延（记录理由）
+
+- `UnitView` 3★（含天命）冠环（r=26 固定局部 cy=-30）与头顶装备行在容器放大后有
+  10~15px 世界交叠；头顶区 25px 放不下血条+法力+图标 28px 是结构性约束，图标绘制序
+  在环之上可读性尚可。需 3★ 实景定夺，列入下一次视觉迭代（与 unitView 剪影/徽章一体调）。
+- main.ts/traitIcons 字体预载超时：本地 woff2 内联/同源资产，挂起风险低，仍循"不动
+  用户在途文件"纪律顺延。
+- 天命对平衡断面的影响（3★ 五费质变 + 护盾回蓝放大）：数值迭代时走 sim:sweep 复测，
+  不在缺陷修复范围。
