@@ -52,14 +52,20 @@ export function traitIconKey(traitId: string, tier: number): string {
 
 let sealLoaded = false;
 
-/** 启动咽喉载入篆体子集（main.ts 顶层 await，与 AI 棋子预解码同槽位） */
+/** 启动咽喉载入篆体子集（main.ts 顶层 await，与 AI 棋子预解码同槽位）。
+ *  3s 超时兜底（与 aiBake/itemIcons 同口径）：弱网下字体请求 TCP 挂起时
+ *  顶层 await 会把 boot 序章永久钉住，超时即按"字库不可用"落楷体放行。 */
 export async function preloadSealFont(): Promise<void> {
   if (sealLoaded) return;
   sealLoaded = true;
   try {
     const face = new FontFace(SEAL_FONT, `url(${sealFontUrl})`);
-    await face.load();
-    document.fonts.add(face);
+    const ok = await Promise.race([
+      face.load().then(() => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), 3000)),
+    ]);
+    if (ok) document.fonts.add(face);
+    else console.warn('[百战天元] 篆体字库载入超时，羁绊徽章回退楷体');
   } catch {
     console.warn('[百战天元] 篆体字库不可用，羁绊徽章回退楷体');
   }
