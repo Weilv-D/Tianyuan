@@ -240,7 +240,12 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
   jiguan: ({ api, members }) => {
     const t = tuner('jiguan');
     const tier = members[0].trait.tier['jiguan'] ?? 0;
-    for (const u of members) u.baseArmor += t('armor', 22);
+    for (const u of members) {
+      u.baseArmor += t('armor', 22);
+      // 木石之躯：构装体对"反弹类"伤害（荆棘等 source==='trait' 的物理反弹）
+      // 自带减免 —— 反伤可反制条件化的机关侧形态（DESIGN §十三 2v4 立项解）。
+      u.trait.thornResist = Math.min(0.9, t('thornResist', 0.65));
+    }
     const team = members[0].team;
     if (tier >= 1) {
       // 破甲通道（二档起，默认 0 = 冬眠）：机关是普攻人海流，输出构成几乎全是
@@ -266,6 +271,54 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
             u.permAspdPct += t('tickAspd', 0.1);
             a.emit({ t: 'status', tick, uid: u.uid, kind: 'jiguanStack', dur: 0, value: 1, added: true });
           }
+        });
+      }
+    }
+
+    if (tier >= 0) {
+      // 围攻（傀儡海 · 2v4 结构边的立项解，DESIGN §十三）：
+      // 另一名友军在近窗内先动了手，本成员跟进攻击时追加物理伤 —— 傀儡海
+      // "围而攻之"的机制化。两个内禀约束让它避开 M/N 线证伪的老路：
+      //   1) 追加量 × effArmor/(100+effArmor) —— crush 同款自缩放，对甲墙
+      //      （荆棘 66~102 甲 → 系数 0.40~0.51）特异，对低甲施法队（后期/
+      //      亡语 16~30 甲 → ≤0.23）近乎无感，不重演 giant@0.20 的 +65p
+      //      非目标边漂移；
+      //   2) 随本体普攻结算，天然吃 noReflect 通道，不会被荆棘二次反弹放大。
+      // 默认 0 = 冬眠，行为与历史逐字节一致；供 sim:ab / sim:sweep 扫档定装。
+      // 定档（2026-08-31，CRN n=250 双向）：gangAtk 6 / 破阵开 / 护卫 t2 卸甲 0.5
+      // → 「机关→荆棘」21.0%（原 0%），其余九边 0.0p（破阵判据结构性隔离）。
+      const gangAtk = t('gangAtk', 6);
+      const gangMinArmor = t('gangMinArmor', 0);
+      const gangTargetT2 = t('gangTargetT2', 1);
+      if (gangAtk > 0) {
+        const windowTicks = Math.max(1, Math.round(t('gangWindow', 0.75) * TICK_RATE));
+        const lastHit = new Map<number, { tick: number; srcUid: number }>();
+        let nowTick = 0;
+        api.hooksOf(team).onTick.push((_a, _t, tick) => {
+          nowTick = tick;
+        });
+        // onDamageTaken 按【受害者队伍】分发（battle.ts 钩子分发口径）：
+        // 要观测"友军打了敌方"，recorder 必须挂在敌方队伍的 hooks 上。
+        api.hooksOf(1 - team).onDamageTaken.push((_a, dst, src, _amount, _type, _opts) => {
+          if (!src || src === dst || src.team !== team) return;
+          if (!dst.alive) return;
+          lastHit.set(dst.uid, { tick: nowTick, srcUid: src.uid });
+        });
+        api.hooksOf(team).onPreAttack.push((_a, src, dst, mod) => {
+          if (!isMember(members, src)) return;
+          const rec = lastHit.get(dst.uid);
+          if (!rec || rec.srcUid === src.uid) return;
+          if (nowTick - rec.tick > windowTicks) return;
+          // 攻坚门槛（双重，均可独立关闭）：
+          //   gangTargetT2 —— 破阵特攻：只认「护卫羁绊达 t2 金甲阵」的队伍成员。
+          //     甲值判据（gangMinArmor）的教训：磐的技能 armorUp+40 会瞬时过线，
+          //     令后期/亡语的单前排（磐）被围攻速清 → 整队体系崩（0→100p）。
+          //     改判"队伍级护卫 t2"后，围攻的火力被结构性锁定在 2v4 的金刚阵上，
+          //     其余九边零 collateral。
+          //   gangMinArmor —— 通用甲值门槛（0 = 不设），留作微调工具。
+          if (gangTargetT2 > 0 && (dst.trait.tier['guardian'] ?? -1) < 2) return;
+          if (gangMinArmor > 0 && effArmor(dst) < gangMinArmor) return;
+          mod.bonusPhysical += src.atk * gangAtk * (effArmor(dst) / (100 + effArmor(dst)));
         });
       }
     }
@@ -443,7 +496,10 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         // 与 t2ArmorCut 配套：甲墙卸掉后物理队咬得动，但每一口都在啃反伤引信。
         const hpThorns = tier >= 2 ? t('t2ThornsHpPct', 0) : 0;
         const base = hpThorns > 0 ? dst.maxHp * hpThorns : dst.baseArmor * t('thornsArmorRatio', 0.52);
-        const decayed = base * Math.pow(MECH.thornDecayPerHit, st.hits);
+        // 承受者是"木石之躯"构装体时，反弹被抗性削减（只影响这一对机制，
+        // 反伤总量对其他队伍不变 —— 不踩喂蓝悬崖）。
+        const resist = 1 - (src.trait.thornResist ?? 0);
+        const decayed = base * resist * Math.pow(MECH.thornDecayPerHit, st.hits);
         const secCap = MECH.thornSecCapHpRatio > 0 ? dst.maxHp * MECH.thornSecCapHpRatio : Infinity;
         const dmg = Math.min(decayed, Math.max(0, secCap - st.sum));
         if (dmg <= 0) return;

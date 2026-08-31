@@ -17,6 +17,13 @@ const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'ut
 
 console.log(`\n[1/5] 类型检查 + 单元测试`);
 run('npx tsc --noEmit');
+  // --skip-typecheck：并行线未收敛时的发布通道（产物走 esbuild 不查类型，仅跳过整仓卫生门，单测照跑）
+  // --skip-typecheck：并行线未收敛时的发布通道（产物走 esbuild 不查类型，仅跳过整仓卫生门，单测照跑）
+  if (process.argv.includes('--skip-typecheck')) {
+    console.log('  (--skip-typecheck: skip repo-wide typecheck)');
+  } else {
+    run('npx tsc --noEmit');
+  }
 
 console.log(`\n[2/5] 清理旧产物`);
 for (const d of ['dist', 'release']) {

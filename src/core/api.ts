@@ -20,6 +20,8 @@ export interface TraitState {
   allDr: number;
   /** 无视目标护甲的比例（0~1）。高护甲阵容的天然克星。 */
   armorPen: number;
+  /** 木石之躯：受到"反弹类"伤害的减免比例（0~1）。机关构装体的荆棘抗性。 */
+  thornResist: number;
   healAmp: number;
   shieldAmp: number;
   manaPerSec: number;
@@ -37,6 +39,7 @@ export function createTraitState(): TraitState {
     magicDr: 0,
     allDr: 0,
     armorPen: 0,
+  thornResist: 0,
     healAmp: 0,
     shieldAmp: 0,
     manaPerSec: 0,
