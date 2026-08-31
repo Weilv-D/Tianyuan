@@ -1,7 +1,7 @@
 import type { BattleApi } from './api';
 import { chebyshev, inBounds } from './grid';
 import { effAtk, effSp, hasStatus, type Unit } from './unit';
-import { STAR_SKILL_SCALE } from './config';
+import { STAR_SKILL_SCALE, TICK_RATE } from './config';
 import type { SkillSpec, TargetMode } from '../data/champions';
 import type { Cell, DamageType, StatusKind } from './types';
 
@@ -367,7 +367,7 @@ const IMPL: Record<string, Impl> = {
     for (const al of api.units) {
       if (!al.alive || al.team !== u.team) continue;
       api.addShield(u, al, amount, shieldDur);
-      if (p.status) api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
+      if (p.status && !DEBUFF_KINDS.has(p.status.kind as StatusKind)) api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       if (p.damageReduction) api.addStatus(u, al, 'dr', shieldDur, p.damageReduction * 100);
       api.fx('shieldWall', { cell: al.cell });
     }
@@ -394,7 +394,7 @@ const IMPL: Record<string, Impl> = {
           for (let dc = -ring; dc <= ring && !placed; dc++) {
             const c = u.cell.c + dc;
             const r = u.cell.r + dr;
-            if (c < 0 || c > 7 || r < 0 || r > 7) continue;
+            if (!inBounds(c, r)) continue;
             if (api.occupied(c, r)) continue;
             api.summon(u, { c, r }, p.summon.hpPct, p.summon.atkPct, p.summon.name);
             api.fx('summon', { cell: { c, r } });
@@ -475,13 +475,20 @@ const IMPL: Record<string, Impl> = {
     // 苍嗥：攻速 + 攻击力双增，击杀续期
     if (spec.params.status?.kind === 'aspdUp' && u.entry.id === 'canghao') {
       api.addStatus(u, u, 'atkUp', dur, 45);
-      u.killHandlers.push((a) => {
-        if (!hasStatus(u, 'aspdUp')) return;
-        for (const s of u.statuses) {
-          if (s.kind === 'aspdUp' || s.kind === 'atkUp') s.ticks = Math.round(dur * 30);
-        }
-        a.fx('buffAura', { uid: u.uid, params: { hue: 1 } });
-      });
+      // 续期回调只注册一次。
+      // 此前每次施放都无条件 push 一个新闭包，而 killHandlers 从不回收：施放 N 次
+      // 就有 N 个闭包，每次击杀要遍历全部 N 个（重复刷新状态 + 重复推送 buffAura
+      // 特效事件）。闭包体只依赖 u 与 dur，与"第几次施放"无关，注册一次即等价。
+      if (!u.traitStacks['canghaoRenew']) {
+        u.traitStacks['canghaoRenew'] = 1;
+        u.killHandlers.push((a) => {
+          if (!hasStatus(u, 'aspdUp')) return;
+          for (const s of u.statuses) {
+            if (s.kind === 'aspdUp' || s.kind === 'atkUp') s.ticks = Math.round(dur * TICK_RATE);
+          }
+          a.fx('buffAura', { uid: u.uid, params: { hue: 1 } });
+        });
+      }
     }
     if (p.invulnWhileCasting) {
       api.addStatus(u, u, 'invuln', dur, 0);
@@ -507,13 +514,21 @@ const IMPL: Record<string, Impl> = {
       const anchor: StatusKind | undefined = p.invulnWhileCasting
         ? 'invuln'
         : (p.status?.kind as StatusKind | undefined);
-      api.hooksOf(u.team).onDamageTaken.push((a, dst, src, amt, type, opts) => {
-        if (anchor && !hasStatus(u, anchor)) return;
-        if (type !== 'physical' && type !== 'magic') return;
-        if (opts.noReflect) return;
-        if (dst.uid !== u.uid || !u.alive || !src || !src.alive) return;
-        a.dealDamage(u, src, Math.max(1, amt * p.reflect!), 'physical', { source: 'skill', noReflect: true });
-      });
+      // 反弹钩子只注册一次。
+      // onDamageTaken 是全场最热的钩子（每一次受击都会遍历），此前每次施放都往
+      // 上面追加一个新闭包：过期增益对应的历史闭包虽然会立刻 return，但仍要被
+      // 逐个调用，热路径成本随施放次数线性上升。窗口判定本来就由 anchor 状态
+      // 在运行时完成（增益过期即 return），与"注册了几份"无关 —— 注册一次即等价。
+      if (!u.traitStacks['reflectHooked']) {
+        u.traitStacks['reflectHooked'] = 1;
+        api.hooksOf(u.team).onDamageTaken.push((a, dst, src, amt, type, opts) => {
+          if (anchor && !hasStatus(u, anchor)) return;
+          if (type !== 'physical' && type !== 'magic') return;
+          if (opts.noReflect) return;
+          if (dst.uid !== u.uid || !u.alive || !src || !src.alive) return;
+          a.dealDamage(u, src, Math.max(1, amt * p.reflect!), 'physical', { source: 'skill', noReflect: true });
+        });
+      }
     }
     api.fx('buffAura', { uid: u.uid, params: { hue: 1 } });
   },

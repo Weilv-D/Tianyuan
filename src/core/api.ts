@@ -1,6 +1,6 @@
 import type { BattleEvent, FxKind } from './events';
 import type { Rng } from './rng';
-import type { Cell, DamageType, StatusKind } from './types';
+import type { Cell, DamageType, StatusKind, TeamId } from './types';
 import type { Unit } from './unit';
 import type { TargetMode } from '../data/champions';
 
@@ -143,6 +143,13 @@ export interface BattleApi {
   alliesOf(u: Unit): Unit[];
   enemiesOf(u: Unit): Unit[];
   hooksOf(team: number): BattleHooks;
+  /**
+   * 与 team 敌对的全部队伍号（升序，顺序确定）。
+   * 取代此前 `1 - team` 的硬编码推算 —— 那要求 team 恒为 0/1，
+   * 一旦出现第三个队伍号就会静默失效：钩子挂到不存在的队伍上，
+   * 机制无声消失（不报错、不影响胜负，只是伤害没了），极难排查。
+   */
+  enemyTeamsOf(team: TeamId): TeamId[];
 
   emit(e: BattleEvent): void;
   fx(

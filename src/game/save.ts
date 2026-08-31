@@ -53,12 +53,20 @@ export function hasSave(): boolean {
   }
 }
 
-export function saveMatch(m: Match): void {
+export function saveMatch(m: Match): boolean {
   try {
     const payload = { v: 3, savedAt: Date.now(), mode: m.mode, data: m.toJSON() };
     localStorage.setItem(KEY, JSON.stringify(payload));
-  } catch {
-    // 隐私模式 / 配额满：存档失败不应该影响正在进行的对局
+    return true;
+  } catch (e) {
+    // 隐私模式 / 配额满：存档失败不应该影响正在进行的对局，但必须显式暴露，
+    // 否则“继续”按钮会静默读到上一次成功的旧档，回退若干回合且无提示（M4）。
+    const isQuota = e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22);
+    if (isQuota) {
+      console.warn('[存档] localStorage 配额已满，存档未写入，请清理浏览器存储后重试');
+      try { localStorage.setItem('inkarena.save.error', String(Date.now())); } catch {}
+    }
+    return false;
   }
 }
 
@@ -147,7 +155,15 @@ export function loadPrefs(): Preferences {
   try {
     const raw = localStorage.getItem(PREF_KEY);
     if (!raw) return { ...DEFAULT_PREFS };
-    return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Preferences>) };
+    const parsed = JSON.parse(raw) as Partial<Preferences>;
+    const out: Preferences = { ...DEFAULT_PREFS };
+    if (typeof parsed.volBgm === 'number' && Number.isFinite(parsed.volBgm)) out.volBgm = Math.max(0, Math.min(1, parsed.volBgm));
+    if (typeof parsed.volSfx === 'number' && Number.isFinite(parsed.volSfx)) out.volSfx = Math.max(0, Math.min(1, parsed.volSfx));
+    if (typeof parsed.volUi === 'number' && Number.isFinite(parsed.volUi)) out.volUi = Math.max(0, Math.min(1, parsed.volUi));
+    if (typeof parsed.muted === 'boolean') out.muted = parsed.muted;
+    if (typeof parsed.autoDeploy === 'boolean') out.autoDeploy = parsed.autoDeploy;
+    if (typeof parsed.calm === 'boolean') out.calm = parsed.calm;
+    return out;
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -163,8 +179,8 @@ export function savePrefs(p: Preferences): void {
 
 /** 供 UI 展示用的一行摘要 */
 export function describeSave(): string {
-  const meta = saveMeta();
-  if (!meta) return '';
-  const p = loadMatch()?.players[0] as PlayerState | undefined;
-  return p ? `第 ${meta.round} 回合 · 生命 ${p.hp} · 等级 ${p.level}` : `第 ${meta.round} 回合`;
+  const m = loadMatch();
+  if (!m) return '';
+  const p = m.players[0] as PlayerState | undefined;
+  return p ? `第 ${m.round} 回合 · 生命 ${p.hp} · 等级 ${p.level}` : `第 ${m.round} 回合`;
 }

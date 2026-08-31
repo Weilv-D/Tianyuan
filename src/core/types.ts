@@ -139,7 +139,6 @@ export interface TraitDef {
   effectText: string[];
   /** 档位色：0=铜 1=银 2=金 3=虹 */
   colors: number[];
-  icon: string;
 }
 
 /** 一场战斗中，某阵营已激活的羁绊档位 */

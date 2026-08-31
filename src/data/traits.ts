@@ -25,7 +25,6 @@ export const TRAITS: readonly TraitDef[] = [
       '战斗开始时，天庭棋子获得 20% 最大生命的护盾；护盾被打破时对周围 1 格敌人造成 120% 法强的法术伤害。',
     ],
     colors: [1, 2],
-    icon: '☰',
   },
   {
     id: 'youming',
@@ -38,7 +37,6 @@ export const TRAITS: readonly TraitDef[] = [
       '幽冥棋子首次阵亡时以 15% 生命复活，并获得 30% 攻速加成直至战斗结束。',
     ],
     colors: [1, 2],
-    icon: '卍',
   },
   {
     id: 'shanhai',
@@ -51,7 +49,6 @@ export const TRAITS: readonly TraitDef[] = [
       '普攻附加【流血】：3 秒内共造成 16% 目标最大生命的真实伤害，并使其受到的治疗效果降低 40%，持续 3 秒。',
     ],
     colors: [1, 2],
-    icon: '山',
   },
   {
     id: 'jianzong',
@@ -64,7 +61,6 @@ export const TRAITS: readonly TraitDef[] = [
       '暴击伤害 +20%，无视目标 18% 护甲，全队无视 20% 护甲；击杀敌人后立即回复 20 点法力。',
     ],
     colors: [1, 2],
-    icon: '剑',
   },
   {
     id: 'yaozu',
@@ -77,7 +73,6 @@ export const TRAITS: readonly TraitDef[] = [
       '全能吸血 +36%；生命首次低于 60% 时化形：回复 24% 最大生命，清除控制效果，获得 35% 攻速、15% 攻击力与 35% 减伤，持续 6 秒。',
     ],
     colors: [1, 2],
-    icon: '妖',
   },
   {
     id: 'jiguan',
@@ -90,7 +85,6 @@ export const TRAITS: readonly TraitDef[] = [
       '每次攻击叠加 9% 攻速（最多 8 层）；每第 4 次攻击额外造成 140% 攻击力的物理伤害。',
     ],
     colors: [1, 2],
-    icon: '⚙',
   },
   {
     id: 'danding',
@@ -103,7 +97,6 @@ export const TRAITS: readonly TraitDef[] = [
       '丹鼎棋子每秒回复 1.5% 最大生命和 3 点法力；治疗溢出的部分转化为等量护盾。',
     ],
     colors: [1, 2],
-    icon: '丹',
   },
   {
     id: 'longyuan',
@@ -116,7 +109,6 @@ export const TRAITS: readonly TraitDef[] = [
       '龙渊棋子技能伤害 +32%；全队法强 +18、技能伤害 +9%；施法后 4 秒内，下一次普攻额外造成 80% 法强的法术伤害。',
     ],
     colors: [1, 2],
-    icon: '龙',
   },
 
   {
@@ -131,7 +123,6 @@ export const TRAITS: readonly TraitDef[] = [
       '兼爱：友军受到的伤害有 30% 转由全体墨门棋子均摊；墨门棋子的全伤害减免提升至 20%。',
     ],
     colors: [0, 1, 2],
-    icon: '墨',
   },
   {
     id: 'bingjia',
@@ -145,7 +136,6 @@ export const TRAITS: readonly TraitDef[] = [
       '百战：任意友军击杀敌人时，全体友军永久 +12% 攻击力与 +9% 攻速；兵家棋子完成击杀时此加成翻倍。',
     ],
     colors: [0, 1, 2],
-    icon: '兵',
   },
 
   // ─────────────── 职业羁绊 (class) ───────────────
@@ -161,7 +151,6 @@ export const TRAITS: readonly TraitDef[] = [
       '攻击力 +75%；受到的物理伤害降低 18%。',
     ],
     colors: [0, 1, 2],
-    icon: '武',
   },
   {
     id: 'guardian',
@@ -175,7 +164,6 @@ export const TRAITS: readonly TraitDef[] = [
       '生命 +28%，护甲 +32，攻击力 +45%；每 3 秒为自身提供 2% 最大生命护盾，受到物理伤害时反弹 52% 基础护甲值的伤害。',
     ],
     colors: [0, 1, 2],
-    icon: '盾',
   },
   {
     id: 'assassin',
@@ -188,7 +176,6 @@ export const TRAITS: readonly TraitDef[] = [
       '跃入后 5 秒内获得 35% 攻速；暴击伤害 +35%。',
     ],
     colors: [1, 2],
-    icon: '影',
   },
   {
     id: 'marksman',
@@ -201,7 +188,6 @@ export const TRAITS: readonly TraitDef[] = [
       '每第 3 次攻击必定暴击，且暴击伤害 +30%。',
     ],
     colors: [1, 2],
-    icon: '弓',
   },
   {
     id: 'mage',
@@ -215,7 +201,6 @@ export const TRAITS: readonly TraitDef[] = [
       '法强 +78；技能对目标周围 1 格造成 55% 溅射伤害。',
     ],
     colors: [0, 1, 2],
-    icon: '术',
   },
   {
     id: 'warlock',
@@ -228,7 +213,6 @@ export const TRAITS: readonly TraitDef[] = [
       '技能伤害的 30% 转化为无法减免的真实伤害；技能命中使目标受到的治疗降低 30%，持续 3 秒。',
     ],
     colors: [1, 2],
-    icon: '咒',
   },
   {
     id: 'support',
@@ -241,7 +225,6 @@ export const TRAITS: readonly TraitDef[] = [
       '治疗与护盾效果 +80%；友军阵亡时，其余友军获得 20% 攻速，持续 8 秒。',
     ],
     colors: [1, 2],
-    icon: '医',
   },
 ];
 

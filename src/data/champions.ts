@@ -157,7 +157,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'pan_q',
     skillSpec: {
       kind: 'selfBuff', name: '岩心', target: 'self',
-      desc: '获得 {value} 最大生命的护盾与 40 点护甲，持续 {dur} 秒；期间每次受击反弹 {reflect} 所受伤害。',
+      desc: '获得 {value} 最大生命的护盾与 40 点护甲，持续 {dur} 秒；期间每次受击，反弹所受伤害的 {reflect}。',
       params: { value: 0.18, dur: 6, reflect: 0.25, status: { kind: 'armorUp', dur: 6, value: 40 } },
     },
   },
@@ -380,7 +380,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'budong_q',
     skillSpec: {
       kind: 'selfBuff', name: '不动明王', target: 'self',
-      desc: '结不动印 {dur} 秒：免疫所有伤害与控制，反弹 {reflect} 承受伤害，并每秒对周围 {radius} 格造成 {dpsSp} 法强的法术伤害。',
+      desc: '结不动印 {dur} 秒：免疫所有伤害与控制，反弹所受伤害的 {reflect}，并每秒对周围 {radius} 格造成 {dpsSp} 法强的法术伤害。',
       params: { dur: 4, reflect: 0.3, radius: 1, dpsSp: 0.5, type: 'magic', invulnWhileCasting: true },
     },
   },
@@ -492,7 +492,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'moyan_q',
     skillSpec: {
       kind: 'selfBuff', name: '墨壁', target: 'self',
-      desc: '凿墨为壁：获得 {value} 最大生命的护盾与 36 点护甲，持续 {dur} 秒，期间反弹 {reflect} 所受伤害。',
+      desc: '凿墨为壁：获得 {value} 最大生命的护盾与 36 点护甲，持续 {dur} 秒，期间反弹所受伤害的 {reflect}。',
       params: { value: 0.16, dur: 6, reflect: 0.2, status: { kind: 'armorUp', dur: 6, value: 36 } },
     },
   },

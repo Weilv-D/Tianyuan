@@ -96,7 +96,7 @@ export const ITEMS: readonly ItemDef[] = [
   // ── 组件 ────────────────────────────────────────────
   {
     id: 'moren',
-    name: '墨刃',
+    name: '翠玦',
     tier: 'component',
     desc: '攻击力 +12',
     bonus: { atk: 12 },
@@ -110,7 +110,7 @@ export const ITEMS: readonly ItemDef[] = [
     // 护甲 18/20 档反而落回零下（护甲边际在 44~56 区间已进 RESIST 曲线
     // 平缓段，且 ±1.5 个百分点的抽样噪声主导），取最小有效档 16。
     id: 'xuanjia',
-    name: '玄甲',
+    name: '金锭',
     tier: 'component',
     desc: '护甲 +16',
     bonus: { armor: 16 },
@@ -126,7 +126,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
   {
     id: 'yunlv',
-    name: '云履',
+    name: '轻羽',
     tier: 'component',
     desc: '攻速 +12%',
     bonus: { aspd: 0.12 },
@@ -134,7 +134,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
   {
     id: 'xueyu',
-    name: '血玉',
+    name: '青莲',
     tier: 'component',
     desc: '生命 +160',
     bonus: { hp: 160 },
@@ -165,7 +165,7 @@ export const ITEMS: readonly ItemDef[] = [
     // 技能流阵容近乎死词条）。补攻击力 +8（与「拳套」语义一致）实测 +1.6%
     // 转正。血玉 / 玄甲同轮 2880 局复测分别为 +2.1% / +0.5%，均已为正，不动。
     id: 'quantao',
-    name: '拳套',
+    name: '紫晶',
     tier: 'component',
     desc: '暴击率 +12%，攻击力 +8。',
     bonus: { critChance: 0.12, atk: 8 },
@@ -173,7 +173,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
   {
     id: 'doupeng',
-    name: '斗篷',
+    name: '赤绳',
     tier: 'component',
     desc: '魔抗 +12，生命 +90',
     bonus: { mr: 12, hp: 90 },
@@ -194,7 +194,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
   {
     id: 'pojia',
-    name: '破甲枪',
+    name: '破甲杖',
     tier: 'combined',
     desc: '攻击力 +20，护甲 +10。攻击无视目标 30% 护甲。',
     recipe: ['moren', 'xuanjia'],
@@ -251,7 +251,7 @@ export const ITEMS: readonly ItemDef[] = [
     // 与组件法符 startMp 12 + 回蓝 1 = -10.3% 的证据一致），落回成品带内。
     // 技能增幅维持 18%。
     id: 'taixu',
-    name: '太虚珠',
+    name: '太虚经',
     tier: 'combined',
     desc: '法强 +32。技能伤害 +18%。',
     recipe: ['lingzhu', 'fafu'],
@@ -272,7 +272,7 @@ export const ITEMS: readonly ItemDef[] = [
     // 原版是纯攻速 +32%，但两个云履（各 +12%，可给两人）加起来就 +24%，
     // 合成反而是负收益 —— 实测 -0.4%。纯属性翻倍救不了它，必须给机制。
     id: 'jifeng',
-    name: '疾风履',
+    name: '疾风弓',
     tier: 'combined',
     // 第一版叠层是 8 层 ×4%，但一场战斗平均只有 12 秒，8 次普攻还没打完就结束了 ——
     // 满层的 50% 攻速是个摸不到的天花板。改成 5 层 ×6%：上限一样，
@@ -325,7 +325,7 @@ export const ITEMS: readonly ItemDef[] = [
     // 敌方火力被迫转回队友。实测 0/1/2/3 秒 = +17.2/+14.1/+13.2/+13.4，
     // 取 2 秒（前 2 秒斜率约 -2pp/秒，2 秒后饱和）。
     id: 'buxiu',
-    name: '不朽衣',
+    name: '鹤龄镜',
     tier: 'combined',
     desc: '生命 +260，魔抗 +14。首次阵亡 2 秒后，以 15% 生命原地爬起。',
     recipe: ['doupeng', 'xueyu'],
@@ -340,7 +340,7 @@ export const ITEMS: readonly ItemDef[] = [
     // "溢出不浪费"的机制：治疗满血目标时，溢出的部分转成护盾。
     // 这条同时解决了丹师/治疗流最大的痛点——满血时治疗全浪费。
     id: 'huitian',
-    name: '回天符',
+    name: '回天灯',
     tier: 'combined',
     desc: '初始法力 +28，每秒回蓝 +4，治疗提升 30%。其治疗若溢出，溢出量的 70% 转为护盾。',
     recipe: ['fafu', 'fafu'],
@@ -352,7 +352,7 @@ export const ITEMS: readonly ItemDef[] = [
   },
   {
     id: 'juling',
-    name: '巨灵血',
+    name: '巨灵冠',
     tier: 'combined',
     desc: '生命 +520。每秒回复 1.5% 最大生命。',
     recipe: ['xueyu', 'xueyu'],

@@ -61,9 +61,9 @@ export function generateBeastBoard(round: number, rng: Rng): (UnitInstance | nul
 
   const picked = rng.shuffle([...pool] as string[]);
   const used = new Set<string>();
+  // L29：count ≤ 8 而 picked 长度 ≥ 5，唯一冲突是重名去重；洞口已按照 slots[i] 固定，跳过只会留空格，不会错位。
   for (let i = 0; i < count; i++) {
     const id = picked[i % picked.length];
-    // 同名最多一只，避免墨兽阵容出现"三只一模一样的石灵"
     if (used.has(id)) continue;
     used.add(id);
     if (!CHAMPION_BY_ID[id]) continue;

@@ -85,8 +85,11 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       }
       a.heal(null, nearest, victim.maxHp * t('deathHeal', 0.06), 'trait');
 
-      // 四档：首次阵亡复活
-      if (tier >= 1 && isMember(members, victim) && !victim.revived && !victim.isMinion) {
+      // 四档：首次阵亡复活（M2修复：与不朽衣解耦，各自一次）
+      // 此前用共享的 victim.revived 互斥：幽冥先触发后置 revived=true，不朽衣再看到即直接 return
+      // 且整局作废。改为按来源独立计数，各自只触发一次。
+      if (tier >= 1 && isMember(members, victim) && !victim.isMinion && !victim.traitStacks['youmingRevived']) {
+        victim.traitStacks['youmingRevived'] = 1;
         // 0.65 → 0.48：以 65% 血量复活相当于"多带半个人的战力"，
         // 四档幽冥因此长期霸占胜率榜首。降到 48% 后它依然是唯一的复活机制，
         // 强度来自"多一条命"而不是"复活后还很能打"。
@@ -299,11 +302,13 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         });
         // onDamageTaken 按【受害者队伍】分发（battle.ts 钩子分发口径）：
         // 要观测"友军打了敌方"，recorder 必须挂在敌方队伍的 hooks 上。
-        api.hooksOf(1 - team).onDamageTaken.push((_a, dst, src, _amount, _type, _opts) => {
-          if (!src || src === dst || src.team !== team) return;
-          if (!dst.alive) return;
-          lastHit.set(dst.uid, { tick: nowTick, srcUid: src.uid });
-        });
+        for (const foe of api.enemyTeamsOf(team)) {
+          api.hooksOf(foe).onDamageTaken.push((_a, dst, src, _amount, _type, _opts) => {
+            if (!src || src === dst || src.team !== team) return;
+            if (!dst.alive) return;
+            lastHit.set(dst.uid, { tick: nowTick, srcUid: src.uid });
+          });
+        }
         api.hooksOf(team).onPreAttack.push((_a, src, dst, mod) => {
           if (!isMember(members, src)) return;
           const rec = lastHit.get(dst.uid);
@@ -653,7 +658,11 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       }
       api.hooksOf(members[0].team).onDeath.push((a, victim) => {
         for (const u of a.units) {
-          if (u.alive && u.team === victim.team) a.addStatus(victim, u, 'aspdUp', 8, t('deathAspd', 20));
+          if (!u.alive || u.team !== victim.team) continue;
+          const cur = u.traitStacks['supportAspdStacks'] ?? 0;
+          if (cur >= 5) continue;
+          u.traitStacks['supportAspdStacks'] = cur + 1;
+          a.addStatus(victim, u, 'aspdUp', 8, t('deathAspd', 20));
         }
       });
     }

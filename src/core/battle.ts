@@ -68,6 +68,7 @@ export class Battle implements BattleApi {
   events: BattleEvent[] = [];
 
   private readonly hooks = new Map<TeamId, BattleHooks>();
+  private sortedTeams: TeamId[] = [];
   private readonly occ = new Int16Array(BOARD_COLS * BOARD_ROWS).fill(-1);
   private zones: Zone[] = [];
   private scheduled: ScheduledTask[] = [];
@@ -104,6 +105,7 @@ export class Battle implements BattleApi {
     for (const team of teams) {
       if (!this.hooks.has(team)) this.hooks.set(team, createHooks());
     }
+    this.sortedTeams = [...this.hooks.keys()].sort((a, b) => a - b);
     for (const team of teams) {
       const teamUnits = this.units.filter((u) => u.team === team);
       applyTraits(this, team, cfg.traits[team] ?? [], teamUnits);
@@ -188,8 +190,15 @@ export class Battle implements BattleApi {
     if (!h) {
       h = createHooks();
       this.hooks.set(team, h);
+      this.sortedTeams = [...this.hooks.keys()].sort((a, b) => a - b);
     }
     return h;
+  }
+
+  enemyTeamsOf(team: TeamId): TeamId[] {
+    const out: TeamId[] = [];
+    for (const t of this.hooks.keys()) if (t !== team) out.push(t);
+    return out.sort((a, b) => a - b);
   }
 
   occupied(c: number, r: number): boolean {
@@ -289,12 +298,17 @@ export class Battle implements BattleApi {
     return best ? [best] : [];
   }
 
-  /** 从 u 出发的 BFS 距离场（-1 = 不可达） */
+  private _distScratch: Int16Array | null = null;
+  private _queueScratch: Int16Array | null = null;
+  /** 从 u 出发的 BFS 距离场（-1 = 不可达）— L8：复用 scratch buffer，零分配热路径 */
   private distanceField(u: Unit): Int16Array {
-    const dist = new Int16Array(BOARD_COLS * BOARD_ROWS).fill(-1);
+    const dist = this._distScratch ?? new Int16Array(BOARD_COLS * BOARD_ROWS);
+    this._distScratch = dist;
+    dist.fill(-1);
     const startIdx = cellIndex(u.cell.c, u.cell.r);
     dist[startIdx] = 0;
-    const queue = new Int16Array(BOARD_COLS * BOARD_ROWS);
+    const queue = this._queueScratch ?? new Int16Array(BOARD_COLS * BOARD_ROWS);
+    this._queueScratch = queue;
     let head = 0;
     let tail = 0;
     queue[tail++] = startIdx;
@@ -475,6 +489,16 @@ export class Battle implements BattleApi {
       this.emit({ t: 'shield', tick: this.tick, uid: dst.uid, amount: -absorbed, total: dst.shield });
       if (dst.shield <= 0.001) {
         dst.shield = 0;
+        // 护盾数值归零，对应的 shield 状态必须同生共死地移除。
+        // 此前只清数值不清状态：残留的 shield 状态带着破碎前的 value 一直挂到
+        // 到期为止，① 渲染层据此画出一条已经归零的护盾条；② 期间再次 addShield
+        // 会命中 existing 分支，把新数值写进这条过期状态 —— 数值与状态互相污染。
+        // 先清理再触发 onShieldBreak，让钩子看到一个干净状态（可安全重新上盾）。
+        const n = dst.statuses.length;
+        dst.statuses = dst.statuses.filter((s) => s.kind !== 'shield');
+        if (dst.statuses.length !== n) {
+          this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind: 'shield', dur: 0, value: 0, added: false });
+        }
         for (const fn of this.hooks.get(dst.team)?.onShieldBreak ?? []) fn(this, dst);
       }
     }
@@ -648,10 +672,22 @@ export class Battle implements BattleApi {
 
   summon(src: Unit, cell: Cell, hpPct: number, atkPct: number, _name: string): Unit | null {
     if (this.units.length >= 64) return null;
+    // 落点防护下沉到内核：与 teleport() 同一口径。
+    // 此前这里直接覆写 occ —— 越界写会写到表外、占格写会把原单位变成"幽灵"，
+    // 恰好违反本文件与 grid.ts 反复声明的"占位表不可腐坏"不变量。
+    // 之前唯一没出事的原因是调用方（skills.ts 的 summon 实现）在调用前自查了
+    // occupied；把架构级不变量的守护放在调用方，等于给每个未来的召唤路径埋雷。
+    if (!inBounds(cell.c, cell.r)) return null;
+    let dest = cell;
+    if (this.occ[cellIndex(cell.c, cell.r)] !== -1) {
+      const free = this.nearestFreeCellTo(cell, 3);
+      if (!free) return null;
+      dest = free;
+    }
     const uid = this.nextUid++;
-    const m = createMinion(uid, src, cell, hpPct, atkPct);
+    const m = createMinion(uid, src, dest, hpPct, atkPct);
     this.units.push(m);
-    this.occ[cellIndex(cell.c, cell.r)] = uid;
+    this.occ[cellIndex(dest.c, dest.r)] = uid;
     this.emit({
       t: 'start',
       tick: this.tick,
@@ -661,7 +697,7 @@ export class Battle implements BattleApi {
           defId: src.entry.id,
           team: src.team,
           star: 1,
-          cell: { c: cell.c, r: cell.r },
+          cell: { c: dest.c, r: dest.r },
           maxHp: m.maxHp,
           hp: m.hp,
         },
@@ -680,6 +716,13 @@ export class Battle implements BattleApi {
     u.mp = u.maxMp;
     u.attackCd = 0;
     u.windupLeft = 0;
+    u.castWindupLeft = 0;
+    u.moveFrom = null;
+    u.moveTo = null;
+    u.moveT = 0;
+    u.moveDur = 0;
+    u.moveCd = 0;
+    u.retargetCd = 0;
     u.targetUid = -1;
     // 复活到施法者附近的空格；近处满则全盘扫描。
     // 仍找不到空格时退回死亡位置并接管占位 —— 单位不能因为"没格子"而凭空消失。
@@ -746,8 +789,9 @@ export class Battle implements BattleApi {
     if (this.finished) return;
     this.tick++;
 
-    // 1) 队伍钩子
-    for (const [team, h] of [...this.hooks.entries()].sort((a, b) => a[0] - b[0])) {
+    // 1) 队伍钩子（L6：缓存排序，1200 tick×分配+排序 → O(1)）
+    for (const team of this.sortedTeams) {
+      const h = this.hooks.get(team)!;
       for (const fn of h.onTick) fn(this, team, this.tick);
     }
 
@@ -925,8 +969,7 @@ export class Battle implements BattleApi {
 
     const base = effAtk(u);
     // 暴击只在这里掷一次骰，倍率交由 dealDamage 统一结算（forceCrit 传入结果）
-    let crit = mod.forceCrit || this.rng.chance(Math.max(0, u.critChance));
-    if (mod.forceCrit) crit = true;
+    const crit = mod.forceCrit || this.rng.chance(Math.max(0, u.critChance));
     this.fx('impact', { uid: u.uid, targetUid: target.uid, params: { crit: crit ? 1 : 0 } });
     const dealt = this.dealDamage(u, target, base, 'physical', {
       source: 'attack',
@@ -1059,16 +1102,20 @@ export class Battle implements BattleApi {
     this.finished = true;
     const survivors: Record<number, number[]> = {};
     const remainingHpRatio: Record<number, number> = {};
-    for (const u of this.units) {
-      if (!survivors[u.team]) survivors[u.team] = [];
-      if (u.alive && !u.isMinion) survivors[u.team].push(u.uid);
-      const teamUnits = this.units.filter((x) => x.team === u.team && !x.isMinion);
-      if (!remainingHpRatio[u.team]) {
-        const cur = teamUnits.reduce((s, x) => s + Math.max(0, x.hp), 0);
-        const max = teamUnits.reduce((s, x) => s + x.maxHp, 0);
-        remainingHpRatio[u.team] = max > 0 ? cur / max : 0;
-      }
+    const byTeam = new Map<TeamId, Unit[]>();
+    for (const u of this.units) if (!u.isMinion) {
+      let arr = byTeam.get(u.team);
+      if (!arr) { arr = []; byTeam.set(u.team, arr); }
+      arr.push(u);
     }
+    for (const [team, teamUnits] of byTeam) {
+      if (!survivors[team]) survivors[team] = [];
+      for (const u of teamUnits) if (u.alive) survivors[team].push(u.uid);
+      const cur = teamUnits.reduce((s, x) => s + Math.max(0, x.hp), 0);
+      const max = teamUnits.reduce((s, x) => s + x.maxHp, 0);
+      remainingHpRatio[team] = max > 0 ? cur / max : 0;
+    }
+    for (const u of this.units) if (u.isMinion && !(u.team in survivors)) survivors[u.team] = [];
     this.result = { winner, ticks: this.tick, survivors, remainingHpRatio, timeout };
     this.emit({ t: 'end', tick: this.tick, winner, timeout });
   }

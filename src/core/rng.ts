@@ -44,6 +44,7 @@ export class Rng {
   }
 
   pick<T>(arr: readonly T[]): T {
+    if (arr.length === 0) throw new Error('Rng.pick: 空数组');
     return arr[this.intn(arr.length)];
   }
 
@@ -70,6 +71,7 @@ export class Rng {
     for (let k = 0; k < count; k++) {
       let total = 0;
       for (let i = 0; i < w.length; i++) total += w[i];
+      if (total <= 0) break;
       let roll = this.next() * total;
       let chosen = w.length - 1;
       for (let i = 0; i < w.length; i++) {

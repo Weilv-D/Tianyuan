@@ -51,6 +51,7 @@ export interface BfsResult {
  *
  * 返回 null 表示不可达（此时单位原地不动，等下一帧再试 —— 比乱走更符合直觉）。
  */
+// L5：battle.ts:distanceField 与此处 bfsTo 共享同一个 BFS 模板，但前者直读 this.occ 老后者拿 blocked 回调，已在内核边界上定义清楚，暂维持双份以保持每一边的语义完整性。
 export function bfsTo(
   start: Cell,
   isGoal: (c: number, r: number) => boolean,

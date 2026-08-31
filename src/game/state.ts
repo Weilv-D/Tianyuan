@@ -105,7 +105,7 @@ export interface PlayerState {
   /** 本回合结果（结算面板用） */
   lastOutcome: 'win' | 'loss' | 'draw' | 'bye' | null;
   lastDamage: number;
-  /** 累计造成的伤害（结算展示） */
+  /** 累计造成的伤害；仅胜局结算时累加（结算面板展示为「胜局累计输出」） */
   totalDamage: number;
 }
 

@@ -114,9 +114,15 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (src.itemUsed.has('momentum')) return; // 满层后不再重复计算
       const per = paramOf(src, 'aspdPerStack');
       const max = paramOf(src, 'maxStacks');
-      const n = Math.min(max, (src.traitStacks['momentum'] ?? 0) + 1);
+      const prev = src.traitStacks['momentum'] ?? 0;
+      const n = Math.min(max, prev + 1);
       src.traitStacks['momentum'] = n;
-      src.permAspdPct = n * per;
+      // 只累加本次新增层数的贡献。
+      // 此前这里是 `permAspdPct = n * per`（按总量重算），会把兵家/机关等羁绊
+      // 在开战前累加进 permAspdPct 的攻速成长整体覆盖掉 —— 实测羁绊的 +0.2
+      // 在第 1 次普攻命中后即归零且永不恢复。装备的成长必须叠加在既有数值之上，
+      // 而不是重新定义它。
+      src.permAspdPct += (n - prev) * per;
       if (n >= max) {
         src.itemUsed.add('momentum');
         a.emit({ t: 'fx', tick: a.tick, uid: src.uid, kind: 'buffAura', params: { hue: 1 } });
@@ -142,8 +148,14 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   // 延迟期间单位不占位、不可选中，敌方火力被迫转回队友，事件价值被稀释。
   if (units.some((u) => has(u, 'immortal'))) {
     h.onDeath.push((a, victim) => {
-      if (!has(victim, 'immortal') || victim.revived || victim.isMinion) return;
+      if (!has(victim, 'immortal') || victim.isMinion) return;
       if (victim.itemUsed.has('immortal')) return;
+      // M2修复：移除对 victim.revived 的检查。此前幽冥四档先触发并置 revived=true
+      // 后，不朽衣因 revived 互斥而永久静默（且不消耗 itemUsed，整局作废）。
+      // 改为仅以 itemUsed 作来源内互斥，允许幽冥与不朽衣各自复活一次。
+      // 同一次死亡只消耗一个来源：若本 tick 已被幽冥拉起（victim.alive），
+      // 不朽衣保留到下次阵亡，避免“同死双耗”的浪费。
+      if (victim.alive) return;
       victim.itemUsed.add('immortal');
       const delay = paramOf(victim, 'reviveDelay');
       const doRevive = (api: BattleApi): void => {
