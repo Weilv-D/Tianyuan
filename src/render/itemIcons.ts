@@ -1,14 +1,16 @@
 /**
- * 装备图标的程序化烘焙。
+ * 装备图标烘焙：AI 立绘优先，程序几何图兜底。
  *
- * 全部 22 件装备共用一套绘制语言：**几何外形 + 单层描边 + 一点高光**。
- * 刻意不做拟物细节 —— 装备图标在棋盘上只有 14px 大，
- * 能被认出来靠的是**轮廓**，不是纹理。
+ * AI 图（src/render/itemArt/ai/，22 张透明 PNG，已按内容裁边）在启动咽喉
+ * `preloadItemArt()` 一次性解码，烘焙期同步 contain-fit 进 96px 画布 ——
+ * 棋盘上 13px、器匣 46px 都由消费端 setDisplaySize 缩放，采样恒为缩小。
+ * 缺图时回落到旧程序几何（drawGlyph），任何装备必有图。
  */
 
 import Phaser from 'phaser';
 import { ITEMS, type ItemGlyph } from '../data/items';
 import { GILT, INK, PAPER } from './palette';
+import { ITEM_AI_URL } from './itemArt/itemAiSource';
 
 export const ITEM_ICON_SIZE = 48;
 
@@ -16,19 +18,55 @@ export function itemIconKey(id: string): string {
   return `item_${id}`;
 }
 
-/** 组件偏冷白，成品偏鎏金 —— 余光里也能分辨"这是组件还是神装" */
-function paletteOf(tier: 'component' | 'combined'): { main: number; line: number } {
-  return tier === 'combined'
-    ? { main: GILT.base, line: GILT.light }
-    : { main: PAPER[300], line: PAPER[100] };
+const cache = new Map<string, HTMLImageElement>();
+
+/** 启动咽喉预解码全部装备图（异步只发生在这一步），返回成功张数 */
+export async function preloadItemArt(): Promise<number> {
+  await Promise.all(
+    Object.entries(ITEM_AI_URL).map(
+      ([id, url]) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            cache.set(id, img);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = url;
+        }),
+    ),
+  );
+  return cache.size;
+}
+
+function hasItemArt(id: string): boolean {
+  return cache.has(id);
 }
 
 export function bakeItemIcons(scene: Phaser.Scene): void {
-  // 尺寸放大 2 倍再缩，避免小尺寸下描边发虚
   const S = ITEM_ICON_SIZE * 2;
   for (const item of ITEMS) {
     const key = itemIconKey(item.id);
     if (scene.textures.exists(key)) continue;
+
+    // ── 一级：AI 立绘（contain-fit，四周留 3% 呼吸） ──
+    if (hasItemArt(item.id)) {
+      const canvas = document.createElement('canvas');
+      canvas.width = S;
+      canvas.height = S;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const img = cache.get(item.id)!;
+        const k = ((S * 0.94) / Math.max(img.naturalWidth, img.naturalHeight));
+        const dw = img.naturalWidth * k;
+        const dh = img.naturalHeight * k;
+        ctx.drawImage(img, (S - dw) / 2, (S - dh) / 2, dw, dh);
+        scene.textures.addCanvas(key, canvas);
+        continue;
+      }
+    }
+
+    // ── 二级：程序几何图（兜底） ──
     const g = scene.make.graphics({ x: 0, y: 0 }, false);
     const { main, line } = paletteOf(item.tier);
     drawGlyph(g, item.glyph, S, main, line);
@@ -41,6 +79,13 @@ export function bakeItemIcons(scene: Phaser.Scene): void {
 }
 
 type G = Phaser.GameObjects.Graphics;
+
+/** 组件偏冷白，成品偏鎏金 —— 余光里也能分辨"这是组件还是神装" */
+function paletteOf(tier: 'component' | 'combined'): { main: number; line: number } {
+  return tier === 'combined'
+    ? { main: GILT.base, line: GILT.light }
+    : { main: PAPER[300], line: PAPER[100] };
+}
 
 function drawGlyph(g: G, glyph: ItemGlyph, S: number, main: number, line: number): void {
   const c = S / 2;

@@ -2,19 +2,25 @@ import Phaser from 'phaser';
 import { CHAMPION_BY_ID } from '../data/champions';
 import { drawSilhouette, makeStyle } from './silhouettes';
 import { RARITY_COLOR, TEAM_COLOR, VOID, INK } from './palette';
+import { hasAiPiece, drawAiPiece } from './pieceArt/aiBake';
 
 /**
- * 把 32 名棋子 × 2 阵营的剪影在启动时烘焙成纹理。
+ * 把 64 名棋子 × 3 套配色的立绘在启动时烘焙成纹理。
  *
  * 为什么烘焙而不是每帧画 Graphics：
  *  - 运行期只剩 40 次 Sprite 绘制，20+ 单位同屏轻松 60FPS
  *  - 烘焙后是 Image，可以用 setTintFill 做"受击白闪"，这是打击感的关键一环
  */
 
-export const SIL_W = 112;
-export const SIL_H = 112;
+/**
+ * 纹理物理尺寸：208×208、脚底 y=184 —— 与 AI 原生分辨率烘焙对齐
+ * （源内容 ~150px + 柔光余量，见 pieceArt/aiBake）。旧版 Graphics 剪影
+ * 以脚底为原点作画，经 rt.draw 落到同一锚点，天然兼容更大画布。
+ */
+export const SIL_W = 208;
+export const SIL_H = 208;
 /** 脚底在纹理中的 y 坐标 */
-export const SIL_FOOT_Y = 96;
+export const SIL_FOOT_Y = 184;
 export const SIL_ORIGIN_Y = SIL_FOOT_Y / SIL_H;
 
 /** 墨兽的"阵营号"。它不是真实的队伍，只是第三套配色。 */
@@ -121,22 +127,71 @@ export function silContentScale(defId: string, star: number, targetH: number, ma
   return Math.min(targetH / h, maxW / w);
 }
 
+/**
+ * 归一后的实际内容高（逻辑 px）：宽体被收口时达不到 targetH，
+ * 血条 / 星标等头顶锚件用它在棋子上方精确悬停。
+ */
+export function silContentHeight(defId: string, star: number, targetH: number, maxW = Infinity): number {
+  const b = silContent(defId, star);
+  const h = Math.max(1, b.maxY - b.minY);
+  const w = Math.max(1, b.maxX - b.minX);
+  return h * Math.min(targetH / h, maxW / w);
+}
+
+/** 烘焙画布上的落墨包围盒 → 脚底原点局部坐标（AI / 矢量路径共用） */
+function scanCanvasBounds(ctx: CanvasRenderingContext2D): Bounds | null {
+  const data = ctx.getImageData(0, 0, SIL_W, SIL_H).data;
+  let minX = SIL_W, minY = SIL_H, maxX = -1, maxY = -1;
+  for (let y = 0; y < SIL_H; y++) {
+    for (let x = 0; x < SIL_W; x++) {
+      if (data[(y * SIL_W + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { minX: minX - SIL_W / 2, minY: minY - SIL_FOOT_Y, maxX: maxX - SIL_W / 2, maxY: maxY - SIL_FOOT_Y };
+}
+
+/** 画布纹理入库（键已由调用方查重） */
+function addCanvasTexture(scene: Phaser.Scene, key: string, canvas: HTMLCanvasElement): void {
+  scene.textures.addCanvas(key, canvas);
+}
+
 export function bakeSilhouettes(scene: Phaser.Scene): void {
   const g = scene.make.graphics({ x: 0, y: 0 }, false);
   for (const entry of Object.values(CHAMPION_BY_ID)) {
     // 三套配色：友方青瓷 / 敌方朱砂 / 墨兽青黛。
-    // 墨兽复用玩家棋子的剪影轮廓，只换配色 —— 零美术成本得到一整套 PvE 内容，
-    // 而且它看起来就该是"墨变成的怪物"，与世界观自洽。
     for (const team of [0, 1, BEAST_TEAM]) {
       const style =
         team === BEAST_TEAM
           ? makeStyle(INK[850], VOID.base, VOID.light)
           : makeStyle(entry.hue, TEAM_COLOR[team], RARITY_COLOR[entry.cost]);
       // 星级分层烘焙：1★ 简笔新兵 → 2★ 标准带饰 → 3★ 精装老卒。
-      // 升星从此有真实的视觉进程，而不只是放大 14%。
       for (let star = 1; star <= 3; star++) {
         const key = silhouetteKey(entry.id, team, star);
         if (scene.textures.exists(key)) continue;
+
+        // ── 一级：AI 生成图（defId 同名 PNG，启动时已预解码） ──
+        if (hasAiPiece(entry.id)) {
+          const canvas = document.createElement('canvas');
+          canvas.width = SIL_W;
+          canvas.height = SIL_H;
+          const ctx = canvas.getContext('2d');
+          if (ctx && drawAiPiece(ctx, entry.id, team, star)) {
+            if (team === 0) {
+              const b = scanCanvasBounds(ctx);
+              if (b) CONTENT[`${entry.id}_s${star}`] = b;
+            }
+            addCanvasTexture(scene, key, canvas);
+            continue;
+          }
+        }
+
+        // ── 二级：旧版 Graphics 剪影（兜底，任何棋子必有图） ──
         // 包围盒与阵营无关：每星只在首个阵营烘焙时量一次，量完的墨迹直接复用
         if (team === 0) {
           const b: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };

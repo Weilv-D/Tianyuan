@@ -7,7 +7,8 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
  *  - 默认（npm run build）  → dist/ 多块产物，供静态托管（phaser 独立分包，命中缓存）；
  *  - singlefile（npm run release 内部调用）→ 单文件 HTML，双击即玩、U 盘/聊天工具直发。
  *    全部 JS/CSS 内联进 index.html，内联 module 脚本在 file:// 下照常执行；
- *    本工程零外部素材（视觉音频全程序化、字体走系统宋体系），单文件形态无任何外部依赖。
+ *    本工程零外部素材（视觉音频全程序化；唯一打包字体是羁绊小篆 22 字子集，
+ *    ?url 导入在单文件形态下内联为 data URL），单文件形态无任何外部依赖。
  */
 export default defineConfig(({ mode }) => {
   const single = mode === 'singlefile';
