@@ -70,15 +70,25 @@ export class Rng {
     const count = Math.min(n, pool.length);
     for (let k = 0; k < count; k++) {
       let total = 0;
-      for (let i = 0; i < w.length; i++) total += w[i];
+      for (let i = 0; i < w.length; i++) total += Math.max(0, w[i]);
       if (total <= 0) break;
+      // 严格小于判定 + 跳过零权重：否则 roll 恰为 0 时会命中第一个权重 0 的项
       let roll = this.next() * total;
-      let chosen = w.length - 1;
+      let chosen = -1;
       for (let i = 0; i < w.length; i++) {
+        if (w[i] <= 0) continue;
         roll -= w[i];
-        if (roll <= 0) {
+        if (roll < 0) {
           chosen = i;
           break;
+        }
+      }
+      if (chosen < 0) {
+        for (let i = w.length - 1; i >= 0; i--) {
+          if (w[i] > 0) {
+            chosen = i;
+            break;
+          }
         }
       }
       out.push(pool[chosen]);

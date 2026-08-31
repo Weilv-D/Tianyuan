@@ -28,12 +28,24 @@ export class EffectsLayer {
   private readonly scene: Phaser.Scene;
   private readonly layer: Phaser.GameObjects.Container;
   private readonly upper: Phaser.GameObjects.Container;
+  /**
+   * 不挂在 layer/upper 里的场景级特效对象（粒子发射器、地面法阵 graphics）。
+   * clear() 必须连它们一起销毁，否则残留在下一场战斗里继续播。
+   */
+  private readonly strays = new Set<Phaser.GameObjects.GameObject>();
   private shakeAccum = 0;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     this.layer = scene.add.container(0, 0).setDepth(20);
     this.upper = scene.add.container(0, 0).setDepth(60);
+  }
+
+  /** 登记一个场景级特效对象；对象自毁时自动出列 */
+  private trackStray<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+    this.strays.add(obj);
+    obj.once('destroy', () => this.strays.delete(obj));
+    return obj;
   }
 
   get shake(): number {
@@ -63,7 +75,10 @@ export class EffectsLayer {
     });
     em.setDepth(25);
     em.explode(count);
-    this.scene.time.delayedCall(700, () => em.destroy());
+    this.trackStray(em);
+    this.scene.time.delayedCall(700, () => {
+      if (em.active) em.destroy();
+    });
   }
 
   play(r: FxRequest): void {
@@ -437,7 +452,10 @@ export class EffectsLayer {
     });
     em.setDepth(25);
     em.explode(8);
-    this.scene.time.delayedCall(900, () => em.destroy());
+    this.trackStray(em);
+    this.scene.time.delayedCall(900, () => {
+      if (em.active) em.destroy();
+    });
   }
 
   private shieldWall(r: FxRequest): void {
@@ -544,9 +562,10 @@ export class EffectsLayer {
     const telegraph = (r.params?.telegraph ?? 0) > 0;
     const dur = (r.params?.dur ?? (telegraph ? 1.2 : 2.6)) * 1000;
     const tint = telegraph ? CINNABAR.light : r.tint ?? VOID.base;
-    const g = this.scene.add.graphics();
+    const g = this.trackStray(this.scene.add.graphics());
     g.setDepth(12);
     const draw = (alpha: number) => {
+      if (!g.active) return;
       g.clear();
       g.lineStyle(1.3, tint, 0.85 * alpha);
       g.strokeEllipse(r.x, r.y, rad * 2, rad * 1.15);
@@ -608,5 +627,8 @@ export class EffectsLayer {
   clear(): void {
     this.layer.removeAll(true);
     this.upper.removeAll(true);
+    for (const s of [...this.strays]) s.destroy();
+    this.strays.clear();
+    this.shakeAccum = 0;
   }
 }

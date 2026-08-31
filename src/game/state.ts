@@ -126,6 +126,24 @@ export function boardIdx(col: number, localRow: number): number {
   return localRow * BOARD_COLS + col;
 }
 
+/**
+ * 由中心向两侧的列填充顺序（如 8 列 → [3,4,2,5,1,6,0,7]），保证阵型对称。
+ *
+ * 全项目唯一实现：此前 match/comp/arrange 三处各自用
+ * `Math.round(3.5 ± Math.ceil(i/2))` 拼这个序列，`.5` 恒向上取整导致
+ * 序列变成 [4,5,3,6,2,7,1,8] —— 越位列 8 混入、列 0 永久缺席
+ * （suggestSlot 甚至会把棋子写进 board[32] 而凭空丢子）。
+ */
+export function centerOutColumns(): number[] {
+  const out: number[] = [];
+  const mid = Math.floor(BOARD_COLS / 2) - 1;
+  for (let i = 0; i < BOARD_COLS; i++) {
+    // 从中列向左/右交替展开：8 列 → [3,4,2,5,1,6,0,7]
+    out.push(i % 2 === 0 ? mid - i / 2 : mid + (i + 1) / 2);
+  }
+  return out;
+}
+
 export function boardColOf(i: number): number {
   return i % BOARD_COLS;
 }

@@ -99,6 +99,10 @@ export class GameScene extends Phaser.Scene {
   private toast: Phaser.GameObjects.Container | null = null;
   private onBeforeUnload: (() => void) | null = null;
   private saveTimer: Phaser.Time.TimerEvent | null = null;
+  /** 开战前玩家的连胜/连败值（负数为连败）—— 翻盘判定必须用战前口径 */
+  private streakBefore = 0;
+  /** 投降/重开后置真：阻止 SHUTDOWN 与 beforeunload 把已放弃的存档写回去 */
+  private abandoned = false;
 
   constructor() {
     super({ key: 'Game' });
@@ -120,6 +124,16 @@ export class GameScene extends Phaser.Scene {
     // （UI 控件/签名守卫/奇遇/拖拽状态随下方模块按局重建，等价于原先的逐字段复位。）
     this.undoStack = [];
     this.toast = null;
+    this.paused = false;
+    this.timerUrgent = false;
+    this.selectedItem = null;
+    // settingsPanel 内部持有已销毁的容器：不置空则 isOpen 永真，设置面板再也打不开
+    this.settingsPanel = null;
+    this.abandoned = false;
+    this.streakBefore = 0;
+    // 战报必须跨越"战斗场景往返"（resultPending 回来时 afterBattle 要读它），
+    // 只在真正开新局时清空，避免把上一局的战报带进新一局的准备阶段
+    if (!data.resultPending) this.lastReport = '';
     this.hud = new HudPanels(this);
     this.boardBake = new BoardBake(this);
     this.refresher = new SceneRefresh(this);
@@ -367,6 +381,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   onUndo(): void {
+    // 开战/结算期间撤销会把"战前快照"盖回已结算的状态（血量/金币已变），必须禁止
+    if (this.phase !== 'prep' || this.busy) return;
     const e = this.undoStack.pop();
     if (!e) {
       this.showToast('没有可撤销的操作', true);
@@ -394,11 +410,14 @@ export class GameScene extends Phaser.Scene {
     this.saveTimer?.remove();
     this.saveTimer = this.time.delayedCall(600, () => {
       this.saveTimer = null;
+      if (this.abandoned) return;
       saveMatch(this.match);
     });
   }
 
   private flushSave(): void {
+    // 已放弃的局（投降/重开）不允许回写：否则 clearSave 之后又被兜底落盘复活
+    if (this.abandoned) return;
     if (this.saveTimer) {
       this.saveTimer.remove();
       this.saveTimer = null;
@@ -540,6 +559,14 @@ export class GameScene extends Phaser.Scene {
     this.pauseScout.closeScout();
     this.busy = true;
     this.phase = 'battle';
+    // 阵容锁定：撤销栈清空（防止结算期间 Ctrl+Z 回滚到战前快照），
+    // 并记下开战前的连胜/连败口径 —— 翻盘演出要用战前值判定
+    this.undoStack = [];
+    this.streakBefore = this.match.human.streak;
+    // 存档必须先于 AI 无头结算落盘：此刻存的是与准备阶段一致的快照；
+    // 若拖到结算之后再写，战斗中途刷新页面会把已结算一半的状态存下来，
+    // 重新载入时 AI 战被二次结算
+    this.flushSave();
     // 奇遇恩赐过期即作废（无惩罚）：公共字段按契约由游戏层清空，面板同步收起
     this.match.adventureOffer = null;
     this.adventure.hide();
@@ -570,7 +597,6 @@ export class GameScene extends Phaser.Scene {
     audio.playPluck(196); // 徵音起手：开战的弦响
     this.cameras.main.fadeOut(260, 7, 9, 12);
     this.time.delayedCall(280, () => {
-      this.flushSave();
       this.scene.start('Battle', { match: this.match, pair: humanPair });
     });
   }
@@ -620,8 +646,9 @@ export class GameScene extends Phaser.Scene {
       this.lastReport = `你 败北　-${p.lastDamage} 生命（剩 ${p.hp}）\n${this.lastReport}`.trim();
     } else if (p.lastOutcome === 'win') {
       this.lastReport = `你 获胜\n${this.lastReport}`.trim();
-      // 终结连败的那一胜，值得单独一次演出
-      if (p.streak === 1 && p.losses >= 4) this.celebrate('comeback', '终结连败');
+      // 终结连败的那一胜，值得单独一次演出 —— 用战前连败口径（负数），
+      // 累计败场会让任何四败之后的胜场都误触发
+      if (p.streak === 1 && this.streakBefore <= -4) this.celebrate('comeback', '终结连败');
       else if (p.streak >= 3) this.celebrate('streak', `${p.streak} 连胜`);
     } else if (p.lastOutcome === 'bye') {
       this.lastReport = `你 本轮轮空\n${this.lastReport}`.trim();
@@ -663,12 +690,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   restart(): void {
+    this.abandoned = true; // 阻止离场流程把已清档的旧局写回
     clearSave();
     this.scene.start('Game', { fresh: true });
   }
 
   /** 投降：放弃当前对局，清档回主菜单（设置面板里二次确认后才走到这里） */
   private resign(): void {
+    this.abandoned = true;
     clearSave();
     this.scene.start('Menu', {});
   }

@@ -553,6 +553,7 @@ export class HudPanels {
   }
 
   closeTraitModal(): void {
+    this.traitModalScroll?.destroy();
     this.traitModal?.destroy();
     this.traitModal = null;
     this.traitModalScroll = null;

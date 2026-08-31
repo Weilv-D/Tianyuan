@@ -91,6 +91,29 @@ export class BattleScene extends Phaser.Scene {
   private lastBars = new Map<number, number>();
   private lastShake = 0;
   private creatingBattle = false;
+  /**
+   * 本场战斗挂起的全部延时回调。重开/重播必须整体取消 ——
+   * 否则旧战斗的"1.6s 转交战"与远程射击音效会落进下一场战斗。
+   */
+  private pendingTimers = new Set<Phaser.Time.TimerEvent>();
+  /** 场景级特效对象（如 burstInk 的粒子），随 clearBattle 一并销毁 */
+  private strays = new Set<Phaser.GameObjects.GameObject>();
+
+  /** 登记一个随 clearBattle 统一取消的延时回调 */
+  private after(ms: number, fn: () => void): void {
+    const ev = this.time.delayedCall(ms, () => {
+      this.pendingTimers.delete(ev);
+      fn();
+    });
+    this.pendingTimers.add(ev);
+  }
+
+  /** 登记一个场景级特效对象；对象自毁时自动出列 */
+  private trackStray<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+    this.strays.add(obj);
+    obj.once('destroy', () => this.strays.delete(obj));
+    return obj;
+  }
 
   constructor() {
     super({ key: 'Battle' });
@@ -344,7 +367,7 @@ export class BattleScene extends Phaser.Scene {
     audio.startBgm('prep');
 
     // 准备阶段：给玩家 1.6 秒读阵，再开打
-    this.time.delayedCall(1600, () => {
+    this.after(1600, () => {
       if (!this.running) return;
       this.board.setPhase('battle');
       this.phaseText.setText('交 战');
@@ -356,15 +379,25 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private clearBattle(): void {
+    for (const ev of this.pendingTimers) ev.remove(false);
+    this.pendingTimers.clear();
     for (const v of this.views.values()) {
       if (v.scene) v.destroy();
     }
     this.views.clear();
     this.dmgText.clear();
     this.fx.clear();
+    for (const s of this.strays) s.destroy();
+    this.strays.clear();
     for (const p of this.projectiles) p.img.destroy();
     this.projectiles = [];
     this.lastBars.clear();
+    if (this.hoverCard) {
+      this.hoverCard.destroy();
+      this.hoverCard = null;
+      this.hoverStatTexts = [];
+    }
+    this.hoverKey = '';
     if (this.resultPanel) {
       this.resultPanel.destroy();
       this.resultPanel = null;
@@ -564,10 +597,11 @@ export class BattleScene extends Phaser.Scene {
           v.setDepth(30 + s.cell.r * 2);
           this.views.set(s.uid, v);
           v.syncBars(s.hp, s.maxHp, 0, 0, 0);
-          // 召唤物登场演出
+          // 召唤物登场演出：先记下星级体量，缩小后补间回去
           this.fx.play({ kind: 'summon', x: p.x, y: p.y });
+          const fullScale = v.scaleX;
           v.setScale(0.2);
-          this.tweens.add({ targets: v, scale: v.scaleX, duration: 320, ease: 'Back.easeOut' });
+          this.tweens.add({ targets: v, scale: fullScale, duration: 320, ease: 'Back.easeOut' });
         }
         break;
 
@@ -597,7 +631,7 @@ export class BattleScene extends Phaser.Scene {
         v.playAttack(t.x - a.x, t.y - a.y, e.windup);
         if (e.isRanged) {
           // 弹道音贴着"命中瞬间"而不是"起手瞬间"，打击感才成立
-          this.time.delayedCall(Math.max(0, e.windup * 1000), () => {
+          this.after(Math.max(0, e.windup * 1000), () => {
             if (v.scene && this.running) audio.play('shoot');
           });
         }
@@ -750,13 +784,18 @@ export class BattleScene extends Phaser.Scene {
     });
     em.setDepth(28);
     em.explode(14);
-    this.time.delayedCall(1000, () => em.destroy());
+    this.trackStray(em);
+    this.time.delayedCall(1000, () => {
+      if (em.active) em.destroy();
+    });
   }
 
   private onBattleEnd(winner: number | null, timeout: boolean): void {
     this.running = false;
     audio.stopBgm();
-    audio.play(winner === 1 ? 'victory' : 'defeat');
+    // 胜负以观众队号为准（演示模式观众在 0 队），不能写死 1
+    const won = winner !== null && winner === this.viewerTeam;
+    if (winner !== null) audio.play(won ? 'victory' : 'defeat');
 
     // 对局模式：把结果交回 Match，然后回主场景走结算。
     // 判定发生在内核，这里只是搬运 —— 渲染层永远不改变战斗结果。
@@ -775,28 +814,34 @@ export class BattleScene extends Phaser.Scene {
     const card = this.add.graphics();
     card.fillStyle(INK[800], 0.97);
     card.fillRoundedRect(bx, by, bw, bh, 12);
-    card.lineStyle(2, winner === 1 ? GILT.base : CINNABAR.base, 0.95);
+    card.lineStyle(2, winner === null ? INK[400] : won ? GILT.base : CINNABAR.base, 0.95);
     card.strokeRoundedRect(bx, by, bw, bh, 12);
     card.lineStyle(1, GILT.base, 0.2);
     card.strokeRoundedRect(bx + 5, by + 5, bw - 10, bh - 10, 9);
     panel.add(card);
 
-    const titleTxt = winner === null ? '和  局' : winner === 1 ? '胜' : '败';
+    const titleTxt = winner === null ? '和  局' : won ? '胜' : '败';
     const title = this.add
       .text(W / 2, by + 46, titleTxt, {
         fontFamily: FONT.title,
         fontSize: '64px',
-        color: winner === 1 ? css(GILT.light) : winner === null ? css(PAPER[200]) : css(CINNABAR.light),
+        color: winner === null ? css(PAPER[200]) : won ? css(GILT.light) : css(CINNABAR.light),
       })
       .setOrigin(0.5, 0);
-    title.setShadow(0, 0, winner === 1 ? css(GILT.base) : css(CINNABAR.base), 26, false, true);
+    title.setShadow(0, 0, winner === null ? css(INK[300]) : won ? css(GILT.base) : css(CINNABAR.base), 26, false, true);
     panel.add(title);
 
     const sub = this.add
       .text(
         W / 2,
         by + 126,
-        timeout ? '战斗超时 · 按剩余兵力裁定' : winner === 1 ? '我方棋子存活' : '我方全军覆没',
+        timeout
+          ? '战斗超时 · 按剩余兵力裁定'
+          : winner === null
+            ? '双方战至力竭 · 不分胜负'
+            : won
+              ? '我方棋子存活'
+              : '我方全军覆没',
         { fontFamily: FONT.body, fontSize: '14px', color: css(PAPER[400]) },
       )
       .setOrigin(0.5, 0);
@@ -846,7 +891,7 @@ export class BattleScene extends Phaser.Scene {
 
     // 对局模式：3.5 秒后自动返回，不打断心流
     if (isMatch) {
-      this.time.delayedCall(3500, () => {
+      this.after(3500, () => {
         if (this.matchCtx) this.returnToGame();
       });
     }
@@ -885,7 +930,7 @@ export class BattleScene extends Phaser.Scene {
     return [...this.battle.units]
       .filter((u) => !u.isMinion)
       .map((u) => ({
-        name: `${u.team === 1 ? '我' : '敌'} ${u.entry.name}${'★'.repeat(u.star)}`,
+        name: `${u.team === this.viewerTeam ? '我' : '敌'} ${u.entry.name}${'★'.repeat(u.star)}`,
         dmg: u.dealtDamage,
         taken: u.takenDamage,
         heal: u.healed,
@@ -1083,8 +1128,10 @@ export class BattleScene extends Phaser.Scene {
 
   private syncUnitBars(v: UnitView, u: Unit): void {
     // 三值打包成单个数字比较（hp/shield ≤ 9999、mp ≤ 999，各占 14bit 足够），
-    // 避免每帧每单位拼模板串 —— 22 单位 × 60fps 的纯 GC 噪声
-    const key = (Math.round(u.hp) << 28) | (Math.round(u.shield) << 14) | Math.round(u.mp);
+    // 避免每帧每单位拼模板串 —— 22 单位 × 60fps 的纯 GC 噪声。
+    // 注意：必须用乘法打包而非位移 —— `hp << 28` 走 32 位截断，
+    // 只留低 4 位，血条会永远判不出变化（曾经整个冻住）。
+    const key = (Math.round(u.hp) * 16384 + Math.round(u.shield)) * 1024 + Math.round(u.mp);
     const prev = this.lastBars.get(u.uid);
     if (prev !== key) {
       this.lastBars.set(u.uid, key);

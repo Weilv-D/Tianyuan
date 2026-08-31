@@ -39,7 +39,7 @@ export function createTraitState(): TraitState {
     magicDr: 0,
     allDr: 0,
     armorPen: 0,
-  thornResist: 0,
+    thornResist: 0,
     healAmp: 0,
     shieldAmp: 0,
     manaPerSec: 0,

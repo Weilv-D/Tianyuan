@@ -25,6 +25,7 @@ import {
   REROLL_COST,
   ROUND_BASE_DAMAGE,
   SHOP_SLOTS,
+  XP_BUY_AMOUNT,
   XP_BUY_COST,
   XP_PER_ROUND,
 } from '../core/config';
@@ -57,6 +58,7 @@ import {
   boardIdx,
   boardRowOf,
   bumpIidCounter,
+  centerOutColumns,
   cloneBoard,
   createUnit,
   addToBench,
@@ -239,7 +241,8 @@ export class Match implements AiWorld {
   standings(): PlayerState[] {
     return [...this.players].sort((a, b) => {
       if (a.alive !== b.alive) return a.alive ? -1 : 1;
-      if (!a.alive) return (b.rank || 99) - (a.rank || 99);
+      // 已淘汰者名次数字越小越靠前（2 名优于 8 名），升序排列
+      if (!a.alive) return (a.rank || 99) - (b.rank || 99);
       if (a.hp !== b.hp) return b.hp - a.hp;
       if (a.level !== b.level) return b.level - a.level;
       return a.idx - b.idx;
@@ -476,7 +479,7 @@ export class Match implements AiWorld {
     if (p.level >= MAX_LEVEL) return false;
     if (p.gold < XP_BUY_COST) return false;
     p.gold -= XP_BUY_COST;
-    gainXp(p, 4);
+    gainXp(p, XP_BUY_AMOUNT);
     return true;
   }
 
@@ -499,11 +502,7 @@ export class Match implements AiWorld {
     const def = CHAMPION_BY_ID[defId];
     const depthRaw = def ? { guardian: 0, warrior: 0.12, assassin: 0.95, marksman: 0.72, mage: 0.78, warlock: 0.6, support: 0.88 }[def.cls] ?? 0.5 : 0.5;
     const preferredRow = Math.min(3, Math.floor(depthRaw * 4));
-    const order: number[] = [];
-    for (let i = 0; i < 8; i++) {
-      const half = 3.5;
-      order.push(Math.round(half + (i % 2 === 0 ? -Math.ceil(i / 2) : Math.ceil(i / 2))));
-    }
+    const order = centerOutColumns();
     for (let r = preferredRow; r < 4; r++) {
       for (const c of order) {
         const i = boardIdx(c, r);

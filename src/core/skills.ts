@@ -237,53 +237,55 @@ const IMPL: Record<string, Impl> = {
   // ─────────── 突进斩 ───────────
   dashStrike: (api, u, spec, target) => {
     const p = spec.params;
-    const type = p.type ?? 'physical';
-    if (!target) return;
-    // 落到目标身边最近的空格
-    let dest: Cell | null = null;
-    let best = Infinity;
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        const c = target.cell.c + dc;
-        const r = target.cell.r + dr;
-        if (!inBounds(c, r)) continue;
-        if (api.occupied(c, r)) continue;
-        const d = chebyshev({ c, r }, u.cell);
-        if (d < best) {
-          best = d;
-          dest = { c, r };
+    // 连斩深度经闭包参数携带（每次顶层施放从 0 起算）。
+    // 此前存在 u.traitStacks['qingming'] 且从不清零：首次连斩到顶后计数永久停在
+    // maxRepeats，之后每次施放的"击杀再施放"永远静默 —— 与文案"至多 2 次"（每次施放）矛盾。
+    const cast = (a: BattleApi, t: Unit, depth: number) => {
+      const type = p.type ?? 'physical';
+      // 落到目标身边最近的空格
+      let dest: Cell | null = null;
+      let best = Infinity;
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const c = t.cell.c + dc;
+          const r = t.cell.r + dr;
+          if (!inBounds(c, r)) continue;
+          if (a.occupied(c, r)) continue;
+          const d = chebyshev({ c, r }, u.cell);
+          if (d < best) {
+            best = d;
+            dest = { c, r };
+          }
         }
       }
-    }
-    api.fx('dashTrail', { uid: u.uid, cell: dest ?? target.cell });
-    if (dest) api.teleport(u, dest, 0.22);
+      a.fx('dashTrail', { uid: u.uid, cell: dest ?? t.cell });
+      if (dest) a.teleport(u, dest, 0.22);
 
-    const radius = p.radius ?? 0;
-    const victims = radius > 0 ? foesIn(api, u, target.cell, radius) : [target];
-    api.fx('slash', { uid: u.uid, targetUid: target.uid });
-    let hits = 0;
-    let killed = false;
-    for (const e of victims) {
-      const before = e.alive;
-      skillDamage(api, u, e, skillRaw(u, p.atk, p.sp, p.flat), type, p.forceCrit ?? false);
-      if (before && !e.alive) killed = true;
-      hits++;
-    }
-    onHits(api, u, hits, p);
-    if (killed && p.resetOnKill) {
-      u.mp = Math.min(u.maxMp, u.maxMp * p.resetOnKill);
-      // maxRepeats 语义 = 最多额外施放次数（青冥文案"至多 2 次"）；
-      // 旧判式 repeats < maxRepeats 在 maxRepeats=1 时恒假，二次施放从未触发过
-      const recasts = u.traitStacks['qingming'] ?? 0;
-      if (p.maxRepeats && recasts < p.maxRepeats) {
-        u.traitStacks['qingming'] = recasts + 1;
-        api.schedule(0.25, (a) => {
-          if (!u.alive) return;
-          const t2 = a.resolveTargets(u, spec.target, 1)[0] ?? null;
-          if (t2) IMPL['dashStrike'](a, u, spec, t2, t2.cell);
-        });
+      const radius = p.radius ?? 0;
+      const victims = radius > 0 ? foesIn(a, u, t.cell, radius) : [t];
+      a.fx('slash', { uid: u.uid, targetUid: t.uid });
+      let hits = 0;
+      let killed = false;
+      for (const e of victims) {
+        const before = e.alive;
+        skillDamage(a, u, e, skillRaw(u, p.atk, p.sp, p.flat), type, p.forceCrit ?? false);
+        if (before && !e.alive) killed = true;
+        hits++;
       }
-    }
+      onHits(a, u, hits, p);
+      if (killed && p.resetOnKill) {
+        u.mp = Math.min(u.maxMp, u.maxMp * p.resetOnKill);
+        // maxRepeats 语义 = 最多额外施放次数（青冥文案"至多 2 次"）
+        if (p.maxRepeats && depth < p.maxRepeats) {
+          a.schedule(0.25, (api2) => {
+            if (!u.alive) return;
+            const t2 = api2.resolveTargets(u, spec.target, 1)[0] ?? null;
+            if (t2) cast(api2, t2, depth + 1);
+          });
+        }
+      }
+    };
+    if (target) cast(api, target, 0);
   },
 
   // ─────────── 连续弹幕 ───────────

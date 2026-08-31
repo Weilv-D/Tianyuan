@@ -53,12 +53,25 @@ export class InputController {
 
   constructor(private scene: GameScene) {}
 
+  /** 页面隐藏：中止拖拽（稳定引用，供 game.events 注册/摘除） */
+  private onGameHidden = (): void => {
+    if (this.dragGhost) this.endDrag(0, 0);
+    if (this.dragItemGhost) {
+      this.dragItemGhost.destroy();
+      this.dragItemGhost = null;
+      this.dragItemId = null;
+    }
+  };
+
   /** create() 时与原场景字段复位一一对应（itemTip 重建、detailCard/拖拽状态/悬停键清空） */
   resetForCreate(): void {
     this.itemTip = new ItemTooltip(this.scene);
     this.detailCard = null;
     this.hoverKey = '';
-    this.dragGhost = null;
+    if (this.dragGhost) {
+      this.dragGhost.destroy();
+      this.dragGhost = null;
+    }
     this.dragUnit = null;
     this.dragFrom = null;
     this.dragItemId = null;
@@ -74,6 +87,8 @@ export class InputController {
     this.scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       audio.unlock();
       if (this.scene.phase !== 'prep' || this.scene.busy) return;
+      // 已有拖拽进行中（多点触控的第二指）：不透传，避免覆盖状态泄漏旧 ghost
+      if (this.dragGhost || this.dragItemGhost) return;
       // 点在奇遇面板上：卡片自己响应，不透传成棋盘/备战席的拖拽
       if (this.scene.adventure.contains(p.x, p.y)) return;
       // 羁绊浮层开着：不透传棋盘交互（遮罩只挡对象事件，挡不住场景级 pointerdown）
@@ -135,9 +150,11 @@ export class InputController {
       if (this.dragItemGhost) this.endItemDrag(p.x, p.y);
       else if (this.dragGhost) this.endDrag(p.x, p.y);
     });
-    this.scene.game.events.once('hidden', () => {
-      if (this.dragGhost) this.endDrag(0, 0);
-      if (this.dragItemGhost) { this.dragItemGhost.destroy(); this.dragItemGhost = null; this.dragItemId = null; }
+    // 页面隐藏时中止拖拽。用稳定引用注册并在 SHUTDOWN 摘除 ——
+    // game.events 是全局总线，不会随场景关闭自动清理，匿名 once 会逐轮累积
+    this.scene.game.events.on('hidden', this.onGameHidden);
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scene.game.events.off('hidden', this.onGameHidden);
     });
 
     // 快捷键
@@ -244,6 +261,11 @@ export class InputController {
       this.dragItemGhost = null;
     }
     this.dragItemId = null;
+    // 阶段守卫：拖拽中途已开战，装备状态随之锁定，放弃这次穿戴
+    if (this.scene.phase !== 'prep' || this.scene.busy) {
+      this.scene.refreshAll();
+      return;
+    }
     const where = this.hitSource(x, y);
     if (!id || !where) {
       this.scene.refreshAll();
@@ -298,7 +320,7 @@ export class InputController {
   private endDrag(x: number, y: number): void {
     const unit = this.dragUnit;
     const from = this.dragFrom;
-    const target = this.hitTarget(x, y);
+    // 先清拖拽态再判落点：无论放哪（或根本放不了），ghost/高亮都必须消失
     if (this.dragGhost) {
       this.dragGhost.destroy();
       this.dragGhost = null;
@@ -309,6 +331,10 @@ export class InputController {
     if (!unit || !from) return;
     (from.where === 'board' ? this.scene.boardBake.boardPortraits : this.scene.boardBake.benchPortraits)[from.slot].setAlpha(1);
 
+    // 阶段守卫：拖拽中途已开战（配对已生成），此时落子会破坏已锁定的阵容 —— 原样放回
+    if (this.scene.phase !== 'prep' || this.scene.busy) return;
+
+    const target = this.hitTarget(x, y);
     if (!target) return;
 
     if (target.where === 'sell') {

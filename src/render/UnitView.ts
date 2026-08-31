@@ -465,6 +465,13 @@ export class UnitView extends Phaser.GameObjects.Container {
     });
     if (this.cost < 4) {
       this.scene.tweens.add({ targets: this.aura, alpha: 0, duration: 240 });
+    } else {
+      // 4/5 费的光环常态是构造函数淡入的 0.3/0.5 —— 不回落就会永远停在吟唱峰值 0.75
+      this.scene.tweens.add({
+        targets: this.aura,
+        alpha: this.cost >= 5 ? 0.5 : 0.3,
+        duration: 240,
+      });
     }
   }
 

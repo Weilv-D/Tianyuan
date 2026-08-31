@@ -41,8 +41,12 @@ export class DamageTextLayer {
   }
 
   private give(t: Phaser.GameObjects.Text): void {
+    // 幂等：clear() 回收后补间尾回调可能再次进 give，
+    // 那时 indexOf 为 -1，裸 splice(-1,1) 会误删队尾另一条飘字并二次入池
+    const i = this.active.indexOf(t);
+    if (i < 0) return;
     t.setVisible(false);
-    this.active.splice(this.active.indexOf(t), 1);
+    this.active.splice(i, 1);
     this.pool.push(t);
   }
 
@@ -107,6 +111,8 @@ export class DamageTextLayer {
   }
 
   clear(): void {
+    // 先杀掉补间再回收：否则尾回调随后仍会触发 give（give 幂等兜底，但杀干净更省事）
+    for (const t of this.active) this.scene.tweens.killTweensOf(t);
     for (const t of [...this.active]) this.give(t);
     this.lastAt.clear();
   }

@@ -2,6 +2,7 @@ import { BOARD_COLS } from '../core/config';
 import { CHAMPION_BY_ID, CHAMPIONS } from '../data/champions';
 import { TRAIT_BY_ID } from '../data/traits';
 import { assignItems } from './inventory';
+import { centerOutColumns } from './state';
 import type { BattleUnitInput, Cell, Star } from '../core/types';
 
 /**
@@ -59,12 +60,7 @@ export function autoPlace(defIds: readonly string[], team: 0 | 1): Map<string, C
   });
 
   // 列填充顺序：由中心向两侧，保证阵型永远对称美观
-  const COL_ORDER: number[] = [];
-  for (let i = 0; i < BOARD_COLS; i++) {
-    const half = (BOARD_COLS - 1) / 2;
-    const v = Math.round(half + (i % 2 === 0 ? -Math.ceil(i / 2) : Math.ceil(i / 2)));
-    if (v >= 0 && v < BOARD_COLS) COL_ORDER.push(v);
-  }
+  const COL_ORDER = centerOutColumns();
 
   const rowUsed: Set<string>[] = [new Set(), new Set(), new Set(), new Set()];
   const out = new Map<string, Cell>();

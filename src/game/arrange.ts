@@ -17,6 +17,7 @@ import type { CardPool } from './pool';
 import {
   allUnits,
   boardCap,
+  centerOutColumns,
   powerScore,
   sellValue,
   type UnitInstance,
@@ -39,16 +40,8 @@ function depthOf(defId: string): number {
   return DEPTH[e?.cls ?? 'warrior'] ?? 0.5;
 }
 
-/** 由中心向两侧的列填充顺序 */
-const COL_ORDER: number[] = (() => {
-  const out: number[] = [];
-  const half = (BOARD_COLS - 1) / 2;
-  for (let i = 0; i < BOARD_COLS; i++) {
-    const v = Math.round(half + (i % 2 === 0 ? -Math.ceil(i / 2) : Math.ceil(i / 2)));
-    if (v >= 0 && v < BOARD_COLS) out.push(v);
-  }
-  return out;
-})();
+/** 由中心向两侧的列填充顺序（规范实现见 state.centerOutColumns） */
+const COL_ORDER: number[] = centerOutColumns();
 
 const ROWS = 4;
 

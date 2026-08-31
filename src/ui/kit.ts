@@ -437,6 +437,8 @@ export function label(
 export interface ScrollHandle {
   /** 内容实际高度（px）。≤ 可视高时复位到顶部 */
   setHeight(contentH: number): void;
+  /** 摘除滚轮监听并销毁遮罩 —— 容器被销毁前必须调用，否则监听逐次累积 */
+  destroy(): void;
 }
 
 export function enableScroll(
@@ -456,16 +458,24 @@ export function enableScroll(
   g.fillStyle(0xffffff, 1);
   g.fillRect(viewX, viewY, viewW, viewH);
   container.setMask(g.createGeometryMask());
-  scene.input.on('wheel', (_p: Phaser.Input.Pointer, _ox: number, _oy: number, dz: number) => {
-    if (max <= 0 || !container.scene) return;
-    container.y -= dz;
+  // wheel 回调实参顺序为 (pointer, overObjects, deltaX, deltaY, deltaZ)
+  const onWheel = (p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) => {
+    if (max <= 0 || !container.scene || !container.visible) return;
+    // 指针必须落在这个视口内：否则并排的多个滚动区（侧栏+浮层）会同时滚
+    if (p.x < viewX || p.x > viewX + viewW || p.y < viewY || p.y > viewY + viewH) return;
+    container.y -= dy;
     clamp();
-  });
+  };
+  scene.input.on('wheel', onWheel);
   return {
     setHeight(contentH: number): void {
       max = Math.max(0, contentH - viewH);
       if (max <= 0) container.y = homeY;
       else clamp();
+    },
+    destroy(): void {
+      scene.input.off('wheel', onWheel);
+      container.clearMask(true);
     },
   };
 }
