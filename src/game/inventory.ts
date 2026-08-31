@@ -11,6 +11,7 @@
  *    一条不可逆的操作会逼玩家在每次拖拽前犹豫，这比允许拆装的代价大得多。
  */
 
+import { ITEM_BAR_SLOTS } from '../core/config';
 import { ITEM_BY_ID, combine } from '../data/items';
 import { CHAMPION_BY_ID } from '../data/champions';
 import { findUnit, powerScore, type PlayerState, type UnitInstance } from './state';
@@ -92,6 +93,25 @@ export function unequipItem(p: PlayerState, iid: number, itemId: string): boolea
     p.items.push(itemId);
   }
   return true;
+}
+
+/**
+ * 卸载器通道：把一个棋子的装备全部卸回器匣。
+ * 成品同样拆回两个组件；器匣容量不足时**整体拒绝**（all-or-nothing）——
+ * 卸到一半放不下会制造"以为卸完了"的错觉，比一次失败更糟。
+ */
+export function unequipAll(p: PlayerState, iid: number): { ok: boolean; count: number; reason?: string } {
+  const u = findUnit(p, iid);
+  if (!u) return { ok: false, count: 0, reason: '找不到这个棋子' };
+  if (u.items.length === 0) return { ok: false, count: 0, reason: '身上没有装备' };
+  let gain = 0;
+  for (const id of u.items) {
+    const def = ITEM_BY_ID[id];
+    gain += def?.tier === 'combined' && def.recipe ? 2 : 1;
+  }
+  if (p.items.length + gain > ITEM_BAR_SLOTS) return { ok: false, count: 0, reason: '器匣空间不足' };
+  stripItems(p, u);
+  return { ok: true, count: gain };
 }
 
 /**

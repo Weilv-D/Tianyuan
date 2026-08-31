@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+// 副作用：全局字号缩放必须先于任何场景建字挂载（见 render/view/textScale）
+import '../render/view/textScale';
 import { css, CINNABAR, DANGER, GILT, INK, PAPER, UI } from '../render/view/palette';
 import { bakedTexture } from '../render/view/bake';
 import { screenToWorld } from '../render/view/viewScale';

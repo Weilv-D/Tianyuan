@@ -1,4 +1,4 @@
-import { GLOBAL_HP_SCALE, STAR_HP_SCALE, STAR_POWER_SCALE, RESIST_CAP } from './config';
+import { GLOBAL_HP_SCALE, LEGEND_T3, STAR_HP_SCALE, STAR_POWER_SCALE, RESIST_CAP } from './config';
 import { itemEffects } from './items';
 import { createTraitState, type BattleApi, type TraitState } from './api';
 import { CHAMPION_BY_ID, type ChampionEntry } from '../data/champions';
@@ -106,7 +106,13 @@ export function createUnit(input: BattleUnitInput): Unit {
   // 装备加成与外部传入的 bonus 合并：装备写在前面，外部覆盖写在后面
   const bonus = { ...eff.bonus, ...(input.bonus ?? {}) } as NonNullable<BattleUnitInput['bonus']>;
 
-  const maxHp = Math.round(b.hp * hpScale * GLOBAL_HP_SCALE + (bonus.hp ?? 0));
+  // 五费三星·天命（LEGEND_T3）：数值在天命层再乘，附免疫控制/开战护盾/全能吸血。
+  // 三星五费是终局单位，常规三星倍率不足以表达"无敌"的玩家预期。
+  const legend = entry.cost === 5 && input.star === 3;
+  const legendHp = legend ? LEGEND_T3.hpMult : 1;
+  const legendPow = legend ? LEGEND_T3.powerMult : 1;
+
+  const maxHp = Math.round(b.hp * hpScale * GLOBAL_HP_SCALE * legendHp + (bonus.hp ?? 0));
   const startMp = Math.min(b.startMp + (bonus.startMp ?? 0), b.maxMp);
 
   return {
@@ -119,8 +125,8 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     maxHp,
     hp: maxHp,
-    atk: Math.round(b.atk * powScale + (bonus.atk ?? 0)),
-    sp: Math.round(b.sp * powScale + (bonus.sp ?? 0)),
+    atk: Math.round(b.atk * powScale * legendPow + (bonus.atk ?? 0)),
+    sp: Math.round(b.sp * powScale * legendPow + (bonus.sp ?? 0)),
     baseArmor: b.armor + (bonus.armor ?? 0),
     baseMr: b.mr + (bonus.mr ?? 0),
     baseAspd: b.aspd * (1 + (bonus.aspd ?? 0)),
@@ -130,7 +136,7 @@ export function createUnit(input: BattleUnitInput): Unit {
     // 装备的暴伤加成（影袭）必须并入，否则是死数值
     critMult: b.critMult + (bonus.critMult ?? 0),
     lifesteal: bonus.lifesteal ?? 0,
-    omnivamp: bonus.omnivamp ?? 0,
+    omnivamp: (bonus.omnivamp ?? 0) + (legend ? LEGEND_T3.omnivamp : 0),
     damageAmp: bonus.damageAmp ?? 0,
 
     mp: startMp,
@@ -144,11 +150,12 @@ export function createUnit(input: BattleUnitInput): Unit {
     moveT: 0,
     moveDur: 0,
 
-    shield: 0,
+    shield: legend ? Math.round(maxHp * LEGEND_T3.startShieldPct) : 0,
     statuses: [],
     permAtkPct: 0,
     permAspdPct: 0,
-    ccImmune: 0,
+    // 天命免疫控制：恒正计数（非状态计数器，永不过期；addStatus 的 CONTROL_KINDS 据此拒绝）
+    ccImmune: legend && LEGEND_T3.ccImmune ? 1_000_000_000 : 0,
     trait: createTraitState(),
     traitStacks: {},
     killHandlers: [],

@@ -128,9 +128,34 @@ export const STAR_POWER_SCALE: readonly [number, number, number] = [1, 1.45, 2.1
 /** 技能数值倍率 */
 export const STAR_SKILL_SCALE: readonly [number, number, number] = [1, 1.5, 2.25];
 
+// ── 五费三星 · 天命（Legend） ─────────────────────────
+/**
+ * 三星五费的"天命护持"包：三星五费应当是终结局面的存在，
+ * 常规三星倍率（3.24/2.1）远不足以表达。数值在天命倍率上再乘，
+ * 并附带四项机制：免疫控制、开战护盾、全能吸血、体量增幅（渲染层读同源值）。
+ */
+export const LEGEND_T3 = {
+  /** 3★ 生命在天命层再乘 */
+  hpMult: 1.6,
+  /** 3★ 攻击/法强在天命层再乘 */
+  powerMult: 1.5,
+  /** 全能吸血（普攻与技能都吃） */
+  omnivamp: 0.15,
+  /** 开战护盾（最大生命百分比） */
+  startShieldPct: 0.25,
+  /** 免疫控制（addStatus 的 CONTROL_KINDS 全系拒绝） */
+  ccImmune: true,
+  /** 渲染体量增幅（UnitView 叠加在星级缩放之后） */
+  sizeMult: 1.2,
+} as const;
+
 // ── 持续伤害 ──────────────────────────────────────────
 /** DoT 结算频率（每秒），分成小跳而非一跳，飘字更好看 */
 export const DOT_TICKS_PER_SEC = 2;
+
+// ── 装备栏 ───────────────────────────────────────────
+/** 器匣容量（背包守恒与渲染网格 2×5 共用此真源） */
+export const ITEM_BAR_SLOTS = 10;
 
 // ── 经济（M2 使用，此处先立框架） ──────────────────────
 export const INCOME_BASE = 5;

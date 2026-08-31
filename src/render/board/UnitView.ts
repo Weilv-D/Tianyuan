@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CHAMPION_BY_ID } from '../../data/champions';
+import { LEGEND_T3 } from '../../core/config';
 import { silhouetteKey, SIL_ORIGIN_Y, silContentScale, silContentHeight, BEAST_TEAM } from './silhouetteFactory';
 import { itemIconKey } from './itemIcons';
 import { ITEM_BY_ID } from '../../data/items';
@@ -156,8 +157,10 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.itemRow.removeAll(true);
     const n = Math.min(3, itemIds.length);
     if (n === 0) return;
-    const size = 13;
-    const gap = 3;
+    const size = 16;
+    const gap = 4;
+    // 挂在血条/法力条正下方、头顶上方：不压脚底六边形，也不遮挡剪影本体
+    this.itemRow.setPosition(0, this.overheadY() + 28);
     const totalW = n * size + (n - 1) * gap;
     for (let i = 0; i < n; i++) {
       const id = itemIds[i];
@@ -177,7 +180,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   }
 
   private applyStarScale(): void {
-    const s = STAR_SCALE[this.star] ?? 1;
+    let s = STAR_SCALE[this.star] ?? 1;
+    // 五费三星·天命：体量再抬一档（数值口径见 config.LEGEND_T3，渲染同源）
+    if (this.cost === 5 && this.star === 3) s *= LEGEND_T3.sizeMult;
     this.setScale(s);
   }
 

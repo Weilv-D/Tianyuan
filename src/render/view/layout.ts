@@ -61,13 +61,13 @@ export const SHOP_X = (W - SHOP_W) / 2; // 636
 export const SHOP_Y = 892;
 
 // ── 器匣（店左 2×5 网格）──────────────────────────────
-export const ITEM_SIZE = 46;
-export const ITEM_GAP = 8;
-export const ITEM_BAR_SLOTS = 10;
+export const ITEM_SIZE = 52;
+export const ITEM_GAP = 6;
+export { ITEM_BAR_SLOTS } from '../../core/config';
 export const ITEM_COLS = 5;
 export const ITEM_ROWS = 2;
 export const ITEM_BAR_W = ITEM_COLS * (ITEM_SIZE + ITEM_GAP) - ITEM_GAP; // 262
-export const ITEM_BAR_X = 356;
+export const ITEM_BAR_X = 334; // 右缘 618 对齐备战席右端；左缘 334 与记事栏（至 330）脱开
 export const ITEM_BAR_Y = 900;
 
 // ── 操作列（店右 2×3）与出售印 ─────────────────────────

@@ -5,7 +5,7 @@ import { Match, type Pairing, type RoundOutcome } from '../../game/match';
 import { autoArrange } from '../../game/arrange';
 import { restorePlayer, snapshotPlayer, type PlayerSnapshot } from '../../game/undo';
 import { findUnit, type UnitInstance } from '../../game/state';
-import { autoEquip, equipItem, unequipItem, MAX_ITEMS_PER_UNIT } from '../../game/inventory';
+import { autoEquip, equipItem, unequipAll, unequipItem, MAX_ITEMS_PER_UNIT } from '../../game/inventory';
 import { ITEM_BY_ID } from '../../data/items';
 import { clearSave, loadMatch, loadPrefs, saveMatch, type Preferences } from '../../game/save';
 import { audio } from '../../audio/AudioEngine';
@@ -90,6 +90,8 @@ export class GameScene extends Phaser.Scene {
   lastReport = '';
   /** 器匣里点选中的装备（点一下选中，再点棋子装上） */
   selectedItem: string | null = null;
+  /** 卸载器模式：点选后点击任意棋子，全身装备一键回器匣（开局可用） */
+  unloadMode = false;
   settingsPanel: SettingsPanel | null = null;
 
   // ── 场景私有 ──
@@ -128,6 +130,7 @@ export class GameScene extends Phaser.Scene {
     this.paused = false;
     this.timerUrgent = false;
     this.selectedItem = null;
+    this.unloadMode = false;
     // settingsPanel 内部持有已销毁的容器：不置空则 isOpen 永真，设置面板再也打不开
     this.settingsPanel = null;
     this.abandoned = false;
@@ -267,6 +270,7 @@ export class GameScene extends Phaser.Scene {
     // 因为拖拽对触屏和手抖的人并不友好，而"点选"永远不会拖错地方。
     if (this.selectedItem === id) {
       this.selectedItem = null;
+    this.unloadMode = false;
     } else {
       this.selectedItem = id;
       audio.play('ui');
@@ -285,6 +289,7 @@ export class GameScene extends Phaser.Scene {
       audio.play('warn');
     } else {
       this.selectedItem = null;
+    this.unloadMode = false;
       audio.play('coin');
       if (r.combined) {
         // 合成神装是这局的高光之一，值得一次演出
@@ -292,6 +297,32 @@ export class GameScene extends Phaser.Scene {
       } else {
         this.showToast(`${u.items.length}/${MAX_ITEMS_PER_UNIT} 件`);
       }
+    }
+    this.afterAction();
+  }
+
+  /** 卸载器开关（器匣右上「卸 载」钮）：仅备战阶段可用 */
+  onToggleUnload(): void {
+    if (this.phase !== 'prep' || this.busy) return;
+    this.unloadMode = !this.unloadMode;
+    if (this.unloadMode) this.selectedItem = null;
+    this.hud.setUnloadMode(this.unloadMode);
+    audio.play('ui');
+    if (this.unloadMode) this.showToast('卸载模式：点击棋子，全身装备回器匣');
+  }
+
+  /** 卸载器执行：全身装备整体回器匣（成品拆回组件；容量不足整体拒绝） */
+  onUnequipAll(u: UnitInstance): void {
+    this.unloadMode = false;
+    this.hud.setUnloadMode(false);
+    this.pushUndo('卸载全部');
+    const r = unequipAll(this.match.human, u.iid);
+    if (r.ok) {
+      audio.play('uiBig');
+      this.showToast(`卸下 ${r.count} 件装备回器匣`);
+    } else {
+      this.undoStack.pop();
+      this.showToast(r.reason ?? '无法卸载', true);
     }
     this.afterAction();
   }
@@ -321,6 +352,7 @@ export class GameScene extends Phaser.Scene {
     this.pushUndo('一键装备');
     autoEquip(this.match.human);
     this.selectedItem = null;
+    this.unloadMode = false;
     audio.play('uiBig');
     this.showToast('已自动分配装备');
     this.afterAction();
@@ -569,6 +601,8 @@ export class GameScene extends Phaser.Scene {
   /** 准备阶段结束 → 战斗 */
   startBattlePhase(): void {
     if (this.busy || this.phase !== 'prep') return;
+    this.unloadMode = false;
+    this.hud.setUnloadMode(false);
     this.pauseScout.setPaused(false);
     this.pauseScout.closeScout();
     this.busy = true;

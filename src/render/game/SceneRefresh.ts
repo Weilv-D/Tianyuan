@@ -63,11 +63,16 @@ export class SceneRefresh {
     }
     // 器匣
     this.refreshItems();
-    // 商肆
+    // 商肆。已有同名（场上/备战席任一处）→ 金框呼吸高亮：
+    // "买它 = 向合成或羁绊推进"的第一眼提示
+    const ownedIds = new Set<string>();
+    for (const u of p.board) if (u) ownedIds.add(u.defId);
+    for (const u of p.bench) if (u) ownedIds.add(u.defId);
     for (let i = 0; i < 5; i++) {
       const id = p.shop[i];
       this.scene.hud.shopCards[i].setDef(id);
       this.scene.hud.shopCards[i].setAffordable(!id || p.gold >= (CHAMPION_BY_ID[id]?.cost ?? 0));
+      this.scene.hud.shopCards[i].setOwned(!!id && ownedIds.has(id));
     }
 
     // ── 顶栏（mono 数值口径；setText 走变化守卫） ──

@@ -93,6 +93,22 @@ export class InputController {
       // 羁绊浮层开着：不透传棋盘交互（遮罩只挡对象事件，挡不住场景级 pointerdown）
       if (this.scene.hud.traitModalOpen) return;
 
+      // 0) 卸载模式：点击棋子 → 全身装备回器匣；点空处退出
+      if (this.scene.unloadMode) {
+        const uw = hitSource(x, y);
+        if (uw) {
+          const uarr = uw.where === 'board' ? this.scene.match.human.board : this.scene.match.human.bench;
+          const uu = uarr[uw.slot];
+          if (uu) {
+            if (uu.isBeast) this.scene.showToast('墨兽不能装装备', true);
+            else this.scene.onUnequipAll(uu);
+            return;
+          }
+        }
+        this.scene.onToggleUnload();
+        return;
+      }
+
       // 1) 装备栏里的一格 → 开始拖这件装备
       const chip = hitItemChip(x, y);
       if (chip >= 0 && this.scene.itemAt(chip)) {
@@ -200,7 +216,7 @@ export class InputController {
   private beginItemDrag(itemId: string, x: number, y: number): void {
     this.dragItemId = itemId;
     const key = itemIconKey(itemId);
-    this.dragItemGhost = this.scene.add.image(x, y, key).setDisplaySize(46, 46).setDepth(320).setAlpha(0.92);
+    this.dragItemGhost = this.scene.add.image(x, y, key).setDisplaySize(52, 52).setDepth(320).setAlpha(0.92);
     audio.play('ui');
   }
 

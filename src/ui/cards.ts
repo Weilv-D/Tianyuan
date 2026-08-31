@@ -134,8 +134,8 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
     this.itemRow.removeAll(true);
     const n = Math.min(3, itemIds.length);
     if (n === 0) return;
-    const size = Math.max(11, Math.round(this.sz * 0.17));
-    const gap = 2;
+    const size = Math.max(13, Math.round(this.sz * 0.22));
+    const gap = 3;
     for (let i = 0; i < n; i++) {
       const key = itemIconKey(itemIds[i]);
       if (!this.scene.textures.exists(key)) continue;
@@ -231,6 +231,8 @@ export class ShopCard extends Phaser.GameObjects.Container {
   private readonly traitText: Phaser.GameObjects.Text;
   private defId: string | null = null;
   private affordable = true;
+  private owned = false;
+  private ownedTween: Phaser.Tweens.Tween | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number, onClick: () => void) {
     super(scene, x, y);
@@ -278,6 +280,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
     if (this.defId === defId) return; // 同卡不刷新：买不起状态走 setAffordable
     this.defId = defId;
     if (!defId) {
+      this.setOwned(false);
       this.sil.setVisible(false);
       this.nameText.setText('');
       this.costText.setText('');
@@ -312,6 +315,36 @@ export class ShopCard extends Phaser.GameObjects.Container {
     this.setAlpha(v ? 1 : 0.42);
   }
 
+  /**
+   * 场上/备战席已有同名棋子：金框高亮 + 呼吸脉冲。
+   * 这是"买它 = 向合成推进/凑羁绊"的提示；脉冲打在底框贴图上，
+   * 与悬停上浮（容器 y）分属不同属性，互不打断。
+   */
+  setOwned(v: boolean): void {
+    if (this.owned === v) return;
+    this.owned = v;
+    this.ownedTween?.remove();
+    this.ownedTween = null;
+    this.bg.setAlpha(1);
+    if (v && this.scene) {
+      this.ownedTween = this.scene.tweens.add({
+        targets: this.bg,
+        alpha: { from: 1, to: 0.66 },
+        duration: 460,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+    if (this.defId) this.redraw(false);
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.ownedTween?.remove();
+    this.ownedTween = null;
+    super.destroy(fromScene);
+  }
+
   get def(): string | null {
     return this.defId;
   }
@@ -324,7 +357,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
     // 底板按（稀有度 × 悬停）烘焙：五费五种 × 两态共十余张，五张卡共用。
     // 悬停态要含 affordable：买不起的卡悬停不提亮，且不能和买得起时共用同一张贴图
     const hoverOn = hover && !!def && this.affordable;
-    const key = `shopv3_${w}x${h}_${def?.cost ?? 0}_${hoverOn ? 1 : 0}`;
+    const key = `shopv3_${w}x${h}_${def?.cost ?? 0}_${hoverOn ? 1 : 0}_${this.owned ? 1 : 0}`;
     bakedTexture(this.scene!, key, w + 2, h + 2, (g) => {
       g.translateCanvas(1, 1);
       // 漆卡：半透漆底 + 淡金细框（样稿 .scard）
@@ -341,6 +374,15 @@ export class ShopCard extends Phaser.GameObjects.Container {
         // 剪影脚下的一道稀有度微染：站位的"地"，代替此前的占位圆碟
         g.fillStyle(col, 0.14);
         g.fillRect(w / 2 - 26, h - 64, 52, 2);
+      }
+      if (this.owned) {
+        // 已有同名：双线金框 + 淡金内染，配合呼吸脉冲一眼可辨
+        g.fillStyle(GILT.base, 0.09);
+        g.fillRect(0, 0, w, h);
+        g.lineStyle(2, GILT.light, 0.95);
+        g.strokeRect(1, 1, w - 2, h - 2);
+        g.lineStyle(1, GILT.base, 0.4);
+        g.strokeRect(3.5, 3.5, w - 7, h - 7);
       }
       if (hoverOn) {
         g.fillStyle(PAPER[100], 0.05);

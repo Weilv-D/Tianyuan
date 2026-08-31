@@ -7,7 +7,7 @@
  *
  * 设计契约：
  * 1. 所有随机必须来自 Match 持有的那个 Rng，禁止 Math.random()。
- * 2. 同名棋子在场上最多存在 1 张（备战席可存放多张待合成）。
+ * 2. 同名棋子允许同时上场；羁绊按拥有该棋子唯一计数，同名堆场不重复叠羁绊。
  *    这是一条刻意的简化：它让羁绊计数与自动站位都不需要处理"同 id 多实例"的歧义，
  *    带来的代价（少了一种堆叠玩法）远小于收益。
  */
@@ -416,10 +416,8 @@ export function canPlace(p: PlayerState, iid: number, where: 'board' | 'bench', 
     if (movingIn && !occupant && boardCount(p) >= boardCap(p)) {
       return { ok: false, reason: `人口已满（${boardCount(p)}/${boardCap(p)}），先升级或撤下一个` };
     }
-    // 同名互斥：目标格不是自己、且场上别处已有同名
-    if (!onBoardNow && p.board.some((x, i) => x !== null && x.defId === u.defId && i !== slot)) {
-      return { ok: false, reason: '场上已有同名棋子' };
-    }
+    // 同名棋子允许同时上场（1.7.0 起）：多余的同名是候补合成料，
+    // 羁绊仍按"是否拥有该棋子"唯一计数，同名堆场不重复叠羁绊。
   }
   return { ok: true };
 }

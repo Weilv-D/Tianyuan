@@ -78,6 +78,7 @@ export class HudPanels {
 
   // 商店 / 器匣
   shopCards: ShopCard[] = [];
+  private unloadBtn: Button | null = null;
   itemChips: ItemChip[] = [];
   itemHint!: Phaser.GameObjects.Text;
 
@@ -334,6 +335,17 @@ export class HudPanels {
       this.itemChips.push(chip);
     }
 
+    // 卸载器（开局可用）：点选 → 点棋子 → 全身装备回器匣
+    this.unloadBtn = new Button(
+      this.scene,
+      ITEM_BAR_X + ITEM_BAR_W - 84,
+      ITEM_BAR_Y - 26,
+      '卸 载',
+      () => this.scene.onToggleUnload(),
+      { width: 84, height: 26 },
+    );
+    this.unloadBtn.setDepth(5);
+
     this.itemHint = this.scene.add
       .text(ITEM_BAR_X - 8, ITEM_BAR_Y + gh + 16, '', {
         fontFamily: FONT.body,
@@ -507,6 +519,13 @@ export class HudPanels {
         color: css(PAPER[400]),
       })
       .setOrigin(1, 0.5);
+  }
+
+  /** 卸载器按钮态（GameScene.onToggleUnload 驱动） */
+  setUnloadMode(on: boolean): void {
+    if (!this.unloadBtn) return;
+    this.unloadBtn.setText(on ? '卸载中…' : '卸 载');
+    this.unloadBtn.setAlpha(on ? 1 : 0.85);
   }
 
   // ══════════════ 羁绊全览浮层（nav「羁绊」） ══════════════
