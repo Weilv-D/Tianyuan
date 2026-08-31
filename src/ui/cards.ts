@@ -243,17 +243,19 @@ export class ShopCard extends Phaser.GameObjects.Container {
     this.cardH = h;
     this.baseY = y;
     this.bg = scene.add.image(-1, -1, '__shop').setOrigin(0);
-    this.sil = scene.add.image(w / 2, h - 62, '').setVisible(false);
-    // 底部信息带只留决策三行：名 / 羁绊 / 价 —— 品阶由底框色表达，称号是冗余文字
+    this.sil = scene.add.image(w / 2, h - 70, '').setVisible(false);
+    // 底部信息带只留决策三行：名 / 羁绊 / 价 —— 品阶由底框色表达，称号是冗余文字。
+    // 三行统一 origin(0.5,1) 底对齐、行间净距 3px、卡底留 6px：origin(0,0) 顶锚
+    // 在字号基线放大后会互相贴死、费用行压到卡底边（textScale 1.12 实测）。
     this.nameText = scene.add
-      .text(w / 2, h - 54, '', { fontFamily: FONT.title, fontSize: '13px', color: css(PAPER[100]), letterSpacing: 4 })
-      .setOrigin(0.5, 0);
+      .text(w / 2, h - 47, '', { fontFamily: FONT.title, fontSize: '13px', color: css(PAPER[100]), letterSpacing: 4 })
+      .setOrigin(0.5, 1);
     this.traitText = scene.add
-      .text(w / 2, h - 35, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
-      .setOrigin(0.5, 0);
+      .text(w / 2, h - 26, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
+      .setOrigin(0.5, 1);
     this.costText = scene.add
-      .text(w / 2, h - 17, '', { fontFamily: FONT.mono, fontSize: '12px', color: css(GILT.light) })
-      .setOrigin(0.5, 0);
+      .text(w / 2, h - 6, '', { fontFamily: FONT.mono, fontSize: '12px', color: css(GILT.light) })
+      .setOrigin(0.5, 1);
     this.add([this.bg, this.sil, this.nameText, this.traitText, this.costText]);
     this.setSize(w, h);
     this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
@@ -377,9 +379,9 @@ export class ShopCard extends Phaser.GameObjects.Container {
         g.fillRect(0, 0, w, 3);
         g.fillStyle(col, 0.35);
         g.fillRect(0, 3, w, 1.5);
-        // 剪影脚下的一道稀有度微染：站位的"地"，代替此前的占位圆碟
+        // 剪影脚下的一道稀有度微染：站位的"地"，代替此前的占位圆碟（随剪影脚 h-70 同步）
         g.fillStyle(col, 0.14);
-        g.fillRect(w / 2 - 26, h - 64, 52, 2);
+        g.fillRect(w / 2 - 26, h - 68, 52, 2);
       }
       if (this.owned) {
         // 已有同名：双线金框 + 淡金内染，配合呼吸脉冲一眼可辨

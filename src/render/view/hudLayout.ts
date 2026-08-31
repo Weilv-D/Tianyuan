@@ -86,7 +86,7 @@ export const REPORT_ROW = {
   barW: 72,
   lvX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6,
   lvSize: 11,
-  streakX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6 + Math.ceil(4 * 0.55 * LV_RENDERED) + 2,
+  streakX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6 + Math.ceil(4 * 0.55 * LV_RENDERED) + 4,
   streakSize: 11,
   /** 连胜注最宽（"胜9"两全角 × 渲染 12px） */
   streakMaxW: 2 * renderedSize(11),

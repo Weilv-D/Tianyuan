@@ -224,10 +224,10 @@ export class HudPanels {
     this.hpText.setColor(css(SPIRIT.base));
     this.levelText = stat(W - 140, '等 级');
 
-    this.hpBar = new Bar(this.scene, W - 250 - 56, 70, 56, 3, SPIRIT.base);
-    this.xpBar = new Bar(this.scene, W - 140 - 56, 70, 56, 3, VOID.base);
+    this.hpBar = new Bar(this.scene, W - 250 - 56, 80, 56, 3, SPIRIT.base);
+    this.xpBar = new Bar(this.scene, W - 140 - 56, 80, 56, 3, VOID.base);
     this.xpText = this.scene.add
-      .text(W - 140 - 64, 70, '', { fontFamily: FONT.mono, fontSize: '10px', color: css(INK[300]) })
+      .text(W - 140 - 64, 80, '', { fontFamily: FONT.mono, fontSize: '10px', color: css(INK[300]) })
       .setOrigin(1, 0.5);
 
     // 设置入口
@@ -351,7 +351,7 @@ export class HudPanels {
     this.unloadBtn.setDepth(5);
 
     this.itemHint = this.scene.add
-      .text(ITEM_BAR_X - 8, ITEM_BAR_Y + gh + 16, '', {
+      .text(ITEM_BAR_X - 8, ITEM_BAR_Y + gh + 22, '', {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[400]),
