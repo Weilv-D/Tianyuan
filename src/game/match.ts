@@ -254,6 +254,17 @@ export class Match implements AiWorld {
   }
 
   /**
+   * 读档时是否需要先推进回合（A2：防回合二次结算）。
+   *
+   * phase='result' 的存档是「战斗结算已落盘、下一回合尚未开始」的中间态：
+   * 直接进备战而不推进，同一回合会被 makePairings + applyBattleResult
+   * 再结算一遍（双倍掉血、重复淘汰、重复快照）。必须先 beginRound()。
+   */
+  needsAdvanceOnLoad(): boolean {
+    return this.phase === 'result';
+  }
+
+  /**
    * 是否为墨兽轮（PvE）。
    * 每 4 回合一次：3 / 7 / 11 / 15 …
    * 前两回合是纯粹的建设期，不该上来就打怪；之后固定节奏插入。
@@ -800,6 +811,28 @@ export class Match implements AiWorld {
     p.bench = emptyBench();
     if (p.isHuman) this.humanRank = p.rank;
     this.log.push(`${p.name} 被淘汰 · 第 ${p.rank} 名`);
+  }
+
+  /**
+   * 结算本回合全部战斗（A3：结算顺序确定性）。
+   *
+   * 按 this.pairings（makePairings 的产出顺序）逐对 runBattleHeadless +
+   * applyBattleResult —— 人类场包含在内，快照由 runBattleHeadless 在正确的
+   * rng 位置记录（digest 走 '' 口径）。渲染层与无头模拟共用此顺序，
+   * 墨兽轮掉落消费 this.rng 的次序两侧逐位一致（对局层确定性契约）。
+   *
+   * 前置：本回合已 makePairings 且写入 this.pairings（渲染层 startBattlePhase
+   * 与模拟脚本都这么做）；结算后清空，防止同一份配对被二次消费。
+   *
+   * @returns 每场战斗的 RoundOutcome（与 this.pairings 顺序一一对应）
+   */
+  settleRound(): RoundOutcome[][] {
+    const outs: RoundOutcome[][] = [];
+    for (const pair of this.pairings) {
+      outs.push(this.applyBattleResult(pair, this.runBattleHeadless(pair)));
+    }
+    this.pairings = [];
+    return outs;
   }
 
   /** 每回合战斗全部结束后调用：快照阵容、推进阶段、判定游戏结束 */

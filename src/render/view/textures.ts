@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PAPER, css } from './palette';
+import { W, H } from './layout';
 
 /**
  * 程序化材质工厂。
@@ -22,10 +23,11 @@ export const TEX = {
 
 /** 全屏纸面颗粒：极低透明度叠在一切之上 —— 数码感的天敌，一次烘焙全场景复用 */
 export function grainOverlay(scene: Phaser.Scene): Phaser.GameObjects.Image {
+  // 逻辑分辨率 +8 出血：scene.scale.width 是物理像素（1920K），会被额外放大 K 倍
   return scene.add
     .image(0, 0, TEX.grain)
     .setOrigin(0)
-    .setDisplaySize(scene.scale.width + 8, scene.scale.height + 8)
+    .setDisplaySize(W + 8, H + 8)
     .setAlpha(0.02)
     .setScrollFactor(0)
     .setDepth(2000);

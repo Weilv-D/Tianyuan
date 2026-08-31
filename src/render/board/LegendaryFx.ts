@@ -7,6 +7,7 @@
  */
 import Phaser from 'phaser';
 import { CINNABAR, GILT, PAPER, SHADE, css } from '../view/palette';
+import { W, H } from '../view/layout';
 import { TEX } from '../view/textures';
 import { silhouetteKey } from './silhouetteFactory';
 import { FONT } from '../../ui/kit';
@@ -15,8 +16,8 @@ import { audio } from '../../audio/AudioEngine';
 import { motion } from '../view/motion';
 
 export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
-  const W = scene.scale.width;
-  const H = scene.scale.height;
+  // 世界系常量：scene.scale.width 在 DPR 底座上是 1920K（物理像素），
+  // 拿它当世界坐标会把整段演出推离屏幕中心 K 倍 —— 必须用 layout 的逻辑常量
   const cx = W / 2;
   const cy = H * 0.44;
   const root = scene.add.container(0, 0).setDepth(1500);

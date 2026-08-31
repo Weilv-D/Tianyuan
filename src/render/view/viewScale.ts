@@ -10,7 +10,10 @@ import { H, W } from './layout';
  * 恒为 1920×1080，布局代码零感知；文字 resolution:2 与原生分辨率棋子
  * 烘焙在采样端 1:1 落地。
  */
-export const VIEW_K = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+export const VIEW_K = Math.min(
+  Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1),
+  2,
+);
 
 /** 相机基准 zoom（逻辑 1920×1080 → 物理 1920K×1080K 的唯一换算） */
 export const CAM_ZOOM = VIEW_K;
@@ -26,4 +29,17 @@ export function baseZoom(scene: Phaser.Scene): void {
   const cam = scene.cameras.main;
   cam.setZoom(CAM_ZOOM);
   cam.centerOn(W / 2, H / 2);
+}
+
+/**
+ * 画布像素 → 世界坐标（1920×1080 逻辑系）。
+ *
+ * Phaser 的 pointer.x/y 是画布分辨率空间（1920K×1080K），而场景级命中检测
+ * （棋盘/备战席/器匣/出售印）全部拿它比对世界常量 —— K≠1 时整体 K 倍偏移。
+ * 本工程相机恒满足 scroll=0（baseZoom centerOn 钉锚），换算精确为 px/zoom。
+ * zoom 必须取**当下**的相机 zoom（celebrate 推镜期间是 CAM_ZOOM×1.012），
+ * 而不是常量，否则推镜窗口内的拖拽落点会偏。
+ */
+export function screenToWorld(px: number, py: number, zoom: number): { x: number; y: number } {
+  return { x: px / zoom, y: py / zoom };
 }

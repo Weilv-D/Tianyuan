@@ -7,26 +7,18 @@ import { ItemTooltip } from '../../ui/tooltip';
 import { UnitPortrait, UnitDetailCard } from '../../ui/cards';
 import { itemIconKey } from '../board/itemIcons';
 import { GILT, CINNABAR } from '../view/palette';
+import { screenToWorld } from '../view/viewScale';
+import { hitItemChip, hitSource, hitTarget, hitUnitItemSlot } from './hitTest';
 import {
   BENCH_CELL,
-  BENCH_W,
   BENCH_X,
   BENCH_Y,
   CELL,
   DETAIL_H,
   DETAIL_W,
-  GRID_H,
-  GRID_W,
   GRID_X,
   GRID_Y,
   HALF_ROWS,
-  ITEM_BAR_SLOTS,
-  ITEM_BAR_X,
-  ITEM_BAR_Y,
-  ITEM_COLS,
-  ITEM_GAP,
-  ITEM_ROWS,
-  ITEM_SIZE,
   W,
   H,
 } from '../view/layout';
@@ -83,32 +75,39 @@ export class InputController {
 
   // ══════════════ 输入 ══════════════
 
+  /** 画布像素 → 世界坐标。指针事件里的 p.x/y 是 1920K×1080K 画布空间，
+   *  而命中检测 / ghost / 提示卡全部活在 1920×1080 世界系（A1）。 */
+  private worldOf(p: Phaser.Input.Pointer): { x: number; y: number } {
+    return screenToWorld(p.x, p.y, this.scene.cameras.main.zoom);
+  }
+
   bindInput(): void {
     this.scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       audio.unlock();
       if (this.scene.phase !== 'prep' || this.scene.busy) return;
+      const { x, y } = this.worldOf(p);
       // 已有拖拽进行中（多点触控的第二指）：不透传，避免覆盖状态泄漏旧 ghost
       if (this.dragGhost || this.dragItemGhost) return;
       // 点在奇遇面板上：卡片自己响应，不透传成棋盘/备战席的拖拽
-      if (this.scene.adventure.contains(p.x, p.y)) return;
+      if (this.scene.adventure.contains(x, y)) return;
       // 羁绊浮层开着：不透传棋盘交互（遮罩只挡对象事件，挡不住场景级 pointerdown）
       if (this.scene.hud.traitModalOpen) return;
 
       // 1) 装备栏里的一格 → 开始拖这件装备
-      const chip = this.hitItemChip(p.x, p.y);
+      const chip = hitItemChip(x, y);
       if (chip >= 0 && this.scene.itemAt(chip)) {
-        this.beginItemDrag(this.scene.itemAt(chip)!, p.x, p.y);
+        this.beginItemDrag(this.scene.itemAt(chip)!, x, y);
         return;
       }
 
-      const where = this.hitSource(p.x, p.y);
+      const where = hitSource(x, y);
       if (!where) return;
       const arr = where.where === 'board' ? this.scene.match.human.board : this.scene.match.human.bench;
       const unit = arr[where.slot];
       if (!unit) return;
 
       // 2) 点在棋子的装备图标上 → 卸下（可撤销，所以直接卸不会造成损失）
-      const itemIdx = this.hitUnitItemSlot(p.x, p.y, where, unit);
+      const itemIdx = hitUnitItemSlot(x, y, where, unit.items.length);
       if (itemIdx >= 0) {
         this.scene.onUnequip(unit, unit.items[itemIdx]);
         return;
@@ -119,36 +118,39 @@ export class InputController {
         return;
       }
       // 4) 否则拖这个棋子
-      this.beginDrag(where.where, where.slot, unit, p.x, p.y);
+      this.beginDrag(where.where, where.slot, unit, x, y);
     });
 
     this.scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      const { x, y } = this.worldOf(p);
       if (this.dragGhost) {
-        this.dragGhost.setPosition(p.x - (CELL - 6) / 2, p.y - (CELL - 6) / 2);
-        this.updateDragTarget(p.x, p.y);
+        this.dragGhost.setPosition(x - (CELL - 6) / 2, y - (CELL - 6) / 2);
+        this.updateDragTarget(x, y);
         this.itemTip.hide();
         return;
       }
       if (this.dragItemGhost) {
         // 此前装备 ghost 从不跟随指针（只有棋子 ghost 跟随），拖装备时图标停在按下处
-        this.dragItemGhost.setPosition(p.x, p.y);
-        if (this.dragItemId) this.itemTip.show(this.dragItemId, p.x, p.y);
+        this.dragItemGhost.setPosition(x, y);
+        if (this.dragItemId) this.itemTip.show(this.dragItemId, x, y);
         return;
       }
-      this.updateHover(p.x, p.y);
+      this.updateHover(x, y);
     });
 
     this.scene.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      const { x, y } = this.worldOf(p);
       if (this.dragItemGhost) {
-        this.endItemDrag(p.x, p.y);
+        this.endItemDrag(x, y);
         return;
       }
-      if (this.dragGhost) this.endDrag(p.x, p.y);
+      if (this.dragGhost) this.endDrag(x, y);
     });
     // L31：画布外释放兜底（Phaser pointerupoutside / gameout）
     this.scene.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => {
-      if (this.dragItemGhost) this.endItemDrag(p.x, p.y);
-      else if (this.dragGhost) this.endDrag(p.x, p.y);
+      const { x, y } = this.worldOf(p);
+      if (this.dragItemGhost) this.endItemDrag(x, y);
+      else if (this.dragGhost) this.endDrag(x, y);
     });
     // 页面隐藏时中止拖拽。用稳定引用注册并在 SHUTDOWN 摘除 ——
     // game.events 是全局总线，不会随场景关闭自动清理，匿名 once 会逐轮累积
@@ -190,60 +192,8 @@ export class InputController {
   }
 
   // ══════════════ 命中检测 ══════════════
-
-  private hitSource(x: number, y: number): { where: 'board' | 'bench'; slot: number } | null {
-    // 大漆盘 8 行全可见，但只有下半 4 行是数据阵地（敌营在数据层没有槽位）
-    if (x >= GRID_X && x < GRID_X + GRID_W && y >= GRID_Y && y < GRID_Y + GRID_H) {
-      const c = Math.floor((x - GRID_X) / CELL);
-      const r = Math.floor((y - GRID_Y) / CELL);
-      if (r < GRID_H / CELL - HALF_ROWS) return null; // 敌营：不可放置也不可选中
-      return { where: 'board', slot: (r - (GRID_H / CELL - HALF_ROWS)) * 8 + c };
-    }
-    if (x >= BENCH_X && x < BENCH_X + BENCH_W && y >= BENCH_Y && y < BENCH_Y + BENCH_CELL) {
-      return { where: 'bench', slot: Math.floor((x - BENCH_X) / BENCH_CELL) };
-    }
-    return null;
-  }
-
-  private hitTarget(x: number, y: number): { where: 'board' | 'bench' | 'sell'; slot: number } | null {
-    if (this.scene.hud.sellRect.contains(x, y)) return { where: 'sell', slot: 0 };
-    return this.hitSource(x, y);
-  }
-
-  /** 命中了器匣（2×5 网格）的哪一格，-1 表示没命中 */
-  private hitItemChip(x: number, y: number): number {
-    const col = Math.floor((x - ITEM_BAR_X + ITEM_GAP / 2) / (ITEM_SIZE + ITEM_GAP));
-    const row = Math.floor((y - ITEM_BAR_Y + ITEM_GAP / 2) / (ITEM_SIZE + ITEM_GAP));
-    if (col < 0 || col >= ITEM_COLS || row < 0 || row >= ITEM_ROWS) return -1;
-    const i = row * ITEM_COLS + col;
-    if (i < 0 || i >= ITEM_BAR_SLOTS) return -1;
-    // 落在格子里而不是缝隙里
-    const left = ITEM_BAR_X + col * (ITEM_SIZE + ITEM_GAP);
-    const top = ITEM_BAR_Y + row * (ITEM_SIZE + ITEM_GAP);
-    return x >= left && x <= left + ITEM_SIZE && y >= top && y <= top + ITEM_SIZE ? i : -1;
-  }
-
-  /** 点中了棋子身上的第几件装备，-1 表示没点中 */
-  private hitUnitItemSlot(
-    x: number,
-    y: number,
-    where: { where: 'board' | 'bench'; slot: number },
-    u: UnitInstance
-  ): number {
-    if (u.items.length === 0) return -1;
-    const size = where.where === 'board' ? CELL - 6 : BENCH_CELL - 6;
-    const px =
-      (where.where === 'board' ? GRID_X + (where.slot % 8) * CELL : BENCH_X + where.slot * BENCH_CELL) + 3;
-    const py =
-      (where.where === 'board' ? GRID_Y + (Math.floor(where.slot / 8) + HALF_ROWS) * CELL : BENCH_Y) + 3;
-    const isz = Math.max(11, Math.round(size * 0.17));
-    const gap = 2;
-    for (let i = 0; i < Math.min(3, u.items.length); i++) {
-      const ix = px + 4 + i * (isz + gap);
-      if (x >= ix && x <= ix + isz && y >= py + 5 && y <= py + 5 + isz) return i;
-    }
-    return -1;
-  }
+  // 纯函数实现见 ./hitTest.ts（A1 抽取，供测试直接调用）；hitTarget 的
+  // 出售印矩形取 HudPanels 的 sellRect 同一实例，几何单一真源在 layout.ts。
 
   // ══════════════ 装备拖拽 ══════════════
 
@@ -266,7 +216,7 @@ export class InputController {
       this.scene.refreshAll();
       return;
     }
-    const where = this.hitSource(x, y);
+    const where = hitSource(x, y);
     if (!id || !where) {
       this.scene.refreshAll();
       return;
@@ -302,7 +252,7 @@ export class InputController {
    * 恰好是"拖动棋子时最需要跟手"的时刻。
    */
   private updateDragTarget(x: number, y: number): void {
-    const t = this.hitTarget(x, y);
+    const t = hitTarget(x, y, this.scene.hud.sellRect);
     this.scene.boardBake.boardHover.clear();
     if (!t || t.where === 'sell' || !this.dragUnit) return;
     const check = canPlace(this.scene.match.human, this.dragUnit.iid, t.where, t.slot);
@@ -334,7 +284,7 @@ export class InputController {
     // 阶段守卫：拖拽中途已开战（配对已生成），此时落子会破坏已锁定的阵容 —— 原样放回
     if (this.scene.phase !== 'prep' || this.scene.busy) return;
 
-    const target = this.hitTarget(x, y);
+    const target = hitTarget(x, y, this.scene.hud.sellRect);
     if (!target) return;
 
     if (target.where === 'sell') {
@@ -386,11 +336,11 @@ export class InputController {
       return;
     }
     // 器匣装备：悬停出提示卡（名 + 效果 + 合成路径）
-    const chipIdx = this.hitItemChip(px, py);
+    const chipIdx = hitItemChip(px, py);
     const chipItem = chipIdx >= 0 ? this.scene.itemAt(chipIdx) : null;
     if (chipItem) this.itemTip.show(chipItem, px, py);
     else this.itemTip.hide();
-    const hit = this.hitSource(px, py);
+    const hit = hitSource(px, py);
     let key = '';
     let unit: UnitInstance | null = null;
     if (hit) {

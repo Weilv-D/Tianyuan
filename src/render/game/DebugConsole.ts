@@ -5,6 +5,7 @@ import { PLAYER_START_HP } from '../../core/config';
 import { newIid } from '../../game/state';
 import { FONT, Button } from '../../ui/kit';
 import { INK, GILT, PAPER, css } from '../view/palette';
+import { W, H } from '../view/layout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
@@ -26,7 +27,8 @@ export class DebugConsole {
   }
 
   private open(): void {
-    const W = this.scene.scale.width; const H = this.scene.scale.height;
+    // layout 逻辑常量（1920×1080）：scene.scale.width 在 DPR 底座上是物理像素，
+    // K=2 时 W/2 会把面板钉到屏外右下角
     const c = this.scene.add.container(W / 2, H / 2).setDepth(950);
     this.panel = c;
     const bg = this.scene.add.graphics();

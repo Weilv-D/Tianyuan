@@ -201,7 +201,17 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.fadeIn(240, 7, 9, 12);
       this.afterBattle();
     } else {
-      if (this.match.round === 0) this.match.beginRound();
+      // 读档路由（A2）：终局档进终局；人类已亡快进到底；结算已落盘（phase='result'）
+      // 的档必须先 beginRound 推进回合，否则同一回合会被二次结算（双倍掉血）。
+      if (this.match.isOver()) {
+        this.scene.start('Result', { match: this.match });
+        return;
+      }
+      if (!this.match.human.alive) {
+        this.fastForward();
+        return;
+      }
+      if (this.match.round === 0 || this.match.needsAdvanceOnLoad()) this.match.beginRound();
       this.enterPrep();
     }
 
@@ -574,16 +584,16 @@ export class GameScene extends Phaser.Scene {
     const pairings = this.match.makePairings();
     this.match.pairings = pairings;
 
-    // 1) 别人的战斗先无头跑完（玩家只关心自己的战场，别人的结果以战报呈现）
+    // 1) 全部战斗按配对顺序无头结算（含人类场 —— A3）。人类场随后由 BattleScene
+    //    用同一 config 播放演出，判定只发生在这里：渲染永远不参与结算，
+    //    墨兽轮掉落的 rng 消费顺序与无头模拟逐位一致（确定性契约）。
     const humanPair = pairings.find((p) => p.a === 0 || p.b === 0);
     const reports: string[] = [];
-    for (const pair of pairings) {
-      if (pair === humanPair) continue;
-      const res = this.match.runBattleHeadless(pair);
-      const before = pair.b >= 0 ? this.match.players[pair.b].hp : 0;
-      const outs = this.match.applyBattleResult(pair, res);
-      reports.push(this.describeOutcome(pair, outs, before));
-    }
+    const outcomes = this.match.settleRound();
+    pairings.forEach((pair, i) => {
+      if (pair === humanPair) return;
+      reports.push(this.describeOutcome(pair, outcomes[i] ?? [], 0));
+    });
 
     // 2) 玩家自己的战斗
     if (!humanPair || !this.match.human.alive) {

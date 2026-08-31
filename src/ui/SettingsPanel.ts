@@ -4,6 +4,7 @@ import { savePrefs, type Preferences } from '../game/save';
 import { Button, FONT } from './kit';
 import { GILT, INK, PAPER, SHADE, css } from '../render/view/palette';
 import { motion } from '../render/view/motion';
+import { screenToWorld } from '../render/view/viewScale';
 import { H, W } from '../render/view/layout';
 
 /**
@@ -117,9 +118,12 @@ export class SettingsPanel {
         draw();
         audio.setVolume(s.key === 'volBgm' ? 'bgm' : s.key === 'volSfx' ? 'sfx' : 'ui', prefs[s.key]);
       };
-      zone.on('pointerdown', (p: Phaser.Input.Pointer) => apply(p.x - (bx + 34)));
+      // 滑杆取值用的是世界系轨道几何，而 p.x 是画布像素（1920K 系）——先换算（A1）
+      const localOf = (p: Phaser.Input.Pointer) =>
+        screenToWorld(p.x, p.y, scene.cameras.main.zoom).x - (bx + 34);
+      zone.on('pointerdown', (p: Phaser.Input.Pointer) => apply(localOf(p)));
       zone.on('pointermove', (p: Phaser.Input.Pointer) => {
-        if (p.isDown) apply(p.x - (bx + 34));
+        if (p.isDown) apply(localOf(p));
       });
       panel.add(zone);
       y += 66;

@@ -11,7 +11,7 @@ import { itemIconKey, bakeItemIcons } from '../board/itemIcons';
 import { traitIconKey, bakeTraitIcons } from '../board/traitIcons';
 import { bakeSilhouettes } from '../board/silhouetteFactory';
 import { buildTextures, grainOverlay } from '../view/textures';
-import { baseZoom } from '../view/viewScale';
+import { baseZoom, screenToWorld } from '../view/viewScale';
 import { H, W } from '../view/layout';
 
 /**
@@ -140,7 +140,8 @@ export class CodexScene extends Phaser.Scene {
         p.setUnit({ defId: d.id, star: 1, items: [], iid: -1 });
         p.setInteractive(new Phaser.Geom.Rectangle(0, 0, cw - 26, cw - 26), Phaser.Geom.Rectangle.Contains);
         p.on('pointerover', (pointer: Phaser.Input.Pointer) => {
-          this.showChampDetail(d.id, pointer.x, pointer.y);
+          const { x, y } = screenToWorld(pointer.x, pointer.y, this.cameras.main.zoom);
+          this.showChampDetail(d.id, x, y);
           this.input.setDefaultCursor('pointer');
         });
         p.on('pointerout', () => {
@@ -252,7 +253,8 @@ export class CodexScene extends Phaser.Scene {
         const chip = new ItemChip(this, px, py, chipSize, () => undefined);
         chip.setItem(it.id);
         chip.on('pointerover', (pointer: Phaser.Input.Pointer) => {
-          this.itemTip.show(it.id, pointer.x, pointer.y);
+          const { x, y } = screenToWorld(pointer.x, pointer.y, this.cameras.main.zoom);
+          this.itemTip.show(it.id, x, y);
           this.input.setDefaultCursor('pointer');
         });
         chip.on('pointerout', () => {
@@ -309,7 +311,10 @@ export class CodexScene extends Phaser.Scene {
       row.add(this.add.text(242, 12, '→', { fontFamily: FONT.body, fontSize: '13px', color: css(INK[300]) }).setOrigin(0, 0));
       draw(it.id, 262);
       row.setInteractive(new Phaser.Geom.Rectangle(0, 0, 380, 34), Phaser.Geom.Rectangle.Contains);
-      row.on('pointerover', (pointer: Phaser.Input.Pointer) => this.itemTip.show(it.id, pointer.x, pointer.y));
+      row.on('pointerover', (pointer: Phaser.Input.Pointer) => {
+        const { x, y } = screenToWorld(pointer.x, pointer.y, this.cameras.main.zoom);
+        this.itemTip.show(it.id, x, y);
+      });
       row.on('pointerout', () => this.itemTip.hide());
       c.add(row);
       y += 36;

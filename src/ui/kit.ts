@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { css, CINNABAR, DANGER, GILT, INK, PAPER, UI } from '../render/view/palette';
 import { bakedTexture } from '../render/view/bake';
+import { screenToWorld } from '../render/view/viewScale';
 import { audio } from '../audio/AudioEngine';
 
 /**
@@ -461,8 +462,10 @@ export function enableScroll(
   // wheel 回调实参顺序为 (pointer, overObjects, deltaX, deltaY, deltaZ)
   const onWheel = (p: Phaser.Input.Pointer, _over: unknown, _dx: number, dy: number) => {
     if (max <= 0 || !container.scene || !container.visible) return;
-    // 指针必须落在这个视口内：否则并排的多个滚动区（侧栏+浮层）会同时滚
-    if (p.x < viewX || p.x > viewX + viewW || p.y < viewY || p.y > viewY + viewH) return;
+    // 指针必须落在这个视口内：否则并排的多个滚动区（侧栏+浮层）会同时滚。
+    // p.x/y 是画布像素（1920K 系），视口矩形是世界系 —— 必须先换算（A1）
+    const { x, y } = screenToWorld(p.x, p.y, scene.cameras.main.zoom);
+    if (x < viewX || x > viewX + viewW || y < viewY || y > viewY + viewH) return;
     container.y -= dy;
     clamp();
   };

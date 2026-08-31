@@ -11,7 +11,7 @@ import { bakeSilhouettes } from '../board/silhouetteFactory';
 import { BOARD_H, BOARD_W, BoardView, CELL } from '../board/BoardView';
 import { UnitView, setFriendlyTeam } from '../board/UnitView';
 import { bakeItemIcons } from '../board/itemIcons';
-import { baseZoom } from '../view/viewScale';
+import { baseZoom, screenToWorld } from '../view/viewScale';
 import { EffectsLayer } from '../board/EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../board/DamageText';
 import { motion } from '../view/motion';
@@ -68,8 +68,6 @@ export class BattleScene extends Phaser.Scene {
    * 为空则是 M1 的"阵容对拍"演示模式。
    */
   private matchCtx: { match: Match; pair: Pairing } | null = null;
-  /** 本场战斗的内核输入原样快照（M4 回放），settleMatch 时随结果入库 */
-  private battleConfig: BattleConfig | null = null;
   /** 墨兽的 uid 集合（渲染层据此换用墨色剪影） */
   private monsterUids = new Set<number>();
   /** 观众（人类玩家）所在队号。演示模式固定为 0。 */
@@ -143,12 +141,13 @@ export class BattleScene extends Phaser.Scene {
     this.buildSidePanels();
     this.buildBottomBar();
 
-    // 交互：悬停查看棋子详情
+    // 交互：悬停查看棋子详情（p.x/y 是画布像素，先换算到 1920×1080 世界系 —— A1）
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      const local = { x: p.x - BOARD_X, y: p.y - BOARD_Y };
+      const { x, y } = screenToWorld(p.x, p.y, this.cameras.main.zoom);
+      const local = { x: x - BOARD_X, y: y - BOARD_Y };
       const cell = this.board.xyToCell(local.x, local.y);
       this.board.setHover(cell);
-      this.updateHoverCard(p.x, p.y, cell);
+      this.updateHoverCard(x, y, cell);
     });
 
     this.input.on('pointerdown', () => audio.unlock());
@@ -312,7 +311,6 @@ export class BattleScene extends Phaser.Scene {
       const b = buildTeam(this.compB, 1, 200);
       cfg = { seed: this.seed, units: [...a.inputs, ...b.inputs], traits: { 0: a.traits, 1: b.traits } };
     }
-    this.battleConfig = cfg;
     const cfgTraits: Record<number, ActiveTrait[]> = cfg.traits;
     this.monsterUids = new Set(cfg.units.filter((u) => u.monster).map((u) => u.uid));
     // "我方"由观众的队号决定，不是写死的 0 —— 玩家永远打下半场，
@@ -799,7 +797,7 @@ export class BattleScene extends Phaser.Scene {
 
     // 对局模式：把结果交回 Match，然后回主场景走结算。
     // 判定发生在内核，这里只是搬运 —— 渲染层永远不改变战斗结果。
-    this.settleMatch();
+    this.finalizeRound();
 
     const panel = this.add.container(0, 0).setDepth(200);
     const shade = this.add.graphics();
@@ -897,20 +895,14 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  /** 把本场结果写回对局（掉血、连胜连败、淘汰判定） */
-  private settleMatch(): void {
-    if (!this.matchCtx || !this.battle?.result) return;
-    const { match, pair } = this.matchCtx;
-    // 人类战场的回放快照：config 与内核输入逐字节同源；渲染战斗不录事件流，
-    // digest 走 '' 口径（verifyReplay 届时只比 winner/ticks）。
-    match.battleSnapshots.push({
-      round: match.round,
-      config: this.battleConfig ?? this.matchCtx.match.buildBattleConfig(pair, pair.swap),
-      winner: this.battle.result.winner as 0 | 1 | null,
-      ticks: this.battle.result.ticks,
-      eventsDigest: '',
-    });
-    match.applyBattleResult(pair, this.battle.result);
+  /**
+   * 回合收尾（A3）。结算（掉血、连胜连败、淘汰、快照）已由 Match.settleRound
+   * 在开战时刻按配对顺序统一完成 —— 人类场结果是同一 config + 种子的无头重放，
+   * 与本场景演出逐位同源。这里只推进阶段与落盘，绝不二次 applyBattleResult。
+   */
+  private finalizeRound(): void {
+    if (!this.matchCtx) return;
+    const match = this.matchCtx.match;
     match.endRound();
     saveMatch(match);
   }
