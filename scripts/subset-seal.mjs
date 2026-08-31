@@ -1,8 +1,8 @@
 /**
- * 羁绊小篆图标 · 字体子集管线
+ * 小篆字库 · 字体子集管线
  *
  * 输入：用户提供的 YiShanBeiZhuanTi.ttf（篆体，源包无授权文件，资产由项目所有者提供）
- * 输出：public/fonts/seal.woff2（仅含羁绊字表，供 FontFace 载入 + traitIcons 烘焙）
+ * 输出：src/assets/fonts/seal.woff2（仅含用字表，供 FontFace 载入 + traitIcons 烘焙）
  *
  * 先逐字探测字体覆盖（篆体字库未必收简繁全部码位），再按实际存在的字出子集。
  * 运行：node scripts/subset-seal.mjs
@@ -10,10 +10,11 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import subsetFont from 'subset-font';
 
-const SRC = '.tmp-seal/ShanBeiZhuanTi/YiShanBeiZhuanTi.ttf';
-const OUT = 'public/fonts/seal.woff2';
+const SRC = 'design/fonts/YiShanBeiZhuanTi.ttf';
+const OUT = 'src/assets/fonts/seal.woff2';
 
-/** 羁绊字表：传统码位优先，简体码位作覆盖探测备选 */
+/** 用字表 = 羁绊字表；传统码位优先，简体码位作覆盖探测备选。
+ *  字表以源字体篆形为界：开屏「天」取自表中，「弈」在源字体为楷形不入表。 */
 const CHARS = '天幽山劍剑妖機机鼎龍龙墨兵武護护刺射方術术丹';
 
 const ttf = readFileSync(SRC);
@@ -26,10 +27,10 @@ for (const ch of CHARS) {
 // 单字子集小于 ~200 字节视为无该字形（空 cmap）
 const missing = probe.filter(([, n]) => n < 200).map(([c]) => c);
 const present = [...CHARS].filter((c) => !missing.includes(c));
-console.log('字体缺失字形：', missing.length ? missing.join(' ') : '（无，22 字全覆盖）');
+console.log('字体缺失字形：', missing.length ? missing.join(' ') : `（无，${present.length} 字全覆盖）`);
 console.log('可用字形：', present.join(' '));
 
-mkdirSync('public/fonts', { recursive: true });
+mkdirSync('src/assets/fonts', { recursive: true });
 const woff2 = await subsetFont(ttf, present.join(''), { targetFormat: 'woff2' });
 writeFileSync(OUT, woff2);
 console.log(`写出 ${OUT}：${(woff2.length / 1024).toFixed(1)} KB，${present.length} 字`);

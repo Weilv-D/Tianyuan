@@ -123,6 +123,9 @@ const config: Phaser.Types.Core.GameConfig = {
 // 启动期唯一的几步异步：篆体子集 + AI 棋子图 + 装备图预解码。此后场景烘焙全同步。
 // 零字体 / 零图时立即通过，互不阻塞。
 await preloadSealFont();
+// 篆体就绪（或已确认失联落楷体）才放行开屏「天」的入场动画 —— index.html 以
+// #boot.seal 门控，保证第一笔画就是篆书，绝不先闪楷体再换字。
+document.getElementById('boot')?.classList.add('seal');
 await preloadAiPieces();
 await preloadItemArt();
 

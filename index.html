@@ -43,8 +43,9 @@ body.cur-hover #cur-ring{width:46px;height:46px;border-color:var(--gold)}
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;
   transition:clip-path 1.2s var(--ez-page);clip-path:inset(0 0 0 0)}
 #boot.hidden{clip-path:inset(0 0 100% 0);pointer-events:none}
-#boot .glyph{font-family:var(--kai);font-size:130px;color:var(--paper);line-height:1;
-  opacity:0;animation:glyphIn 1.5s var(--ez-in) .15s forwards}
+/* 开屏「天」以篆书起笔：篆体子集就绪（main.ts 挂 seal 类）后才入场 */
+#boot .glyph{font-family:"XiaoZhuan",var(--kai);font-size:130px;color:var(--paper);line-height:1;opacity:0}
+#boot.seal .glyph{animation:glyphIn 1.5s var(--ez-in) .15s forwards}
 @keyframes glyphIn{from{opacity:0;transform:scale(1.14);filter:blur(12px)}
   to{opacity:1;transform:scale(1);filter:blur(0)}}
 #boot .bar{width:200px;height:1px;background:rgba(179,150,96,.18);position:relative;overflow:hidden}
@@ -64,7 +65,7 @@ body.cur-hover #cur-ring{width:46px;height:46px;border-color:var(--gold)}
 <div id="cur-dot"></div><div id="cur-ring"></div>
 
 <div id="boot">
-  <div class="glyph">弈</div>
+  <div class="glyph">天</div>
   <div class="bar"><i></i></div>
   <div class="tip">九幽墨卷 · 徐徐展开</div>
 </div>

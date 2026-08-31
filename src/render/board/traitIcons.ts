@@ -13,7 +13,8 @@ import sealFontUrl from '../../assets/fonts/seal.woff2?url';
  *  - 计数不烘 —— 每局变动，由调用处以 Text 放在徽章内环下方。
  *
  * 字体：用户提供的篆体 TTF（design/fonts/）经 scripts/subset-seal.mjs 裁出
- * 羁绊字表 22 字 → seal.woff2（6.7KB，单文件构建时内联）。
+ * 羁绊字表 22 字 → seal.woff2（6.7KB，单文件构建时内联）。开屏「天」取自同一
+ * 族（index.html 直引 XiaoZhuan）；字表以源字体篆形为界，「弈」为楷形不在表内。
  * 载入失败时族栈自动落到楷体，徽章体系不变。
  */
 
