@@ -2,8 +2,8 @@
   "$meta": {
     "description": "百战天元 · M2 锁版金种子快照。由 tests/golden-determinism.test.ts 生成与消费；只比对 cases 字段，$meta 仅供参考。",
     "regenerate": "UPDATE_GOLDEN=1 npx vitest run tests/golden-determinism.test.ts",
-    "gameVersion": "1.4.0",
-    "build": "2026-08-30"
+    "gameVersion": "1.4.1",
+    "build": "2026-08-31"
   },
   "cases": {
     "jianzong-vs-longyuan": {
