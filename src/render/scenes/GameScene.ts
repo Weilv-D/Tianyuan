@@ -176,6 +176,7 @@ export class GameScene extends Phaser.Scene {
     audio.setVolume('bgm', this.prefs.volBgm);
     audio.setVolume('sfx', this.prefs.volSfx);
     audio.setVolume('ui', this.prefs.volUi);
+    audio.setLicensedMusicEnabled(this.prefs.licensedMusic);
 
     // 构建顺序与拆分前完全一致（同层深度按创建先后叠放，不可重排）
     this.hud.buildBackground();

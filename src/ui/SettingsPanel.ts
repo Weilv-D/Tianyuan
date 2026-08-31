@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { audio } from '../audio/AudioEngine';
 import { savePrefs, type Preferences } from '../game/save';
 import { Button, FONT } from './kit';
+import { musicCreditLine } from '../music/manifest';
 import { GILT, INK, PAPER, SHADE, css } from '../render/view/palette';
 import { motion } from '../render/view/motion';
 import { screenToWorld } from '../render/view/viewScale';
@@ -67,7 +68,7 @@ export class SettingsPanel {
     panel.add(shade);
 
     const bw = 440;
-    const bh = prefs && this.host.inMatch ? 578 : 478;
+    const bh = prefs && this.host.inMatch ? 646 : 546;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
     const g = scene.add.graphics();
@@ -167,6 +168,24 @@ export class SettingsPanel {
     );
     y += 60;
 
+    // 典藏音乐（D4）：CC0 授权曲目 / 程序化五声音阶合成
+    const licensedBtn = new Button(scene, bx + 34, y + 6, prefs.licensedMusic ? '典藏音乐 开' : '典藏音乐 关', () => {
+      prefs.licensedMusic = !prefs.licensedMusic;
+      audio.setLicensedMusicEnabled(prefs.licensedMusic);
+      licensedBtn.setText(prefs.licensedMusic ? '典藏音乐 开' : '典藏音乐 关');
+    }, { width: 150, height: 40 });
+    panel.add(licensedBtn);
+    panel.add(
+      scene.add
+        .text(bx + 196, y + 20, '关＝程序化五声音阶合成', {
+          fontFamily: FONT.body,
+          fontSize: '12px',
+          color: css(PAPER[400]),
+        })
+        .setOrigin(0, 0)
+    );
+    y += 60;
+
     if (this.host.inMatch) {
       // 放弃对局：二次确认（第一次点变成"确认放弃？"）
       const resignBtn = new Button(scene, bx + 34, y, '放弃对局', () => {
@@ -194,10 +213,21 @@ export class SettingsPanel {
 
     panel.add(
       scene.add
-        .text(W / 2, by + bh - 36, '快捷键：D 刷新　F 升级　E 布阵　空格 开战　Ctrl+Z 撤销　ESC 暂停', {
+        .text(W / 2, by + bh - 58, '快捷键：D 刷新　F 升级　E 布阵　空格 开战　Ctrl+Z 撤销　ESC 暂停', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[400]),
+        })
+        .setOrigin(0.5, 0)
+    );
+
+    // 音乐出处（读 manifest 单一真源；正式发布说明见 design/music/CREDITS.md）
+    panel.add(
+      scene.add
+        .text(W / 2, by + bh - 36, musicCreditLine(), {
+          fontFamily: FONT.body,
+          fontSize: '11px',
+          color: css(INK[300]),
         })
         .setOrigin(0.5, 0)
     );

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "menu",
+    "file": "src/music/tracks/menu.ogg",
+    "title": "Night Vigil",
+    "artist": "Kevin MacLeod",
+    "license": "CC0-1.0",
+    "sourceUrl": "https://freepd.com/epic.php",
+    "sha256": "8b9f0b1352b307d82143e6df4b9e886ee67b65b7a988dda29c563c80ffb5e8bd"
+  },
+  {
+    "id": "prep",
+    "file": "src/music/tracks/prep.ogg",
+    "title": "Think About It",
+    "artist": "Kevin MacLeod",
+    "license": "CC0-1.0",
+    "sourceUrl": "https://freepd.com/epic.php",
+    "sha256": "77099c323efe51707013bff77be4cf323019a74da5310f7fddfcf32557e9a372"
+  },
+  {
+    "id": "battle",
+    "file": "src/music/tracks/battle.ogg",
+    "title": "Battle Ready",
+    "artist": "Kevin MacLeod",
+    "license": "CC0-1.0",
+    "sourceUrl": "https://freepd.com/epic.php",
+    "sha256": "695bc17267f9654b93c93829ca2e8544936ad5dd1c8e1675db4fb74e55d911d8"
+  },
+  {
+    "id": "final",
+    "file": "src/music/tracks/final.ogg",
+    "title": "Epic Boss Battle",
+    "artist": "Kevin MacLeod",
+    "license": "CC0-1.0",
+    "sourceUrl": "https://freepd.com/epic.php",
+    "sha256": "e1cdca99b6e0f0bfcfe3dcd563f765070de979feb0ed23e13e4c430794dc2b25"
+  }
+]

@@ -8,6 +8,8 @@
  * 共享卷积混响、滤波压暗、声像摆位、乐句级调度与交叉淡入淡出。
  */
 
+import { LICENSED_MUSIC, type MusicMood } from '../music/manifest';
+
 type Bus = 'bgm' | 'sfx' | 'ui';
 
 /** 五声音阶（C 宫调），单位：半音相对 A4=440 */
@@ -24,18 +26,41 @@ export class AudioEngine {
   private bgmTimer: number | null = null;
   private nextNoteTime = 0;
   private step = 0;
-  private mood: 'prep' | 'battle' | 'final' | 'none' = 'none';
+  private mood: MusicMood | 'none' = 'none';
   private started = false;
   private visBound = false;
   private noiseBufCache = new Map<number, AudioBuffer>();
 
+  // ── 典藏音乐层（D4）：曲目可用且开关开启时接管 BGM 总线，否则程序化合成 ──
+  /** 已解码的授权曲目（按 mood 键控）；解码失败/缺失的 mood 不入表 → 自动回落 */
+  private licensedBufs = new Map<MusicMood, AudioBuffer>();
+  private licensedSrc: AudioBufferSourceNode | null = null;
+  /** 代际计数：慢解码完成后据此丢弃过期接管（用户已切歌/已停） */
+  private licensedGen = 0;
+  private licensedEnabled = true;
+  private licensedLoading = false;
+
   private reverb: ConvolverNode | null = null;
   private reverbBuilt = false;
+
+  /**
+   * bgm 总线 gain 的最后写入值镜像（D2）。
+   * cancelScheduledValues 后读 g.value 拿到的是「固有值」而非当前计算值
+   * （LinearRampToValueAtTime 推进中的实际音量不在 .value 里）——切歌/恢复
+   * 用它当起点会跳变。所有对 bgm 总线的写入都同步更新此镜像。
+   */
+  private bgmGainMirror: number | null = null;
 
   /** 必须在用户手势后调用 */
   unlock(): void {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.ctx.state === 'suspended') {
+        void this.ctx.resume().then(() => {
+          // 挂起期间 currentTime 冻结、恢复后前跳：立即重锚乐句时钟，
+          // 否则调度循环会把挂起期欠下的音符一次性塞进同一瞬间（D1 音爆）
+          if (this.mood !== 'none') this.nextNoteTime = this.now() + 0.15;
+        });
+      }
       return;
     }
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -73,6 +98,8 @@ export class AudioEngine {
     }
     this.buildReverb();
     this.started = true;
+    // 曲目解码是后台慢操作：先让程序化路径响着，解码完成后无缝接管（D4）
+    void this.loadLicensedMusic();
   }
 
   get ready(): boolean {
@@ -81,6 +108,7 @@ export class AudioEngine {
 
   setVolume(bus: Bus, v: number): void {
     this.volumes[bus] = v;
+    if (bus === 'bgm') this.bgmGainMirror = v;
     if (this.ctx) this.buses[bus].gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
   }
 
@@ -95,6 +123,107 @@ export class AudioEngine {
 
   isMuted(): boolean {
     return this.muted;
+  }
+
+  // ── 典藏音乐（D4） ──
+
+  /** 设置面板开关：即刻生效（开→授权曲目接管；关→回程序化合成） */
+  setLicensedMusicEnabled(v: boolean): void {
+    this.licensedEnabled = v;
+    const cur = this.mood;
+    if (cur !== 'none') {
+      this.stopBgm();
+      this.startBgm(cur);
+    }
+  }
+
+  isLicensedMusicEnabled(): boolean {
+    return this.licensedEnabled;
+  }
+
+  /** 当前是否由授权曲目驱动（设置面板/调试显示用） */
+  isLicensedPlaying(): boolean {
+    return this.licensedSrc !== null;
+  }
+
+  /** 后台抓取并解码全部授权曲目；逐曲 try/catch，失败即静默回落程序化 */
+  private async loadLicensedMusic(): Promise<void> {
+    if (!this.ctx || this.licensedLoading) return;
+    this.licensedLoading = true;
+    const ctx = this.ctx;
+    for (const track of LICENSED_MUSIC) {
+      const gen = ++this.licensedGen;
+      try {
+        const res = await fetch(track.url);
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        const audio = await ctx.decodeAudioData(buf);
+        if (gen !== this.licensedGen && this.mood === 'none') {
+          // 解码期间用户已停曲：只登记缓冲，不接管
+          this.licensedBufs.set(track.id, audio);
+          continue;
+        }
+        this.licensedBufs.set(track.id, audio);
+        this.maybeTakeoverLicensed();
+      } catch {
+        // 单曲失败不影响其余曲目与程序化路径
+      }
+    }
+    this.licensedLoading = false;
+  }
+
+  /** 程序化 BGM 正在响而目标曲目已就绪 → 无缝接管 */
+  private maybeTakeoverLicensed(): void {
+    if (
+      !this.ctx ||
+      !this.licensedEnabled ||
+      this.mood === 'none' ||
+      this.licensedSrc !== null ||
+      this.bgmTimer === null
+    ) {
+      return;
+    }
+    this.startLicensed(this.mood);
+  }
+
+  /** 启动某心境的授权曲目循环；曲目不可用返回 false（调用方回落程序化） */
+  private startLicensed(mood: MusicMood): boolean {
+    if (!this.ctx || !this.licensedEnabled) return false;
+    const buf = this.licensedBufs.get(mood);
+    if (!buf) return false;
+    this.stopLicensed(0);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(this.buses.bgm);
+    const gen = this.licensedGen;
+    src.onended = () => {
+      if (gen === this.licensedGen) this.licensedSrc = null;
+    };
+    src.start();
+    this.licensedSrc = src;
+    this.stopProcedural();
+    return true;
+  }
+
+  /** 停掉授权曲目源。fadeMs>0 时延迟物理停止（总线淡出先行，避免硬切） */
+  private stopLicensed(fadeMs: number): void {
+    this.licensedGen++;
+    const src = this.licensedSrc;
+    this.licensedSrc = null;
+    if (!src) return;
+    const kill = () => {
+      try { src.stop(); } catch { /* 已自然结束 */ }
+      try { src.disconnect(); } catch { /* 已断开 */ }
+    };
+    if (fadeMs > 0) window.setTimeout(kill, fadeMs);
+    else kill();
+  }
+
+  /** 停掉程序化调度循环（不清 mood） */
+  private stopProcedural(): void {
+    if (this.bgmTimer !== null) window.clearInterval(this.bgmTimer);
+    this.bgmTimer = null;
   }
 
   // ── 混响 ──
@@ -186,11 +315,13 @@ export class AudioEngine {
     q?: number,
     pan?: number,
     revSend?: number,
-  ): OscillatorNode {
+  ): OscillatorNode | null {
     const ctx = this.ctx!;
     const t = this.now() + when;
     if (!Number.isFinite(freq) || !Number.isFinite(t) || freq <= 0 || dur <= 0) {
-      return ctx.createOscillator();
+      // 无效参数：返回 null。此前返回一个未启动未连接的振荡器，
+      // 调用方若持有它会误以为有音在响（D3）
+      return null;
     }
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
@@ -375,9 +506,9 @@ export class AudioEngine {
 
   // ── BGM ──
 
-  startBgm(mood: 'prep' | 'battle' | 'final'): void {
+  startBgm(mood: MusicMood): void {
     if (!this.ready) return;
-    if (this.mood === mood && this.bgmTimer !== null) return;
+    if (this.mood === mood && (this.bgmTimer !== null || this.licensedSrc !== null)) return;
     const prev = this.mood;
     this.mood = mood;
     if (prev !== 'none' && this.buses) {
@@ -385,9 +516,12 @@ export class AudioEngine {
       const g = this.buses.bgm.gain;
       try {
         g.cancelScheduledValues(now);
-        g.setValueAtTime(g.value, now);
+        // 起点取镜像（最后写入值），不读 g.value —— cancel 后它是固有值，
+        // 推进中的淡入淡出读它会跳变（D2）
+        g.setValueAtTime(this.bgmGainMirror ?? this.volumes.bgm, now);
         g.linearRampToValueAtTime(Math.max(0.0001, this.volumes.bgm * 0.18), now + 0.12);
         g.linearRampToValueAtTime(this.volumes.bgm, now + 0.7);
+        this.bgmGainMirror = this.volumes.bgm;
       } catch {}
     }
     if ((prev === 'prep' || prev === 'final') && mood === 'battle') {
@@ -395,25 +529,31 @@ export class AudioEngine {
     } else if (prev === 'none') {
       this.step = 0;
     }
+    // 授权曲目可用且开关开启 → 循环 AudioBufferSourceNode 挂既有 bgm 总线
+    //（淡入淡出复用上面的总线 ramp），程序化调度不启动
+    if (this.startLicensed(mood)) return;
     this.nextNoteTime = this.now() + 0.12;
-    if (this.bgmTimer !== null) window.clearInterval(this.bgmTimer);
+    this.stopProcedural();
     this.bgmTimer = window.setInterval(() => this.scheduleBgm(), 60);
   }
 
   stopBgm(): void {
-    if (this.bgmTimer !== null) window.clearInterval(this.bgmTimer);
-    this.bgmTimer = null;
+    this.stopProcedural();
+    // 总线 0.22s 淡出后再杀源：授权曲目硬切会露一个爆点
+    this.stopLicensed(260);
     this.mood = 'none';
     if (this.ctx && this.buses) {
       try {
         const g = this.buses.bgm.gain;
         const now = this.now();
         g.cancelScheduledValues(now);
-        g.setValueAtTime(g.value, now);
+        g.setValueAtTime(this.bgmGainMirror ?? this.volumes.bgm, now);
         g.linearRampToValueAtTime(0.0001, now + 0.22);
+        this.bgmGainMirror = 0.0001;
         window.setTimeout(() => {
           if (this.ctx && this.buses && this.mood === 'none') {
             try { g.setValueAtTime(this.volumes.bgm, this.ctx.currentTime); } catch {}
+            this.bgmGainMirror = this.volumes.bgm;
           }
         }, 240);
       } catch {}
@@ -427,16 +567,23 @@ export class AudioEngine {
 
   private scheduleBgm(): void {
     if (!this.ctx || this.mood === 'none') return;
-    const tempo = this.mood === 'prep' ? 0.5 : this.mood === 'battle' ? 0.32 : 0.26;
+    // 挂起的上下文（隐藏标签页 / 未完成的手势解锁）：currentTime 冻结，
+    // 照常调度会把一串音符塞到同一时间戳上，恢复瞬间齐鸣（D1 音爆）。
+    // 直接跳过本拍，恢复时 resyncBgm / unlock 重锚乐句时钟。
+    if (this.ctx.state !== 'running') return;
+    // 程序化织体三档：menu 与 prep 共用慢板（menu 通常由授权曲目接管）
+    const style: 'prep' | 'battle' | 'final' =
+      this.mood === 'battle' ? 'battle' : this.mood === 'final' ? 'final' : 'prep';
+    const tempo = style === 'prep' ? 0.5 : style === 'battle' ? 0.32 : 0.26;
     this.resyncBgm();
     while (this.nextNoteTime < this.now() + 0.25) {
       const t = this.nextNoteTime - this.now();
       const s = this.step;
       const bar = Math.floor(s / 8);
       const beat = s % 8;
-      const swing = this.mood === 'prep' && beat % 2 === 1 ? 0.018 : 0;
+      const swing = style === 'prep' && beat % 2 === 1 ? 0.018 : 0;
 
-      if (this.mood === 'prep') {
+      if (style === 'prep') {
         const chunk = Math.floor(bar / 2) % 4;
         const padRoots = [0, 3, 2, 0];
         const isChunkHead = bar % 2 === 0 && beat === 0;
@@ -466,7 +613,7 @@ export class AudioEngine {
           this.tone('bgm', f, 2.0, 'triangle', 0.022, t, 0.6, 0, 1200, 0.7, 0, 0.1);
         }
       } else {
-        const isFinal = this.mood === 'final';
+        const isFinal = style === 'final';
         if (beat === 0) this.drum(t + swing, 0.24, 1, 0);
         if (beat === 2) this.drum(t + swing, 0.14, 1.45, -0.1);
         if (beat === 4) {

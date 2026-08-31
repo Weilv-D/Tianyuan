@@ -85,6 +85,7 @@ export class MenuScene extends Phaser.Scene {
     const hasSave = !!loadMatch();
     const prefs = loadPrefs();
     audio.setMuted(prefs.muted);
+    audio.setLicensedMusicEnabled(prefs.licensedMusic);
     motion.calm = prefs.calm;
 
     const bx = W / 2;
@@ -164,7 +165,7 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
 
     audio.unlock();
-    audio.startBgm('prep');
+    audio.startBgm('menu');
 
     this.cameras.main.fadeIn(360, 7, 9, 12);
     // ESC 在主菜单关设置

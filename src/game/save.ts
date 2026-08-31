@@ -138,6 +138,8 @@ export interface Preferences {
   autoDeploy: boolean;
   /** 静观模式：震动归零、闪光关闭、飘字去冲击缩放、天命之印缩短（前庭敏感/低配降级档） */
   calm: boolean;
+  /** 典藏音乐：授权 CC0 曲目接管 BGM（关 = 程序化五声音阶合成，D4） */
+  licensedMusic: boolean;
 }
 
 const PREF_KEY = 'inkarena.prefs.v1';
@@ -149,6 +151,7 @@ export const DEFAULT_PREFS: Preferences = {
   muted: false,
   autoDeploy: true,
   calm: false,
+  licensedMusic: true,
 };
 
 export function loadPrefs(): Preferences {
@@ -163,6 +166,7 @@ export function loadPrefs(): Preferences {
     if (typeof parsed.muted === 'boolean') out.muted = parsed.muted;
     if (typeof parsed.autoDeploy === 'boolean') out.autoDeploy = parsed.autoDeploy;
     if (typeof parsed.calm === 'boolean') out.calm = parsed.calm;
+    if (typeof parsed.licensedMusic === 'boolean') out.licensedMusic = parsed.licensedMusic;
     return out;
   } catch {
     return { ...DEFAULT_PREFS };
