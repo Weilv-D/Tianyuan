@@ -34,8 +34,9 @@ export class InputController {
   private dragUnit: UnitInstance | null = null;
   private dragFrom: { where: 'board' | 'bench'; slot: number } | null = null;
   private dragGhost: UnitPortrait | null = null;
-  /** 正在拖拽的装备（从装备栏拖向棋子） */
+  /** 正在拖拽的装备（从装备栏拖向棋子；拖向器匣另一组件 = 直接合成） */
   private dragItemId: string | null = null;
+  private dragItemFrom = -1;
   private dragItemGhost: Phaser.GameObjects.Image | null = null;
 
   // 悬停详情
@@ -57,6 +58,7 @@ export class InputController {
       this.dragItemGhost.destroy();
       this.dragItemGhost = null;
       this.dragItemId = null;
+      this.dragItemFrom = -1;
     }
   };
 
@@ -72,6 +74,7 @@ export class InputController {
     this.dragUnit = null;
     this.dragFrom = null;
     this.dragItemId = null;
+    this.dragItemFrom = -1;
     if (this.dragItemGhost) {
       this.dragItemGhost.destroy();
       this.dragItemGhost = null;
@@ -117,7 +120,7 @@ export class InputController {
       // 1) 装备栏里的一格 → 开始拖这件装备
       const chip = hitItemChip(x, y);
       if (chip >= 0 && this.scene.itemAt(chip)) {
-        this.beginItemDrag(this.scene.itemAt(chip)!, x, y);
+        this.beginItemDrag(chip, this.scene.itemAt(chip)!, x, y);
         return;
       }
 
@@ -222,22 +225,38 @@ export class InputController {
 
   // ══════════════ 装备拖拽 ══════════════
 
-  private beginItemDrag(itemId: string, x: number, y: number): void {
+  private beginItemDrag(fromIdx: number, itemId: string, x: number, y: number): void {
     this.dragItemId = itemId;
+    this.dragItemFrom = fromIdx;
     const key = itemIconKey(itemId);
-    this.dragItemGhost = this.scene.add.image(x, y, key).setDisplaySize(52, 52).setDepth(320).setAlpha(0.92);
+    // v1.9 放大：ghost 52→64，与放大后的器匣/头顶图标同一可读口径
+    this.dragItemGhost = this.scene.add.image(x, y, key).setDisplaySize(64, 64).setDepth(320).setAlpha(0.92);
     audio.play('ui');
   }
 
   private endItemDrag(x: number, y: number): void {
     const id = this.dragItemId;
+    const fromIdx = this.dragItemFrom;
     if (this.dragItemGhost) {
       this.dragItemGhost.destroy();
       this.dragItemGhost = null;
     }
     this.dragItemId = null;
+    this.dragItemFrom = -1;
+    this.itemTip.hide(); // 拖拽途中的提示卡跟随的是拖拽件，落定后即失效
     // 阶段守卫：拖拽中途已开战，装备状态随之锁定，放弃这次穿戴
     if (this.scene.phase !== 'prep' || this.scene.busy) {
+      this.scene.refreshAll();
+      return;
+    }
+    // v1.9 全配方：组件拖到器匣里的另一组件上 = 原地合成（不再需要经过棋子）。
+    // 落在自身格 = 原地放下，什么都不做。
+    const dropChip = hitItemChip(x, y);
+    if (dropChip >= 0) {
+      if (dropChip !== fromIdx && id && this.scene.itemAt(dropChip)) {
+        this.scene.onCombineInBar(fromIdx, dropChip);
+        return;
+      }
       this.scene.refreshAll();
       return;
     }

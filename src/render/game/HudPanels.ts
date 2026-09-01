@@ -587,11 +587,20 @@ export class HudPanels {
     this.traitModalScroll = enableScroll(this.scene, content, bodyX, bodyY, panelW - 40, panelH - PANEL_TITLE_H - 80);
     this.traitModalScroll.setHeight(y);
 
-    const close = new Button(this.scene, px + panelW / 2, py + panelH - 30, '关 闭', () => this.closeTraitModal(), {
-      width: 140,
-      height: 40,
-      variant: 'primary',
-    });
+    // Button 的 (x, y) 是左上角（bg origin 0），不是中心 —— 按"中心"传会把按键
+    // 右移半个身位、底部溢出面板边框。这里换算成左上角：水平居中、底缘净距 10px。
+    const close = new Button(
+      this.scene,
+      px + (panelW - 140) / 2,
+      py + panelH - 30 - 20,
+      '关 闭',
+      () => this.closeTraitModal(),
+      {
+        width: 140,
+        height: 40,
+        variant: 'primary',
+      },
+    );
     close.setDepth(562);
 
     this.traitModal = this.scene.add.container(0, 0).setDepth(560);

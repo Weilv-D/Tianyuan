@@ -264,7 +264,8 @@ export class CodexScene extends Phaser.Scene {
       list.forEach((it, i) => {
         const col = i % cols;
         const row = Math.floor(i / cols);
-        const px = col * (chipSize + 96) + 4;
+        // 格距随图标放大收紧（旧 96 是给 46 图标的疏排）
+        const px = col * (chipSize + 64) + 4;
         const py = y + row * (chipSize + 34);
         const chip = new ItemChip(this, px, py, chipSize, () => undefined);
         chip.setItem(it.id);
@@ -293,8 +294,9 @@ export class CodexScene extends Phaser.Scene {
 
     const comps = ITEMS.filter((i) => i.tier === 'component');
     const comb = ITEMS.filter((i) => i.tier === 'combined');
-    section('组 件', comps, 46, 4);
-    section('成 品（神兵）', comb, 46, 4);
+    // v1.9 全配方 36 件成品：格距按 4 列收排（格距 96 → 72），图 46→56 放大
+    section('组 件', comps, 56, 4);
+    section('成 品（神兵）', comb, 56, 4);
 
     // 合成表：A + B → C
     c.add(
@@ -309,7 +311,7 @@ export class CodexScene extends Phaser.Scene {
       const row = this.add.container(0, y);
       const draw = (id: string, x: number) => {
         if (this.textures.exists(itemIconKey(id))) {
-          row.add(this.add.image(x, 10, itemIconKey(id)).setDisplaySize(22, 22).setOrigin(0, 0));
+          row.add(this.add.image(x, 8, itemIconKey(id)).setDisplaySize(30, 30).setOrigin(0, 0));
         }
         row.add(
           this.add

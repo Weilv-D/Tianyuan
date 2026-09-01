@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ITEMS, ITEM_BY_ID } from '../data/items';
+import { ITEM_BY_ID } from '../data/items';
 import { itemIconKey } from '../render/board/itemIcons';
 import { GILT, INK, PAPER, css } from '../render/view/palette';
 import { FONT } from './kit';
@@ -67,18 +67,19 @@ export class ItemTooltip {
     const nameColor = def.tier === 'combined' ? GILT.light : PAPER[100];
     let y = 0;
 
-    // 首行：图标 + 名（成品鎏金、组件月白）
+    // 首行：图标 + 名（成品鎏金、组件月白）。v1.9 放大：26→36 —— 提示卡
+    // 是玩家读装备的唯一出口，图标必须与名字同权重
     const icon = this.scene.add
-      .image(14, 14, itemIconKey(itemId))
-      .setDisplaySize(26, 26)
+      .image(14, 12, itemIconKey(itemId))
+      .setDisplaySize(36, 36)
       .setOrigin(0, 0);
     c.add(icon);
     c.add(
       this.scene.add
-        .text(48, 15, def.name, { fontFamily: FONT.title, fontSize: '15px', color: css(nameColor) })
+        .text(58, 15, def.name, { fontFamily: FONT.title, fontSize: '16px', color: css(nameColor) })
         .setOrigin(0, 0)
     );
-    y = 44;
+    y = 52;
 
     const desc = this.scene.add
       .text(14, y, def.desc, {
@@ -91,16 +92,14 @@ export class ItemTooltip {
     c.add(desc);
     y += desc.height + 8;
 
-    // 合成信息：成品给来源，组件给去向
+    // 合成信息：成品给来源；组件在全配方（36/36）下与任意组件必有合成，
+    // 逐一列出去向（8 条）只会淹没提示卡，改为一句话
     let recipeLine = '';
     if (def.tier === 'combined' && def.recipe) {
       const [a, b] = def.recipe;
       recipeLine = `由 ${ITEM_BY_ID[a]?.name ?? a} + ${ITEM_BY_ID[b]?.name ?? b} 合成`;
     } else if (def.tier === 'component') {
-      const outs = ITEMS.filter((it) => it.tier === 'combined' && it.recipe?.includes(itemId)).map(
-        (it) => it.name
-      );
-      if (outs.length > 0) recipeLine = `可合成 ${outs.join(' · ')}`;
+      recipeLine = '与任意组件拖到一起即可合成成品';
     }
     if (recipeLine) {
       const rec = this.scene.add

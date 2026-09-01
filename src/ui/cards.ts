@@ -303,8 +303,9 @@ export class ShopCard extends Phaser.GameObjects.Container {
     const key = silhouetteKey(defId, 0, 1); // 商店里永远是一星新兵的简笔剪影
     if (this.scene.textures.exists(key)) {
       this.sil.setTexture(key);
-      // 按墨迹可见内容高缩放：所有卡片的棋子占卡面同一比例，不再随原型忽大忽小
-      const scale = silContentScale(defId, 1, 62, this.cardW * 0.76);
+      // 按墨迹可见内容高缩放：所有卡片的棋子占卡面同一比例，不再随原型忽大忽小。
+      // 78/0.84：上部留白收窄（脚底锚点不动，棋子向上长高），卡面利用率显著提高。
+      const scale = silContentScale(defId, 1, 78, this.cardW * 0.84);
       this.sil.setScale(scale).setOrigin(0.5, SIL_ORIGIN_Y);
       this.sil.setPosition(this.cardW / 2, this.cardH - 62);
       this.sil.setVisible(true);
@@ -433,7 +434,13 @@ export class TraitRow extends Phaser.GameObjects.Container {
     const def = TRAIT_BY_ID[id];
     const active = tier >= 0;
     if (this.scene.textures.exists(traitIconKey(id, active ? Math.min(tier, 3) : 0))) {
-      this.icon.setTexture(traitIconKey(id, active ? Math.min(tier, 3) : 0)).setVisible(true);
+      // 徽章贴图是 40 逻辑 × 2 超采样的 80px 画布；setDisplaySize 的本质是"按当前
+      // 贴图尺寸换算 scale"，构造期对空贴图设的 30px 会在 setTexture 后失真成
+      // ~75px 巨环（圈圈互相叠连、压住描述首字）——换贴图后必须重设显示尺寸。
+      this.icon
+        .setTexture(traitIconKey(id, active ? Math.min(tier, 3) : 0))
+        .setVisible(true)
+        .setDisplaySize(30, 30);
     }
     this.nameText.setText(def?.name ?? id);
     this.nameText.setColor(active ? css(tierColor) : css(INK[300]));
@@ -616,7 +623,9 @@ export class ItemChip extends Phaser.GameObjects.Container {
     const key = itemIconKey(id);
     if (this.scene.textures.exists(key)) {
       this.img.setTexture(key);
-      this.img.setDisplaySize(this.chipSize - 12, this.chipSize - 12);
+      // v1.9 放大：52 格内图标 40→47，只留 2.5px 描边呼吸 —— 器匣是玩家
+      // 停留最久的装备界面，图标必须一眼可辨
+      this.img.setDisplaySize(this.chipSize - 5, this.chipSize - 5);
       this.img.setPosition(this.chipSize / 2, this.chipSize / 2);
       this.img.setVisible(true);
     }

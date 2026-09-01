@@ -6,7 +6,7 @@ import { autoArrange } from '../../game/arrange';
 import { restorePlayer, snapshotPlayer, type PlayerSnapshot } from '../../game/undo';
 import { findUnit, type UnitInstance } from '../../game/state';
 import { autoEquip, equipItem, unequipAll, unequipItem, MAX_ITEMS_PER_UNIT } from '../../game/inventory';
-import { ITEM_BY_ID } from '../../data/items';
+import { ITEM_BY_ID, combine } from '../../data/items';
 import { clearSave, loadMatch, loadPrefs, saveMatch, type Preferences } from '../../game/save';
 import { audio } from '../../audio/AudioEngine';
 import { FONT, resetCursorOnShutdown } from '../../ui/kit';
@@ -288,6 +288,39 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ══════════════ 装备操作 ══════════════
+
+  /**
+   * 器匣内合成：组件 A 拖到组件 B 上，原地合出成品（v1.9 全配方）。
+   * 结果落在靠前的那个格位 —— 先摘后放，其余装备的格位保持稳定。
+   */
+  onCombineInBar(from: number, to: number): void {
+    const a = this.itemAt(from);
+    const b = this.itemAt(to);
+    if (!a || !b || a === b) {
+      this.refreshAll();
+      return;
+    }
+    const out = combine(a, b);
+    if (!out) {
+      // 全配方下不可达（36/36 两两可合），守在这里只是防未来加"不成装"组合
+      this.showToast('这两件合不出东西', true);
+      audio.play('warn');
+      this.refreshAll();
+      return;
+    }
+    this.pushUndo('器匣合成');
+    const p = this.match.human;
+    const lo = Math.min(from, to);
+    const hi = Math.max(from, to);
+    p.items.splice(hi, 1);
+    p.items.splice(lo, 1, out);
+    this.selectedItem = null;
+    this.exitUnloadMode();
+    audio.play('coin');
+    // 合成神装是这局的高光之一，与拖到棋子上的合成共用同一场演出
+    this.celebrate('item', ITEM_BY_ID[out].name);
+    this.afterAction();
+  }
 
   onEquip(u: UnitInstance, itemId: string): void {
     this.pushUndo('装配');

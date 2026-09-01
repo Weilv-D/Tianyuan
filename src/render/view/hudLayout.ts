@@ -148,13 +148,14 @@ export function reportRowFitsSide(): boolean {
 // 历史事故：cards.ts 放大图标（0.17→0.22）后 hitTest 未同步，点装备卸单件
 // 错位 4~6px。公式收拢到这里，两侧只许引用、不许再各写一份。
 
-/** 单枚装备图标的边长（sz = 棋子卡边长） */
+/** 单枚装备图标的边长（sz = 棋子卡边长）。v1.9 放大：0.22→0.26 —— 点选热区与
+ *  可读性同步扩大；3×(0.26sz)+2×2 在 66px 卡内仍留 ≥8px 右缘。 */
 export function portraitItemSlotSize(sz: number): number {
-  return Math.max(13, Math.round(sz * 0.22));
+  return Math.max(14, Math.round(sz * 0.26));
 }
 
 /** 图标间缝与卡内左上起点 */
-export const PORTRAIT_ITEM_GAP = 3;
+export const PORTRAIT_ITEM_GAP = 2;
 export const PORTRAIT_ITEM_PAD = { x: 4, y: 5 } as const;
 
 /** 第 i 枚图标的矩形（卡局部坐标，左上原点）。供 cards.ts 定位与 hitTest 命中。 */

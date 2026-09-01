@@ -37,10 +37,12 @@ export const HP_BAR_H = 4.5;
 export const MANA_BAR_H = 3.5;
 export const BAR_W = 44;
 export const PIP_HALF = 3.6;
-export const ITEM_ICON = 12;
-export const ITEM_GAP = 4;
-/** 装备行满编宽 —— 恰等于血条宽，头顶横带完全对齐 */
-export const ITEM_ROW_W = 3 * ITEM_ICON + 2 * ITEM_GAP; // 44
+// v1.9 放大：12→16。装备是"这局打得怎么样"的第一手情报，12px 在实机 DPR 缩放下
+// 几乎不可读；16px 后装备行(54)仍窄于格距 72，邻格不串行。
+export const ITEM_ICON = 16;
+export const ITEM_GAP = 3;
+/** 装备行满编宽 —— 略宽于血条，三枚图标仍是头顶横带的视觉主体 */
+export const ITEM_ROW_W = 3 * ITEM_ICON + 2 * ITEM_GAP; // 54
 
 // ── 头顶栈净距（世界 px）──────────────────────────────
 export const HEAD_GAP = {

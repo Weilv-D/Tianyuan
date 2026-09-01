@@ -136,7 +136,8 @@ export class SceneRefresh {
       this.scene.hud.itemChips[i].setAlpha(this.scene.selectedItem && this.scene.selectedItem !== this.scene.itemAt(i) ? 0.55 : 1);
     }
     const n = p.items.length;
-    this.scene.hud.itemHint.setText(n === 0 ? '' : `${n} 件待装`);
+    // 全配方后组件拖组件即合成 —— 手势在提示行里带上一句，玩家不必去图鉴查谱
+    this.scene.hud.itemHint.setText(n === 0 ? '' : `${n} 件待装 · 拖到棋子装配，拖到组件直接合成`);
   }
 
   // ══════════════ 羁绊轨（左：小篆徽章 + 计数，悬停出详情） ══════════════
