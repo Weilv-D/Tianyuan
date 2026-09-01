@@ -672,7 +672,10 @@ export class GameScene extends Phaser.Scene {
     if (pair.beast) {
       const o = outs[0];
       const won = o?.outcome === 'win';
-      const drop = o?.drops?.length ? `　得 ${o.drops.length} 件器件` : '';
+      const parts: string[] = [];
+      if ((o?.drops?.length ?? 0) > 0) parts.push(`得 ${o!.drops.length} 件器件`);
+      if ((o?.gold ?? 0) > 0) parts.push(`+${o!.gold} 金`);
+      const drop = parts.length > 0 ? `　${parts.join(' · ')}` : '';
       return `${nameOf(pair.a)} VS 墨兽 · ${won ? `胜${drop}` : `败 -${o?.damage ?? 0}${drop}`}`;
     }
     if (pair.b < 0) {

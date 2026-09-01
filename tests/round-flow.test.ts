@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PLAYER_START_HP } from '../src/core/config';
 import { COMPONENT_IDS } from '../src/data/items';
 import { COMBINED_ITEM_IDS, adventureGold, adventureReinforceCost, adventureStage, adventureXp } from '../src/game/adventure';
-import { ADVENTURE_ROUND_SCHEDULE, BEAST_ROUND_SCHEDULE, Match } from '../src/game/match';
+import { ADVENTURE_ROUND_SCHEDULE, BEAST_DROP_SCHEDULE, BEAST_ROUND_SCHEDULE, Match } from '../src/game/match';
 import { createUnit } from '../src/game/state';
 
 /** 逐轮推进到目标回合（不结算战斗 —— 调度与掉落断言不依赖 AI 战局） */
@@ -56,7 +56,7 @@ describe('首战引导轮（第 1 回合墨兽）', () => {
     }
   });
 
-  it('教学轮零掉血：空场败给墨兽不扣生命，且必掉 1 件组件', () => {
+  it('教学轮零掉血：空场败给墨兽不扣生命，必掉 2 组件 + 8 金', () => {
     const match = new Match(42);
     match.beginRound();
     match.pairings = match.makePairings();
@@ -67,8 +67,8 @@ describe('首战引导轮（第 1 回合墨兽）', () => {
     expect(match.human.lastOutcome).toBe('loss');
     expect(match.human.lastDamage).toBe(0);
     expect(match.human.hp).toBe(PLAYER_START_HP);
-    expect(match.human.items).toHaveLength(1);
-    expect(COMPONENT_IDS).toContain(match.human.items[0]);
+    expect(match.human.items).toHaveLength(2);
+    for (const id of match.human.items) expect(COMPONENT_IDS).toContain(id);
   });
 });
 
@@ -81,58 +81,81 @@ describe('墨兽掉落表', () => {
     });
   }
 
-  it('第 7 轮：胜局 1~2 件全组件，败局保底恰 1 件', () => {
-    const winCounts = new Set<number>();
-    for (let seed = 1; seed <= 16; seed++) {
-      const match = new Match(seed);
-      enterRound(match, 7);
-      forceWin(match);
-      match.pairings = match.makePairings();
-      match.settleRound();
-      expect(match.human.lastOutcome).toBe('win');
-      const drops = match.human.items;
-      expect(drops.length).toBeGreaterThanOrEqual(1);
-      expect(drops.length).toBeLessThanOrEqual(2);
-      for (const id of drops) expect(COMPONENT_IDS).toContain(id);
-      winCounts.add(drops.length);
-    }
-    // 55% 第二件分支必须真实存在：16 个种子不该全是单掉
-    expect(winCounts.has(2)).toBe(true);
+  /** 结算并返回人类本场的掉落（组件/成品 ids 与金币） */
+  function settleDrop(match: Match, win: boolean): { items: string[]; gold: number } {
+    if (win) forceWin(match);
+    match.pairings = match.makePairings();
+    const goldBefore = match.human.gold;
+    match.settleRound();
+    return {
+      items: match.human.items,
+      gold: match.human.gold - goldBefore,
+    };
+  }
 
-    const lost = new Match(7);
-    enterRound(lost, 7);
-    lost.pairings = lost.makePairings();
-    lost.settleRound();
-    expect(lost.human.lastOutcome).toBe('loss');
-    expect(lost.human.items).toHaveLength(1);
-    expect(COMPONENT_IDS).toContain(lost.human.items[0]);
+  it('下限口径：五轮全败 = 19 组件（9.5 成装当量）+ 70 金，双双过 9 件/60 金验收线', () => {
+    // 1 成品 = 2 组件（items.ts recipe 均为两两合成），9 件成装 = 18 组件当量
+    const compSum = BEAST_DROP_SCHEDULE.reduce((sum, tier) => sum + tier.comp, 0);
+    const goldSum = BEAST_DROP_SCHEDULE.reduce((sum, tier) => sum + tier.gold, 0);
+    expect(compSum).toBe(19);
+    expect(goldSum).toBe(70);
+    expect(compSum).toBeGreaterThanOrEqual(18);
+    expect(goldSum).toBeGreaterThanOrEqual(60);
+    // 胜场追加只多不少：逐轮胜侧总量（含成品按 2 组件当量计）高于败侧
+    for (const tier of BEAST_DROP_SCHEDULE) {
+      const winValue = tier.comp + tier.winComp + tier.winCompleted * 2;
+      expect(winValue).toBeGreaterThanOrEqual(tier.comp);
+    }
   });
 
-  it('第 25 轮：胜局至多 4 件、可含成品装备；败局仍保底 1 件组件', () => {
+  it('第 7 轮：保底 3 组件 + 12 金，胜场追加至 4 组件 + 16 金', () => {
+    const lost = new Match(7);
+    enterRound(lost, 7);
+    const lossDrop = settleDrop(lost, false);
+    expect(lost.human.lastOutcome).toBe('loss');
+    expect(lossDrop.items).toHaveLength(3);
+    for (const id of lossDrop.items) expect(COMPONENT_IDS).toContain(id);
+    expect(lossDrop.gold).toBe(12);
+
+    const won = new Match(7);
+    enterRound(won, 7);
+    const winDrop = settleDrop(won, true);
+    expect(won.human.lastOutcome).toBe('win');
+    expect(winDrop.items).toHaveLength(4);
+    for (const id of winDrop.items) expect(COMPONENT_IDS).toContain(id);
+    expect(winDrop.gold).toBe(16);
+  });
+
+  it('第 13 轮：保底 4 组件 + 14 金，胜场追加至 6 组件 + 20 金', () => {
+    const won = new Match(13);
+    enterRound(won, 13);
+    const winDrop = settleDrop(won, true);
+    expect(winDrop.items).toHaveLength(6);
+    expect(winDrop.gold).toBe(20);
+  });
+
+  it('第 19/25 轮：胜场各含 1 件成品，金币随表递增', () => {
     const COMBINED = new Set(COMBINED_ITEM_IDS);
-    let sawCombined = false;
-    for (let seed = 1; seed <= 16; seed++) {
-      const match = new Match(seed);
-      enterRound(match, 25);
-      forceWin(match);
-      match.pairings = match.makePairings();
-      match.settleRound();
-      expect(match.human.lastOutcome).toBe('win');
-      const drops = match.human.items;
-      expect(drops.length).toBeLessThanOrEqual(4);
-      for (const id of drops) {
-        expect(COMPONENT_IDS.includes(id) || COMBINED.has(id)).toBe(true);
-        if (COMBINED.has(id)) sawCombined = true;
-      }
-    }
-    expect(sawCombined).toBe(true);
+
+    const r19 = new Match(19);
+    enterRound(r19, 19);
+    const drop19 = settleDrop(r19, true);
+    expect(drop19.items).toHaveLength(8); // 5 保底 + 2 追加组件 + 1 成品
+    expect(drop19.items.filter((id) => COMBINED.has(id))).toHaveLength(1);
+    expect(drop19.gold).toBe(24);
+
+    const r25 = new Match(25);
+    enterRound(r25, 25);
+    const drop25 = settleDrop(r25, true);
+    expect(drop25.items).toHaveLength(9); // 5 保底 + 3 追加组件 + 1 成品
+    expect(drop25.items.filter((id) => COMBINED.has(id))).toHaveLength(1);
+    expect(drop25.gold).toBe(30);
 
     const lost = new Match(9);
     enterRound(lost, 25);
-    lost.pairings = lost.makePairings();
-    lost.settleRound();
-    expect(lost.human.lastOutcome).toBe('loss');
-    expect(lost.human.items).toHaveLength(1);
-    expect(COMPONENT_IDS).toContain(lost.human.items[0]);
+    const lossDrop = settleDrop(lost, false);
+    expect(lossDrop.items).toHaveLength(5);
+    for (const id of lossDrop.items) expect(COMPONENT_IDS).toContain(id);
+    expect(lossDrop.gold).toBe(20);
   });
 });

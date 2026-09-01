@@ -139,8 +139,10 @@ export interface RoundOutcome {
   damage: number;
   hpAfter: number;
   eliminated: boolean;
-  /** 本场掉落的装备（墨兽轮） */
+  /** 本场掉落的装备（墨兽轮）：组件与成品 ids */
   drops: string[];
+  /** 本场掉落的金币（墨兽轮） */
+  gold: number;
 }
 
 export interface MatchSettings {
@@ -159,6 +161,34 @@ export interface BuyResult {
 export const BEAST_ROUND_SCHEDULE: readonly number[] = [1, 7, 13, 19, 25];
 /** 对局节奏真源：奇遇轮恰三次，对准开局 / 中盘 / 后程三段成长弧 */
 export const ADVENTURE_ROUND_SCHEDULE: readonly number[] = [4, 10, 16];
+
+/** 单只墨兽的掉落档：全员保底（胜负同发）+ 胜场追加（含成品件数） */
+export interface BeastDropTier {
+  round: number;
+  /** 保底组件数（胜负同发） */
+  comp: number;
+  /** 保底金币（胜负同发） */
+  gold: number;
+  /** 胜场追加组件数 */
+  winComp: number;
+  /** 胜场追加金币 */
+  winGold: number;
+  /** 胜场追加成品装备数 */
+  winCompleted: number;
+}
+
+/**
+ * 墨兽掉落真源表。下限口径（验收线）：**五轮全败**也有组件 19（= 9.5 件成装当量，
+ * 1 成品 = 2 组件）+ 金币 70，高于 9 件 / 60 金的验收线；五轮全胜 27 组件 + 2 成品
+ * （= 15.5 件成装当量）+ 96 金。保底对所有玩家无条件发放，胜场追加只多不少。
+ */
+export const BEAST_DROP_SCHEDULE: readonly BeastDropTier[] = [
+  { round: 1, comp: 2, gold: 8, winComp: 0, winGold: 0, winCompleted: 0 },
+  { round: 7, comp: 3, gold: 12, winComp: 1, winGold: 4, winCompleted: 0 },
+  { round: 13, comp: 4, gold: 14, winComp: 2, winGold: 6, winCompleted: 0 },
+  { round: 19, comp: 5, gold: 16, winComp: 2, winGold: 8, winCompleted: 1 },
+  { round: 25, comp: 5, gold: 20, winComp: 3, winGold: 10, winCompleted: 1 },
+];
 
 export class Match implements AiWorld {
   readonly seed: number;
@@ -769,7 +799,7 @@ export class Match implements AiWorld {
     if (!pair.beast && pair.b < 0 && pair.ghost < 0) {
       pa.lastOutcome = 'bye';
       pa.lastDamage = 0;
-      out.push({ idx: pa.idx, outcome: 'bye', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [] });
+      out.push({ idx: pa.idx, outcome: 'bye', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [], gold: 0 });
       return out;
     }
 
@@ -778,13 +808,13 @@ export class Match implements AiWorld {
       pa.lastOutcome = 'draw';
       pa.streak = 0;
       pa.lastDamage = 0;
-      out.push({ idx: pa.idx, outcome: 'draw', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [] });
+      out.push({ idx: pa.idx, outcome: 'draw', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [], gold: 0 });
       if (pair.b >= 0) {
         const pb = this.players[pair.b];
         pb.lastOutcome = 'draw';
         pb.streak = 0;
         pb.lastDamage = 0;
-        out.push({ idx: pb.idx, outcome: 'draw', damage: 0, hpAfter: pb.hp, eliminated: false, drops: [] });
+        out.push({ idx: pb.idx, outcome: 'draw', damage: 0, hpAfter: pb.hp, eliminated: false, drops: [], gold: 0 });
       }
       return out;
     }
@@ -815,8 +845,8 @@ export class Match implements AiWorld {
     p.lastOutcome = 'win';
     p.lastDamage = 0;
     this.applyStreak(p, true);
-    const drops = beast ? this.rollItemDrops(p, true) : [];
-    out.push({ idx: p.idx, outcome: 'win', damage: 0, hpAfter: p.hp, eliminated: false, drops });
+    const drop = beast ? this.rollItemDrops(p, true) : { items: [], gold: 0 };
+    out.push({ idx: p.idx, outcome: 'win', damage: 0, hpAfter: p.hp, eliminated: false, drops: drop.items, gold: drop.gold });
   }
 
   private applyLoss(
@@ -834,9 +864,9 @@ export class Match implements AiWorld {
     if (winner) winner.totalDamage += dmg;
     const dead = p.hp <= 0 && p.alive;
     if (dead) this.eliminate(p);
-    // 墨兽轮输了也给一件保底，否则弱势玩家会彻底断掉装备来源，雪崩无解
-    const drops = beast ? this.rollItemDrops(p, false) : [];
-    out.push({ idx: p.idx, outcome: 'loss', damage: dmg, hpAfter: p.hp, eliminated: dead, drops });
+    // 墨兽轮败野按真源表保底发放（下限口径：全败也过 9 件成装 + 60 金验收线）
+    const drop = beast ? this.rollItemDrops(p, false) : { items: [], gold: 0 };
+    out.push({ idx: p.idx, outcome: 'loss', damage: dmg, hpAfter: p.hp, eliminated: dead, drops: drop.items, gold: drop.gold });
   }
 
   boardOfOpponent(pair: Pairing): readonly (UnitInstance | null)[] {
@@ -853,36 +883,41 @@ export class Match implements AiWorld {
 
 
   /**
-   * 墨兽轮掉落表（全场恰五只墨兽，单轮期望对齐旧七轮节奏且下限更高）：
+   * 墨兽轮掉落：按 BEAST_DROP_SCHEDULE 真源表发放。
    *
-   * | 轮次      | 胜                                | 败       |
-   * |-----------|----------------------------------|----------|
-   * | 第 1 轮   | 组件 ×1（引导轮，输赢同礼）        | 组件 ×1  |
-   * | 2~12 轮   | 组件 ×1 + 55% 第二件              | 组件 ×1  |
-   * | ≥13 轮    | 再 + 20% 第三件组件               | 组件 ×1  |
-   * | ≥19 轮    | 再 + 25% 成品装备                 | 组件 ×1  |
-   *
-   * 败野保底从 40% 概率提为必给 —— 这不是仁慈，是防雪崩：
-   * 装备差距一旦在早期拉开，弱势玩家会连输到再也拿不到装备，对局中段就提前结束。
+   * 结构 = 全员保底（胜负同发）+ 胜场追加：败野的量就是验收下限本身 ——
+   * 全败也稳拿 9.5 件成装当量（1 成品 = 2 组件）+ 70 金，"至少 9 件 / 60 金"
+   * 由表结构保证而不是由胜率期望保证；胜场只多不少，19/25 轮胜场另含成品。
+   * 这不是仁慈，是防雪崩：装备差距一旦在早期拉开，弱势玩家会连输到
+   * 再也拿不到装备，对局在中段就提前结束。
    *
    * 发放不设器匣上限（裁决 2026-09-01）：与 stripItems 同一守恒口径 ——
    * 装备只进不出，超过版面格数的部分不可见但仍入存档；卸装侧的容量守卫见
    * inventory.unequipAll（玩家主动卸装才严守 ITEM_BAR_SLOTS）。
+   *
+   * @returns 实发明细（组件/成品 ids 与金币数），调用方写入 RoundOutcome 供战报呈现
    */
-  private rollItemDrops(p: PlayerState, won: boolean): string[] {
-    const drops: string[] = [];
-    if (this.round === 1) {
-      drops.push(this.rng.pick(COMPONENT_IDS));
-    } else if (won) {
-      drops.push(this.rng.pick(COMPONENT_IDS));
-      if (this.rng.chance(0.55)) drops.push(this.rng.pick(COMPONENT_IDS));
-      if (this.round >= 13 && this.rng.chance(0.2)) drops.push(this.rng.pick(COMPONENT_IDS));
-      if (this.round >= 19 && this.rng.chance(0.25)) drops.push(this.rng.pick(COMBINED_ITEM_IDS));
-    } else {
-      drops.push(this.rng.pick(COMPONENT_IDS));
+  private rollItemDrops(p: PlayerState, won: boolean): { items: string[]; gold: number } {
+    const tier =
+      BEAST_DROP_SCHEDULE.find((t) => t.round === this.round) ??
+      (this.round < BEAST_DROP_SCHEDULE[0].round ? BEAST_DROP_SCHEDULE[0] : BEAST_DROP_SCHEDULE[BEAST_DROP_SCHEDULE.length - 1]);
+    const comp = tier.comp + (won ? tier.winComp : 0);
+    const items: string[] = [];
+    for (let i = 0; i < comp; i++) {
+      const id = this.rng.pick(COMPONENT_IDS);
+      addItem(p, id);
+      items.push(id);
     }
-    for (const d of drops) addItem(p, d);
-    return drops;
+    if (won) {
+      for (let i = 0; i < tier.winCompleted; i++) {
+        const id = this.rng.pick(COMBINED_ITEM_IDS);
+        addItem(p, id);
+        items.push(id);
+      }
+    }
+    const gold = tier.gold + (won ? tier.winGold : 0);
+    p.gold += gold;
+    return { items, gold };
   }
 
   /** AI 分配装备：把装备栏里的东西装到最合适的棋子上 */
