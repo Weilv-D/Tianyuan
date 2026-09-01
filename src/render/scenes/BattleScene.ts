@@ -8,10 +8,10 @@ import { TRAIT_BY_ID } from '../../data/traits';
 import { SHADE, TRAIT_TIER_COLOR_HEX, CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../view/palette';
 import { buildTextures, grainOverlay, TEX } from '../view/textures';
 import { bakeSilhouettes } from '../board/silhouetteFactory';
-import { BOARD_W, BoardView, CELL } from '../board/BoardView';
+import { BoardView, CELL } from '../board/BoardView';
 import { UnitView, setFriendlyTeam } from '../board/UnitView';
 import { bakeItemIcons } from '../board/itemIcons';
-import { baseZoom, screenToWorld } from '../view/viewScale';
+import { baseZoom, battleWorldToLayer, BATTLE_BOARD_LX, BATTLE_BOARD_LY, BATTLE_BOARD_SCALE, BATTLE_BOARD_SIZE, screenToWorld } from '../view/viewScale';
 import { EffectsLayer } from '../board/EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../board/DamageText';
 import { motion } from '../view/motion';
@@ -25,12 +25,8 @@ import type { ActiveTrait, BattleConfig } from '../../core/types';
 
 const W = 1920;
 const H = 1080;
-/** 战斗演出：棋盘层整体放大系数。棋子/特效/血条/投射物全部随之放大，
- *  面板/顶栏/悬停卡是层外组件不受影响。1.25 → 盘 800²：
- *  水平 [560,1360] 落在左右面板（344/1576）之间，垂直 [108,908] 让开顶部带与控制条。 */
-const BOARD_SCALE = 1.25;
-const BOARD_LX = (W - BOARD_W * BOARD_SCALE) / 2;
-const BOARD_LY = 108;
+// 棋盘层的位置 / 缩放真源在 viewScale（BATTLE_BOARD_*），此处不另立常量——
+// 指针逆变换 battleWorldToLayer 与布局必须同一出处，测试才能断言同一契约。
 /** 悬停单位卡尺寸（updateHoverCard 与 makeUnitCard 共用）；高度容纳两行技能描述 */
 const UNIT_CARD_W = 268;
 const UNIT_CARD_H = 184;
@@ -152,7 +148,7 @@ export class BattleScene extends Phaser.Scene {
 
     // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
 
-    this.boardLayer = this.add.container(BOARD_LX, BOARD_LY).setScale(BOARD_SCALE);
+    this.boardLayer = this.add.container(BATTLE_BOARD_LX, BATTLE_BOARD_LY).setScale(BATTLE_BOARD_SCALE);
     this.board = new BoardView(this, 0, 0);
     this.boardLayer.add(this.board);
     this.fx = new EffectsLayer(this, this.boardLayer);
@@ -166,7 +162,7 @@ export class BattleScene extends Phaser.Scene {
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       const { x, y } = screenToWorld(p.x, p.y, this.cameras.main.zoom);
       // 逆变换到棋盘层局部系（层被放大 BOARD_SCALE，指针世界坐标要先平移再除缩放）
-      const local = { x: (x - BOARD_LX) / BOARD_SCALE, y: (y - BOARD_LY) / BOARD_SCALE };
+      const local = battleWorldToLayer(x, y);
       const cell = this.board.xyToCell(local.x, local.y);
       this.board.setHover(cell);
       this.updateHoverCard(x, y, cell);
@@ -243,10 +239,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private buildBottomBar(): void {
-    // 控制条对齐放大后的棋盘层（原 BOARD_Y+BOARD_H+24 已被放大的棋盘占据）
-    const y = BOARD_LY + BOARD_W * BOARD_SCALE + 24;
-    const pw = BOARD_W * BOARD_SCALE;
-    const px = BOARD_LX;
+    // 控制条对齐放大后的棋盘层（层真源见 viewScale.BATTLE_BOARD_*）
+    const y = BATTLE_BOARD_LY + BATTLE_BOARD_SIZE + 24;
+    const pw = BATTLE_BOARD_SIZE;
+    const px = BATTLE_BOARD_LX;
     makePanel(this, px, y, pw, 76, { alpha: 0.85 });
 
     const mk = (label: string, x: number, w: number, onClick: () => void, variant: 'primary' | 'ghost' = 'ghost') => {

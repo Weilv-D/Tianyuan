@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { H, W } from './layout';
+import { BOARD_SIZE, H, W } from './layout';
 
 /**
  * 画布底座倍率 —— 高分屏整屏发糊的根治。
@@ -42,4 +42,25 @@ export function baseZoom(scene: Phaser.Scene): void {
  */
 export function screenToWorld(px: number, py: number, zoom: number): { x: number; y: number } {
   return { x: px / zoom, y: py / zoom };
+}
+
+// ── 战斗场景棋盘层（BattleScene 布局与指针换算的唯一真源）────────
+//
+// 战斗时棋盘层整体放大 1.25×（棋子/特效/飘字/投射物随之），层外组件
+// （左右阵容面板 / 顶栏 / 底部控制条 / 悬停卡）不受影响：
+//   层世界范围 x ∈ [560, 1360] 落在左右面板（344 / 1576）之间，
+//   y ∈ [108, 908] 让开顶部带（≤84）——底部控制条对齐层底 + 24。
+// 常量放这里（而非场景内）让指针逆变换可以被核心测试直接断言。
+
+/** 棋盘层放大系数（盘 640 → 800） */
+export const BATTLE_BOARD_SCALE = 1.25;
+/** 放大后的棋盘层边长（世界 px） */
+export const BATTLE_BOARD_SIZE = BOARD_SIZE * BATTLE_BOARD_SCALE;
+/** 棋盘层左上角（世界坐标） */
+export const BATTLE_BOARD_LX = (W - BATTLE_BOARD_SIZE) / 2;
+export const BATTLE_BOARD_LY = 108;
+
+/** 世界坐标 → 棋盘层局部坐标（战斗场景指针悬停命中的唯一入口） */
+export function battleWorldToLayer(x: number, y: number): { x: number; y: number } {
+  return { x: (x - BATTLE_BOARD_LX) / BATTLE_BOARD_SCALE, y: (y - BATTLE_BOARD_LY) / BATTLE_BOARD_SCALE };
 }
