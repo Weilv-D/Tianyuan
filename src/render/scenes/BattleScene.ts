@@ -8,7 +8,7 @@ import { TRAIT_BY_ID } from '../../data/traits';
 import { SHADE, TRAIT_TIER_COLOR_HEX, CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../view/palette';
 import { buildTextures, grainOverlay, TEX } from '../view/textures';
 import { bakeSilhouettes } from '../board/silhouetteFactory';
-import { BOARD_H, BOARD_W, BoardView, CELL } from '../board/BoardView';
+import { BOARD_W, BoardView, CELL } from '../board/BoardView';
 import { UnitView, setFriendlyTeam } from '../board/UnitView';
 import { bakeItemIcons } from '../board/itemIcons';
 import { baseZoom, screenToWorld } from '../view/viewScale';
@@ -25,11 +25,15 @@ import type { ActiveTrait, BattleConfig } from '../../core/types';
 
 const W = 1920;
 const H = 1080;
-const BOARD_X = (W - BOARD_W) / 2;
+/** 战斗演出：棋盘层整体放大系数。棋子/特效/血条/投射物全部随之放大，
+ *  面板/顶栏/悬停卡是层外组件不受影响。1.25 → 盘 800²：
+ *  水平 [560,1360] 落在左右面板（344/1576）之间，垂直 [108,908] 让开顶部带与控制条。 */
+const BOARD_SCALE = 1.25;
+const BOARD_LX = (W - BOARD_W * BOARD_SCALE) / 2;
+const BOARD_LY = 108;
 /** 悬停单位卡尺寸（updateHoverCard 与 makeUnitCard 共用）；高度容纳两行技能描述 */
 const UNIT_CARD_W = 268;
 const UNIT_CARD_H = 184;
-const BOARD_Y = 176;
 
 interface Projectile {
   img: Phaser.GameObjects.Image;
@@ -49,6 +53,7 @@ interface Projectile {
  */
 export class BattleScene extends Phaser.Scene {
   private board!: BoardView;
+  private boardLayer!: Phaser.GameObjects.Container;
   private fx!: EffectsLayer;
   private dmgText!: DamageTextLayer;
   private views = new Map<number, UnitView>();
@@ -58,6 +63,8 @@ export class BattleScene extends Phaser.Scene {
   private speed = 1;
   private paused = false;
   private running = false;
+  /** 真·快进进行中：update 循环按 240× 速排水，步数上限同步放开 */
+  private ff = false;
   private seed = 20260829;
 
   private compA: CompSpec = PRESET_COMPS[1];
@@ -145,9 +152,11 @@ export class BattleScene extends Phaser.Scene {
 
     // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
 
-    this.board = new BoardView(this, BOARD_X, BOARD_Y);
-    this.fx = new EffectsLayer(this);
-    this.dmgText = new DamageTextLayer(this);
+    this.boardLayer = this.add.container(BOARD_LX, BOARD_LY).setScale(BOARD_SCALE);
+    this.board = new BoardView(this, 0, 0);
+    this.boardLayer.add(this.board);
+    this.fx = new EffectsLayer(this, this.boardLayer);
+    this.dmgText = new DamageTextLayer(this, this.boardLayer);
 
     this.buildTopBar();
     this.buildSidePanels();
@@ -156,7 +165,8 @@ export class BattleScene extends Phaser.Scene {
     // 交互：悬停查看棋子详情（p.x/y 是画布像素，先换算到 1920×1080 世界系 —— A1）
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       const { x, y } = screenToWorld(p.x, p.y, this.cameras.main.zoom);
-      const local = { x: x - BOARD_X, y: y - BOARD_Y };
+      // 逆变换到棋盘层局部系（层被放大 BOARD_SCALE，指针世界坐标要先平移再除缩放）
+      const local = { x: (x - BOARD_LX) / BOARD_SCALE, y: (y - BOARD_LY) / BOARD_SCALE };
       const cell = this.board.xyToCell(local.x, local.y);
       this.board.setHover(cell);
       this.updateHoverCard(x, y, cell);
@@ -233,9 +243,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private buildBottomBar(): void {
-    const y = BOARD_Y + BOARD_H + 24;
-    const pw = BOARD_W + 80;
-    const px = BOARD_X - 40;
+    // 控制条对齐放大后的棋盘层（原 BOARD_Y+BOARD_H+24 已被放大的棋盘占据）
+    const y = BOARD_LY + BOARD_W * BOARD_SCALE + 24;
+    const pw = BOARD_W * BOARD_SCALE;
+    const px = BOARD_LX;
     makePanel(this, px, y, pw, 76, { alpha: 0.85 });
 
     const mk = (label: string, x: number, w: number, onClick: () => void, variant: 'primary' | 'ghost' = 'ghost') => {
@@ -245,9 +256,11 @@ export class BattleScene extends Phaser.Scene {
     };
 
     if (this.matchCtx) {
-      // 对局模式：只保留观战相关控制，避免玩家误触把对局重开
+      // 对局模式：只保留观战相关控制，避免玩家误触把对局重开。
+      // 「快进到底」是真快进（把剩余战斗按 tick 序排到终局），不是切 4× 速 ——
+      // 仅设倍速时，后台标签页的 rAF 节流配上 8 步/帧上限会让战斗永远爬不完。
       mk('暂 停', 24, 96, () => this.togglePause());
-      mk('快进到底', 132, 116, () => this.setSpeed(4));
+      mk('快进到底', 132, 116, () => this.fastForward());
     } else {
       mk('重开对局', 24, 110, () => this.restart(), 'primary');
       mk('暂 停', 142, 80, () => this.togglePause());
@@ -272,12 +285,23 @@ export class BattleScene extends Phaser.Scene {
 
   private setSpeed(s: number): void {
     this.speed = s;
+    this.ff = false; // 显式选速即收回快进：控制权还给玩家
     this.speedBtns.forEach((b, i) => {
       const on = [1, 2, 4][i] === s;
       b.setDisabled(false);
       b.setText(`${[1, 2, 4][i]}×`);
       b.setAlpha(on ? 1 : 0.55);
     });
+    audio.play('ui');
+  }
+
+  /** 真·快进：标志位交给 update 循环按 240× 排水。战斗结果与无头重放逐位
+   *  同源（同一 config + 种子），这里只是把演出压缩 —— 渲染层不改变结果。 */
+  private fastForward(): void {
+    if (!this.battle || !this.running || this.paused) return;
+    this.ff = true;
+    this.speed = 4;
+    this.speedBtns.forEach((b, i) => b.setAlpha(i === 2 ? 1 : 0.55));
     audio.play('ui');
   }
 
@@ -339,12 +363,13 @@ export class BattleScene extends Phaser.Scene {
     this.battle = new Battle(cfg, (e) => this.onEvent(e), false);
     this.creatingBattle = false;
 
-    // 生成可视对象
+    // 生成可视对象（挂进棋盘层，随层放大）
     for (const u of this.battle.units) {
       const p = this.cellWorld(u.cell.c, u.cell.r);
       const v = new UnitView(this, u.entry.id, u.team, u.star, p.x, p.y, this.monsterUids.has(u.uid));
       v.setDepth(30 + u.cell.r * 2);
       v.setItems(u.itemIds);
+      this.boardLayer.add(v);
       this.views.set(u.uid, v);
       v.syncBars(u.hp, u.maxHp, u.shield, u.mp, u.maxMp);
     }
@@ -369,6 +394,7 @@ export class BattleScene extends Phaser.Scene {
     this.acc = 0;
     this.running = true;
     this.paused = false;
+    this.ff = false;
     this.board.setPhase('prep');
     this.phaseText.setText('备 战');
     this.phaseText.setColor(css(SPIRIT.light));
@@ -590,8 +616,9 @@ export class BattleScene extends Phaser.Scene {
   // ══════════════ 坐标 ══════════════
 
   private cellWorld(c: number, r: number): { x: number; y: number } {
-    const p = this.board.cellToXY(c, r);
-    return { x: BOARD_X + p.x, y: BOARD_Y + p.y };
+    // 棋盘层局部坐标：层内对象（棋子/特效/飘字/投射物）直接使用，
+    // 层自身的位置与缩放由 boardLayer 统一承担
+    return this.board.cellToXY(c, r);
   }
 
   private unitAnchor(uid: number): { x: number; y: number } | null {
@@ -602,6 +629,11 @@ export class BattleScene extends Phaser.Scene {
 
   // ══════════════ 事件 → 音画 ══════════════
 
+  /**
+   * 内核事件流的唯一渲染入口：按 BattleEvent 类型分发到视图/特效/飘字/音效。
+   * 事件在 battle.step() 内同步派发，顺序即 tick 顺序 —— 快进（ff）排水时
+   * 全部事件被压缩进少数几帧，本函数是唯一的顺序保证点，不重排不合并。
+   */
   private onEvent(e: BattleEvent): void {
     if (this.creatingBattle) return;
     switch (e.t) {
@@ -611,6 +643,7 @@ export class BattleScene extends Phaser.Scene {
           const p = this.cellWorld(s.cell.c, s.cell.r);
           const v = new UnitView(this, s.defId, s.team, s.star, p.x, p.y, this.monsterUids.has(s.uid));
           v.setDepth(30 + s.cell.r * 2);
+          this.boardLayer.add(v);
           this.views.set(s.uid, v);
           v.syncBars(s.hp, s.maxHp, 0, 0, 0);
           // 召唤物登场演出：先记下星级体量，缩小后补间回去
@@ -648,7 +681,7 @@ export class BattleScene extends Phaser.Scene {
         if (e.isRanged) {
           // 弹道音贴着"命中瞬间"而不是"起手瞬间"，打击感才成立
           this.after(Math.max(0, e.windup * 1000), () => {
-            if (v.scene && this.running) audio.play('shoot');
+            if (v.scene && this.running && !this.ff) audio.play('shoot');
           });
         }
         break;
@@ -663,6 +696,7 @@ export class BattleScene extends Phaser.Scene {
           .setTint(e.kind === 'arrow' ? MOON.light : SPIRIT.light)
           .setBlendMode(Phaser.BlendModes.ADD)
           .setDepth(55);
+        this.boardLayer.add(img); // 投射物随棋盘层缩放（坐标为层内局部）
         img.setRotation(Math.atan2(to.y - from.y, to.x - from.x));
         img.setDisplaySize(28, 5);
         this.projectiles.push({
@@ -692,7 +726,7 @@ export class BattleScene extends Phaser.Scene {
 
         if (e.amount > 0) {
           this.dmgText.spawn(t.x, t.y, e.amount, tier, e.crit ? '' : '');
-          audio.play(e.crit && e.source === 'attack' ? 'crit' : 'hit');
+          if (!this.ff) audio.play(e.crit && e.source === 'attack' ? 'crit' : 'hit');
         }
         break;
       }
@@ -701,7 +735,7 @@ export class BattleScene extends Phaser.Scene {
         const t = this.unitAnchor(e.dstUid);
         if (!t) break;
         this.dmgText.spawn(t.x, t.y, e.amount, 'heal', '+');
-        audio.play('heal');
+        if (!this.ff) audio.play('heal');
         break;
       }
 
@@ -710,7 +744,7 @@ export class BattleScene extends Phaser.Scene {
         const t = this.unitAnchor(e.uid);
         if (!t) break;
         this.dmgText.spawn(t.x, t.y, e.amount, 'shield', '+');
-        audio.play('shield');
+        if (!this.ff) audio.play('shield');
         break;
       }
 
@@ -720,7 +754,7 @@ export class BattleScene extends Phaser.Scene {
         v.playCast(e.windup);
         const a = this.unitAnchor(e.uid);
         if (a) this.fx.play({ kind: 'castRing', x: a.x, y: a.y + 34 });
-        audio.play('cast');
+        if (!this.ff) audio.play('cast');
         break;
       }
 
@@ -743,7 +777,7 @@ export class BattleScene extends Phaser.Scene {
         const p = { x: v.x, y: v.y - 30 };
         this.fx.play({ kind: 'burst', x: p.x, y: p.y, radius: 0.6, tint: INK[300] });
         this.burstInk(p.x, p.y);
-        audio.play('death');
+        if (!this.ff) audio.play('death');
         v.playDeath(() => {
           if (v.scene) v.destroy();
           this.views.delete(e.uid);
@@ -1092,11 +1126,14 @@ export class BattleScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     const dt = Math.min(0.05, delta / 1000);
 
-    // 1) 推进战斗（固定步长，与渲染帧率解耦）
+    // 1) 推进战斗（固定步长，与渲染帧率解耦）。
+    //    快进中 240× 排水 + 步数上限放开到 400：每帧 ≥4 个模拟秒，
+    //    40s 封顶的战斗在数帧内到达终局；事件仍按 tick 序同步派发。
     if (this.battle && this.running && !this.paused) {
-      this.acc += dt * this.speed;
+      this.acc += this.ff ? Math.min(0.05, 1 / 60) * 240 : dt * this.speed;
+      const cap = this.ff ? 400 : 8;
       let steps = 0;
-      while (this.acc >= DT && steps < 8) {
+      while (this.acc >= DT && steps < cap) {
         this.battle.step();
         this.acc -= DT;
         steps++;

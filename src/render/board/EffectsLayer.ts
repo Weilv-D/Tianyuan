@@ -37,14 +37,24 @@ export class EffectsLayer {
   /** 代际计数：clear() 递增；迟到的延时回调据此自杀（C1） */
   private gen = 0;
 
-  constructor(scene: Phaser.Scene) {
+  /** 坐标系根：无 parent 时为 null（strays 经 scene.add 已在场景根） */
+  private readonly root: Phaser.GameObjects.Container | null;
+
+  constructor(scene: Phaser.Scene, parent?: Phaser.GameObjects.Container) {
     this.scene = scene;
     this.layer = scene.add.container(0, 0).setDepth(20);
     this.upper = scene.add.container(0, 0).setDepth(60);
+    this.root = parent ?? null;
+    // 挂进棋盘层（战斗时随层放大）：layer/upper 与 strays 都要在同一坐标系里
+    if (parent) {
+      parent.add(this.layer);
+      parent.add(this.upper);
+    }
   }
 
   /** 登记一个场景级特效对象；对象自毁时自动出列 */
   private trackStray<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+    this.root?.add(obj as unknown as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.Transform);
     this.strays.add(obj);
     obj.once('destroy', () => this.strays.delete(obj));
     return obj;
@@ -78,7 +88,9 @@ export class EffectsLayer {
     em.setDepth(25);
     em.explode(count);
     this.trackStray(em);
+    const gen = this.gen;
     this.scene.time.delayedCall(700, () => {
+      if (gen !== this.gen || !this.scene.scene || !this.scene.scene.isActive()) return;
       if (em.active) em.destroy();
     });
   }
@@ -233,6 +245,23 @@ export class EffectsLayer {
         });
       });
     }
+    // 暴击追加：界格放射线——六道鎏金短线从命中点射出，"裁定落下"的语言
+    if (crit) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + spin;
+        const line = this.img(TEX.spark, r.x + Math.cos(a) * 20, r.y + Math.sin(a) * 20, GILT.base);
+        line.setRotation(a).setDisplaySize(26, 1.8).setAlpha(0.9);
+        this.scene.tweens.add({
+          targets: line,
+          x: r.x + Math.cos(a) * 78,
+          y: r.y + Math.sin(a) * 78,
+          alpha: 0,
+          duration: 300,
+          ease: 'Cubic.easeOut',
+          onComplete: () => line.destroy(),
+        });
+      }
+    }
     this.shakeAccum += crit ? 0.5 : 0.12;
   }
 
@@ -268,7 +297,9 @@ export class EffectsLayer {
     // 副弧：反向 25° 交叉斩，迟 40ms 错拍
     const s2 = this.img(TEX.slash, mx, my, tint);
     s2.setRotation(ang - 0.45).setDisplaySize(112, 112).setAlpha(0);
+    const gen = this.gen;
     this.scene.time.delayedCall(40, () => {
+      if (gen !== this.gen || !this.scene.scene || !this.scene.scene.isActive()) return;
       if (!s2.active) return;
       this.scene.tweens.add({
         targets: s2,
@@ -306,6 +337,20 @@ export class EffectsLayer {
         onComplete: () => line.destroy(),
       });
     }
+
+    // 界格十字闪：落点一横一竖两道界格线，是"斩落"的句点
+    const cross = this.trackStray(this.scene.add.graphics());
+    cross.setDepth(26);
+    cross.lineStyle(1.6, tint, 0.9);
+    cross.lineBetween(tx - 12, ty - 40, tx + 12, ty - 40);
+    cross.lineBetween(tx, ty - 52, tx, ty - 28);
+    this.scene.tweens.add({
+      targets: cross,
+      alpha: 0,
+      duration: 200,
+      delay: 60,
+      onComplete: () => cross.destroy(),
+    });
   }
 
   // ── 远程穿刺：光束 + 弹尾拖影 ──
@@ -368,6 +413,21 @@ export class EffectsLayer {
       ease: 'Quad.easeOut',
       onComplete: () => core.destroy(),
     });
+    // 界格放射线：八道沿环法线射出、随环退隐——把"范围边界"喊出来
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.39;
+      const line = this.img(TEX.spark, r.x + Math.cos(a) * rad * 0.4, r.y + Math.sin(a) * rad * 0.4, tint);
+      line.setRotation(a).setDisplaySize(rad * 0.5, 2.2).setAlpha(0.8);
+      this.scene.tweens.add({
+        targets: line,
+        x: r.x + Math.cos(a) * rad * 1.05,
+        y: r.y + Math.sin(a) * rad * 1.05,
+        alpha: 0,
+        duration: 360,
+        ease: 'Cubic.easeOut',
+        onComplete: () => line.destroy(),
+      });
+    }
     this.burst(r.x, r.y, 16, tint, 380, 0.3);
     this.shakeAccum += r.radius && r.radius >= 2 ? 1.1 : 0.6;
   }
@@ -425,6 +485,24 @@ export class EffectsLayer {
         onComplete: () => s.destroy(),
       });
     }
+    // 脉冲节点：束线上两枚亮点依次闪过，能量"流动"感
+    for (let i = 0; i < 2; i++) {
+      const t01 = 0.35 + i * 0.3;
+      const nx = r.x + (tx - r.x) * t01;
+      const ny = r.y - 30 + (ty - (r.y - 30)) * t01;
+      const n = this.img(TEX.glow, nx, ny, PAPER[50]);
+      n.setDisplaySize(16, 16).setAlpha(0.95);
+      this.scene.tweens.add({
+        targets: n,
+        displayWidth: 4,
+        displayHeight: 4,
+        alpha: 0,
+        duration: 240,
+        delay: i * 90,
+        ease: 'Cubic.easeOut',
+        onComplete: () => n.destroy(),
+      });
+    }
     this.burst(r.x, r.y - 30, 8, tint, 260, 0.2);
     this.shakeAccum += 0.8;
   }
@@ -432,6 +510,30 @@ export class EffectsLayer {
   // ── 蓄力法阵：预兆，让玩家有 0.3 秒的心理准备 ──
   private castRing(r: FxRequest): void {
     const tint = r.tint ?? GILT.light;
+    // 旋开虚线环：八段短弧随收缩反向旋转——法阵"起手"的仪式感
+    const g = this.trackStray(this.scene.add.graphics());
+    g.setDepth(21);
+    const seg = (t01: number): void => {
+      if (!g.active) return;
+      g.clear();
+      const rr = 75 - 59 * t01;
+      g.lineStyle(2, tint, 0.55 + 0.4 * t01);
+      for (let i = 0; i < 8; i++) {
+        const a0 = (i / 8) * Math.PI * 2 - t01 * 1.8;
+        g.beginPath();
+        g.arc(r.x, r.y, rr, a0, a0 + Math.PI / 5);
+        g.strokePath();
+      }
+    };
+    seg(0);
+    this.scene.tweens.addCounter({
+      from: 0,
+      to: 100,
+      duration: 420,
+      ease: 'Quad.easeIn',
+      onUpdate: (tw) => seg((tw.getValue() ?? 0) / 100),
+      onComplete: () => g.destroy(),
+    });
     const ring = this.img(TEX.ring, r.x, r.y, tint);
     ring.setDisplaySize(150, 150).setAlpha(0.35);
     this.scene.tweens.add({
@@ -483,7 +585,38 @@ export class EffectsLayer {
     em.setDepth(25);
     em.explode(8);
     this.trackStray(em);
+    // 灵青符点：三枚小菱形（星标同款）错拍上浮，与伤害语言彻底区分
+    for (let i = 0; i < 3; i++) {
+      const g = this.trackStray(this.scene.add.graphics());
+      g.setDepth(26);
+      const draw = (s: number): void => {
+        if (!g.active) return;
+        g.clear();
+        const px = r.x + (i - 1) * 14;
+        const py = r.y - 26 - (1 - s) * 34;
+        g.fillStyle(SPIRIT.light, 0.9 * s);
+        g.beginPath();
+        g.moveTo(px, py - 4);
+        g.lineTo(px + 4, py);
+        g.lineTo(px, py + 4);
+        g.lineTo(px - 4, py);
+        g.closePath();
+        g.fillPath();
+      };
+      draw(0);
+      this.scene.tweens.addCounter({
+        from: 0,
+        to: 100,
+        duration: 700,
+        delay: i * 110,
+        ease: 'Sine.easeOut',
+        onUpdate: (tw) => draw((tw.getValue() ?? 0) / 100),
+        onComplete: () => g.destroy(),
+      });
+    }
+    const gen = this.gen;
     this.scene.time.delayedCall(900, () => {
+      if (gen !== this.gen || !this.scene.scene || !this.scene.scene.isActive()) return;
       if (em.active) em.destroy();
     });
   }
@@ -529,6 +662,29 @@ export class EffectsLayer {
 
   private summon(r: FxRequest): void {
     const tint = GILT.light;
+    // 界格方阵：3×3 小方格在落点闪现后消散——机关造物"落格"的语言
+    const grid = this.trackStray(this.scene.add.graphics());
+    grid.setDepth(13);
+    const cellW = 16;
+    const drawGrid = (s: number): void => {
+      if (!grid.active) return;
+      grid.clear();
+      grid.lineStyle(1, GILT.base, 0.8 * s);
+      for (let ix = -1; ix <= 1; ix++) {
+        for (let iy = -1; iy <= 1; iy++) {
+          grid.strokeRect(r.x + ix * cellW - 6, r.y + iy * cellW * 0.55 - 4, 12, 8);
+        }
+      }
+    };
+    drawGrid(1);
+    this.scene.tweens.addCounter({
+      from: 100,
+      to: 0,
+      duration: 380,
+      ease: 'Cubic.easeOut',
+      onUpdate: (tw) => drawGrid((tw.getValue() ?? 0) / 100),
+      onComplete: () => grid.destroy(),
+    });
     const pillar = this.img(TEX.glow, r.x, r.y - 40, tint);
     pillar.setDisplaySize(30, 130).setAlpha(0.9);
     this.scene.tweens.add({
@@ -631,18 +787,34 @@ export class EffectsLayer {
   }
 
   private tick(r: FxRequest, tint: number): void {
+    // 形状分化：灼烧=火苗形上浮摇摆（亮朱）、流血=血珠下坠（深朱）
+    const burn = tint === CINNABAR.light;
     const p = this.img(TEX.glow, r.x + (Math.random() - 0.5) * 22, r.y - 20 - Math.random() * 34, tint);
-    p.setDisplaySize(18, 18).setAlpha(0.9);
-    this.scene.tweens.add({
-      targets: p,
-      y: p.y - 26,
-      alpha: 0,
-      displayWidth: 4,
-      displayHeight: 4,
-      duration: 620,
-      ease: 'Quad.easeOut',
-      onComplete: () => p.destroy(),
-    });
+    if (burn) {
+      p.setDisplaySize(10, 20).setAlpha(0.9);
+      this.scene.tweens.add({
+        targets: p,
+        y: p.y - 30,
+        x: p.x + (Math.random() - 0.5) * 14,
+        displayWidth: 4,
+        alpha: 0,
+        duration: 560,
+        ease: 'Quad.easeOut',
+        onComplete: () => p.destroy(),
+      });
+    } else {
+      p.setDisplaySize(8, 8).setAlpha(0.85);
+      this.scene.tweens.add({
+        targets: p,
+        y: p.y + 16 + Math.random() * 10,
+        alpha: 0,
+        displayWidth: 3,
+        displayHeight: 3,
+        duration: 640,
+        ease: 'Quad.easeIn',
+        onComplete: () => p.destroy(),
+      });
+    }
   }
 
   /** 屏幕级的全屏演出（五费大招 / 三星星辰绽放） */

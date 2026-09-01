@@ -2,7 +2,8 @@
 import Phaser from 'phaser';
 import { CHAMPIONS } from '../../data/champions';
 import { PLAYER_START_HP } from '../../core/config';
-import { newIid } from '../../game/state';
+import { newIid, resolveMerges } from '../../game/state';
+import type { Star } from '../../core/types';
 import { FONT, Button } from '../../ui/kit';
 import { INK, GILT, PAPER, css } from '../view/palette';
 import { W, H } from '../view/layout';
@@ -53,7 +54,7 @@ export class DebugConsole {
     c.add(this.scene.add.text(0, -232, '实验控制台（仅调试版本）', { fontFamily: FONT.title, fontSize: '14px', color: css(GILT.light), letterSpacing: 2 }).setOrigin(0.5, 0));
     const btns: [string, string][] = [
       ['gold', '+50 金'], ['level', '+1 级'], ['hpPlus', '+20 生命'], ['comp', ' random 2★'],
-      ['all2', ' bench 全 2★'], ['items', '1 full bag'], ['skip', '快进到底'], ['reset', '清场'],
+      ['all2', ' bench 全 2★'], ['items', '1 full bag'], ['legend', '天命 3★'], ['skip', '快进到底'], ['reset', '清场'],
     ];
     for (let i = 0; i < btns.length; i++) {
       const [id, label] = btns[i];
@@ -78,6 +79,22 @@ export class DebugConsole {
         else this.scene.showToast('备战席已满', true); break;
       }
       case 'all2': for (let i = 0; i < p.bench.length; i++) { const c = CHAMPIONS[(i * 7) % CHAMPIONS.length]; p.bench[i] = { defId: c.id, star: 2, items: [], iid: newIid() }; } break;
+      case 'legend': {
+        // 五费三星·天命验收：三张同名 2★ 入席 → 走真实合成链出 3★ → 上场。
+        // 没有它，3★ 天命档在实机上永远验不到（对局内自然合成成本极高）。
+        const five = CHAMPIONS.find((c) => c.cost === 5) ?? CHAMPIONS[0];
+        p.board.fill(null);
+        p.bench.fill(null);
+        for (let i = 0; i < 3; i++) p.bench[i] = { defId: five.id, star: 2 as Star, items: [], iid: newIid() };
+        resolveMerges(p);
+        const merged = p.bench.find((b) => b !== null && b.star === 3);
+        if (merged) {
+          const slot = p.board.findIndex((x) => x === null);
+          p.bench[p.bench.indexOf(merged)] = null;
+          p.board[slot] = merged;
+        } else this.scene.showToast('合成异常：未见 3★', true);
+        break;
+      }
       case 'items': if (p.bench.some((x) => x)) { for (const slot of p.bench) if (slot) slot.items = ['xuanjia', 'moren', 'lingzhu', 'yunlv', 'xueyu', 'fafu']; } else p.items.push(...['xuanjia', 'moren', 'lingzhu']); break;
       case 'skip': void this.scene.fastForward(); break;
       case 'reset': p.board.fill(null); p.bench.fill(null); p.items.length = 0; break;

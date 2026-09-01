@@ -1,14 +1,27 @@
 import Phaser from 'phaser';
 import { CHAMPION_BY_ID } from '../../data/champions';
-import { LEGEND_T3 } from '../../core/config';
 import { silhouetteKey, SIL_ORIGIN_Y, silContentScale, silContentHeight, BEAST_TEAM } from './silhouetteFactory';
+import {
+  BAR_W,
+  CROWN_BEAR_HALF,
+  CROWN_ORBIT_R,
+  CROWN_R,
+  HP_BAR_H,
+  ITEM_GAP,
+  ITEM_ICON,
+  MANA_BAR_H,
+  PIP_HALF,
+  headStackLayout,
+  crownArcSpan,
+  crownBeadAngle,
+  unitContainerScale,
+  type HeadStackLayout,
+} from './unitLayout';
 import { itemIconKey } from './itemIcons';
 import { ITEM_BY_ID } from '../../data/items';
 import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from '../view/palette';
 import { TEX } from '../view/textures';
 
-const STAR_SCALE = [0, 0.9, 1.02, 1.16];
-const BAR_W = 44;
 /** 棋盘体量（内容高归一口径）：1★≈94% / 2★≈107% / 3★≈121% 格高（格 72）。
  *  内容高按"身体"量取（描边光晕不计入，见 aiBake BODY_RECTS），观感饱满。 */
 const CONTENT_H = 68;
@@ -67,6 +80,8 @@ export class UnitView extends Phaser.GameObjects.Container {
   private readonly castRing: Phaser.GameObjects.Graphics;
   /** 归一后的内容高（1★ 基准逻辑 px）：血条 / 星标等头顶锚件的唯一依据 */
   private readonly contentH: number;
+  /** 头顶栈（真源 unitLayout）：构造期一次算定——战斗内星级恒定，锚件不跳动 */
+  private readonly head: HeadStackLayout;
 
   // 位置插值
   private px: number;
@@ -122,15 +137,16 @@ export class UnitView extends Phaser.GameObjects.Container {
       .image(0, 0, silhouetteKey(defId, isBeast ? BEAST_TEAM : this.side, star))
       .setOrigin(0.5, SIL_ORIGIN_Y);
     // 内容归一：不同原型的墨迹占框差异大，按可见内容高统一体量，
-    // 星级体量差仍由容器级 STAR_SCALE 表达
+    // 星级体量差仍由容器级缩放表达
     this.sprite.setScale(silContentScale(defId, star, CONTENT_H, CONTENT_W));
     this.contentH = silContentHeight(defId, star, CONTENT_H, CONTENT_W);
+    this.head = headStackLayout(this.contentH, unitContainerScale(star, this.cost, isBeast));
     this.castRing = scene.add.graphics();
     this.crown = scene.add.graphics();
     this.bars = scene.add.graphics();
     this.pips = scene.add.graphics();
-    // 装备图标挂在血条下方，最多三件
-    this.itemRow = scene.add.container(0, 14);
+    // 装备行挂在头顶栈的装备带（血条/法力上方、冠弧下方），最多三件
+    this.itemRow = scene.add.container(0, this.head.itemsCenterY);
 
     this.add([this.shadow, this.aura, this.base, this.sprite, this.castRing, this.crown, this.bars, this.pips, this.itemRow]);
     this.applyStarScale();
@@ -157,10 +173,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.itemRow.removeAll(true);
     const n = Math.min(3, itemIds.length);
     if (n === 0) return;
-    const size = 16;
-    const gap = 4;
-    // 挂在血条/法力条正下方、头顶上方：不压脚底六边形，也不遮挡剪影本体
-    this.itemRow.setPosition(0, this.overheadY() + 28);
+    // 图标世界尺寸恒定：局部 = 世界 / 容器缩放（头顶 UI 是跨星级标准件）
+    const size = ITEM_ICON / this.head.scale;
+    const gap = ITEM_GAP / this.head.scale;
     const totalW = n * size + (n - 1) * gap;
     for (let i = 0; i < n; i++) {
       const id = itemIds[i];
@@ -180,10 +195,8 @@ export class UnitView extends Phaser.GameObjects.Container {
   }
 
   private applyStarScale(): void {
-    let s = STAR_SCALE[this.star] ?? 1;
-    // 五费三星·天命：体量再抬一档（数值口径见 config.LEGEND_T3，渲染同源）
-    if (this.cost === 5 && this.star === 3) s *= LEGEND_T3.sizeMult;
-    this.setScale(s);
+    // 缩放真源 unitLayout：与头顶栈同一口径，杜绝"锚件局部偏移再乘一次星级"的双重缩放
+    this.setScale(unitContainerScale(this.star, this.cost, this.isBeast));
   }
 
   // ── 位置 ──
@@ -250,61 +263,59 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.drawPips();
   }
 
-  /** 头顶锚件（血条/星标）的 y：贴着内容顶留 9px，随星级体量联动 */
-  private overheadY(): number {
-    const s = STAR_SCALE[this.star] ?? 1;
-    return -(this.contentH * s + 9);
-  }
-
   private drawBars(): void {
     const g = this.bars;
     g.clear();
     if (this.dead) return;
-    const y = this.overheadY();
-    const h = 4.5;
+    const k = 1 / this.head.scale; // 头顶 UI 世界尺寸 → 局部绘制尺寸
+    const y = this.head.barsY;
+    const h = HP_BAR_H * k;
+    const w = BAR_W * k;
     const hpRatio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
     const shieldRatio = Phaser.Math.Clamp(this.shield / this.maxHp, 0, 1);
 
-    // 底槽
+    // 底槽（描边偏移同样随世界尺寸换算）
+    const e = 1 * k;
+    const pad = 2 * k;
     g.fillStyle(INK[900], 0.85);
-    g.fillRoundedRect(-BAR_W / 2 - 1, y - 1, BAR_W + 2, h + 2, 2);
+    g.fillRoundedRect(-w / 2 - e, y - e, w + pad, h + pad, 2 * k);
     g.fillStyle(INK[600], 1);
-    g.fillRect(-BAR_W / 2, y, BAR_W, h);
+    g.fillRect(-w / 2, y, w, h);
 
     // 生命：我方玉青恒色（低血不变色）；敌方朱砂，残血提亮
     const low = hpRatio < 0.3;
     const hpColor = this.friendly ? SPIRIT.base : low ? CINNABAR.light : CINNABAR.base;
     g.fillStyle(hpColor, 1);
-    g.fillRect(-BAR_W / 2, y, BAR_W * hpRatio, h);
+    g.fillRect(-w / 2, y, w * hpRatio, h);
     g.fillStyle(PAPER[50], 0.22);
-    g.fillRect(-BAR_W / 2, y, BAR_W * hpRatio, 2);
+    g.fillRect(-w / 2, y, w * hpRatio, 2 * k);
 
     // 护盾：月白色覆盖在生命之上
     if (shieldRatio > 0) {
       g.fillStyle(PAPER[200], 0.92);
-      g.fillRect(-BAR_W / 2, y, BAR_W * Math.min(1, shieldRatio), h);
-      g.lineStyle(1, PAPER[50], 0.8);
-      g.strokeRect(-BAR_W / 2, y, BAR_W * Math.min(1, shieldRatio), h);
+      g.fillRect(-w / 2, y, w * Math.min(1, shieldRatio), h);
+      g.lineStyle(1 * k, PAPER[50], 0.8);
+      g.strokeRect(-w / 2, y, w * Math.min(1, shieldRatio), h);
     }
 
     // 外框
-    g.lineStyle(1, INK[400], 0.9);
-    g.strokeRect(-BAR_W / 2, y, BAR_W, h);
+    g.lineStyle(1 * k, INK[400], 0.9);
+    g.strokeRect(-w / 2, y, w, h);
 
-    // 法力：细条，满了会发光
+    // 法力：细条，满了会发光（y 出自头顶栈真源，不从血条下沿推算——单一定义）
     if (this.maxMp > 0 && this.maxMp < 1e6) {
-      const my = y + h + 2;
-      const mh = 3.5;
+      const my = this.head.manaY;
+      const mh = MANA_BAR_H * k;
       const mpRatio = Phaser.Math.Clamp(this.mp / this.maxMp, 0, 1);
       g.fillStyle(INK[900], 0.85);
-      g.fillRect(-BAR_W / 2 - 1, my - 1, BAR_W + 2, mh + 2);
+      g.fillRect(-w / 2 - e, my - e, w + pad, mh + pad);
       g.fillStyle(INK[700], 1);
-      g.fillRect(-BAR_W / 2, my, BAR_W, mh);
+      g.fillRect(-w / 2, my, w, mh);
       g.fillStyle(VOID.base, 1);
-      g.fillRect(-BAR_W / 2, my, BAR_W * mpRatio, mh);
+      g.fillRect(-w / 2, my, w * mpRatio, mh);
       if (mpRatio >= 1) {
         g.fillStyle(VOID.light, 0.9);
-        g.fillRect(-BAR_W / 2, my, BAR_W, mh);
+        g.fillRect(-w / 2, my, w, mh);
       }
     }
   }
@@ -312,10 +323,12 @@ export class UnitView extends Phaser.GameObjects.Container {
   private drawPips(): void {
     const g = this.pips;
     g.clear();
-    const y = this.overheadY() - 10;
-    const size = 3.6;
+    const k = 1 / this.head.scale;
+    const y = this.head.pipsY;
+    const size = PIP_HALF * k;
+    const pitch = 10 * k;
     for (let i = 0; i < 3; i++) {
-      const x = (i - 1) * 10;
+      const x = (i - 1) * pitch;
       const on = i < this.star;
       g.fillStyle(on ? GILT.light : INK[600], on ? 1 : 0.8);
       g.beginPath();
@@ -332,27 +345,38 @@ export class UnitView extends Phaser.GameObjects.Container {
     }
   }
 
-  /** 三星星冠：界格断环 + 四枚旋转方胜印 —— 直角体系里"圆"的表达方式 */
+  /**
+   * 三星冠弧：越顶半弧 + 弧内三枚摆印 + 冠心主印。
+   *
+   * 旧版是环绕身体中部的整环（固定局部 cy=-30），与头顶装备行在 3★ 缩放下
+   * 相撞约 11px；整环下半本来就被剪影遮挡、无视读价值。改为贴头顶的上半
+   * 断弧：弧脚悬在星标上沿之上（净距 ≥0.8px），印珠收在弧内侧绕冠顶摆动，
+   * 全部几何出自 unitLayout 真源（几何论证见 tests/unit-layout）。
+   */
   private drawCrown(t: number): void {
     const g = this.crown;
     g.clear();
     if (this.star < 3 || this.dead) return;
-    const cy = -30;
-    // 断环：四段弧，段间留白，像界格钉出的圆
-    const r = 26;
-    g.lineStyle(1.8, GILT.base, 0.62);
-    for (let i = 0; i < 4; i++) {
-      const a0 = (i / 4) * Math.PI * 2 + 0.3;
+    const k = 1 / this.head.scale;
+    const cy = this.head.crownCy;
+    const r = CROWN_R * k;
+
+    // 断环：上半两段弧，段间与冠顶留白，像界格钉出的冠
+    g.lineStyle(1.8 * k, GILT.base, 0.62);
+    for (const kk of [0, 1] as const) {
+      const { start, end } = crownArcSpan(kk);
       g.beginPath();
-      g.arc(0, cy, r, a0, a0 + Math.PI / 2 - 0.6);
+      g.arc(0, cy, r, start, end);
       g.strokePath();
     }
-    // 四枚方胜印沿环缓转
-    for (let i = 0; i < 4; i++) {
-      const a = t * 0.85 + (i / 4) * Math.PI * 2;
-      const x = Math.cos(a) * (r + 7);
-      const y = cy + Math.sin(a) * (r + 6);
-      const sz = 2.8;
+
+    // 三枚方胜印在弧内侧绕冠顶缓摆
+    const orbR = CROWN_ORBIT_R * k;
+    const sz = CROWN_BEAR_HALF * k;
+    for (let i = 0; i < 3; i++) {
+      const a = crownBeadAngle(i, 3, t);
+      const x = Math.cos(a) * orbR;
+      const y = cy + Math.sin(a) * orbR;
       g.fillStyle(GILT.light, 0.95);
       g.beginPath();
       g.moveTo(x, y - sz);
@@ -362,16 +386,18 @@ export class UnitView extends Phaser.GameObjects.Container {
       g.closePath();
       g.fillPath();
     }
-    // 顶心主印：一枚实心方胜
+
+    // 冠心主印：一枚实心方胜
+    const m = 5 * k;
     g.fillStyle(GILT.glow, 0.92);
     g.beginPath();
-    g.moveTo(0, cy - 5);
-    g.lineTo(5, cy);
-    g.lineTo(0, cy + 5);
-    g.lineTo(-5, cy);
+    g.moveTo(0, cy - m);
+    g.lineTo(m, cy);
+    g.lineTo(0, cy + m);
+    g.lineTo(-m, cy);
     g.closePath();
     g.fillPath();
-    g.lineStyle(0.8, GILT.deep, 0.9);
+    g.lineStyle(0.8 * k, GILT.deep, 0.9);
     g.strokePath();
   }
 

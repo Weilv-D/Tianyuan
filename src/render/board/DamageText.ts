@@ -21,17 +21,21 @@ export class DamageTextLayer {
   private readonly scene: Phaser.Scene;
   private readonly pool: Phaser.GameObjects.Text[] = [];
   private readonly active: Phaser.GameObjects.Text[] = [];
-  /** 同帧同目标的飘字错峰，避免叠成一坨 */
+  /** 同帧同目标的飘字错峰，避免叠成一坨（上限 256 键：连续坐标理论无限，
+   *  只增不清会随长局缓慢膨胀 —— 淘汰最旧键即可，错峰窗口才 110ms） */
   private lastAt = new Map<number, number>();
+  /** 坐标系根（棋盘层）：飘字随棋盘层放大，坐标为层内局部 */
+  private readonly root: Phaser.GameObjects.Container | null;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, parent?: Phaser.GameObjects.Container) {
     this.scene = scene;
+    this.root = parent ?? null;
   }
 
   private take(): Phaser.GameObjects.Text {
     const t = this.pool.pop();
     if (t) return t.setVisible(true);
-    return this.scene.add
+    const created = this.scene.add
       .text(0, 0, '', {
         fontFamily: FONT.num,
         fontSize: '20px',
@@ -39,6 +43,8 @@ export class DamageTextLayer {
       })
       .setOrigin(0.5, 1)
       .setDepth(70);
+    if (this.root) this.root.add(created);
+    return created;
   }
 
   private give(t: Phaser.GameObjects.Text): void {
@@ -63,6 +69,10 @@ export class DamageTextLayer {
     const last = this.lastAt.get(key) ?? 0;
     const stacked = now - last < 110;
     this.lastAt.set(key, now);
+    if (this.lastAt.size > 256) {
+      const oldest = this.lastAt.keys().next().value;
+      if (oldest !== undefined) this.lastAt.delete(oldest);
+    }
     const jitter = stacked ? (Math.random() - 0.5) * 46 : (Math.random() - 0.5) * 12;
 
     t.setText(`${prefix}${Math.round(amount)}`);
