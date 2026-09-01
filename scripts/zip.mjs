@@ -49,8 +49,10 @@ for (const input of inputs) {
   for (const [zipPath, file] of walk(abs, basename(abs))) {
     entries[zipPath] = new Uint8Array(readFileSync(file));
   }
-  for (const dir of walkDirs(abs, basename(abs))) {
-    entries[`${dir}/`] = new Uint8Array(0);
+  if (statSync(abs).isDirectory()) {
+    for (const dir of walkDirs(abs, basename(abs))) {
+      entries[`${dir}/`] = new Uint8Array(0);
+    }
   }
 }
 
