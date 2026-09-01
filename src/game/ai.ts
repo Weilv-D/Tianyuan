@@ -63,7 +63,7 @@ const ARCHETYPE: Record<AiArchetype, Omit<AiProfile, 'arch' | 'label'>> = {
   // 奇遇偏好 gold/xp：金币直接进存款吃利息、经验推进升级曲线，全是"明天更值钱"的
   // 复利项；顿悟 +1 级等同免买的经验，同属复利；组件与援军是即时消耗，
   // 援军占备战席还会打乱它攒三合成的节奏，与 mergeBias 标准的攒牌打法相克。
-  econ: { rollFloor: 26, aggression: 0.3, preferred: ['danding', 'tian', 'guardian'], levelPace: 0.95, levelCap: 9, mergeBias: 1.0, noise: 0.1, adventurePref: ['gold', 'xp', 'level', 'item', 'components', 'reinforce'] },
+  econ: { rollFloor: 22, aggression: 0.3, preferred: ['danding', 'tian', 'guardian'], levelPace: 0.95, levelCap: 9, mergeBias: 1.0, noise: 0.1, adventurePref: ['gold', 'xp', 'level', 'item', 'components', 'reinforce'] },
   // 老谋：什么都沾一点，跟着发牌走
   // 奇遇偏好 item：不押单一维度，而成品装备是全游戏唯一不能从商店买到的资源
   // （只能墨兽轮掉落）——拿装备补"钱买不到"的那块短板，期望收益最稳。
@@ -84,7 +84,7 @@ const ARCHETYPE: Record<AiArchetype, Omit<AiProfile, 'arch' | 'label'>> = {
    * （人口 = 等级，多一人口就多一格摆三星），顿悟 +1 级与经验同轴且更即时，
    * 援军 2★ 低费棋子直接是三星进度或即时战力；装备对它节奏最慢（还得等合适的持有者）。
    */
-  hyperroll: { rollFloor: 20, aggression: 0.6, preferred: ['yaozu', 'jiguan', 'warrior'], levelPace: 1.0, levelCap: 8, mergeBias: 2.6, noise: 0.3, adventurePref: ['xp', 'level', 'reinforce', 'gold', 'components', 'item'] },
+  hyperroll: { rollFloor: 12, aggression: 0.6, preferred: ['yaozu', 'jiguan', 'warrior'], levelPace: 1.0, levelCap: 9, mergeBias: 3.6, noise: 0.3, adventurePref: ['xp', 'level', 'reinforce', 'gold', 'components', 'item'] },
   // 钓叟：疯狂冲人口，靠高费卡翻盘；不屑于凑低费三星
   // 奇遇偏好 gold：金币是最通用的燃料（刷牌找 4/5 费 + 买经验冲 9 级）；
   // 顿悟 +1 级直接等于它最稀缺的人口；低费援军对它几乎无用 ——

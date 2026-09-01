@@ -112,12 +112,30 @@ if (args.some((a) => a.startsWith('--match'))) {
   const { Match } = await import('../src/game/match');
   const { aiTakeTurn, makeProfile } = await import('../src/game/ai');
   const N = Number(args.find((a) => a.startsWith('--match='))?.slice(8) ?? 200);
+  // AI 档位在线覆盖：--prof=hyperroll:rollFloor=12,mergeBias=3.2（可多次出现）。
+  // 只允许数字档位键 —— 名单/偏好是数组，不属于 A/B 通道。
+  const PROF_KEYS = new Set(['rollFloor', 'aggression', 'levelPace', 'levelCap', 'mergeBias', 'noise']);
+  const profPatches = new Map<string, Record<string, number>>();
+  for (const a of args.filter((x) => x.startsWith('--prof='))) {
+    const [arch, kvs] = a.slice(7).split(':');
+    for (const kv of kvs.split(',')) {
+      const [k, v] = kv.split('=');
+      if (!PROF_KEYS.has(k)) throw new Error(`--prof 不支持键 ${k}（仅数字档位：${[...PROF_KEYS].join('/')}）`);
+      const bucket = profPatches.get(arch) ?? {};
+      bucket[k] = Number(v);
+      profPatches.set(arch, bucket);
+    }
+  }
+  if (profPatches.size > 0) {
+    console.log('档位覆盖：' + [...profPatches].map(([a, kv]) => `${a} { ${Object.entries(kv).map(([k, v]) => `${k}=${v}`).join(', ')} }`).join('；'));
+  }
   const archs = ['aggro', 'econ', 'balanced', 'hyperroll', 'greedy'] as const;
   const rounds: number[] = [];
   const winArch = new Map<string, number>();
   const rankBy = new Map<string, number[]>();
   const star3 = new Map<string, number[]>();
   const levelBy = new Map<string, number[]>();
+  const goldBy = new Map<string, number[]>();
   let fiveStar2OnChamp = 0; // 冠军场上 ≥2★ 五费件数
   let totalStar3 = 0;
   const champLevels: number[] = [];
@@ -127,6 +145,12 @@ if (args.some((a) => a.startsWith('--match'))) {
     const humanArch = archs[i % archs.length];
     m.human.ai = makeProfile(humanArch);
     m.human.name = `[模拟]${humanArch}`;
+    if (profPatches.size > 0) {
+      for (const p of m.players) {
+        const patch = p.ai && profPatches.get(p.ai.arch);
+        if (p.ai && patch) Object.assign(p.ai, patch);
+      }
+    }
     let guard = 0;
     while (!m.isOver() && guard < 60) {
       m.beginRound();
@@ -161,19 +185,22 @@ if (args.some((a) => a.startsWith('--match'))) {
       }
       (star3.get(arch) ?? star3.set(arch, []).get(arch)!).push(s3);
       (levelBy.get(arch) ?? levelBy.set(arch, []).get(arch)!).push(p.level);
+      (goldBy.get(arch) ?? goldBy.set(arch, []).get(arch)!).push(p.gold);
       totalStar3 += s3;
     }
   }
   const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
   console.log(`\n━━ 整局 ${N} 局（配对种子）━━`);
   console.log(`回合均值 ${avg(rounds).toFixed(1)}   冠军等级 ${avg(champLevels).toFixed(2)}`);
-  console.log('原型：平均名次 / 终局三星 / 终局等级 / 夺冠%');
+  console.log('原型：平均名次 / 终局三星 / 终局等级 / 终局金币 / 夺冠%');
   const totalWin = [...winArch.values()].reduce((a, b) => a + b, 0) || 1;
   for (const [arch, ranks] of [...rankBy.entries()].sort((a, b) => avg(a[1]) - avg(b[1]))) {
     const lv = levelBy.get(arch) ?? [];
     const s3 = star3.get(arch) ?? [];
-    console.log(`  ${arch.padEnd(10)} ${avg(ranks).toFixed(2)}  ${avg(s3).toFixed(3)}  ${avg(lv).toFixed(2)}  ${(((winArch.get(arch) ?? 0) / totalWin) * 100).toFixed(1)}%`);
+    const gd = goldBy.get(arch) ?? [];
+    console.log(`  ${arch.padEnd(10)} ${avg(ranks).toFixed(2)}  ${avg(s3).toFixed(3)}  ${avg(lv).toFixed(2)}  ${avg(gd).toFixed(1)}  ${(((winArch.get(arch) ?? 0) / totalWin) * 100).toFixed(1)}%`);
   }
   console.log(`全局面 3★ 总数/局 ${(totalStar3 / N).toFixed(3)}   冠军场上 ≥2★ 五费均值 ${(fiveStar2OnChamp / N).toFixed(3)}`);
   console.log(`3★ 分解（件/${N}局，按费用 1→5）：${star3ByCost.slice(1).join(' / ')}`);
+  // 密度探针：末局终局库存密度 = 共享池余量（按费用档汇总）= 稀缺度的直接读数
 }
