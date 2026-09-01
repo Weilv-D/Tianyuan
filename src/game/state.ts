@@ -134,6 +134,17 @@ export function boardIdx(col: number, localRow: number): number {
  * 序列变成 [4,5,3,6,2,7,1,8] —— 越位列 8 混入、列 0 永久缺席
  * （suggestSlot 甚至会把棋子写进 board[32] 而凭空丢子）。
  */
+/** 职业纵深：0 = 最前排，1 = 最后排（autoPlace / arrange / suggestSlot 单一真源） */
+export const UNIT_DEPTH: Record<string, number> = {
+  guardian: 0,
+  warrior: 0.12,
+  assassin: 0.95,
+  marksman: 0.72,
+  mage: 0.78,
+  warlock: 0.6,
+  support: 0.88,
+};
+
 export function centerOutColumns(): number[] {
   const out: number[] = [];
   const mid = Math.floor(BOARD_COLS / 2) - 1;

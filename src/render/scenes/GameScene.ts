@@ -46,6 +46,8 @@ interface SceneData {
   daily?: boolean;
   /** 每日挑战的种子（MenuScene 算好注入；缺失时回退随机种子） */
   seed?: number;
+  /** 从图鉴返回：恢复进图鉴那一刻的备战剩余秒数（缺失 = 走常规 enterPrep 满时长） */
+  prepLeft?: number;
 }
 
 interface UndoEntry {
@@ -96,7 +98,8 @@ export class GameScene extends Phaser.Scene {
 
   // ── 场景私有 ──
   private prefs!: Preferences;
-  private prepLeft = 0;
+  /** 备战剩余秒数：nav「图鉴」往返时经场景数据带回，倒计时不重置（只读） */
+  prepLeft = 0;
   private timerUrgent = false;
   private toast: Phaser.GameObjects.Container | null = null;
   private onBeforeUnload: (() => void) | null = null;
@@ -221,6 +224,9 @@ export class GameScene extends Phaser.Scene {
       }
       if (this.match.round === 0 || this.match.needsAdvanceOnLoad()) this.match.beginRound();
       this.enterPrep();
+      // 图鉴往返：倒计时从进图鉴那一刻续跑，而不是重置回满 ——
+      // 重置等于"翻图鉴免费续 35 秒"，备战期的时钟就不成时钟了
+      if (typeof data.prepLeft === 'number') this.prepLeft = data.prepLeft;
     }
 
     this.refreshAll();
@@ -452,6 +458,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   pushUndo(label: string): void {
+    // 撤销快照 scope=准备阶段（见 undo.ts 文件头）：结算期间入栈的快照
+    // 一旦被 Ctrl+Z 消费会把已结算的血量/连胜盖回战前值 —— 在入口拦死
+    if (this.phase !== 'prep' || this.busy) return;
     this.undoStack.push({ snap: snapshotPlayer(this.match.human, this.match.pool), label });
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
   }
@@ -639,7 +648,7 @@ export class GameScene extends Phaser.Scene {
     const outcomes = this.match.settleRound();
     pairings.forEach((pair, i) => {
       if (pair === humanPair) return;
-      reports.push(this.describeOutcome(pair, outcomes[i] ?? [], 0));
+      reports.push(this.describeOutcome(pair, outcomes[i] ?? []));
     });
 
     // 2) 玩家自己的战斗
@@ -658,7 +667,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private describeOutcome(pair: Pairing, outs: RoundOutcome[], loserHpBefore: number): string {
+  private describeOutcome(pair: Pairing, outs: RoundOutcome[]): string {
     const nameOf = (i: number) => this.match.players[i].name;
     if (pair.beast) {
       const o = outs[0];
@@ -678,7 +687,6 @@ export class GameScene extends Phaser.Scene {
     let line = `${winner} 胜 ${nameOf(loser.idx)}`;
     if (loser.damage > 0) line += `（-${loser.damage}，剩 ${loser.hpAfter}）`;
     if (loser.eliminated) line += `　☠ 淘汰`;
-    void loserHpBefore;
     return line;
   }
 

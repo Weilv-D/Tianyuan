@@ -62,8 +62,7 @@ export class AudioEngine {
         });
       }
       return;
-    }
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    }    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
     this.ctx = new Ctor();
     const comp = this.ctx.createDynamicsCompressor();
@@ -80,6 +79,9 @@ export class AudioEngine {
       this.visBound = true;
       document.addEventListener('visibilitychange', () => {
         if (!this.ctx) return;
+        // closed 态（极端回收场景）下 resume() 会 reject 且无法复苏 —— 不碰它，
+        // 避免悬起的 unhandled rejection；running 态也无需重复 resume
+        if (this.ctx.state === 'closed') return;
         if (document.hidden) void this.ctx.suspend();
         else {
           void this.ctx.resume();
@@ -154,17 +156,25 @@ export class AudioEngine {
     for (const track of LICENSED_MUSIC) {
       const gen = ++this.licensedGen;
       try {
-        const res = await fetch(track.url);
-        if (!res.ok) continue;
-        const buf = await res.arrayBuffer();
-        const audio = await ctx.decodeAudioData(buf);
-        if (gen !== this.licensedGen && this.mood === 'none') {
-          // 解码期间用户已停曲：只登记缓冲，不接管
+        // 弱网单曲 5s 超时：与 boot 序章的预载超时同一纪律 —— 不让任何一首
+        // 挂起的 TCP 连接拖死整条典藏曲目链（失败按曲回落程序化）
+        const ctrl = new AbortController();
+        const timer = window.setTimeout(() => ctrl.abort(), 5000);
+        try {
+          const res = await fetch(track.url, { signal: ctrl.signal });
+          if (!res.ok) continue;
+          const buf = await res.arrayBuffer();
+          const audio = await ctx.decodeAudioData(buf);
+          if (gen !== this.licensedGen && this.mood === 'none') {
+            // 解码期间用户已停曲：只登记缓冲，不接管
+            this.licensedBufs.set(track.id, audio);
+            continue;
+          }
           this.licensedBufs.set(track.id, audio);
-          continue;
+          this.maybeTakeoverLicensed();
+        } finally {
+          window.clearTimeout(timer);
         }
-        this.licensedBufs.set(track.id, audio);
-        this.maybeTakeoverLicensed();
       } catch {
         // 单曲失败不影响其余曲目与程序化路径
       }
@@ -206,15 +216,17 @@ export class AudioEngine {
     return true;
   }
 
-  /** 停掉授权曲目源。fadeMs>0 时延迟物理停止（总线淡出先行，避免硬切） */
+  /** 停掉授权曲目源。fadeMs>0 时延迟物理停止（总线淡出先行，避免硬切）。
+   *  引用保持到物理 stop 才清空：淡出窗口内 maybeTakeover 见到非空即不再
+   *  起新源 —— 否则切心境时旧源还响着、新源已起，两个源叠 260ms。 */
   private stopLicensed(fadeMs: number): void {
     this.licensedGen++;
     const src = this.licensedSrc;
-    this.licensedSrc = null;
     if (!src) return;
     const kill = () => {
       try { src.stop(); } catch { /* 已自然结束 */ }
       try { src.disconnect(); } catch { /* 已断开 */ }
+      if (this.licensedSrc === src) this.licensedSrc = null;
     };
     if (fadeMs > 0) window.setTimeout(kill, fadeMs);
     else kill();

@@ -87,20 +87,28 @@ function tracking(g: Phaser.GameObjects.Graphics, b: Bounds): Phaser.GameObjects
       const raw = Reflect.get(target, prop, target);
       if (typeof raw !== 'function') return raw;
       const geo = GEO[prop as string];
-      if (!geo) return (...args: unknown[]) => Reflect.apply(raw, target, args);
+      if (!geo) {
+        // 点集方法（fillPoints/strokePoints）：入参是坐标对象数组而非数字表，
+        // 走不了 GEO 的数字解码 —— 单独合并点集包围盒。此前该分支写在 !geo
+        // 早退之后永不可达：一旦剪影改用点集绘制，内容归一会静默失真。
+        if (prop === 'fillPoints' || prop === 'strokePoints') {
+          return (...args: unknown[]) => {
+            for (const p of args) {
+              if (Array.isArray(p)) {
+                for (const pt of p as { x: number; y: number }[]) {
+                  if (pt && typeof pt.x === 'number') merge(pt.x, pt.y, pt.x, pt.y);
+                }
+              }
+            }
+            return Reflect.apply(raw, target, args);
+          };
+        }
+        return (...args: unknown[]) => Reflect.apply(raw, target, args);
+      }
       return (...args: unknown[]) => {
         const nums = args.filter((x): x is number => typeof x === 'number');
         const box = geo(nums);
         if (box) merge(box[0], box[1], box[2], box[3]);
-        if (prop === 'fillPoints' || prop === 'strokePoints') {
-          for (const p of args) {
-            if (Array.isArray(p)) {
-              for (const pt of p as { x: number; y: number }[]) {
-                if (pt && typeof pt.x === 'number') merge(pt.x, pt.y, pt.x, pt.y);
-              }
-            }
-          }
-        }
         return Reflect.apply(raw, target, args);
       };
     },

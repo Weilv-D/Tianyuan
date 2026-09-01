@@ -2,7 +2,7 @@ import { BOARD_COLS } from '../core/config';
 import { CHAMPION_BY_ID, CHAMPIONS } from '../data/champions';
 import { TRAIT_BY_ID } from '../data/traits';
 import { assignItems } from './inventory';
-import { centerOutColumns } from './state';
+import { UNIT_DEPTH, centerOutColumns } from './state';
 import type { BattleUnitInput, Cell, Star } from '../core/types';
 
 /**
@@ -10,17 +10,6 @@ import type { BattleUnitInput, Cell, Star } from '../core/types';
  * 把"一串棋子 id"翻译成一份可直接喂给战斗内核的入场配置 ——
  * 站位由职业自动推导（前排/后排/刺客位），玩家不必手摆每一格。
  */
-
-/** 每个职业偏好的"纵深"：0 = 最前排，1 = 最后排 */
-const DEPTH: Record<string, number> = {
-  guardian: 0,
-  warrior: 0.12,
-  assassin: 0.95,
-  marksman: 0.72,
-  mage: 0.78,
-  warlock: 0.6,
-  support: 0.88,
-};
 
 /** 计算一堆棋子激活的羁绊（同名棋子只计一次） */
 export function computeTraits(defIds: readonly string[]): { id: string; count: number; tier: number }[] {
@@ -50,14 +39,18 @@ export function computeTraits(defIds: readonly string[]): { id: string; count: n
  */
 export function autoPlace(defIds: readonly string[], team: 0 | 1): Map<string, Cell> {
   const rows = team === 0 ? [3, 2, 1, 0] : [4, 5, 6, 7];
+  // 容量钳制：棋盘只有 4×8=32 格。合法调用方（预设 7~9 人、玩家场上上限）
+  // 远够不着；此前超发（如调试注入）会走到行尾 throw —— 异常直接进 Phaser
+  // 帧回调，页面冻结。截断到容量，超出的棋子由调用方的兜底落格处理。
+  const CAP = 4 * BOARD_COLS;
   const sorted = [...defIds].sort((a, b) => {
     const ea = CHAMPION_BY_ID[a];
     const eb = CHAMPION_BY_ID[b];
-    const da = DEPTH[ea?.cls ?? 'warrior'] ?? 0.5;
-    const db = DEPTH[eb?.cls ?? 'warrior'] ?? 0.5;
+    const da = UNIT_DEPTH[ea?.cls ?? 'warrior'] ?? 0.5;
+    const db = UNIT_DEPTH[eb?.cls ?? 'warrior'] ?? 0.5;
     if (da !== db) return da - db;
     return (eb?.cost ?? 0) - (ea?.cost ?? 0);
-  });
+  }).slice(0, CAP);
 
   // 列填充顺序：由中心向两侧，保证阵型永远对称美观
   const COL_ORDER = centerOutColumns();
@@ -66,7 +59,7 @@ export function autoPlace(defIds: readonly string[], team: 0 | 1): Map<string, C
   const out = new Map<string, Cell>();
   for (const id of sorted) {
     const e = CHAMPION_BY_ID[id];
-    const depth = DEPTH[e?.cls ?? 'warrior'] ?? 0.5;
+    const depth = UNIT_DEPTH[e?.cls ?? 'warrior'] ?? 0.5;
     const preferred = Math.min(3, Math.floor(depth * 4));
     // 行选择单调前进：偏好行起向远离前排方向找第一个未满行，到头回扫全表。
     // 此前"满行原地 rowIdx+1 + guard 上限"会在 4 行全满时落回满行死循环
@@ -86,10 +79,10 @@ export function autoPlace(defIds: readonly string[], team: 0 | 1): Map<string, C
         }
       }
     }
-    if (rowIdx < 0) throw new Error(`autoPlace: 全表无空行（${sorted.length} 人）`);
+    if (rowIdx < 0) break; // 理论不可达（sorted 已钳到 32）；兜底交由调用方默认落格
     const used = rowUsed[rowIdx];
     const c = COL_ORDER.find((cc) => !used.has(String(cc)));
-    if (c === undefined) throw new Error(`autoPlace: 第 ${rowIdx} 行未满却无空列`);
+    if (c === undefined) break; // 同上：行未满则必有空列
     used.add(String(c));
     out.set(id, { c, r: rows[rowIdx] });
   }

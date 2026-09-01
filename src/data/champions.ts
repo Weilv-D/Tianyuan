@@ -99,6 +99,10 @@ export interface SkillParams {
   shieldDur?: number;
   /** 全场处决：每处决一名敌人，全体友军回复的最大生命百分比 */
   healPerExecute?: number;
+  /** 附加：第二段自身状态（如苍嗥狂血的攻击力提升，与 status 并列生效） */
+  extraStatus?: { kind: string; dur?: number; value?: number };
+  /** 附加：期间击杀敌人时，把本技能施加的自身状态时长刷新至满 */
+  killRenew?: boolean;
 }
 
 export interface SkillSpec {
@@ -247,6 +251,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
       params: {
         dur: 8,
         status: { kind: 'aspdUp', dur: 8, value: 50 },
+        extraStatus: { kind: 'atkUp', value: 45 },
+        killRenew: true,
       },
     },
   },
@@ -282,7 +288,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'muji_q',
     skillSpec: {
       kind: 'volley', name: '连弩齐射', target: 'currentTarget',
-      desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害；每发命中提升自身 6% 攻速（至多 8 层，持续 5 秒）。',
+      desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 6% 攻速（至多 8 层，持续 5 秒）。',
       params: { atk: 0.55, type: 'physical', shots: 8, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
@@ -528,7 +534,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jinghong_q',
     skillSpec: {
       kind: 'volley', name: '逐羽', target: 'currentTarget',
-      desc: '连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害。',
+      desc: '连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭双倍。',
       params: { atk: 0.65, type: 'physical', shots: 4, interval: 0.5 },
     },
   },
@@ -552,7 +558,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'lingque_q',
     skillSpec: {
       kind: 'volley', name: '雀鸣', target: 'currentTarget',
-      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害；每箭命中提升自身 5% 攻速（持续 5 秒）。',
+      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；每箭命中提升自身 5% 攻速（持续 5 秒）。',
       params: { atk: 0.5, type: 'physical', shots: 5, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 5 } },
     },
   },
@@ -614,7 +620,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'paoche_q',
     skillSpec: {
       kind: 'volley', name: '石弩', target: 'currentTarget',
-      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害；命中后自身获得 8% 攻速 3 秒。',
+      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；命中后自身获得 8% 攻速 3 秒。',
       params: { atk: 0.62, type: 'physical', shots: 4, interval: 0.55, status: { kind: 'aspdUp', dur: 3, value: 8 } },
     },
   },
@@ -650,7 +656,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'chaoji_q',
     skillSpec: {
       kind: 'volley', name: '潮弩', target: 'currentTarget',
-      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害；每发命中提升自身 6% 攻速（持续 5 秒）。',
+      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 6% 攻速（持续 5 秒）。',
       params: { atk: 0.5, type: 'physical', shots: 6, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },

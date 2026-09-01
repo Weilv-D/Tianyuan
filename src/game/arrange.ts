@@ -17,6 +17,7 @@ import type { CardPool } from './pool';
 import {
   allUnits,
   boardCap,
+  UNIT_DEPTH,
   centerOutColumns,
   powerScore,
   sellValue,
@@ -24,20 +25,9 @@ import {
   type PlayerState,
 } from './state';
 
-/** 职业纵深：0 = 最前排，1 = 最后排 */
-const DEPTH: Record<string, number> = {
-  guardian: 0,
-  warrior: 0.12,
-  assassin: 0.95,
-  marksman: 0.72,
-  mage: 0.78,
-  warlock: 0.6,
-  support: 0.88,
-};
-
 function depthOf(defId: string): number {
   const e = CHAMPION_BY_ID[defId];
-  return DEPTH[e?.cls ?? 'warrior'] ?? 0.5;
+  return UNIT_DEPTH[e?.cls ?? 'warrior'] ?? 0.5;
 }
 
 /** 由中心向两侧的列填充顺序（规范实现见 state.centerOutColumns） */

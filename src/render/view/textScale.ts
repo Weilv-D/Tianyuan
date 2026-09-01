@@ -20,9 +20,11 @@ const SCALE = TEXT_SCALE;
     Phaser.GameObjects.GameObjectFactory.prototype,
     Phaser.GameObjects.GameObjectCreator.prototype,
   ] as unknown as Record<string, TextFn>[]) {
-    // 幂等守卫：Vite HMR 会重读本模块，不判重就在旧包装上再缠一层 ×1.12
+    // 幂等守卫：Vite HMR 会重读本模块，不判重就在旧包装上再缠一层 ×1.12。
+    // 已打过补丁的原型跳过（continue），另一个原型仍要独立检查 —— 用 break
+    // 会把 Creator 留在未补丁状态，HMR 后 create 出的字全部缩回 1×。
     const prev = proto.text as TextFn & { __textScaled?: boolean };
-    if (prev?.__textScaled) break;
+    if (prev?.__textScaled) continue;
     const wrapped = function (this: unknown, ...args: unknown[]) {
       const [x, y, text, style, ...rest] = args as [number, number, string, Phaser.Types.GameObjects.Text.TextStyle | undefined, unknown[]];
       let s = style;

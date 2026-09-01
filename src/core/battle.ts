@@ -313,7 +313,11 @@ export class Battle implements BattleApi {
 
   private _distScratch: Int16Array | null = null;
   private _queueScratch: Int16Array | null = null;
-  /** 从 u 出发的 BFS 距离场（-1 = 不可达）— L8：复用 scratch buffer，零分配热路径 */
+  /**
+   * 从 u 出发的 BFS 距离场（-1 = 不可达）— L8：复用 scratch buffer，零分配热路径。
+   * 返回的是内部缓冲：仅当次调用有效，下一次 distanceField 会覆盖 —— 禁止缓存
+   * 或跨调用持有（当前唯一调用方 pickNearestEnemy 即取即用）。
+   */
   private distanceField(u: Unit): Int16Array {
     const dist = this._distScratch ?? new Int16Array(BOARD_COLS * BOARD_ROWS);
     this._distScratch = dist;
@@ -582,6 +586,11 @@ export class Battle implements BattleApi {
     return healed;
   }
 
+  /**
+   * 护盾口径（渲染层与测试照此消费）：unit.shield 为当前总量；shield 事件的
+   * amount 是本次增量、total 是累加后总量；shield 状态的 value 存总量。
+   * 续盾是"刷新"而非"叠加"：时长取剩余与新增的较大者，数值并入总量。
+   */
   addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void {
     if (!dst.alive || amount <= 0) return;
     const amt = amount * (1 + (src?.trait.shieldAmp ?? 0));

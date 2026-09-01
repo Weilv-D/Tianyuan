@@ -27,6 +27,18 @@ function* walk(abs, zipPrefix) {
   }
 }
 
+// 目录自身也产出占位条目：fflate 只为出现的键建条目，空目录不占位解压后即丢失
+function* walkDirs(abs, dirPrefix) {
+  for (const name of readdirSync(abs)) {
+    const p = join(abs, name);
+    const zp = dirPrefix === '' ? name : `${dirPrefix}/${name}`;
+    if (statSync(p).isDirectory()) {
+      yield zp;
+      yield* walkDirs(p, zp);
+    }
+  }
+}
+
 const entries = {};
 for (const input of inputs) {
   const abs = resolve(root, input);
@@ -36,6 +48,9 @@ for (const input of inputs) {
   }
   for (const [zipPath, file] of walk(abs, basename(abs))) {
     entries[zipPath] = new Uint8Array(readFileSync(file));
+  }
+  for (const dir of walkDirs(abs, basename(abs))) {
+    entries[`${dir}/`] = new Uint8Array(0);
   }
 }
 

@@ -45,6 +45,11 @@ export class InputController {
 
   constructor(private scene: GameScene) {}
 
+  /** 棋子或装备拖拽进行中（多点触控/快捷键守卫共用） */
+  private get dragging(): boolean {
+    return this.dragGhost !== null || this.dragItemGhost !== null;
+  }
+
   /** 页面隐藏：中止拖拽（稳定引用，供 game.events 注册/摘除） */
   private onGameHidden = (): void => {
     if (this.dragGhost) this.endDrag(0, 0);
@@ -175,15 +180,19 @@ export class InputController {
       this.scene.game.events.off('hidden', this.onGameHidden);
     });
 
-    // 快捷键
+    // 快捷键。E/Z 在拖拽进行中必须让路：autoArrange/undo 会整体重排
+    // board/bench 数组，endDrag 持有的 from 槽位与残影高亮随即失效
     this.scene.input.keyboard?.on('keydown-D', () => this.scene.onReroll());
     this.scene.input.keyboard?.on('keydown-F', () => this.scene.onBuyXp());
-    this.scene.input.keyboard?.on('keydown-E', () => this.scene.onAutoArrange());
+    this.scene.input.keyboard?.on('keydown-E', () => {
+      if (this.dragging) return;
+      this.scene.onAutoArrange();
+    });
     this.scene.input.keyboard?.on('keydown-SPACE', () => {
       if (this.scene.phase === 'prep') this.scene.startBattlePhase();
     });
     this.scene.input.keyboard?.on('keydown-Z', (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) this.scene.onUndo();
+      if ((e.ctrlKey || e.metaKey) && !this.dragging) this.scene.onUndo();
     });
     // ESC 统一分发：设置 → 调试 → 侦查 → 暂停，一次只关一层
     this.scene.input.keyboard?.on('keydown-ESC', () => {

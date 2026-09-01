@@ -196,7 +196,7 @@ export const ITEMS: readonly ItemDef[] = [
     id: 'pojia',
     name: '破甲杖',
     tier: 'combined',
-    desc: '攻击力 +20，护甲 +10。攻击无视目标 30% 护甲。',
+    desc: '攻击力 +20，护甲 +10。攻击无视目标 35% 护甲。',
     recipe: ['moren', 'xuanjia'],
     bonus: { atk: 20, armor: 10 },
     mods: { armorPen: 0.35 },
@@ -275,9 +275,9 @@ export const ITEMS: readonly ItemDef[] = [
     name: '疾风弓',
     tier: 'combined',
     // 第一版叠层是 8 层 ×4%，但一场战斗平均只有 12 秒，8 次普攻还没打完就结束了 ——
-    // 满层的 50% 攻速是个摸不到的天花板。改成 5 层 ×6%：上限一样，
-    // 但五六次攻击（约 5 秒）就能吃满，这才叫"越打越快"。
-    desc: '攻速 +20%。每次普攻命中叠加 6% 攻速，最多 5 层。',
+    // 满层攻速是个摸不到的天花板。改成 5 层 ×7%（满层 +35%）：五六次攻击
+    // （约 5 秒）就能吃满，这才叫"越打越快"。
+    desc: '攻速 +20%。每次普攻命中叠加 7% 攻速，最多 5 层。',
     recipe: ['yunlv', 'yunlv'],
     bonus: { aspd: 0.2 },
     hooks: ['momentum'],

@@ -80,10 +80,11 @@ for (const [id, [r, c]] of Object.entries(MAP)) {
     empty.push(`${id}@r${r}c${c}`);
     continue;
   }
-  minX = Math.max(0, minX - PAD);
-  minY = Math.max(0, minY - PAD);
-  maxX = Math.min(png.width - 1, maxX + PAD);
-  maxY = Math.min(png.height - 1, maxY + PAD);
+  // padding 钳到本格（与 slice-sheet.mjs 同口径）：钳到整图会吃进相邻格的像素
+  minX = Math.max(x0, minX - PAD);
+  minY = Math.max(y0, minY - PAD);
+  maxX = Math.min(x1 - 1, maxX + PAD);
+  maxY = Math.min(y1 - 1, maxY + PAD);
   const w = maxX - minX + 1;
   const h = maxY - minY + 1;
   const out = new PNG({ width: w, height: h });

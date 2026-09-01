@@ -28,8 +28,15 @@ export async function preloadItemArt(): Promise<number> {
       ([id, url]) =>
         new Promise<void>((resolve) => {
           const img = new Image();
-          const done = () => resolve();
-          window.setTimeout(done, 3000);
+          let settled = false;
+          let tid = 0;
+          const done = () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(tid);
+            resolve();
+          };
+          tid = window.setTimeout(done, 3000);
           img.onload = () => {
             cache.set(id, img);
             done();

@@ -35,9 +35,16 @@ function loadData(raw: string, expectV: number): ReturnType<Match['toJSON']> | n
   try {
     const parsed = JSON.parse(raw) as SavePayload;
     if (!parsed || parsed.v !== expectV || !parsed.data) return null;
-    // 基本结构校验，防止旧版本残留数据把游戏搞崩
-    if (!Array.isArray(parsed.data.players) || parsed.data.players.length === 0) return null;
-    return parsed.data;
+    // 基本结构校验，防止配额截断/旧版本残留的半截载荷把游戏搞崩：
+    // fromJSON 假定的字段逐个验型，缺一样就当"没有存档"（容错原则见文件头）
+    const d = parsed.data;
+    if (!Array.isArray(d.players) || d.players.length === 0) return null;
+    if (typeof d.rngState !== 'number' || typeof d.round !== 'number') return null;
+    if (typeof d.phase !== 'string' || typeof d.pool !== 'object' || d.pool === null) return null;
+    if (!Array.isArray(d.ghosts)) return null;
+    // 注意：mode/battleSnapshots/humanRank 等是 v3 增量字段，v2 旧档合法地
+    // 缺失、由 fromJSON 兜底 —— 校验只钉 v2/v3 共有的骨架字段
+    return d;
   } catch {
     return null;
   }

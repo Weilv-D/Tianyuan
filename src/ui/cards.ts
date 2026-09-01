@@ -87,6 +87,9 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[200]),
+        // 名字直接压在立绘/剪影上：浅色原画区域会吃掉 PAPER 字色，
+        // 一道 1px 墨影保证任意底图上的可读性（图鉴浅色立绘实测救回来的）
+        shadow: { offsetX: 0, offsetY: 1, color: css(INK[900]), blur: 2, fill: true },
       })
       .setOrigin(0.5, 1);
     this.itemRow = scene.add.container(0, 0);

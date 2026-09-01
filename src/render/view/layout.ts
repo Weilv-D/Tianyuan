@@ -54,11 +54,17 @@ export const BENCH_Y = PHASE_Y + 40; // 812：框顶（BENCH_Y-24=788）须避�
 
 // ── 商店（样稿 .scard 窄卡 × 5，宽对齐备战席带）───────
 export const SHOP_CW = 120;
-export const SHOP_CH = 170;
+/** 卡高 164：卡底 1056 给注脚行留出 1058→~1077 的落地带 —— 旧 170 时注脚
+ * 顶到 1064，13px@1.12 的行高直接越过 1080 设计底缘被画布裁字。 */
+export const SHOP_CH = 164;
 export const SHOP_GAP = 12;
 export const SHOP_W = SHOP_CW * 5 + SHOP_GAP * 4; // 648
 export const SHOP_X = (W - SHOP_W) / 2; // 636
 export const SHOP_Y = 892;
+/** 商肆注脚行（「商 肆」/「刷新 · N 金」）顶缘：卡底 +2，行高（13px@1.12 ≈ 19px）
+ *  底缘 ~1077，收在 1080 之内 —— 契约测试按 SHOP_FOOT_Y + 20 ≤ H 钉死。 */
+export const SHOP_FOOT_DY = 2;
+export const SHOP_FOOT_Y = SHOP_Y + SHOP_CH + SHOP_FOOT_DY;
 
 // ── 器匣（店左 2×5 网格）──────────────────────────────
 export const ITEM_SIZE = 52;

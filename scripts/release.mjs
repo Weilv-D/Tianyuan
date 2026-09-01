@@ -81,18 +81,36 @@ console.log(`\n[4/5] 打包 zip`);
 const zip = `百战天元-${version}-web.zip`;
 run(`node scripts/zip.mjs "release.tmp/${zip}" "release.tmp/百战天元.html" "release.tmp/dist-web" "release.tmp/使用说明.txt" "release.tmp/THIRD_PARTY_LICENSES.txt"`);
 
-// 产物体检：单文件不得残留任何外链资源（src=/href= 指向文件的引用）
-const external = html.match(/<(script|link)[^>]+(src|href)="(?!https?:|data:)[^"]+"/g) ?? [];
+// 产物体检：单文件不得残留任何外链资源（src=/href= 指向文件的引用，
+// 单双引号都查；再扫 CSS url() 与 srcset —— 漏一种写法就漏一类资源）
+const external = [
+  html.match(/<(script|link|img|audio|source|video|track)[^>]+(src|href|srcset)\s*=\s*"(?!https?:|data:)[^"]+"/gi) ?? [],
+  html.match(/<(script|link|img|audio|source|video|track)[^>]+(src|href|srcset)\s*=\s*'(?!https?:|data:)[^']+'/gi) ?? [],
+  // url() 只认小写（打包器产出的 CSS 恒为小写）、内容含路径特征（. 或 /），
+  // 且排除 JS 拼接特征（+ $ {）—— 宽松版会被压缩 JS 的 URL(i)/URL(Q) 与
+  // url("+this.src+') 之类动态串误杀（实测分别 27 处与 1 处）
+  html.match(/url\(\s*['"]?(?!data:|https?:|blob:)[^)'"+${}]*[./][^)'"+${}]*['"]?\s*\)/g) ?? [],
+].flat();
 if (external.length) {
   console.error('✗ 单文件仍引用外部资源：', external);
   process.exit(1);
 }
 
 console.log(`\n[5/5] 原子替换 dist/ 与 release/`);
-// 全部构建成功才走到这里：旧产物此刻才被替换，中途任何失败都不损上一版
+// 全部构建成功才走到这里：旧产物此刻才被替换，中途任何失败都不损上一版。
+// 替换走「旧→.bak → 新落位 → 删 .bak」三步：rm+rename 两步版若 rename 被
+// 占用/跨盘打断，旧产物已删新产物未落位，发布损坏且不可回滚。
 for (const [tmp, dest] of [[distTmp, DIST], [relTmp, RELEASE]]) {
-  if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
-  renameSync(tmp, dest);
+  const bak = `${dest}.bak`;
+  const hadOld = existsSync(dest);
+  if (hadOld) renameSync(dest, bak);
+  try {
+    renameSync(tmp, dest);
+  } catch (err) {
+    if (hadOld) renameSync(bak, dest); // 新版落位失败：旧版回滚复位
+    throw err;
+  }
+  if (hadOld) rmSync(bak, { recursive: true, force: true });
 }
 
 console.log(`

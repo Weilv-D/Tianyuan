@@ -32,6 +32,10 @@ import { ITEMS } from '../src/data/items';
 
 const RAW_ARGS = process.argv.slice(2);
 const N = Number(RAW_ARGS.find((a) => !a.startsWith('--')) ?? 16);
+if (!Number.isInteger(N) || N <= 0) {
+  console.error(`✗ 对局数必须是正整数，收到：${RAW_ARGS.find((a) => !a.startsWith('--')) ?? '(缺省)'}`);
+  process.exit(1);
+}
 const IDS_ARG = RAW_ARGS.find((a) => a.startsWith('--ids='));
 /** 只测指定件；null = 全表 */
 const ONLY: readonly string[] | null = IDS_ARG ? IDS_ARG.slice('--ids='.length).split(',').filter((s) => s.length > 0) : null;

@@ -76,7 +76,9 @@ export class SettingsPanel {
     const closeRel = 76 + 66 * 3 + 60 * 3 + (inMatch ? 58 : 0);
     const hotkeyRel = closeRel + 42 + 14;
     const creditRel = hotkeyRel + 22;
-    const bh = creditRel + 20;
+    // 底衬 34：署名行（11px@1.12，行高 ~16px）+ 字形下延，与底框净距 ≥10px ——
+    // 旧 20 时文字视觉上骑在面板底边框上（浏览器实测）
+    const bh = creditRel + 34;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
 

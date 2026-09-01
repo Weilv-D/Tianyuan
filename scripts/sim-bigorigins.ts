@@ -11,6 +11,10 @@ import { Battle } from '../src/core/battle';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../src/game/comp';
 
 const N = Number(process.argv[2] ?? 120);
+if (!Number.isInteger(N) || N <= 0) {
+  console.error(`✗ 对局数必须是正整数，收到：${process.argv[2] ?? '(缺省)'}`);
+  process.exit(1);
+}
 
 const MOMEN9: CompSpec = {
   name: '墨门九守',

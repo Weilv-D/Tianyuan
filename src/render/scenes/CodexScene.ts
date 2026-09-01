@@ -42,6 +42,8 @@ export class CodexScene extends Phaser.Scene {
   };
   private tabBtns: Partial<Record<CodexTab, Button>> = {};
   private backTo: 'Menu' | 'Game' = 'Menu';
+  /** 返回时原样带回的载荷（对局引用 + 备战剩余秒数），让 GameScene 续跑而非重置 */
+  private backData: Record<string, unknown> = {};
   private itemTip!: ItemTooltip;
   private detailCard: UnitDetailCard | null = null;
 
@@ -49,11 +51,16 @@ export class CodexScene extends Phaser.Scene {
     super({ key: 'Codex' });
   }
 
-  create(data: { from?: 'Menu' | 'Game' }): void {
+  create(data: { from?: 'Menu' | 'Game'; match?: unknown; prepLeft?: number }): void {
     baseZoom(this);
     resetCursorOnShutdown(this);
-    // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）
+    // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）；
+    // 对局引用与备战剩余秒数原样带回，GameScene 据此续跑倒计时
     this.backTo = data.from === 'Game' ? 'Game' : 'Menu';
+    this.backData =
+      data.from === 'Game'
+        ? { match: data.match, ...(typeof data.prepLeft === 'number' ? { prepLeft: data.prepLeft } : {}) }
+        : {};
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);
@@ -92,7 +99,7 @@ export class CodexScene extends Phaser.Scene {
       this.tabBtns[id] = b;
     });
 
-    new Button(this, W - 200, 26, '返 回', () => this.scene.start(this.backTo, {}), {
+    new Button(this, W - 200, 26, '返 回', () => this.scene.start(this.backTo, this.backData), {
       width: 150,
       height: 44,
       variant: 'primary',

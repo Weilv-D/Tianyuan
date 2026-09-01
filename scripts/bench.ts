@@ -3,6 +3,10 @@ import { Battle } from '../src/core/battle';
 import { PRESET_COMPS, buildTeam } from '../src/game/comp';
 
 const N = Number(process.argv[2] ?? 300);
+if (!Number.isInteger(N) || N <= 0) {
+  console.error(`✗ 基准局数必须是正整数，收到：${process.argv[2] ?? '(缺省)'}`);
+  process.exit(1);
+}
 const t0 = Date.now();
 let ticks = 0;
 let timeouts = 0;

@@ -38,13 +38,16 @@ import {
   SELL_Y,
   SHOP_CH,
   SHOP_CW,
+  SHOP_FOOT_Y,
   SHOP_GAP,
   SHOP_W,
   SHOP_X,
   SHOP_Y,
   UNLOAD_BTN_DY,
+  H,
   W,
 } from '../view/layout';
+import { screenToWorld } from '../view/viewScale';
 import { TRAIT_BY_ID } from '../../data/traits';
 import { RAIL_VIEW_H, RAIL_VIEW_W } from '../view/hudLayout';
 import type { GameScene } from '../scenes/GameScene';
@@ -125,7 +128,7 @@ export class HudPanels {
 
     // ── 左导航：楷/mono 双行 + 下划线 hover（样稿 .nl） ──
     const nav: [string, string, () => void][] = [
-      ['图 鉴', 'Codex', () => this.scene.scene.start('Codex', { from: 'Game', match: this.scene.match })],
+      ['图 鉴', 'Codex', () => this.scene.scene.start('Codex', { from: 'Game', match: this.scene.match, prepLeft: this.scene.prepLeft })],
       ['羁 绊', 'Bonds', () => this.openTraitModal()],
       ['阵 容', 'Legion', () => this.scoutNextOpponent()],
     ];
@@ -269,8 +272,9 @@ export class HudPanels {
 
   buildShop(): void {
     // 注脚放卡下一行：卡上方紧贴备战席框底，旧「卡上标题」压进框底带是备战区视觉混乱的一处根因
+    // 行顶坐标走 SHOP_FOOT_Y（layout 单一真源）：13px@1.12 行高 ~19px，底缘收在 1080 之内
     this.scene.add
-      .text(SHOP_X, SHOP_Y + SHOP_CH + 2, '商 肆', {
+      .text(SHOP_X, SHOP_FOOT_Y, '商 肆', {
         fontFamily: FONT.title,
         fontSize: '13px',
         color: css(PAPER[300]),
@@ -278,7 +282,7 @@ export class HudPanels {
       })
       .setOrigin(0, 0);
     this.scene.add
-      .text(SHOP_X + SHOP_W, SHOP_Y + SHOP_CH + 2, `刷新 · ${REROLL_COST} 金`, {
+      .text(SHOP_X + SHOP_W, SHOP_FOOT_Y, `刷新 · ${REROLL_COST} 金`, {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[400]),
@@ -546,18 +550,18 @@ export class HudPanels {
       this.traitModalScroll = null;
       return;
     }
-    const shade = this.scene.add.rectangle(0, 0, W, 1080, 0x000000, 0.55).setOrigin(0).setDepth(560).setInteractive();
+    const shade = this.scene.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setDepth(560).setInteractive();
     const panelW = 640;
     const panelH = 720;
     const px = (W - panelW) / 2;
-    const py = (1080 - panelH) / 2;
+    const py = (H - panelH) / 2;
     const modal = makePanel(this.scene, px, py, panelW, panelH, { title: '羁 绊 全 览', accent: SPIRIT.base, alpha: 0.98 });
     modal.setDepth(561);
     // 遮罩点击关闭（点浮层本体不关）：shade 一直 setInteractive 却无响应，
-    // 玩家本能的点空白处关闭从未生效
+    // 玩家本能的点空白处关闭从未生效。坐标换算走 screenToWorld —— 与
+    // hitTest/enableScroll 同一真源，勿再手写 px/zoom。
     shade.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      const wx = p.x / this.scene.cameras.main.zoom;
-      const wy = p.y / this.scene.cameras.main.zoom;
+      const { x: wx, y: wy } = screenToWorld(p.x, p.y, this.scene.cameras.main.zoom);
       if (wx < px || wx > px + panelW || wy < py || wy > py + panelH) this.openTraitModal();
     });
 

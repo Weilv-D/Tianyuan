@@ -152,8 +152,9 @@ export class BoardView extends Phaser.GameObjects.Container {
     this.gridImg = scene.add.image(BOARD_PAD, BOARD_PAD, TEX_GRID).setOrigin(0);
     this.overlay = scene.add.graphics();
 
-    // 层序：漆盘 → 微光 → 纸纹 → 格线 → 悬停
-    this.add([this.boardImg, this.sheen, this.paper, this.gridImg, this.overlay]);
+    // 层序：漆盘 → 微光 → 纸纹 → 格线 → 环境粒子 → 悬停
+    // （粒子先于 overlay 收进容器：悬停描边永不被灵尘/余烬盖住）
+    this.add([this.boardImg, this.sheen, this.paper, this.gridImg]);
 
     // 环境粒子：缓慢上浮的灵尘（准备阶段）/ 余烬（战斗阶段）
     this.motes = scene.add.particles(0, 0, TEX.glow, {
@@ -188,6 +189,7 @@ export class BoardView extends Phaser.GameObjects.Container {
 
     this.add(this.motes);
     this.add(this.embers);
+    this.add(this.overlay);
 
     // 入场：漆盘先落，格线次第浮现（烘焙纹理之间的 stagger 淡入，零重绘成本）
     this.gridImg.setAlpha(0);

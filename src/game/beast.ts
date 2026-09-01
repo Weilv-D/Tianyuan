@@ -61,16 +61,21 @@ export function generateBeastBoard(round: number, rng: Rng): (UnitInstance | nul
 
   const picked = rng.shuffle([...pool] as string[]);
   const used = new Set<string>();
-  // L29：count ≤ 8 而 picked 长度 ≥ 5，唯一冲突是重名去重；洞口已按照 slots[i] 固定，跳过只会留空格，不会错位。
+  // 先生成入列（去重 + 名单校验），再连续占位 —— 此前"跳过仍占 slots[i]"，
+  // 候选重名或未知 id 时会留下站位空洞，宣告数量与实际落地不符。
+  // rng 语义不变：chance 只在真正落地时消费，顺序与旧实现逐位一致。
+  const chosen: string[] = [];
   for (let i = 0; i < count; i++) {
     const id = picked[i % picked.length];
-    if (used.has(id)) continue;
+    if (used.has(id) || !CHAMPION_BY_ID[id]) continue;
     used.add(id);
-    if (!CHAMPION_BY_ID[id]) continue;
+    chosen.push(id);
+  }
+  for (let i = 0; i < chosen.length; i++) {
     let star: Star = 1;
     if (rng.chance(threeStarChance)) star = 3;
     else if (rng.chance(twoStarChance)) star = 2;
-    const u = createUnit(id, star);
+    const u = createUnit(chosen[i], star);
     u.isBeast = true;
     board[slots[i]] = u;
   }

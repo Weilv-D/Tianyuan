@@ -37,12 +37,15 @@ const flag = (name: string): string | undefined => {
 const nPerPair = Number(flag('n') ?? 80);
 const seedBase = Number(flag('seed') ?? 20260829);
 const comparePath = flag('compare');
-// 位置感知：--flag 会吃掉紧跟的一个词，剩下的不含 = 的才是位置参数（spec 路径）
+// 位置感知：只有已知的有值 flag 才吃掉紧跟的一个词 —— 未知 --flag 不占位，
+// 漏值的 --n 也不会把下一个词误吞成 spec 路径
+const VALUED_FLAGS = new Set(['n', 'seed', 'compare', 'set']);
 const flagValuePos = new Set<number>();
 for (let i = 0; i < argv.length; i++) {
-  if (argv[i].startsWith('--')) flagValuePos.add(i + 1);
+  const m = /^--([a-z-]+)$/.exec(argv[i]);
+  if (m && VALUED_FLAGS.has(m[1])) flagValuePos.add(i + 1);
 }
-const specPath = argv.find((a, i) => !a.startsWith('--') && !flagValuePos.has(i) && !a.includes('='));
+const specPath = argv.find((a, i) => !a.startsWith('--') && !flagValuePos.has(i));
 const setArg = flag('set');
 
 let spec: SweepSpec;

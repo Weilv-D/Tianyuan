@@ -26,6 +26,10 @@ for (let i = 0; i < args.length; i++) {
   } else if (a === '--n') n = Number(args[++i]);
   else if (a === '--pairs') focus = args[++i] ?? '4';
 }
+if (!Number.isInteger(n) || n <= 0) {
+  console.error(`✗ --n 必须是正整数，收到：${n}`);
+  process.exit(1);
+}
 const focusSet = new Set(focus.split(',').map(Number).filter((x) => Number.isInteger(x)));
 if (Object.keys(overrides).length === 0) {
   console.error('用法: npx tsx scripts/ab-pair.ts --set path=value [--n 200] [--pairs 4]');

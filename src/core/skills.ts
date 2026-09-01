@@ -18,6 +18,15 @@ const DEBUFF_KINDS = new Set<StatusKind>([
   'burn', 'bleed', 'armorShred', 'mrShred', 'vulnerability', 'taunt',
 ]);
 
+/** 增益白名单（DEBUFF 的显式补集）。技能的"施加给自身"分支只认这份名单：
+ *  此前用 !DEBUFF_KINDS 反向判断，新增 StatusKind 忘注册会被误当增益推给
+ *  施法者（历史上赤瞳的 atkUp 走过反向错误）；显式白名单下未知种类安全
+ *  no-op，漏注册在数值扫描里立即可见，而不是静默强化施法者。 */
+const BUFF_KINDS = new Set<StatusKind>([
+  'atkUp', 'aspdUp', 'armorUp', 'mrUp', 'shield', 'invuln', 'stealth',
+  'dr', 'spellCharge', 'ccImmune', 'drain',
+]);
+
 /** 技能原始伤害 = (攻击力 × atk倍率 + 法强 × sp倍率 + 固定值) × 星级技能倍率 */
 export function skillRaw(u: Unit, atk = 0, sp = 0, flat = 0): number {
   return (atk * effAtk(u) + sp * effSp(u) + flat) * STAR_SKILL_SCALE[u.star - 1];
@@ -133,7 +142,7 @@ const IMPL: Record<string, Impl> = {
     if (p.invulnWhileCasting) api.addStatus(u, u, 'invuln', Math.max(0.1, shots * interval), 0);
     // 增益类 status 一律施加给自身（此前只有 aspdUp 走这条分支，
     // 赤瞳的 atkUp 被当成减益推给了敌人）
-    if (p.status && !DEBUFF_KINDS.has(p.status.kind as StatusKind)) {
+    if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
       api.addStatus(u, u, p.status.kind as StatusKind, p.status.dur ?? 6, p.status.value ?? 0);
     }
 
@@ -342,7 +351,7 @@ const IMPL: Record<string, Impl> = {
     for (const al of healed) {
       api.heal(u, al, amount, 'skill');
       // 减益类 status（白娘的重伤）只走下方"随机敌人"分支，绝不能套在友军身上
-      if (p.status && !DEBUFF_KINDS.has(p.status.kind as StatusKind)) {
+      if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
         api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       }
       if (p.damageReduction) api.addStatus(u, al, 'dr', 6, p.damageReduction * 100);
@@ -474,23 +483,22 @@ const IMPL: Record<string, Impl> = {
     const dur = p.dur ?? 6;
     if (p.value) api.addShield(u, u, u.maxHp * p.value, dur);
     if (p.status) api.addStatus(u, u, p.status.kind as StatusKind, p.status.dur ?? dur, p.status.value ?? 0);
-    // 苍嗥：攻速 + 攻击力双增，击杀续期
-    if (spec.params.status?.kind === 'aspdUp' && u.entry.id === 'canghao') {
-      api.addStatus(u, u, 'atkUp', dur, 45);
-      // 续期回调只注册一次。
-      // 此前每次施放都无条件 push 一个新闭包，而 killHandlers 从不回收：施放 N 次
-      // 就有 N 个闭包，每次击杀要遍历全部 N 个（重复刷新状态 + 重复推送 buffAura
-      // 特效事件）。闭包体只依赖 u 与 dur，与"第几次施放"无关，注册一次即等价。
-      if (!u.traitStacks['canghaoRenew']) {
-        u.traitStacks['canghaoRenew'] = 1;
-        u.killHandlers.push((a) => {
-          if (!hasStatus(u, 'aspdUp')) return;
-          for (const s of u.statuses) {
-            if (s.kind === 'aspdUp' || s.kind === 'atkUp') s.ticks = Math.round(dur * TICK_RATE);
-          }
-          a.fx('buffAura', { uid: u.uid, params: { hue: 1 } });
-        });
-      }
+    // 双增益（数值随 data 走：p.extraStatus 声明第二段自身状态，如苍嗥的攻击力）
+    if (p.extraStatus) {
+      api.addStatus(u, u, p.extraStatus.kind as StatusKind, p.extraStatus.dur ?? dur, p.extraStatus.value ?? 0);
+    }
+    // 击杀续期（data 声明 killRenew 才启用）：把本技能施加的自身状态刷新至满时长。
+    // 此前按 entry.id === 'canghao' 硬编码，tuning/扫描器覆盖不到。续期回调只注册
+    // 一次：闭包体只依赖 u 与 dur，与"第几次施放"无关，注册一次即等价。
+    if (p.killRenew && !u.traitStacks['selfBuffKillRenew']) {
+      u.traitStacks['selfBuffKillRenew'] = 1;
+      u.killHandlers.push((a) => {
+        if (!hasStatus(u, 'aspdUp')) return;
+        for (const s of u.statuses) {
+          if (s.kind === 'aspdUp' || s.kind === 'atkUp') s.ticks = Math.round(dur * TICK_RATE);
+        }
+        a.fx('buffAura', { uid: u.uid, params: { hue: 1 } });
+      });
     }
     if (p.invulnWhileCasting) {
       api.addStatus(u, u, 'invuln', dur, 0);

@@ -67,6 +67,7 @@ import {
   localToGlobalRow,
   resolveMerges,
   sellValue,
+  UNIT_DEPTH,
   type PlayerState,
   type Phase,
   type UnitInstance,
@@ -552,7 +553,7 @@ export class Match implements AiWorld {
   /** 按职业纵深推荐一个空格 */
   suggestSlot(p: PlayerState, defId: string): number {
     const def = CHAMPION_BY_ID[defId];
-    const depthRaw = def ? { guardian: 0, warrior: 0.12, assassin: 0.95, marksman: 0.72, mage: 0.78, warlock: 0.6, support: 0.88 }[def.cls] ?? 0.5 : 0.5;
+    const depthRaw = def ? UNIT_DEPTH[def.cls] ?? 0.5 : 0.5;
     const preferredRow = Math.min(3, Math.floor(depthRaw * 4));
     const order = centerOutColumns();
     for (let r = preferredRow; r < 4; r++) {
@@ -710,6 +711,12 @@ export class Match implements AiWorld {
 
   /**
    * 结算一场战斗：更新连胜连败、扣血、判定淘汰。
+   *
+   * 契约：同一 Pairing 只得结算一次 —— 二次结算即双倍掉血/重复掉落。
+   * 批量路径走 settleRound（结算后清空 pairings 防重入）；淘汰快进走
+   * GameScene.fastForward 的逐场循环（配对现生成现消费）。渲染层永远
+   * 不直接调用本方法改写结果。
+   *
    * @returns 双方的结果描述
    */
   applyBattleResult(pair: Pairing, result: BattleResult): RoundOutcome[] {
@@ -718,6 +725,9 @@ export class Match implements AiWorld {
     const out: RoundOutcome[] = [];
 
     // 轮空：不掉血，但不给连胜奖励（否则轮空太划算）。
+    // 连胜/连败计数保留不动（不视作胜也不视作败，TFT 同类口径）——
+    // 3 连胜 → 轮空 → 再胜仍按 4 连胜计；当轮的连胜金由 computeIncome
+    // 的 skipStreak 压为 0（轮空当轮不发，计数跨轮空延续）。
     // 注意必须排除墨兽轮 —— 墨兽配对的 b 与 ghost 同样是 -1，
     // 不排除的话它会在这里被当成轮空提前返回，既不掉血也不掉装备。
     if (!pair.beast && pair.b < 0 && pair.ghost < 0) {
@@ -811,6 +821,10 @@ export class Match implements AiWorld {
    *
    * 输了也给一件保底 —— 这不是仁慈，是防止雪崩：
    * 装备差距一旦在早期拉开，弱势玩家会连输到再也拿不到装备，对局在中段就提前结束了。
+   *
+   * 发放不设器匣上限（裁决 2026-09-01）：与 stripItems 同一守恒口径 ——
+   * 装备只进不出，超过版面格数的部分不可见但仍入存档；卸装侧的容量守卫见
+   * inventory.unequipAll（玩家主动卸装才严守 ITEM_BAR_SLOTS）。
    */
   private rollItemDrops(p: PlayerState, won: boolean): string[] {
     const drops: string[] = [];
@@ -908,6 +922,8 @@ export class Match implements AiWorld {
     mode: 'normal' | 'daily';
     battleSnapshots: BattleSnapshot[];
     adventureOffer: AdventureOffer | null;
+    /** 人类玩家最终名次（淘汰时写入）；旧档缺省 0 = 未定名次 */
+    humanRank: number;
   } {
     return {
       seed: this.seed,
@@ -922,6 +938,7 @@ export class Match implements AiWorld {
       mode: this.mode,
       battleSnapshots: [...this.battleSnapshots],
       adventureOffer: this.adventureOffer,
+      humanRank: this.humanRank,
     };
   }
 
@@ -937,6 +954,7 @@ export class Match implements AiWorld {
     m.settings = data.settings ?? { autoDeploy: true };
     m.battleSnapshots = data.battleSnapshots ?? [];
     m.adventureOffer = data.adventureOffer ?? null;
+    m.humanRank = data.humanRank ?? 0;
     // iid 计数器必须扫到所有存活引用（含墨影快照与墨兽阵容），
     // 否则读档后 createUnit 可能发出重复 iid，拖拽与视图绑定会串单位
     let maxIid = 0;

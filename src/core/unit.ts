@@ -114,7 +114,9 @@ export function createUnit(input: BattleUnitInput): Unit {
   const legendHp = legend ? LEGEND_T3.hpMult : 1;
   const legendPow = legend ? LEGEND_T3.powerMult : 1;
 
-  const maxHp = Math.round(b.hp * hpScale * GLOBAL_HP_SCALE * legendHp + (bonus.hp ?? 0));
+  // 下界 1：负向 bonus（扫参实验/误配装备）把 maxHp 打到 ≤0 时，
+  // 下游 hp 比例、超时裁定会除零/NaN，整场战斗的确定性随之报废
+  const maxHp = Math.max(1, Math.round(b.hp * hpScale * GLOBAL_HP_SCALE * legendHp + (bonus.hp ?? 0)));
   const startMp = Math.min(b.startMp + (bonus.startMp ?? 0), b.maxMp);
 
   return {

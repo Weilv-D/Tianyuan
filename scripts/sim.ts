@@ -16,6 +16,10 @@ import { CHAMPIONS, CHAMPION_BY_ID } from '../src/data/champions';
 import { TRAITS, TRAIT_BY_ID } from '../src/data/traits';
 
 const N = Number(process.argv[2] ?? 200);
+if (!Number.isInteger(N) || N <= 0) {
+  console.error(`✗ 对局数必须是正整数，收到：${process.argv[2] ?? '(缺省)'}`);
+  process.exit(1);
+}
 
 function mulberry(seed: number): () => number {
   let s = seed >>> 0;
