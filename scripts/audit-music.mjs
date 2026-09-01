@@ -5,16 +5,16 @@
 //   2. id 唯一
 //   3. menu / prep / battle / final 四个心境全覆盖
 //   4. 授权恒为 CC0-1.0（ADR D1：禁 CC-BY / 自定义授权）
-// 并生成 release/THIRD_PARTY_LICENSES.txt 随包分发（零署名义务下的自愿出处）。
+// 同时从 package-lock 收集生产依赖许可证，生成完整的 THIRD_PARTY_LICENSES.txt。
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = join(root, 'src/music/tracks.json');
 const outPath = process.argv[2]
-  ? join(root, process.argv[2])
+  ? resolve(root, process.argv[2])
   : join(root, 'release/THIRD_PARTY_LICENSES.txt');
 
 if (!existsSync(manifestPath)) {
@@ -29,6 +29,36 @@ const fail = (msg) => {
   console.error(`✗ ${msg}`);
   failed = true;
 };
+
+// 打包进浏览器的生产依赖必须随包携带许可证正文。package-lock 是依赖集合真源，
+// 不维护会随升级漂移的手写名单。
+const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+const runtimePackages = [];
+for (const [location, metadata] of Object.entries(lock.packages ?? {})) {
+  if (!location.startsWith('node_modules/') || metadata.dev === true) continue;
+  const packageDir = join(root, location);
+  const packagePath = join(packageDir, 'package.json');
+  if (!existsSync(packagePath)) {
+    fail(`生产依赖未安装：${location}`);
+    continue;
+  }
+  const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
+  if (pkg.version !== metadata.version) {
+    fail(`${pkg.name ?? location}: 已安装版本 ${pkg.version} 与锁文件 ${metadata.version} 不一致`);
+    continue;
+  }
+  const licenseFile = readdirSync(packageDir).find((name) => /^licen[cs]e(?:\.|$)/i.test(name));
+  if (!pkg.license || !licenseFile) {
+    fail(`${pkg.name ?? location}: 缺少许可证元数据或正文`);
+    continue;
+  }
+  runtimePackages.push({
+    name: pkg.name,
+    version: pkg.version,
+    license: pkg.license,
+    text: readFileSync(join(packageDir, licenseFile), 'utf8').trim(),
+  });
+}
 
 // 1) id 唯一
 const ids = tracks.map((t) => t.id);
@@ -56,6 +86,18 @@ for (const t of tracks) {
 if (!failed) {
   const lines = [
     '百战天元 · 第三方授权清单',
+    '',
+    '一、运行时软件',
+    '',
+    ...runtimePackages.flatMap((pkg) => [
+      `软件：${pkg.name} ${pkg.version}`,
+      `授权：${pkg.license}`,
+      `来源：https://www.npmjs.com/package/${pkg.name}/v/${pkg.version}`,
+      '',
+      pkg.text,
+      '',
+    ]),
+    '二、音乐作品',
     '',
     '本包包含以下 CC0-1.0（公有领域贡献）音乐作品。CC0 不设署名义务，',
     '此清单为工程自愿记录的完整出处。',

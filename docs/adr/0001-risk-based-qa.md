@@ -11,10 +11,10 @@ The project needs fast feedback for everyday changes and stronger evidence for r
 
 QA uses four layers with separate responsibilities:
 
-1. `npm run qa` is the mandatory default gate: strict type checking, core behavior tests, and a production build.
+1. `npm run qa` is the mandatory default gate: strict type checking, architecture boundaries, core behavior tests, and a production build.
 2. Domain checks are change-scoped: simulations for combat balance, music audit for licensed assets, and foreground smoke checks for rendered UI and browser interaction.
 3. `npm run release` is the distribution gate: version validation, automated QA, music audit, both build forms, external-resource inspection, and atomic packaging.
-4. CI runs the same `npm run qa` command on pull requests and pushes to `main`.
+4. CI runs the same `npm run qa` command on pull requests and pushes to `main`; boundary checks keep the headless layers independent from rendering and ambient nondeterminism.
 
 Core tests are selected by player-facing risk, not code structure or coverage percentage. A test belongs in the default suite only when its failure maps to a concrete gameplay, persistence, interaction, or delivery failure.
 

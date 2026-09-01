@@ -441,7 +441,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     const armor = t(`armor${tier}`, [16, 26, 32][tier] ?? 16);
     // t2 形态置换（DESIGN §十三 2v4 结构边的立项解）：护甲墙的一部分/全部搬进
     // 生命池，反伤改按最大生命百分比计（血池即引信）。默认 0 = 关闭，
-    // 行为与历史逐字节一致（golden 快照锁定）。
+    // 默认关闭时不得改变确定性事件流或实战结果。
     const swapCut = tier >= 2 ? t('t2ArmorCut', 0) : 0;
     const swapHp = tier >= 2 ? t('t2HpGain', 0) : 0;
     for (const u of members) {

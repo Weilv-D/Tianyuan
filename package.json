@@ -4,6 +4,9 @@
   "version": "1.7.0",
   "type": "module",
   "description": "百战天元 · Tian Yuan — 商业级自走棋",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && npm run build:app",
@@ -11,9 +14,10 @@
     "release": "node scripts/release.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "vitest run --allowOnly=false",
     "test:watch": "vitest",
-    "qa": "npm run typecheck && npm test && npm run build:app",
+    "qa": "npm run typecheck && npm run check:boundaries && npm test && npm run build:app",
     "sim": "tsx scripts/sim.ts",
     "sim:sweep": "tsx scripts/sim-sweep.ts",
     "sim:match": "tsx scripts/sim-match.ts",
@@ -27,7 +31,8 @@
     "audit": "tsx scripts/audit.ts",
     "diag": "tsx scripts/diag.ts",
     "probe": "tsx scripts/probe.ts",
-    "audit:music": "node scripts/audit-music.mjs"
+    "audit:music": "node scripts/audit-music.mjs",
+    "audit:deps": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "phaser": "^3.80.1"

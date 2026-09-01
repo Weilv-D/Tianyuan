@@ -20,11 +20,12 @@
 | 层级 | 入口 | 解决的问题 | 执行时机 |
 |---|---|---|---|
 | 静态正确性 | `npm run typecheck` | 类型错误、无效调用、未使用代码 | 每次改动 |
+| 架构边界 | `npm run check:boundaries` | 内核越层依赖、浏览器 API 和非确定性随机源 | 每次改动 |
 | 核心行为 | `npm test` | 玩法、资产、存档、回放、输入是否破坏 | 每次改动 |
 | 生产可构建 | `npm run build:app` | Vite 生产打包与资源解析是否成功 | 每次改动 |
-| 默认 QA | `npm run qa` | 依次执行以上三层 | 交付前、CI |
+| 默认 QA | `npm run qa` | 依次执行以上四层 | 交付前、CI |
 | 领域专项 | 模拟、音乐审计、实机冒烟 | 平衡、授权资源、真实渲染与交互 | 按改动领域 |
-| 发布验收 | `npm run release` | 双形态产物、外链扫描、压缩包与原子替换 | 发版时 |
+| 发布验收 | `npm run release` | 依赖/资源审计、双形态产物、外链扫描与原子替换 | 发版时 |
 
 `npm run build` 适合单独构建，内部包含类型检查；`npm run qa` 直接调用 `build:app`，避免同一轮
 流程重复类型检查。
@@ -47,6 +48,7 @@ GitHub Actions 在 Pull Request 和 `main` 分支推送时执行：
 npm ci
 └─ npm run qa
    ├─ TypeScript strict
+   ├─ Architecture boundaries
    ├─ Vitest core behavior
    └─ Vite production build
 ```
@@ -55,7 +57,7 @@ npm ci
 
 ### 3.3 发布
 
-`npm run release` 负责版本一致性、类型检查、核心行为测试、音乐审计、静态托管构建、
+`npm run release` 负责版本一致性、类型/边界检查、核心行为测试、依赖与资源审计、静态托管构建、
 单文件构建、外部资源扫描、说明文件和 zip。所有临时产物成功后才替换已有发布目录，任何中途
 失败都保留上一版可用产物。
 
@@ -79,7 +81,7 @@ npm ci
 
 ## 5. 核心测试策略
 
-默认套件为 16 个文件、42 项行为测试，聚焦四类项目风险：
+默认套件保持精简，聚焦四类项目风险：
 
 | 风险 | 测试文件 | 保护内容 |
 |---|---|---|

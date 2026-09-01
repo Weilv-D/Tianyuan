@@ -3,12 +3,12 @@
 // 产物（release/ 目录）：
 //   百战天元.html          —— 单文件版：双击即玩（file:// 下内联脚本照常执行），
 //                             微信/U盘/邮件直发，接收方无需安装任何东西。
-//   dist-web/              —— 静态托管版：丢到任意静态服务器 / GitHub Pages /
+//   dist-web/              —— 静态托管版：丢到云 OSS / 内网等静态服务器 /
 //                             局域网共享即可，多块产物 + 相对路径（base './'）。
-//   THIRD_PARTY_LICENSES.txt —— 典藏音乐出处清单（CC0，自愿署名）
+//   THIRD_PARTY_LICENSES.txt —— 运行时软件与典藏音乐的第三方授权清单
 //   百战天元-<版本>-web.zip —— 上述全部打包，便于分发归档。
 //
-// 门禁：版本三处一致 + 类型检查（--skip-typecheck 可跳过）+ 全量测试 + 音乐审计（sha256）。
+// 门禁：代码/包版本一致 + 类型/边界/核心行为 + 依赖与资源审计 + 双形态构建。
 // 构建全程写临时目录，成功后才原子替换 dist/ 与 release/ —— 中途失败时上一版产物完好。
 import { execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -19,12 +19,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const run = (cmd) => execSync(cmd, { cwd: root, stdio: 'inherit', shell: true });
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
-// 版本一致性门禁：version.ts（界面落款/金种子元信息）与 package.json 必须同值，
+// 版本一致性门禁：version.ts（界面落款）与 package.json 必须同值，
 // 否则会出现"zip 是 1.4.0、界面显示 1.4.1"的错版分发
 const verTs = readFileSync(path.join(root, 'src/version.ts'), 'utf8');
 const gameVersion = /GAME_VERSION = '([^']+)'/.exec(verTs)?.[1];
 if (gameVersion !== version) {
-  console.error(`✗ 版本三处不一致：package.json=${version}，src/version.ts=${gameVersion}。发版前请同步两处。`);
+  console.error(`✗ 版本不一致：package.json=${version}，src/version.ts=${gameVersion}。发版前请同步两处。`);
   process.exit(1);
 }
 
@@ -33,16 +33,18 @@ const RELEASE = path.join(root, 'release');
 const distTmp = path.join(root, 'dist.tmp');
 const relTmp = path.join(root, 'release.tmp');
 
-console.log(`\n[1/5] 类型检查 + 全量测试（v${version}）`);
+console.log(`\n[1/5] 类型 + 架构边界 + 核心行为 + 生产依赖审计（v${version}）`);
 // --skip-typecheck：并行线未收敛时的发布通道（产物走 esbuild 不查类型，仅跳过整仓卫生门，单测照跑）
 if (process.argv.includes('--skip-typecheck')) {
   console.log('  (--skip-typecheck: skip repo-wide typecheck)');
 } else {
-  run('npx tsc --noEmit');
+  run('npm run typecheck');
 }
-run('npx vitest run');
+run('npm run check:boundaries');
+run('npm test');
+run('npm run audit:deps');
 
-console.log(`\n[2/5] 音乐审计（文件存在 + sha256 + CC0 口径）+ 静态托管构建 → dist.tmp/`);
+console.log(`\n[2/5] 第三方授权与音乐资源审计 + 静态托管构建 → dist.tmp/`);
 mkdirSync(relTmp, { recursive: true });
 run('node scripts/audit-music.mjs release.tmp/THIRD_PARTY_LICENSES.txt');
 run('npx vite build --outDir dist.tmp --emptyOutDir');
@@ -66,11 +68,11 @@ writeFileSync(
     '  单文件零依赖零安装，存档保存在本机浏览器里；换电脑请用游戏内「继续对局」前的存档习惯（存档在本机，不随文件走）。',
     '',
     '【方式二 · 网页托管】',
-    '  dist-web/ 文件夹整体上传到任意静态托管（GitHub Pages / 云 OSS / 公司内网服务器）。',
+    '  dist-web/ 文件夹整体上传到云 OSS、公司内网等静态服务器。',
     '  局域网试玩：任意机器执行  npx serve dist-web  后分享地址即可。',
     '',
-    '【音乐出处】',
-    '  见 THIRD_PARTY_LICENSES.txt（四曲 CC0，作者 Kevin MacLeod，源自 FreePD）。',
+    '【第三方授权】',
+    '  见 THIRD_PARTY_LICENSES.txt（运行时软件许可证与四曲 CC0 音乐出处）。',
     '',
     `版本 ${version} · 构建产物由 npm run release 生成`,
     '',

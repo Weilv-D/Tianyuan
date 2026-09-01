@@ -9,24 +9,24 @@
 程序化五声音阶合成），风格为「夜宴 · 幽冥水墨」（Night Feast）。
 
 ```
-npm install      # 安装（仅 phaser 一个运行时依赖）
+npm ci           # 按锁文件安装依赖（Node 20+）
 npm run dev      # 开发服务器 → http://localhost:5199
-npm test         # 42 项核心行为测试（vitest）
+npm test         # 核心行为测试（vitest）
 npm run build    # tsc 严格类型检查 + 生产构建 → dist/
-npm run qa       # 交付门禁：类型检查 + 核心行为 + 生产构建
+npm run qa       # 交付门禁：类型 + 架构边界 + 核心行为 + 生产构建
 ```
 
 一键启停（含端口占用自动清理与退出释放）：Windows 双击/命令行 `start.bat`（`stop` / `status` / `restart` 子命令可用）；Git Bash 用 `start.sh`。
 
 ## 打包发布（任意电脑游玩）
 
-一条命令：`npm run release`（类型检查 + 全量测试 + 音乐审计 + 双形态构建 + 打 zip），产物在 `release/`：
+一条命令：`npm run release`（类型/边界 + 核心行为 + 依赖/资源审计 + 双形态构建 + 打 zip），产物在 `release/`：
 
 | 产物 | 用法 |
 |---|---|
-| `百战天元.html`（约 25MB 单文件，四曲音乐内联） | **双击即玩**——用 Chrome / Edge / Firefox 打开；微信、U 盘、邮件直发，接收方零安装零依赖 |
-| `dist-web/` | **静态托管**——整体上传 GitHub Pages / 云 OSS / 公司内网服务器；局域网试玩：任意机器 `npx serve dist-web` 后分享地址 |
-| `百战天元-<版本>-web.zip` | 上述两者 + 使用说明 + 音乐授权清单，分发归档 |
+| `百战天元.html`（单文件，四曲音乐内联） | **双击即玩**：用 Chrome / Edge / Firefox 打开；微信、U 盘、邮件直发，接收方零安装零依赖 |
+| `dist-web/` | **静态托管**：整体上传云 OSS 或公司内网服务器；局域网试玩可执行 `npx serve dist-web` 后分享地址 |
+| `百战天元-<版本>-web.zip` | 上述两者 + 使用说明 + 第三方授权清单，分发归档 |
 
 要点：单文件形态无任何外链（发布脚本内置体检，残留外链即失败）；相对路径 `base './'`，任意子目录托管可用。发布工具链跨平台（Node zip，Windows/macOS/Linux 一致）。存档（对局进度 / 每日挑战 / 偏好）保存在**玩家本机浏览器**的 localStorage，不随文件走。
 
@@ -101,10 +101,7 @@ src/
 | `npm run gold` | 阵容造价核算 —— 对拍必须落在同一造价带内，否则测的是钱不是羁绊 |
 | `npm run beast` / `diag` / `probe` / `audit` / `roster` / `bench` | 墨兽自检 / 单局诊断 / 分布探针 / 羁绊可达性 / 速查 / 吞吐基准 |
 
-当前平衡态（每对 200 局、CRN 双向平均）：六流派综合胜率 41.3% ~ 63.7%，极差 22.5%；
-极端克制边「亡语→后期」90.75%（十殿处决机制锁定）；整局模拟平均 28.2 回合
-（约 23.8 分钟），五原型平均名次 4.38 ~ 4.65（极差 0.27）。
-方法与完整数据见
+当前平衡断面、先手偏差、克制边和局长数据见
 **[docs/DESIGN.md](./docs/DESIGN.md)**（§十二 当前平衡数据），质量验收见 **[docs/QA.md](./docs/QA.md)**。
 
 ## 技术选型
@@ -113,8 +110,8 @@ src/
 |---|---|
 | Phaser 3.80 | 2D 场景图、RenderTexture 烘焙、tween、粒子一站式 |
 | TypeScript strict | 战斗内核的数值口径（暴击单结算、抗性上限、吸血语义）靠类型与测试固化 |
-| Vite 5 | 秒级冷启动；生产构建 ~98KB gzip（phaser 单独分包） |
-| Vitest | 回归防线：经济 / 撤销 / 守恒 / 战斗公式 / 确定性 / 占格 / 扫描框架 |
+| Vite 5 | 秒级冷启动；应用代码与 Phaser 独立分包 |
+| Vitest | 风险驱动的核心行为防线：战斗、资产、进度与交互 |
 | 轻素材管线 | 纸纹、颗粒、图标、音效全部程序化；立绘 64 张 / 小篆子集 / CC0 音乐三源入库，`?url` 导入自动适配双形态 |
 | DPR 渲染底座 | 画布缓冲 = 1920×1080 × K（K=min(dpr,2)），相机 zoom=K 锚点居中 —— 高分屏 1 逻辑 px = 1 设备 px；指针坐标经 screenToWorld 咽喉换算，高分屏拖拽/命中零偏移 |
 
@@ -143,7 +140,9 @@ src/
 
 - **[DESIGN.md](./docs/DESIGN.md)** —— 设计说明书：核心循环、经济、羁绊与克制环、装备、
   战斗内核契约、AI、平衡方法论与当前数据
-- **[QA.md](./docs/QA.md)** —— 质量手册：测试分层、不变量、性能包络、稳定性、复现命令
+- **[DEVELOPMENT.md](./docs/DEVELOPMENT.md)** —— 开发全流程：需求、边界、实现、验证、提交、同步与回退
+- **[QA.md](./docs/QA.md)** —— 质量规范：风险分层、门禁、专项验证与通过标准
 - **[ART_BIBLE.md](./docs/ART_BIBLE.md)** —— 美术圣经：色板、字体、立绘与徽章体系、特效与 UI 规范
+- **[VERSIONING.md](./docs/VERSIONING.md)** —— 版本号、CHANGELOG、正式发布与版本回退
 - **[CHANGELOG.md](./docs/CHANGELOG.md)** —— 更新日志（1.0.0 起按版本归档）
 - **[UPGRADE.md](./docs/UPGRADE.md)** —— 五阶段重构升级计划（v3，执行归档）
