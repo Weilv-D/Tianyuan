@@ -8,6 +8,8 @@ import { GILT, INK, CINNABAR, PAPER, SHADE, SPIRIT, TRAIT_TIER_COLOR_HEX, css } 
 import { buildTextures, grainOverlay, TEX } from '../view/textures';
 import { H, W } from '../view/layout';
 import { baseZoom } from '../view/viewScale';
+import { fadeIn, fadeTo } from '../view/transition';
+import { shakeFactor } from '../view/fxPrefs';
 
 /**
  * 终局结算场景。
@@ -22,13 +24,14 @@ export class ResultScene extends Phaser.Scene {
 
   create(data: { match?: Match }): void {
     baseZoom(this);
+    fadeIn(this);
     resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
     audio.stopBgm();
     const match = data.match;
     if (!match) {
-      this.scene.start('Menu', {});
+      fadeTo(this, 'Menu', {});
       return;
     }
     clearSave(match.mode); // 只清本局模式的档：终局结算不波及另一模式进度
@@ -176,12 +179,12 @@ export class ResultScene extends Phaser.Scene {
 
     panel.add(
       new Button(this, -220, by + bh - 62, '回 主 菜 单', () => {
-        this.scene.start('Menu', {});
+        fadeTo(this, 'Menu', {});
       }, { width: 200, height: 46 })
     );
     panel.add(
       new Button(this, 20, by + bh - 62, '再来一局', () => {
-        this.scene.start('Game', { fresh: true });
+        fadeTo(this, 'Game', { fresh: true });
       }, { width: 200, height: 46, variant: 'primary' })
     );
 
@@ -239,7 +242,8 @@ export class ResultScene extends Phaser.Scene {
       duration: 220,
       ease: 'Cubic.easeIn',
       onComplete: () => {
-        this.cameras.main.shake(140, 0.0035);
+        const f = shakeFactor();
+        if (f > 0) this.cameras.main.shake(140, 0.0035 * f);
         this.tweens.add({ targets: seal, scaleY: 0.9, duration: 70, yoyo: true, ease: 'Quad.easeOut' });
       },
     });

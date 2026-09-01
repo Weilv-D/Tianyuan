@@ -20,6 +20,7 @@ import { bakeSilhouettes } from '../board/silhouetteFactory';
 import { INK, GILT, CINNABAR, SPIRIT, PAPER, css } from '../view/palette';
 import { W, H } from '../view/layout';
 import { motion } from '../view/motion';
+import { fadeIn, fadeTo } from '../view/transition';
 
 // ── 渲染模块（R2 拆分）：场景只保留 create/update 主循环、场景切换与对局数据装配；
 //    覆盖层/面板/输入/刷新细节全部委托 src/render/game/ 下的模块。 ──
@@ -112,6 +113,7 @@ export class GameScene extends Phaser.Scene {
 
   create(data: SceneData): void {
     baseZoom(this);
+    fadeIn(this);
     resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
@@ -205,7 +207,7 @@ export class GameScene extends Phaser.Scene {
       // 从战斗场景返回：结果已由 BattleScene 写回 Match，这里只负责展示与推进
       this.phase = 'battle';
       this.busy = true;
-      this.cameras.main.fadeIn(240, 7, 9, 12);
+      this.cameras.main.fadeIn(160, 7, 9, 12);
       this.afterBattle();
     } else {
       // 读档路由（A2）：终局档进终局；人类已亡快进到底；结算已落盘（phase='result'）
@@ -480,6 +482,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   afterAction(): void {
+    this.inputCtl.clearSelection();
     this.refreshAll();
     this.queueSave();
   }
@@ -636,6 +639,7 @@ export class GameScene extends Phaser.Scene {
     this.exitUnloadMode();
     this.pauseScout.setPaused(false);
     this.pauseScout.closeScout();
+    this.inputCtl.clearSelection(); // 阵容锁定：选中态随开战清空
     this.busy = true;
     this.phase = 'battle';
     // 阵容锁定：撤销栈清空（防止结算期间 Ctrl+Z 回滚到战前快照），
@@ -680,10 +684,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshAll();
 
     audio.playPluck(196); // 徵音起手：开战的弦响
-    this.cameras.main.fadeOut(260, 7, 9, 12);
-    this.time.delayedCall(280, () => {
-      this.scene.start('Battle', { match: this.match, pair: humanPair });
-    });
+    fadeTo(this, 'Battle', { match: this.match, pair: humanPair });
   }
 
   private describeOutcome(pair: Pairing, outs: RoundOutcome[]): string {
@@ -778,20 +779,20 @@ export class GameScene extends Phaser.Scene {
   private showFinalStandings(): void {
     // 终局结算已独立为 ResultScene：对局场景就此卸下，残留状态随场景关闭清空
     this.phase = 'over';
-    this.scene.start('Result', { match: this.match });
+    fadeTo(this, 'Result', { match: this.match });
   }
 
   restart(): void {
     this.abandoned = true; // 阻止离场流程把已清档的旧局写回
     clearSave(this.match.mode); // 只清本局模式的档：普通档重开不波及每日档，反之亦然
-    this.scene.start('Game', { fresh: true });
+    fadeTo(this, 'Game', { fresh: true });
   }
 
   /** 投降：放弃当前对局，清档回主菜单（设置面板里二次确认后才走到这里） */
   private resign(): void {
     this.abandoned = true;
     clearSave(this.match.mode);
-    this.scene.start('Menu', {});
+    fadeTo(this, 'Menu', {});
   }
 
   // ══════════════ 设置 ══════════════

@@ -5,6 +5,7 @@ import { Button, FONT } from './kit';
 import { musicCreditLine } from '../music/manifest';
 import { GILT, INK, PAPER, SHADE, css } from '../render/view/palette';
 import { motion } from '../render/view/motion';
+import { fxPrefs, type ShakeStrength } from '../render/view/fxPrefs';
 import { screenToWorld } from '../render/view/viewScale';
 import { H, W } from '../render/view/layout';
 
@@ -73,7 +74,11 @@ export class SettingsPanel {
     // 各算各的坐标，行数一变就撞车。
     const bw = 440;
     const inMatch = !!this.host.inMatch;
-    const closeRel = 76 + 66 * 3 + 60 * 3 + (inMatch ? 58 : 0);
+    // 行高表：标题带 76 + 三滑杆 66×3 + 六个开关行 60×6（静音/自动/静观/典藏/
+    // 伤害数字/镜头震动）+ 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 20。
+    // 页脚贴着内容流排布，不再用 bh 固定偏移 —— 此前「关闭」钮与快捷键/署名两行
+    // 重叠的根源就是两者各算各的坐标，行数一变就撞车。
+    const closeRel = 76 + 66 * 3 + 60 * 6 + (inMatch ? 58 : 0);
     const hotkeyRel = closeRel + 42 + 14;
     const creditRel = hotkeyRel + 22;
     // 底衬 34：署名行（11px@1.12，行高 ~16px）+ 字形下延，与底框净距 ≥10px ——
@@ -189,6 +194,48 @@ export class SettingsPanel {
     panel.add(
       scene.add
         .text(bx + 196, y + 20, '关：程序合成音乐', {
+          fontFamily: FONT.body,
+          fontSize: '12px',
+          color: css(PAPER[400]),
+        })
+        .setOrigin(0, 0)
+    );
+    y += 60;
+
+    // 演出偏好（独立 fxPrefs 键，与对局偏好档分离）：伤害飘字开关
+    const dmgBtn = new Button(scene, bx + 34, y + 6, fxPrefs.damageText ? '伤害数字 开' : '伤害数字 关', () => {
+      fxPrefs.set({ damageText: !fxPrefs.damageText });
+      dmgBtn.setText(fxPrefs.damageText ? '伤害数字 开' : '伤害数字 关');
+    }, { width: 150, height: 40 });
+    panel.add(dmgBtn);
+    panel.add(
+      scene.add
+        .text(bx + 196, y + 20, '战斗中的数值飘字', {
+          fontFamily: FONT.body,
+          fontSize: '12px',
+          color: css(PAPER[400]),
+        })
+        .setOrigin(0, 0)
+    );
+    y += 60;
+
+    // 镜头震动强度：标准 / 轻 / 关（循环切换，与静观模式叠加时静观恒胜）
+    const shakeLabels: Record<ShakeStrength, string> = {
+      standard: '镜头震动 标准',
+      light: '镜头震动 轻',
+      off: '镜头震动 关',
+    };
+    const shakeOrder: ShakeStrength[] = ['standard', 'light', 'off'];
+    let shakeIdx = shakeOrder.indexOf(fxPrefs.shake);
+    const shakeBtn = new Button(scene, bx + 34, y + 6, shakeLabels[fxPrefs.shake], () => {
+      shakeIdx = (shakeIdx + 1) % shakeOrder.length;
+      fxPrefs.set({ shake: shakeOrder[shakeIdx] });
+      shakeBtn.setText(shakeLabels[shakeOrder[shakeIdx]]);
+    }, { width: 150, height: 40 });
+    panel.add(shakeBtn);
+    panel.add(
+      scene.add
+        .text(bx + 196, y + 20, '战斗镜头晃动幅度', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[400]),

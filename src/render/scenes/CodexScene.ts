@@ -13,6 +13,7 @@ import { bakeSilhouettes } from '../board/silhouetteFactory';
 import { buildTextures, grainOverlay } from '../view/textures';
 import { baseZoom, screenToWorld } from '../view/viewScale';
 import { H, W } from '../view/layout';
+import { fadeIn, fadeTo } from '../view/transition';
 
 /**
  * 图鉴场景（离对局浏览）。
@@ -53,6 +54,7 @@ export class CodexScene extends Phaser.Scene {
 
   create(data: { from?: 'Menu' | 'Game'; match?: unknown }): void {
     baseZoom(this);
+    fadeIn(this);
     resetCursorOnShutdown(this);
     // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）；
     // 对局引用原样带回。备战无倒计时（手动开战），无需带回剩余秒数
@@ -96,7 +98,7 @@ export class CodexScene extends Phaser.Scene {
       this.tabBtns[id] = b;
     });
 
-    new Button(this, W - 200, 26, '返 回', () => this.scene.start(this.backTo, this.backData), {
+    new Button(this, W - 200, 26, '返 回', () => fadeTo(this, this.backTo, this.backData), {
       width: 150,
       height: 44,
       variant: 'primary',

@@ -15,6 +15,8 @@ import { baseZoom, battleWorldToLayer, BATTLE_BOARD_LX, BATTLE_BOARD_LY, BATTLE_
 import { EffectsLayer } from '../board/EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../board/DamageText';
 import { motion } from '../view/motion';
+import { fadeIn, fadeTo } from '../view/transition';
+import { shakeFactor } from '../view/fxPrefs';
 import { audio } from '../../audio/AudioEngine';
 import { Button, enableScroll, FONT, makeChip, makePanel, resetCursorOnShutdown, type ScrollHandle } from '../../ui/kit';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../../game/comp';
@@ -126,6 +128,7 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     baseZoom(this);
+    fadeIn(this);
     resetCursorOnShutdown(this);
     buildTextures(this);
     bakeSilhouettes(this);
@@ -981,10 +984,7 @@ export class BattleScene extends Phaser.Scene {
     if (!this.matchCtx) return;
     const match = this.matchCtx.match;
     this.matchCtx = null;
-    this.cameras.main.fadeOut(220, 7, 9, 12);
-    this.time.delayedCall(240, () => {
-      this.scene.start('Game', { match, resultPending: true });
-    });
+    fadeTo(this, 'Game', { match, resultPending: true });
   }
 
   private buildScoreboard(): { name: string; dmg: number; taken: number; heal: number }[] {
@@ -1178,7 +1178,9 @@ export class BattleScene extends Phaser.Scene {
     // 4) 屏幕震动（按特效累计强度分级，不做无差别抖动）。
     //    边沿触发：此前 fx.shake>0 期间每帧重调 shake() 会不断重置震动计时，
     //    表现为持续微抖 —— 只在强度从无到有的那一刻触发一次。
-    const shake = motion.calm ? 0 : this.fx.shake;
+    //    强度档（fxPrefs）：standard=1 / light=0.4 / off=0；静观模式恒 0
+    const raw = motion.calm ? 0 : this.fx.shake;
+    const shake = raw * shakeFactor();
     if (shake > 0 && this.lastShake <= 0) {
       this.cameras.main.shake(Math.min(320, 90 + shake * 90), Math.min(0.012, 0.0022 * shake));
     }

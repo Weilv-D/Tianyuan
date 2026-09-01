@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ITEM_BY_ID } from '../data/items';
+import { ITEM_BY_ID, combine } from '../data/items';
 import { itemIconKey } from '../render/board/itemIcons';
 import { GILT, INK, PAPER, css } from '../render/view/palette';
 import { FONT } from './kit';
@@ -17,6 +17,9 @@ import { FONT } from './kit';
 export class ItemTooltip {
   private card: Phaser.GameObjects.Container | null = null;
   private itemId: string | null = null;
+  /** 合成预览态：拖组件悬停到另一组件上，预览 A + B → C */
+  private combineA: string | null = null;
+  private combineB: string | null = null;
   private cardW = 244;
   private cardH = 96;
   private readonly maxRight: number;
@@ -38,6 +41,15 @@ export class ItemTooltip {
     this.move(px, py);
   }
 
+  /** 合成预览：A + B → C（拖组件悬停到另一组件且可合成时） */
+  showCombine(a: string, b: string, px: number, py: number): void {
+    const out = combine(a, b);
+    if (!out) return;
+    if (!this.combineA || this.combineA !== a || this.combineB !== b) this.rebuildCombine(a, b, out);
+    this.card?.setVisible(true);
+    this.move(px, py);
+  }
+
   hide(): void {
     this.card?.setVisible(false);
   }
@@ -54,6 +66,8 @@ export class ItemTooltip {
     this.card?.destroy();
     this.card = null;
     this.itemId = null;
+    this.combineA = null;
+    this.combineB = null;
   }
 
   private rebuild(itemId: string): void {
@@ -123,6 +137,78 @@ export class ItemTooltip {
     g.lineStyle(1.5, edge, 0.9);
     g.strokeRect(0, 0, w, h);
     g.fillStyle(edge, 0.7);
+    g.fillRect(0, 0, w, 2);
+    c.addAt(g, 0);
+    this.card = c;
+  }
+
+  /** 合成预览卡：首行三枚图标 A + B → C，下接成品名/效果/来源。成品信息即决策信息。 */
+  private rebuildCombine(a: string, b: string, out: string): void {
+    const outDef = ITEM_BY_ID[out];
+    if (!outDef) return;
+    this.destroy();
+    this.combineA = a;
+    this.combineB = b;
+    const w = this.cardW;
+    const c = this.scene.add.container(-999, -999).setDepth(this.depth);
+    let y = 12;
+
+    const icon = (id: string, size: number): Phaser.GameObjects.Image =>
+      this.scene.add.image(0, 0, itemIconKey(id)).setDisplaySize(size, size).setOrigin(0, 0);
+    const aIcon = icon(a, 30);
+    aIcon.setPosition(14, y + 15);
+    c.add(aIcon);
+    c.add(
+      this.scene.add.text(50, y + 10, '+', { fontFamily: FONT.body, fontSize: '14px', color: css(INK[300]) }).setOrigin(0.5)
+    );
+    const bIcon = icon(b, 30);
+    bIcon.setPosition(66, y + 15);
+    c.add(bIcon);
+    c.add(
+      this.scene.add.text(102, y + 10, '→', { fontFamily: FONT.body, fontSize: '14px', color: css(INK[300]) }).setOrigin(0.5)
+    );
+    const cIcon = icon(out, 36);
+    cIcon.setPosition(122, y + 18);
+    c.add(cIcon);
+    y += 50;
+
+    c.add(
+      this.scene.add
+        .text(14, y, outDef.name, { fontFamily: FONT.title, fontSize: '16px', color: css(GILT.light) })
+        .setOrigin(0, 0)
+    );
+    y += 28;
+
+    const desc = this.scene.add
+      .text(14, y, outDef.desc, {
+        fontFamily: FONT.body,
+        fontSize: '13px',
+        color: css(PAPER[300]),
+        wordWrap: { useAdvancedWrap: true, width: w - 28 },
+      })
+      .setOrigin(0, 0);
+    c.add(desc);
+    y += desc.height + 8;
+
+    const rec = this.scene.add
+      .text(14, y, `由 ${ITEM_BY_ID[a]?.name ?? a} + ${ITEM_BY_ID[b]?.name ?? b} 合成`, {
+        fontFamily: FONT.body,
+        fontSize: '13px',
+        color: css(GILT.base),
+        wordWrap: { useAdvancedWrap: true, width: w - 28 },
+      })
+      .setOrigin(0, 0);
+    c.add(rec);
+    y += rec.height + 8;
+
+    const h = Math.max(96, y + 6);
+    this.cardH = h;
+    const g = this.scene.add.graphics();
+    g.fillStyle(INK[900], 0.97);
+    g.fillRect(0, 0, w, h);
+    g.lineStyle(1.5, GILT.base, 0.9);
+    g.strokeRect(0, 0, w, h);
+    g.fillStyle(GILT.base, 0.7);
     g.fillRect(0, 0, w, 2);
     c.addAt(g, 0);
     this.card = c;

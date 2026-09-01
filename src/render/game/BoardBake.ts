@@ -63,7 +63,7 @@ export class BoardBake {
         this.boardPortraits.push(new UnitPortrait(this.scene, x + 3, y + 3, CELL - 6));
       }
     }
-    this.boardHover = this.scene.add.graphics();
+    this.boardHover = this.scene.add.graphics().setDepth(296);
   }
 
   /**

@@ -439,6 +439,21 @@ export function canPlace(p: PlayerState, iid: number, where: 'board' | 'bench', 
   return { ok: true };
 }
 
+/**
+ * 一枚棋子当前全部可放置槽位（己方半场 32 格 + 备战席 9 格）。
+ * 与拖拽位置无关（canPlace 只依赖人口/同名），拖起时算一次即可供落点预显复用。
+ */
+export function validPlacements(p: PlayerState, iid: number): { where: 'board' | 'bench'; slot: number }[] {
+  const out: { where: 'board' | 'bench'; slot: number }[] = [];
+  for (let slot = 0; slot < BOARD_CELLS; slot++) {
+    if (canPlace(p, iid, 'board', slot).ok) out.push({ where: 'board', slot });
+  }
+  for (let slot = 0; slot < BENCH_SLOTS; slot++) {
+    if (canPlace(p, iid, 'bench', slot).ok) out.push({ where: 'bench', slot });
+  }
+  return out;
+}
+
 /** 清空并重建一个空的己方半场 */
 export function emptyBoard(): (UnitInstance | null)[] {
   return new Array(BOARD_CELLS).fill(null);

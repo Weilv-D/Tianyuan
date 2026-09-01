@@ -13,6 +13,7 @@ import { buildTextures, grainOverlay } from '../view/textures';
 import { baseZoom } from '../view/viewScale';
 import { H, W } from '../view/layout';
 import { motion } from '../view/motion';
+import { fadeIn, fadeTo } from '../view/transition';
 
 /**
  * 主菜单场景。
@@ -29,6 +30,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     baseZoom(this);
+    fadeIn(this);
     resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
@@ -102,10 +104,10 @@ export class MenuScene extends Phaser.Scene {
     };
 
     if (saveAvailable) {
-      mk('继 续 对 局', () => this.scene.start('Game', {}), { primary: true });
-      mk('新 对 局', () => this.scene.start('Game', { fresh: true }));
+      mk('继 续 对 局', () => fadeTo(this, 'Game', {}), { primary: true });
+      mk('新 对 局', () => fadeTo(this, 'Game', { fresh: true }));
     } else {
-      mk('新 对 局', () => this.scene.start('Game', { fresh: true }), { primary: true });
+      mk('新 对 局', () => fadeTo(this, 'Game', { fresh: true }), { primary: true });
     }
 
     // 每日挑战（M4）：种子取自今日日期哈希，同一日反复进入是同一局。
@@ -127,7 +129,7 @@ export class MenuScene extends Phaser.Scene {
       /* 无成绩记录或读取失败：不显示成绩行 */
     }
     const dailyBtnY = by;
-    mk('每 日 挑 战', () => this.scene.start('Game', { daily: true, fresh: true, seed: dailySeed }));
+    mk('每 日 挑 战', () => fadeTo(this, 'Game', { daily: true, fresh: true, seed: dailySeed }));
     if (bestText) {
       // 成绩小字贴在按钮右侧：按钮纵向栈间距只够下一颗按钮，横排不与版本行/落款相犯
       this.add
@@ -139,7 +141,7 @@ export class MenuScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5);
     }
-    mk('图　鉴', () => this.scene.start('Codex', {}));
+    mk('图　鉴', () => fadeTo(this, 'Codex', {}));
     mk('设　置', () => {
       this.settings ??= new SettingsPanel(this, { prefs });
       this.settings.open();
@@ -167,7 +169,7 @@ export class MenuScene extends Phaser.Scene {
     audio.unlock();
     audio.startBgm('menu');
 
-    this.cameras.main.fadeIn(360, 7, 9, 12);
+    // 场景入场统一走 transition.fadeIn（create 首部已调）
     // ESC 在主菜单关设置
     this.input.keyboard?.on('keydown-ESC', () => this.settings?.close());
   }

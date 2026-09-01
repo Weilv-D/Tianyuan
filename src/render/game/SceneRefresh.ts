@@ -117,6 +117,7 @@ export class SceneRefresh {
     this.scene.hud.rerollBtn.setDisabled(p.gold < REROLL_COST);
     this.scene.hud.levelBtn.setDisabled(p.gold < XP_BUY_COST || p.level >= MAX_LEVEL);
     this.scene.hud.undoBtn.setDisabled(this.scene.undoStack.length === 0);
+    this.scene.hud.setUndoAvailable(this.scene.undoStack.length > 0);
     this.scene.hud.lockBtn.setText(p.shopLocked ? '已锁定 ✓' : '锁定商店');
     this.scene.hud.lockBtn.setAlpha(p.shopLocked ? 1 : 0.8);
 

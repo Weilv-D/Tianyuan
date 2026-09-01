@@ -234,6 +234,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly traitText: Phaser.GameObjects.Text;
+  private readonly keyBadge: Phaser.GameObjects.Text;
   private defId: string | null = null;
   private affordable = true;
   private owned = false;
@@ -260,6 +261,13 @@ export class ShopCard extends Phaser.GameObjects.Container {
       .text(w / 2, h - 6, '', { fontFamily: FONT.mono, fontSize: '12px', color: css(GILT.light) })
       .setOrigin(0.5, 1);
     this.add([this.bg, this.sil, this.nameText, this.traitText, this.costText]);
+    // 键盘角标：商肆 1-5 直购（与 InputController 的 keydown-ONE..FIVE 对应）。
+    // 角标只给买得起且有货的卡（setDef 时切换），不显示时整卡可买性仍由底框表达
+    this.keyBadge = scene.add
+      .text(5, 5, '', { fontFamily: FONT.mono, fontSize: '10px', color: css(PAPER[400]) })
+      .setOrigin(0, 0)
+      .setAlpha(0.6);
+    this.add(this.keyBadge);
     this.setSize(w, h);
     this.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
     this.on('pointerover', () => {
@@ -295,6 +303,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
       this.nameText.setText('');
       this.costText.setText('');
       this.traitText.setText('');
+      this.keyBadge.setVisible(false);
       this.redraw(false);
       return;
     }
@@ -317,6 +326,9 @@ export class ShopCard extends Phaser.GameObjects.Container {
       .join(' · ');
     this.traitText.setText(clipToWidth(this.traitText, names, this.cardW - 12));
     this.costText.setText(`${def.cost} 金`);
+    // 角标随卡恢复：买走一张后新卡上架（setDef 换 id）时重新可见；
+    // setAffordable 只在可买性翻转时触发，恢复必须在这里做
+    this.keyBadge.setVisible(this.affordable && this.keyBadge.text !== '');
     this.redraw(false);
   }
 
@@ -324,6 +336,13 @@ export class ShopCard extends Phaser.GameObjects.Container {
     if (this.affordable === v) return;
     this.affordable = v;
     this.setAlpha(v ? 1 : 0.42);
+    // 买不起的卡角标一并隐去：快捷键语义只在可买时成立
+    this.keyBadge.setVisible(v && this.keyBadge.text !== '');
+  }
+
+  /** 商肆快捷键角标（buildShop 按卡位注入 1-5） */
+  setHotkey(digit: number): void {
+    this.keyBadge.setText(`${digit}`).setVisible(this.affordable && !!this.defId);
   }
 
   /**

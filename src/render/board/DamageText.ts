@@ -3,6 +3,7 @@ import { DAMAGE_OUTLINE, GILT, MOON, PAPER, SHADE, CINNABAR, SPIRIT, VOID, css }
 import { FONT } from '../../ui/kit';
 import { TEXT_SCALE } from '../view/textScale';
 import { motion } from '../view/motion';
+import { fxPrefs } from '../view/fxPrefs';
 
 export type DamageTier = 'normal' | 'crit' | 'skill' | 'true' | 'heal' | 'shield' | 'execute' | 'dot';
 
@@ -58,6 +59,8 @@ export class DamageTextLayer {
   }
 
   spawn(x: number, y: number, amount: number, tier: DamageTier, prefix = ''): void {
+    // 演出偏好：关闭飘字时整层静默（战斗信息仍由血条/盾条承担）
+    if (!fxPrefs.damageText) return;
     let cfg = STYLE[tier];
     // 静观模式：去冲击缩放与抖动，保留上浮与淡出（信息仍在，冲击不在）
     if (motion.calm) cfg = { ...cfg, pop: 1, shake: false, glow: false };

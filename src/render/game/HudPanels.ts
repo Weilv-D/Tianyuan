@@ -78,6 +78,9 @@ export class HudPanels {
   rerollBtn!: Button;
   levelBtn!: Button;
   undoBtn!: Button;
+  /** 撤销可用金点（呼吸高亮，SceneRefresh 驱动） */
+  undoDot!: Phaser.GameObjects.Graphics;
+  private undoDotActive = false;
   lockBtn!: Button;
   sellRect!: Phaser.Geom.Rectangle;
 
@@ -303,6 +306,7 @@ export class HudPanels {
         SHOP_CH,
         () => this.scene.onBuy(i)
       );
+      card.setHotkey(i + 1);
       this.shopCards.push(card);
     }
   }
@@ -394,6 +398,9 @@ export class HudPanels {
       width: ACT_BTN_W,
       height: ACT_BTN_H,
     });
+    // 撤销可用金点：有可撤销操作时点亮并呼吸（SceneRefresh 按 undoStack 长度驱动）
+    this.undoDot = this.scene.add.graphics().setDepth(8);
+    this.undoDotActive = false;
     new Button(this.scene, gx, gy + rowStep * 2, '一键装备', () => this.scene.onAutoEquip(), {
       width: ACT_BTN_W,
       height: ACT_BTN_H,
@@ -541,6 +548,23 @@ export class HudPanels {
     if (!this.unloadBtn) return;
     this.unloadBtn.setText(on ? '卸载中…' : '卸 载');
     this.unloadBtn.setAlpha(on ? 1 : 0.85);
+  }
+
+  /** 撤销可用金点：栈非空点亮呼吸，空栈熄灭 */
+  setUndoAvailable(has: boolean): void {
+    if (!this.undoDot || this.undoDotActive === has) return;
+    this.undoDotActive = has;
+    this.scene.tweens.killTweensOf(this.undoDot);
+    const cx = ACT_X + ACT_BTN_W + 10 + 6;
+    const cy = ACT_Y + 5; // 撤销钮首行下方的小点：与钮顶对齐，不压钮文字
+    if (!has) {
+      this.undoDot.clear();
+      return;
+    }
+    this.undoDot.clear();
+    this.undoDot.fillStyle(GILT.light, 1);
+    this.undoDot.fillCircle(cx, cy, 3);
+    this.scene.tweens.add({ targets: this.undoDot, alpha: { from: 0.45, to: 1 }, duration: 1400, yoyo: true, repeat: -1 });
   }
 
   // ══════════════ 羁绊全览浮层（nav「羁绊」） ══════════════
