@@ -1,7 +1,7 @@
 import type { BattleApi } from './api';
 import { chebyshev, inBounds } from './grid';
 import { effAtk, effSp, hasStatus, type Unit } from './unit';
-import { STAR_SKILL_SCALE, TICK_RATE } from './config';
+import { LEGEND_T3, STAR_SKILL_SCALE, TICK_RATE } from './config';
 import type { SkillSpec, TargetMode } from '../data/champions';
 import type { Cell, DamageType, StatusKind } from './types';
 
@@ -27,9 +27,15 @@ const BUFF_KINDS = new Set<StatusKind>([
   'dr', 'spellCharge', 'ccImmune', 'drain',
 ]);
 
-/** 技能原始伤害 = (攻击力 × atk倍率 + 法强 × sp倍率 + 固定值) × 星级技能倍率 */
+/** 技能原始伤害 = (攻击力 × atk倍率 + 法强 × sp倍率 + 固定值) × 星级技能倍率 × 天命倍率 */
 export function skillRaw(u: Unit, atk = 0, sp = 0, flat = 0): number {
-  return (atk * effAtk(u) + sp * effSp(u) + flat) * STAR_SKILL_SCALE[u.star - 1];
+  // 天命技能乘区：与 unit.ts 的 legend 判定同口径（墨兽/召唤物不天命）
+  const legend = u.entry.cost === 5 && u.star === 3 && !u.isMinion && !u.isMonster;
+  return (
+    (atk * effAtk(u) + sp * effSp(u) + flat) *
+    STAR_SKILL_SCALE[u.star - 1] *
+    (legend ? LEGEND_T3.skillMult : 1)
+  );
 }
 
 /**

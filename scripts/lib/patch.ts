@@ -1,8 +1,9 @@
 /**
  * 数值补丁层 —— 扫描框架的写入面。
  *
- * 路径语法（四类，全部指向"已存在的数字字段"，禁止凭空造字段）：
- *   cfg.<字段>                    机制软化常量（core/config.ts 的 MECH 对象字段）
+ * 路径语法（五类，全部指向"已存在的数字字段"，禁止凭空造字段）：
+ *   cfg.<字段>                    机制软化常量（core/config.ts 的 MECH / MATCH_TUNING 字段）
+ *   legend.<字段>                 天命包数值（core/config.ts 的 LEGEND_T3 数字字段）
  *   champ.<defId>.base.<field>    基础面板：hp/atk/sp/armor/mr/aspd/range/moveTime/startMp/maxMp/critChance/critMult
  *   champ.<defId>.skill.<param>   技能参数：skillSpec.params 里的数字键（如 atk、value、radius）
  *   trait.<id>.scale              整条羁绊等比缩放
@@ -13,7 +14,7 @@
  */
 import { CHAMPION_BY_ID } from '../../src/data/champions';
 import { resetTuning, TRAIT_TUNING, TRAIT_TUNING_KEYS } from '../../src/data/tuning';
-import { MATCH_TUNING, MECH } from '../../src/core/config';
+import { LEGEND_T3, MATCH_TUNING, MECH } from '../../src/core/config';
 
 export type Overrides = Record<string, number>;
 
@@ -52,6 +53,14 @@ export class Patcher {
       const target = field in MECH ? MECH : field in MATCH_TUNING ? MATCH_TUNING : null;
       if (!target) throw new Error(`cfg 里没有字段 ${field}（MECH / MATCH_TUNING）：${path}`);
       setNumber(target as unknown as Record<string, unknown>, field, value, path, this.journal);
+      return;
+    }
+    // legend.<字段>：天命包单点覆盖（sim-legend 的口径 2 用它把包归零）
+    const legendM = /^legend\.([A-Za-z0-9_]+)$/.exec(path);
+    if (legendM) {
+      const field = legendM[1];
+      if (!(field in LEGEND_T3)) throw new Error(`LEGEND_T3 里没有字段 ${field}：${path}`);
+      setNumber(LEGEND_T3 as unknown as Record<string, unknown>, field, value, path, this.journal);
       return;
     }
     const m = /^([a-z]+)\.([A-Za-z0-9_]+)\.(.+)$/.exec(path);
