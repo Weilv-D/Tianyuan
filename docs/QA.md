@@ -86,7 +86,7 @@ npm ci
 | 风险 | 测试文件 | 保护内容 |
 |---|---|---|
 | 战斗可信 | `determinism`、`battle-formula`、`grid`、`skills`、`traits-big` | 收敛、重演、战斗规则、占格、技能与大羁绊 |
-| 资产正确 | `economy`、`conservation`、`adventure`、`legend-qol` | 收入、卡池、装备、奇遇、天命与卸载 |
+| 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载 |
 | 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销与每日成绩 |
 | 交互安全 | `input-coords`、`robustness` | K=2 输入、满盘站位、坏输入与墨兽落地 |
 

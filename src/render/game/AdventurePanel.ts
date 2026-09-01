@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import type { AdventureOffer } from '../../game/adventure';
 import { cornerTicks, FONT, TRACK } from '../../ui/kit';
 import { audio } from '../../audio/AudioEngine';
-import { INK, GILT, MOON, SPIRIT, VOID, PAPER, css } from '../view/palette';
+import { INK, GILT, MOON, SPIRIT, VOID, CINNABAR, PAPER, css } from '../view/palette';
 import { W } from '../view/layout';
 import type { GameScene } from '../scenes/GameScene';
 
@@ -137,13 +137,15 @@ export class AdventurePanel {
       }).setAlpha(0.92)
     );
 
-    // 恩赐类徽标：汉字界格印（装/金/经/援），色取自调色板既有语义色
-    const badgeOf: Record<string, string> = { item: '装', gold: '金', xp: '经', reinforce: '援' };
+    // 恩赐类徽标：汉字界格印（装/金/经/材/悟/援），色取自调色板既有语义色
+    const badgeOf: Record<string, string> = { item: '装', gold: '金', xp: '经', components: '材', level: '悟', reinforce: '援' };
     const colorOf: Record<string, number> = {
-      item: GILT.base,
-      gold: MOON.base,
+      item: CINNABAR.base,
+      gold: GILT.base,
       xp: SPIRIT.base,
-      reinforce: VOID.base,
+      components: MOON.base,
+      level: VOID.base,
+      reinforce: MOON.deep,
     };
 
     cards.forEach((opt, i) => {

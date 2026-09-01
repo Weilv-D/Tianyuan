@@ -31,7 +31,7 @@ import {
 } from '../core/config';
 import { CHAMPION_BY_ID, CHAMPION_IDS_BY_COST } from '../data/champions';
 import { computeTraits } from './comp';
-import { gainXp, computeIncome } from './economy';
+import { gainXp, computeIncome, xpToNext } from './economy';
 import { CardPool, rollShop } from './pool';
 import { aiTakeTurn, AI_ROSTER, chooseAdventureIndex, makeProfile, type AiWorld } from './ai';
 import {
@@ -40,6 +40,7 @@ import {
   rollAdventureOffer,
   adventureGold,
   adventureXp,
+  adventureComponents,
   adventureReinforceCost,
   reinforceRefund,
   type AdventureOffer,
@@ -92,6 +93,7 @@ function pushBoard(
       cell: { c: boardColOf(idx), r: localToGlobalRow(team, boardRowOf(idx)) },
       items: u.items.length > 0 ? [...u.items] : undefined,
       monster: u.isBeast ? true : undefined,
+      powMult: u.powMult,
     });
     i++;
   }
@@ -152,6 +154,11 @@ export interface BuyResult {
   /** ok=false 时的原因：none=无卡可买；gold=金币不足；bench=备战席满（且无法即合）；pool=卡池不足 */
   reason?: 'none' | 'gold' | 'bench' | 'pool';
 }
+
+/** 对局节奏真源：墨兽轮（PvE）恰五次 —— 首回合引导 + 每 6 回合一次，25 轮后纯 PvP 终局 */
+export const BEAST_ROUND_SCHEDULE: readonly number[] = [1, 7, 13, 19, 25];
+/** 对局节奏真源：奇遇轮恰三次，对准开局 / 中盘 / 后程三段成长弧 */
+export const ADVENTURE_ROUND_SCHEDULE: readonly number[] = [4, 10, 16];
 
 export class Match implements AiWorld {
   readonly seed: number;
@@ -273,21 +280,21 @@ export class Match implements AiWorld {
   }
 
   /**
-   * 是否为墨兽轮（PvE）。
-   * 每 4 回合一次：3 / 7 / 11 / 15 …
-   * 前两回合是纯粹的建设期，不该上来就打怪；之后固定节奏插入。
+   * 墨兽轮（PvE）：1 / 7 / 13 / 19 / 25，全场恰五次。
+   * 第 1 回合是引导轮 —— 人人只有一两个棋子也能打过（攻击力削到 15%），
+   * 装备来源从第一轮就建立；此后每 6 回合一次，第 25 轮是最后一只，
+   * 其后的纯 PvP 终局不再插入 PvE。
    */
   isBeastRound(round = this.round): boolean {
-    return round >= 3 && round % 4 === 3;
+    return BEAST_ROUND_SCHEDULE.includes(round);
   }
 
   /**
-   * 是否为奇遇轮（PvE 恩赐）。
-   * 与墨兽轮（3/7/11…）交替：5/9/13…—— 前两回合是建设期，第 3 轮墨兽、
-   * 第 5 轮奇遇，之后每 4 回合交替一次。
+   * 是否为奇遇轮（PvE 恩赐）：4 / 10 / 16，全场恰三次，
+   * 对准开局 / 中盘 / 后程三段成长弧各一次（档位见 adventure.adventureStage）。
    */
   isAdventureRound(round = this.round): boolean {
-    return round >= 5 && round % 4 === 1;
+    return ADVENTURE_ROUND_SCHEDULE.includes(round);
   }
 
   /** 人类玩家点选奇遇恩赐（index 对应 adventureOffer.options 下标；每回合至多一次） */
@@ -303,10 +310,11 @@ export class Match implements AiWorld {
   /**
    * 发放一份奇遇恩赐（人类 resolveAdventure 与 AI 即选共用同一入口）。
    *
-   * 纪律：只走既有系统入账 —— 金币直接加持有、经验走 gainXp、装备走 addItem
-   * （器匣，与墨兽轮 rollItemDrops 同一发放路径）、援军走 createUnit + 卡池扣除
-   * （2★ 占 3 张）+ 备战席入驻。任何入不了账的情况（备战席满 / 卡池余量不足）
-   * 按棋子卖出价折算金币返还，保证卡与金币守恒。
+   * 纪律：只走既有系统入账 —— 金币直接加持有、经验走 gainXp、等级走升级表
+   * （顿悟发放恰好升 1 级的经验，满级折当档经验）、装备走 addItem（器匣，
+   * 组件与成品、墨兽轮 rollItemDrops 同一发放路径）、援军走 createUnit +
+   * 卡池扣除（2★ 占 3 张）+ 备战席入驻。任何入不了账的情况（备战席满 /
+   * 卡池余量不足）按棋子卖出价折算金币返还，保证卡与金币守恒。
    */
   private grantAdventure(p: PlayerState, opt: AdventureOption, round: number): void {
     switch (opt.kind) {
@@ -326,6 +334,31 @@ export class Match implements AiWorld {
         const id = this.rng.pick(COMBINED_ITEM_IDS);
         addItem(p, id);
         this.log.push(`${p.name} 奇遇 · 丹青成装 · ${ITEM_BY_ID[id]?.name ?? id} 入装备栏`);
+        break;
+      }
+      case 'components': {
+        const n = adventureComponents(round);
+        const names: string[] = [];
+        for (let i = 0; i < n; i++) {
+          const id = this.rng.pick(COMPONENT_IDS);
+          addItem(p, id);
+          names.push(ITEM_BY_ID[id]?.name ?? id);
+        }
+        this.log.push(`${p.name} 奇遇 · 组件 ×${n}（${names.join('、')}）入装备栏`);
+        break;
+      }
+      case 'level': {
+        // 走既有升级表：发放恰好升 1 级的经验，经验条不跳变；
+        // 满级经验不再入账（economy 口径），按 4 金 = 4 经验折金 —— 与援军折金同一守恒先例
+        const need = xpToNext(p.level);
+        if (need > 0) {
+          gainXp(p, need);
+          this.log.push(`${p.name} 奇遇 · 顿悟（等级 ${p.level}）`);
+        } else {
+          const n = adventureXp(round);
+          p.gold += n;
+          this.log.push(`${p.name} 奇遇 · 顿悟满级 · 折算金币 +${n}`);
+        }
         break;
       }
       case 'reinforce':
@@ -691,8 +724,11 @@ export class Match implements AiWorld {
   /**
    * 败方应受的伤害 = 阶段基础伤害 + 胜方每个**存活**单位的追加伤害。
    * 只算存活单位，是因为"我用三个人换掉你五个，最后只剩一个残血"应该算是打赢了。
+   * 第 1 回合例外归零：引导轮的墨兽攻击力已削到 15%，掉血再归零 ——
+   * 首战的全部意义是装备教学与节奏体验，不构成任何淘汰威胁。
    */
   damageOf(result: BattleResult, winnerTeam: 0 | 1, winnerBoard: readonly (UnitInstance | null)[]): number {
+    if (this.round === 1) return 0;
     const baseCurve = ROUND_BASE_DAMAGE[Math.min(this.round, ROUND_BASE_DAMAGE.length - 1)];
     // 后期处决曲线放缓：round ≥ lateDamageCurveFromRound 的 base 段乘该系数，
     // 存活追加伤害（extra）不受影响 —— 只放缓"阶段处决"，不动"打赢余威"。
@@ -817,10 +853,17 @@ export class Match implements AiWorld {
 
 
   /**
-   * 墨兽轮掉落。
+   * 墨兽轮掉落表（全场恰五只墨兽，单轮期望对齐旧七轮节奏且下限更高）：
    *
-   * 输了也给一件保底 —— 这不是仁慈，是防止雪崩：
-   * 装备差距一旦在早期拉开，弱势玩家会连输到再也拿不到装备，对局在中段就提前结束了。
+   * | 轮次      | 胜                                | 败       |
+   * |-----------|----------------------------------|----------|
+   * | 第 1 轮   | 组件 ×1（引导轮，输赢同礼）        | 组件 ×1  |
+   * | 2~12 轮   | 组件 ×1 + 55% 第二件              | 组件 ×1  |
+   * | ≥13 轮    | 再 + 20% 第三件组件               | 组件 ×1  |
+   * | ≥19 轮    | 再 + 25% 成品装备                 | 组件 ×1  |
+   *
+   * 败野保底从 40% 概率提为必给 —— 这不是仁慈，是防雪崩：
+   * 装备差距一旦在早期拉开，弱势玩家会连输到再也拿不到装备，对局中段就提前结束。
    *
    * 发放不设器匣上限（裁决 2026-09-01）：与 stripItems 同一守恒口径 ——
    * 装备只进不出，超过版面格数的部分不可见但仍入存档；卸装侧的容量守卫见
@@ -828,10 +871,14 @@ export class Match implements AiWorld {
    */
   private rollItemDrops(p: PlayerState, won: boolean): string[] {
     const drops: string[] = [];
-    if (won) {
+    if (this.round === 1) {
       drops.push(this.rng.pick(COMPONENT_IDS));
-      if (this.rng.chance(0.35)) drops.push(this.rng.pick(COMPONENT_IDS));
-    } else if (this.rng.chance(0.4)) {
+    } else if (won) {
+      drops.push(this.rng.pick(COMPONENT_IDS));
+      if (this.rng.chance(0.55)) drops.push(this.rng.pick(COMPONENT_IDS));
+      if (this.round >= 13 && this.rng.chance(0.2)) drops.push(this.rng.pick(COMPONENT_IDS));
+      if (this.round >= 19 && this.rng.chance(0.25)) drops.push(this.rng.pick(COMBINED_ITEM_IDS));
+    } else {
       drops.push(this.rng.pick(COMPONENT_IDS));
     }
     for (const d of drops) addItem(p, d);

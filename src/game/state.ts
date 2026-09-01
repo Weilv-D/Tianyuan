@@ -33,6 +33,8 @@ export interface UnitInstance {
   items: string[];
   /** 墨兽（PvE 单位）。渲染层据此换用墨色剪影。 */
   isBeast?: boolean;
+  /** 攻击力倍率（乘在星级倍率之后、装备加成之前）。引导轮墨兽 0.15，缺省 1。 */
+  powMult?: number;
 }
 
 /** AI 性格原型 */

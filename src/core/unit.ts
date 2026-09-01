@@ -129,7 +129,7 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     maxHp,
     hp: maxHp,
-    atk: Math.round(b.atk * powScale * legendPow + (bonus.atk ?? 0)),
+    atk: Math.max(1, Math.round(b.atk * powScale * legendPow * (input.powMult ?? 1) + (bonus.atk ?? 0))),
     sp: Math.round(b.sp * powScale * legendPow + (bonus.sp ?? 0)),
     baseArmor: b.armor + (bonus.armor ?? 0),
     baseMr: b.mr + (bonus.mr ?? 0),

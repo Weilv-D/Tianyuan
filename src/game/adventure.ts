@@ -1,8 +1,8 @@
 /**
  * PVE 奇遇轮（M3）· 契约与恩赐实现。
  *
- * 奇遇轮与墨兽轮交替：墨兽 3/7/11…（Match.isBeastRound），奇遇 5/9/13…
- * （Match.isAdventureRound）。同一回合全员共享同一份 2~3 选 1 恩赐：
+ * 奇遇轮为 4 / 10 / 16，全场恰三次（Match.isAdventureRound）；墨兽轮为
+ * 1 / 7 / 13 / 19 / 25（Match.isBeastRound）。同一回合全员共享同一份 2~3 选 1 恩赐：
  * AI 在 beginRound 内按原型偏好即选，人类在准备阶段任意时刻点选；
  * 进入战斗阶段未选即过期（无惩罚）。
  *
@@ -10,8 +10,8 @@
  * 发放必须守恒（援军占用卡池、器匣物品计入持有）；文案规格口吻（每档绝对数值）。
  *
  * 数值表依据（阶段划分与档位，全部为绝对数值）：
- * - 阶段线：前期 < 13，中期 13~24，后期 ≥ 25。奇遇轮为 5/9/13/17/21/25…，
- *   第 13 回合是第 3 次奇遇（玩家阵容初形），第 25 回合是第 6 次奇遇（终局门槛）。
+ * - 阶段线：前期 < 8（奇遇轮 4），中期 8~13（奇遇轮 10），后期 ≥ 14（奇遇轮 16）。
+ *   三次奇遇对准开局 / 中盘 / 后程三段成长弧，每次恰落一档。
  * - 金币档 10/16/24：基础收入 5 金/回合，前期 10 金 = 2 回合基础收入；
  *   后期满利息玩家每回合进账约 14 金（5 基础 + 5 利息 + 连胜/胜利），24 金
  *   约等于两回合的满额进账，是"有用但不改写经济规则"的一笔。
@@ -22,15 +22,22 @@
  *   2★ 卖出价 = 费用 ×3 − 1（state.sellValue 口径），三档折金 2/5/8。
  *   折金低于金币档是刻意的：援军的价值在"即时战力 + 免刷牌"，
  *   费用档随阶段递增保证后期拿到的不是一张上不了场的低费卡。
+ * - 组件档 2/3/3：组件 = 三分之一件成品，与墨兽轮掉落同一来源、同一守恒口径
+ *   （addItem 入器匣，只进不出）。前期 2 件约等于一轮墨兽胜场的掉落量，
+ *   是"让这局的装备计划提前一拍"的恩赐，不改写装备总量上限。
+ * - 顿悟档：恒定 +1 级，走既有升级表结算（发放 xpToNext(level) 点经验，
+ *   经验条不跳变）；已达最高等级 9 级时经验不再入账（economy 口径），
+ *   按经验档等值折金（4 金 = 4 经验口径，后期档 20 金）—— 与援军折金同一守恒先例。
  * - 器匣档：恒定 1 件成品装备。成品只能经墨兽轮组件合成获得（稀缺资源），
  *   其有效价值随阶段自然上升（核心棋子定型、装备栏位渐满），恒定一件已达成
  *   "前期小后期大"的实际体感；若按数量递增（后期 2 件）会一次性注入
  *   2 件装备的战力差，破坏墨兽轮的装备经济。
  */
 import type { Rng } from '../core/rng';
-import { ITEMS } from '../data/items';
+import { MAX_LEVEL } from '../core/config';
+import { COMPONENT_IDS, ITEMS } from '../data/items';
 
-export type AdventureKind = 'item' | 'gold' | 'xp' | 'reinforce';
+export type AdventureKind = 'item' | 'gold' | 'xp' | 'components' | 'level' | 'reinforce';
 
 export interface AdventureOption {
   kind: AdventureKind;
@@ -50,10 +57,10 @@ export interface AdventureOffer {
 
 export type AdventureStage = 'early' | 'mid' | 'late';
 
-/** 阶段划分：前期 < 13，中期 13~24，后期 ≥ 25（依据见文件头） */
+/** 阶段划分：前期 < 8（奇遇轮 4），中期 8~13（奇遇轮 10），后期 ≥ 14（奇遇轮 16）（依据见文件头） */
 export function adventureStage(round: number): AdventureStage {
-  if (round < 13) return 'early';
-  if (round < 25) return 'mid';
+  if (round < 8) return 'early';
+  if (round < 14) return 'mid';
   return 'late';
 }
 
@@ -73,6 +80,12 @@ export function adventureXp(round: number): number {
 export function adventureReinforceCost(round: number): number {
   const t = adventureStage(round);
   return t === 'early' ? 1 : t === 'mid' ? 2 : 3;
+}
+
+/** 组件档：前期 2 / 中期 3 / 后期 3（与墨兽轮掉落同一来源、同一守恒口径） */
+export function adventureComponents(round: number): number {
+  const t = adventureStage(round);
+  return t === 'early' ? 2 : 3;
 }
 
 /** 成品装备池（item 恩赐从合成装备里随机，与墨兽轮组件掉落区分开） */
@@ -101,6 +114,20 @@ function optionFor(kind: AdventureKind, round: number): AdventureOption {
         title: '丹青成装 · 随机成品装备一件',
         desc: `随机获得一件成品装备（合成装备池 ${COMBINED_ITEM_IDS.length} 选 1），放入装备栏，可装配或卖出。`,
       };
+    case 'components': {
+      const n = adventureComponents(round);
+      return {
+        kind,
+        title: `组件 ×${n}`,
+        desc: `随机获得 ${n} 件组件装备（组件池 ${COMPONENT_IDS.length} 选 1 各自独立），放入装备栏，可合成、装配或卖出。`,
+      };
+    }
+    case 'level':
+      return {
+        kind,
+        title: '顿悟 · 等级 +1',
+        desc: `立即提升 1 级（按升级表结算）；已达最高等级 ${MAX_LEVEL} 级时改为获得 ${adventureXp(round)} 金。`,
+      };
     case 'reinforce': {
       const cost = adventureReinforceCost(round);
       return {
@@ -116,7 +143,7 @@ function optionFor(kind: AdventureKind, round: number): AdventureOption {
  * 选项展示顺序。掷出的种类集合是无序的，按此固定次序排列，
  * 保证同一 offer 全员看到的排序一致、断言可写死。
  */
-const DISPLAY_ORDER: readonly AdventureKind[] = ['gold', 'xp', 'item', 'reinforce'];
+const DISPLAY_ORDER: readonly AdventureKind[] = ['gold', 'xp', 'components', 'item', 'level', 'reinforce'];
 
 /**
  * 由对局 rng 掷出本回合的恩赐选项。

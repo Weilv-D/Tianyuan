@@ -54,18 +54,20 @@ export interface AiWorld {
 
 const ARCHETYPE: Record<AiArchetype, Omit<AiProfile, 'arch' | 'label'>> = {
   // 血勇：早早提战力，靠连胜滚雪球
-  // 血勇：早早提人口压场面，靠连胜滚雪球；不太搜牌，等级就是它的战力
-  // 奇遇偏好 reinforce/item：连胜窗口期要的是"这一回合就能多打出一口血"的即战力 ——
-  // 援军 2★ 直接落场形成战力，成品装备直接装到核心身上；金币/经验是慢变量，等不起。
-  aggro: { rollFloor: 10, aggression: 0.7, preferred: ['jianzong', 'assassin', 'warrior'], levelPace: 1.15, levelCap: 9, mergeBias: 1.0, noise: 0.22, adventurePref: ['reinforce', 'item', 'gold', 'xp'] },
+  // 血勇：早早提战力，靠连胜滚雪球
+  // 奇遇偏好 reinforce/components：连胜窗口期要的是"这一回合就能多打出一口血"的即战力 ——
+  // 援军 2★ 直接落场形成战力，组件当场就能合成装上；等级即人口即战力；
+  // 金币/经验是慢变量，等不起。
+  aggro: { rollFloor: 10, aggression: 0.7, preferred: ['jianzong', 'assassin', 'warrior'], levelPace: 1.15, levelCap: 9, mergeBias: 1.0, noise: 0.22, adventurePref: ['reinforce', 'components', 'item', 'level', 'gold', 'xp'] },
   // 守财：死守 50 金吃满利息，中期突然发力
   // 奇遇偏好 gold/xp：金币直接进存款吃利息、经验推进升级曲线，全是"明天更值钱"的
-  // 复利项；援军占备战席还会打乱它攒三合成的节奏，与 mergeBias 标准的攒牌打法相克。
-  econ: { rollFloor: 26, aggression: 0.3, preferred: ['danding', 'tian', 'guardian'], levelPace: 0.95, levelCap: 9, mergeBias: 1.0, noise: 0.1, adventurePref: ['gold', 'xp', 'item', 'reinforce'] },
+  // 复利项；顿悟 +1 级等同免买的经验，同属复利；组件与援军是即时消耗，
+  // 援军占备战席还会打乱它攒三合成的节奏，与 mergeBias 标准的攒牌打法相克。
+  econ: { rollFloor: 26, aggression: 0.3, preferred: ['danding', 'tian', 'guardian'], levelPace: 0.95, levelCap: 9, mergeBias: 1.0, noise: 0.1, adventurePref: ['gold', 'xp', 'level', 'item', 'components', 'reinforce'] },
   // 老谋：什么都沾一点，跟着发牌走
   // 奇遇偏好 item：不押单一维度，而成品装备是全游戏唯一不能从商店买到的资源
   // （只能墨兽轮掉落）——拿装备补"钱买不到"的那块短板，期望收益最稳。
-  balanced: { rollFloor: 12, aggression: 0.55, preferred: ['shanhai', 'youming', 'mage'], levelPace: 1.0, levelCap: 9, mergeBias: 1.0, noise: 0.16, adventurePref: ['item', 'gold', 'reinforce', 'xp'] },
+  balanced: { rollFloor: 12, aggression: 0.55, preferred: ['shanhai', 'youming', 'mage'], levelPace: 1.0, levelCap: 9, mergeBias: 1.0, noise: 0.16, adventurePref: ['item', 'level', 'gold', 'components', 'reinforce', 'xp'] },
   /**
    * 孤注：血线赌徒。
    *
@@ -79,14 +81,15 @@ const ARCHETYPE: Record<AiArchetype, Omit<AiProfile, 'arch' | 'label'>> = {
    * 这样它既激进又不送，而且玩家能明显感觉到"那个孤注在拼命了"。
    *
    * 奇遇偏好 xp/reinforce：卡 8 级人口搜低费三星 —— 经验把它更快推到等级上限
-   * （人口 = 等级，多一人口就多一格摆三星），援军 2★ 低费棋子直接是三星进度或
-   * 即时战力；装备对它节奏最慢（还得等合适的持有者）。
+   * （人口 = 等级，多一人口就多一格摆三星），顿悟 +1 级与经验同轴且更即时，
+   * 援军 2★ 低费棋子直接是三星进度或即时战力；装备对它节奏最慢（还得等合适的持有者）。
    */
-  hyperroll: { rollFloor: 20, aggression: 0.6, preferred: ['yaozu', 'jiguan', 'warrior'], levelPace: 1.0, levelCap: 8, mergeBias: 2.6, noise: 0.3, adventurePref: ['xp', 'reinforce', 'gold', 'item'] },
+  hyperroll: { rollFloor: 20, aggression: 0.6, preferred: ['yaozu', 'jiguan', 'warrior'], levelPace: 1.0, levelCap: 8, mergeBias: 2.6, noise: 0.3, adventurePref: ['xp', 'level', 'reinforce', 'gold', 'components', 'item'] },
   // 钓叟：疯狂冲人口，靠高费卡翻盘；不屑于凑低费三星
   // 奇遇偏好 gold：金币是最通用的燃料（刷牌找 4/5 费 + 买经验冲 9 级）；
-  // 低费援军对它几乎无用 —— levelPace 1.25 的高人口阵容里上不了场。
-  greedy: { rollFloor: 20, aggression: 0.4, preferred: ['longyuan', 'tian', 'mage'], levelPace: 1.25, levelCap: 9, mergeBias: 1.0, noise: 0.1, adventurePref: ['gold', 'item', 'xp', 'reinforce'] },
+  // 顿悟 +1 级直接等于它最稀缺的人口；低费援军对它几乎无用 ——
+  // levelPace 1.25 的高人口阵容里上不了场。
+  greedy: { rollFloor: 20, aggression: 0.4, preferred: ['longyuan', 'tian', 'mage'], levelPace: 1.25, levelCap: 9, mergeBias: 1.0, noise: 0.1, adventurePref: ['gold', 'level', 'item', 'xp', 'components', 'reinforce'] },
 };
 
 /** 8 名参与者的名字。称号直接暴露性格 —— 玩家应该能一眼看出"这局谁危险"。 */
