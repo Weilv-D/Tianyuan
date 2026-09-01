@@ -18,7 +18,10 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const run = (command, args) => execFileSync(command, args, { cwd: root, stdio: 'inherit', shell: false });
+const run = (command, args) => {
+  const needShell = command.endsWith('.cmd');
+  return execFileSync(command, args, { cwd: root, stdio: 'inherit', shell: needShell });
+};
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 // 版本一致性门禁：version.ts（界面落款）与 package.json 必须同值，
