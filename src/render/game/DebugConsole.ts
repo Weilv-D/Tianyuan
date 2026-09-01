@@ -93,7 +93,7 @@ export class DebugConsole {
           const slot = p.board.findIndex((x) => x === null);
           p.bench[p.bench.indexOf(merged)] = null;
           p.board[slot] = merged;
-        } else this.scene.showToast('合成异常：未见 3★', true);
+        } else this.scene.showToast('合成异常', true);
         break;
       }
       case 'items': if (p.bench.some((x) => x)) { for (const slot of p.bench) if (slot) slot.items = ['xuanjia', 'moren', 'lingzhu', 'yunlv', 'xueyu', 'fafu']; } else p.items.push(...['xuanjia', 'moren', 'lingzhu']); break;

@@ -323,7 +323,7 @@ export class GameScene extends Phaser.Scene {
     if (this.unloadMode) this.selectedItem = null;
     this.hud.setUnloadMode(this.unloadMode);
     audio.play('ui');
-    if (this.unloadMode) this.showToast('卸载模式：点击棋子，全身装备回器匣');
+    if (this.unloadMode) this.showToast('卸载：点选棋子收回装备');
   }
 
   /** 卸载器执行：全身装备整体回器匣（成品拆回组件；容量不足整体拒绝） */

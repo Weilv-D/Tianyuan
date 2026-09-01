@@ -34,8 +34,7 @@
  *   一次性注入 2 件装备的战力差，破坏墨兽轮的装备经济。
  */
 import type { Rng } from '../core/rng';
-import { MAX_LEVEL } from '../core/config';
-import { COMPONENT_IDS, ITEMS } from '../data/items';
+import { ITEMS } from '../data/items';
 
 export type AdventureKind = 'item' | 'gold' | 'xp' | 'components' | 'level' | 'reinforce';
 
@@ -102,38 +101,38 @@ function optionFor(kind: AdventureKind, round: number): AdventureOption {
   switch (kind) {
     case 'gold': {
       const n = adventureGold(round);
-      return { kind, title: `金币 +${n}`, desc: `立即获得 ${n} 金币，计入持有金币，参与下回合利息结算。` };
+      return { kind, title: `金币 +${n}`, desc: `计入持有，参与利息结算。` };
     }
     case 'xp': {
       const n = adventureXp(round);
-      return { kind, title: `经验 +${n}`, desc: `立即获得 ${n} 点经验，按升级表结算，可一次连升多级。` };
+      return { kind, title: `经验 +${n}`, desc: `按升级表结算，可连升多级。` };
     }
     case 'item':
       return {
         kind,
-        title: '丹青成装 · 随机成品装备一件',
-        desc: `随机获得一件成品装备（合成装备池 ${COMBINED_ITEM_IDS.length} 选 1），放入装备栏，可装配或卖出。`,
+        title: '丹青成装',
+        desc: `随机成品装备 ×1，放入装备栏。`,
       };
     case 'components': {
       const n = adventureComponents(round);
       return {
         kind,
         title: `组件 ×${n}`,
-        desc: `随机获得 ${n} 件组件装备（组件池 ${COMPONENT_IDS.length} 选 1 各自独立），放入装备栏，可合成、装配或卖出。`,
+        desc: `随机组件 ×${n}，放入装备栏。`,
       };
     }
     case 'level':
       return {
         kind,
         title: '顿悟 · 等级 +1',
-        desc: `立即提升 1 级（按升级表结算）；已达最高等级 ${MAX_LEVEL} 级时改为获得 ${adventureXp(round)} 金。`,
+        desc: `等级 +1；满级改得 ${adventureXp(round)} 金。`,
       };
     case 'reinforce': {
       const cost = adventureReinforceCost(round);
       return {
         kind,
-        title: '援军 · 随机 2★ 棋子入驻备战席',
-        desc: `免费获得一个 2★ ${cost} 费棋子（占卡池 3 张），入驻备战席；备战席已满时按 ${reinforceRefund(round)} 金折算返还。`,
+        title: `援军 · 2★ ${cost} 费`,
+        desc: `入驻备战席，占卡池 3 张；席满折返 ${reinforceRefund(round)} 金。`,
       };
     }
   }

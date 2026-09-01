@@ -893,7 +893,7 @@ export class BattleScene extends Phaser.Scene {
         timeout
           ? '战斗超时 · 按剩余兵力裁定'
           : winner === null
-            ? '双方战至力竭 · 不分胜负'
+            ? '不分胜负'
             : won
               ? '我方棋子存活'
               : '我方全军覆没',

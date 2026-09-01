@@ -30,6 +30,8 @@ export class AudioEngine {
   private started = false;
   private visBound = false;
   private noiseBufCache = new Map<number, AudioBuffer>();
+  /** 页面失焦/隐藏的自动静音层（与用户静音取或）；恢复聚焦自动解除 */
+  private autoMuted = false;
 
   // ── 典藏音乐层（D4）：曲目可用且开关开启时接管 BGM 总线，否则程序化合成 ──
   /** 已解码的授权曲目（按 mood 键控）；解码失败/缺失的 mood 不入表 → 自动回落 */
@@ -78,6 +80,7 @@ export class AudioEngine {
     if (!this.visBound) {
       this.visBound = true;
       document.addEventListener('visibilitychange', () => {
+        this.setAutoMuted(document.hidden);
         if (!this.ctx) return;
         // closed 态（极端回收场景）下 resume() 会 reject 且无法复苏 —— 不碰它，
         // 避免悬起的 unhandled rejection；running 态也无需重复 resume
@@ -88,6 +91,9 @@ export class AudioEngine {
           this.resyncBgm();
         }
       });
+      // 失焦即静音（窗口仍可见但不在前台）：与隐藏静音同一自动层
+      window.addEventListener('blur', () => this.setAutoMuted(true));
+      window.addEventListener('focus', () => this.setAutoMuted(false));
     }
     this.buses = {
       bgm: this.ctx.createGain(),
@@ -120,11 +126,30 @@ export class AudioEngine {
 
   setMuted(m: boolean): void {
     this.muted = m;
-    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.05);
+    this.applyGain();
+  }
+
+  /** 页面失焦/隐藏的自动静音开关；恢复聚焦时解除。与用户静音相互独立、取或生效 */
+  setAutoMuted(m: boolean): void {
+    this.autoMuted = m;
+    this.applyGain();
+    if (!this.autoMuted && !this.muted && this.ctx && this.ctx.state === 'suspended' && !document.hidden) {
+      void this.ctx.resume();
+    }
+  }
+
+  /** 实际是否处于静音（用户静音或自动静音任一成立） */
+  isEffectivelyMuted(): boolean {
+    return this.muted || this.autoMuted;
   }
 
   isMuted(): boolean {
     return this.muted;
+  }
+
+  private applyGain(): void {
+    const m = this.muted || this.autoMuted;
+    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.05);
   }
 
   // ── 典藏音乐（D4） ──

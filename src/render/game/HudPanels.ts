@@ -614,7 +614,7 @@ export class HudPanels {
   private scoutNextOpponent(): void {
     const pr = this.scene.match.pairings.find((x) => x.a === 0 || x.b === 0);
     if (!pr) {
-      this.scene.showToast('配对未定 · 开战后自动更新');
+      this.scene.showToast('开战后方可侦查');
       return;
     }
     const other = pr.a === 0 ? pr.b : pr.a;

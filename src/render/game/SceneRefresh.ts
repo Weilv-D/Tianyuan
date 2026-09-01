@@ -292,7 +292,7 @@ export class SceneRefresh {
     if (pr.beast) {
       setTextIf(this.scene.hud.opponentText, '墨 兽');
       this.scene.hud.intelContainer.add(
-        this.scene.add.text(0, 8, '碾过棋盘的墨浪，无可侦之阵。', {
+        this.scene.add.text(0, 8, '墨兽轮，无阵可侦。', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[400]),
@@ -434,7 +434,7 @@ export class SceneRefresh {
     this.logSig = this.scene.match.log.length;
     const all = this.scene.match.log;
     if (all.length === 0) {
-      this.scene.hud.logText.setText('对局伊始，万象未动。');
+      this.scene.hud.logText.setText('对局开始。');
       return;
     }
     // 13 行为上限；长行折行后总高仍可能出栏——按实测高度再剥最旧行，永远收在记事栏内
@@ -449,7 +449,7 @@ export class SceneRefresh {
   private refreshReport(): void {
     if (this.scene.lastReport === this.lastReportSig) return;
     this.lastReportSig = this.scene.lastReport;
-    this.scene.hud.reportText.setText(this.scene.lastReport || '首战未启，静候鼓角。');
+    this.scene.hud.reportText.setText(this.scene.lastReport || '首战未启。');
   }
 }
 

@@ -45,7 +45,7 @@ export class PauseScoutOverlay {
     );
     c.add(
       this.scene.add
-        .text(W / 2, H / 2 + 40, '倒计时已冻结 · 仍可布置阵容 · 按 ESC 继续', {
+        .text(W / 2, H / 2 + 40, '已暂停 · ESC 继续', {
           fontFamily: FONT.body,
           fontSize: '15px',
           color: css(PAPER[400]),

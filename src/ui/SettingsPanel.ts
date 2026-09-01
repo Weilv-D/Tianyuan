@@ -170,7 +170,7 @@ export class SettingsPanel {
     panel.add(calmBtn);
     panel.add(
       scene.add
-        .text(bx + 196, y + 20, '减少震动与闪光，演出缩短', {
+        .text(bx + 196, y + 20, '关闭震动与闪光', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[400]),
@@ -188,7 +188,7 @@ export class SettingsPanel {
     panel.add(licensedBtn);
     panel.add(
       scene.add
-        .text(bx + 196, y + 20, '关＝程序化五声音阶合成', {
+        .text(bx + 196, y + 20, '关：程序合成音乐', {
           fontFamily: FONT.body,
           fontSize: '12px',
           color: css(PAPER[400]),
