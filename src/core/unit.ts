@@ -39,6 +39,8 @@ export interface Unit {
   // ── 位置 ──
   cell: Cell;
   alive: boolean;
+  /** 死亡位置：killUnit 落笔，复活以此为锚（死亡点起身） */
+  deathCell: Cell | null;
   /** 渲染用：上一次移动的起止与插值进度 */
   moveFrom: Cell | null;
   moveTo: Cell | null;
@@ -149,6 +151,7 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     cell: { c: input.cell.c, r: input.cell.r },
     alive: true,
+    deathCell: null,
     moveFrom: null,
     moveTo: null,
     moveT: 0,

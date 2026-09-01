@@ -31,12 +31,15 @@ describe('大羁绊玩法', () => {
     const enemy = battle.unitByUid(90)!;
     const members = MOMEN.map((_, index) => battle.unitByUid(10 + index)!);
 
-    const allyLoss = battle.dealDamage(enemy, ally, 1000, 'physical', { source: 'attack' });
+    // 输入 500：端岳 1★（甲 24 / 血 700）结算后 ≈371，远低于生命 —— 两边都不触发
+    // 「final 只计实际扣血」的过量钳制，70/30 比例断言与钳制语义解耦（钳制若改回
+    // 全额口径本测试同样成立）。
+    const allyLoss = battle.dealDamage(enemy, ally, 500, 'physical', { source: 'attack' });
     const sharedLoss = members.reduce((sum, member) => sum + member.takenDamage, 0);
 
     const noShare = momenBattle();
     const baselineAlly = noShare.unitByUid(30)!;
-    const baselineLoss = noShare.dealDamage(noShare.unitByUid(90)!, baselineAlly, 1000, 'physical', { source: 'attack', noShare: true });
+    const baselineLoss = noShare.dealDamage(noShare.unitByUid(90)!, baselineAlly, 500, 'physical', { source: 'attack', noShare: true });
 
     expect(allyLoss).toBeCloseTo(baselineLoss * 0.7, 4);
     expect(sharedLoss).toBeGreaterThan(0);

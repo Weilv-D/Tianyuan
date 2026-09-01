@@ -456,12 +456,23 @@ export class Battle implements BattleApi {
     // 暴击：唯一的结算点。调用方若已掷骰（普攻 / 神射必爆），以 forceCrit 传入结果，
     // 此处只乘一次倍率、不再掷骰 —— 否则暴伤变成倍率的平方、暴击率变成 1-(1-p)²。
     // canCrit=true 表示"由这里掷骰"（如机关第 4 击的附加物伤）。
+    // 技能暴击（惊雷锤）：caller 未掷骰且未开放 canCrit 的 skill 伤害，
+    // 按持有者 skillCritChance 掷骰，倍率优先用装备给的绝对值。
     let crit = false;
     const callerDecided = opts.forceCrit === true;
     const canCrit = callerDecided || opts.canCrit === true;
     if (src && canCrit) {
       crit = callerDecided || this.rng.chance(Math.max(0, src.critChance));
       if (crit) amount *= src.critMult;
+    } else if (
+      src &&
+      !callerDecided &&
+      opts.canCrit !== true &&
+      source === 'skill' &&
+      src.trait.skillCritChance > 0
+    ) {
+      crit = this.rng.chance(Math.min(1, src.trait.skillCritChance));
+      if (crit) amount *= src.trait.skillCritMult > 0 ? src.trait.skillCritMult : src.critMult;
     }
 
     // 易伤
@@ -529,16 +540,28 @@ export class Battle implements BattleApi {
       }
     }
 
+    // 有效伤害口径：只计"真正被移除的量" —— 生命扣到 0 即止，溢出部分不计。
+    // 溢出计入会沿三条通道放大成数值灾难（实测：820 血目标被 10819 的处决一跳
+    // 命中时，final 报 10819）：
+    //   ① 吸血 / 全能吸血按 final 结算 —— 处决者一击回满血（天命 3★五费
+    //      omnivamp 0.2 × 溢出额 ≫ 自身 maxHp，heal 封顶即等于全恢复）；
+    //   ② onDamageTaken / onDamageDealt 的 amount 是 final —— 玄武甲反弹、
+    //      磐/不动的反射、方士六档溅射全部按溢出额放大；
+    //   ③ dealtDamage / takenDamage 直接进结算面板 —— 玩家看到"造成 10819"。
+    // 生命同时钳到 0：让 dst.hp 不再是负数，下游 hp/maxHp 比例无需各自防御。
     const before = dst.hp;
-    dst.hp -= amount;
+    dst.hp = Math.max(0, dst.hp - amount);
     const hpLoss = before - dst.hp;
     const final = hpLoss + absorbed;
 
     dst.takenDamage += final;
     if (src) src.dealtDamage += final;
 
-    // 受击回蓝
-    const manaGain = Math.min(MANA_FROM_DAMAGE_CAP, (final / dst.maxHp) * MANA_FROM_DAMAGE_RATIO);
+    // 受击回蓝（manaFromDamageMult：装备的承伤转蓝增幅，护盾吸收额计入 final）
+    const manaGain = Math.min(
+      MANA_FROM_DAMAGE_CAP,
+      (final / dst.maxHp) * MANA_FROM_DAMAGE_RATIO * dst.trait.manaFromDamageMult,
+    );
     if (!dst.isMinion && dst.manaLock <= 0) {
       dst.mp = Math.min(dst.maxMp, dst.mp + manaGain);
     }
@@ -742,9 +765,11 @@ export class Battle implements BattleApi {
 
   revive(u: Unit, hpPct: number, src: Unit): void {
     if (u.alive) return;
+    // 复活位置 = 死亡点（killUnit 落笔的 deathCell）；被占时取其邻近空格。
     // Reserve a destination before changing state. A failed revive must remain
     // a complete death state rather than creating an alive, unoccupied unit.
-    let dest = this.nearestFreeCellTo(src.cell, 3);
+    const anchor = u.deathCell ?? { c: src.cell.c, r: src.cell.r };
+    let dest = this.nearestFreeCellTo(anchor, 3);
     if (!dest) {
       for (let r = 0; r < BOARD_ROWS && !dest; r++) {
         for (let c = 0; c < BOARD_COLS && !dest; c++) {
@@ -789,6 +814,7 @@ export class Battle implements BattleApi {
     if (!u.alive) return;
     u.hp = 0;
     u.alive = false;
+    u.deathCell = { c: u.cell.c, r: u.cell.r }; // 复活锚点：死亡位置
     u.shield = 0;
     u.statuses = [];
     u.windupLeft = 0;
