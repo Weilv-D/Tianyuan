@@ -56,4 +56,22 @@ describe('大羁绊玩法', () => {
     expect(unit.permAtkPct).toBeGreaterThan(attackBefore);
     expect(unit.permAspdPct).toBeGreaterThan(0);
   });
+
+  it('最后一名幽冥成员阵亡时仍会触发自身复活', () => {
+    const battle = new Battle({
+      seed: 43,
+      units: [
+        { uid: 1, defId: 'yeyou', team: 0, star: 1, cell: { c: 0, r: 6 } },
+        { uid: 9, defId: 'jingyu', team: 1, star: 1, cell: { c: 7, r: 1 } },
+      ],
+      traits: { 0: [{ id: 'youming', count: 4, tier: 1 }], 1: [] },
+      maxTicks: 600,
+    }, null, false);
+    const victim = battle.unitByUid(1)!;
+
+    battle.dealDamage(battle.unitByUid(9)!, victim, victim.maxHp * 2, 'true');
+
+    expect(victim.alive).toBe(true);
+    expect(victim.traitStacks['youmingRevived']).toBe(1);
+  });
 });

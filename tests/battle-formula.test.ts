@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TIMEOUT_WIN_RATIO, TICK_RATE } from '../src/core/config';
+import { SHIELD_CAP_RATIO, TIMEOUT_WIN_RATIO, TICK_RATE } from '../src/core/config';
 import { Battle } from '../src/core/battle';
 import { cornerPair, mkBattle } from './helpers';
 
@@ -51,6 +51,18 @@ describe('玩家可感知的战斗规则', () => {
     src.omnivamp = 0.3;
     const skillDamage = battle.dealDamage(src, dst, 100, 'true', { source: 'skill' });
     expect(src.hp - woundedHp).toBeCloseTo(skillDamage * 0.3, 3);
+  });
+
+  it('护盾达到上限时事件只报告实际增加量', () => {
+    const battle = mkBattle(cornerPair());
+    const target = battle.units[1];
+    target.shield = target.maxHp * SHIELD_CAP_RATIO - 41;
+
+    battle.addShield(null, target, 328, 5);
+
+    const event = battle.drainEvents().find((candidate) => candidate.t === 'shield');
+    expect(event?.amount).toBe(41);
+    expect(event?.total).toBe(Math.round(target.shield));
   });
 
   it('超时按双方存活生命判定，势均力敌时平局', () => {

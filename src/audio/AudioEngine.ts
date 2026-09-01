@@ -61,10 +61,11 @@ export class AudioEngine {
           // 挂起期间 currentTime 冻结、恢复后前跳：立即重锚乐句时钟，
           // 否则调度循环会把挂起期欠下的音符一次性塞进同一瞬间（D1 音爆）
           if (this.mood !== 'none') this.nextNoteTime = this.now() + 0.15;
-        });
+        }).catch(() => {});
       }
       return;
-    }    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    }
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
     this.ctx = new Ctor();
     const comp = this.ctx.createDynamicsCompressor();
@@ -85,10 +86,9 @@ export class AudioEngine {
         // closed 态（极端回收场景）下 resume() 会 reject 且无法复苏 —— 不碰它，
         // 避免悬起的 unhandled rejection；running 态也无需重复 resume
         if (this.ctx.state === 'closed') return;
-        if (document.hidden) void this.ctx.suspend();
+        if (document.hidden) void this.ctx.suspend().catch(() => {});
         else {
-          void this.ctx.resume();
-          this.resyncBgm();
+          void this.ctx.resume().then(() => this.resyncBgm()).catch(() => {});
         }
       });
       // 失焦即静音（窗口仍可见但不在前台）：与隐藏静音同一自动层
@@ -134,7 +134,7 @@ export class AudioEngine {
     this.autoMuted = m;
     this.applyGain();
     if (!this.autoMuted && !this.muted && this.ctx && this.ctx.state === 'suspended' && !document.hidden) {
-      void this.ctx.resume();
+      void this.ctx.resume().catch(() => {});
     }
   }
 

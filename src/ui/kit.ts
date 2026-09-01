@@ -422,7 +422,10 @@ export function divider(scene: Phaser.Scene, x: number, y: number, w: number): P
  * classList 增删幂等）。
  */
 export function resetCursorOnShutdown(scene: Phaser.Scene): void {
-  const flag = scene.input as unknown as { __curHoverBound?: boolean };
+  const flag = scene.input as unknown as {
+    __curHoverBound?: boolean;
+    __curHoverLifecycleBound?: boolean;
+  };
   const attach = () => {
     if (flag.__curHoverBound) return;
     flag.__curHoverBound = true;
@@ -431,6 +434,8 @@ export function resetCursorOnShutdown(scene: Phaser.Scene): void {
     scene.input.on('gameobjectout', () => doc.remove('cur-hover'));
   };
   attach();
+  if (flag.__curHoverLifecycleBound) return;
+  flag.__curHoverLifecycleBound = true;
   // once 只覆盖第一次关闭：场景实例跨局复用，每次关闭都要复位光标与桥接标记
   scene.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
     flag.__curHoverBound = false;

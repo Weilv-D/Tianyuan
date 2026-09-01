@@ -73,17 +73,18 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       //   上调 0.08 —— 「亡语→后期」边回到 100%（超时裁定被回血续命翻转，非线性）
       //   且「荆棘→亡语」+11.9p，极差 22.4 → 24.9，全门崩。维持 0.06。
       const allies = a.units.filter((x) => x.alive && x.team === victim.team);
-      if (allies.length === 0) return;
-      let nearest = allies[0];
-      let best = Infinity;
-      for (const al of allies) {
-        const d = chebyshev(al.cell, victim.cell);
-        if (d < best) {
-          best = d;
-          nearest = al;
+      if (allies.length > 0) {
+        let nearest = allies[0];
+        let best = Infinity;
+        for (const al of allies) {
+          const d = chebyshev(al.cell, victim.cell);
+          if (d < best) {
+            best = d;
+            nearest = al;
+          }
         }
+        a.heal(null, nearest, victim.maxHp * t('deathHeal', 0.06), 'trait');
       }
-      a.heal(null, nearest, victim.maxHp * t('deathHeal', 0.06), 'trait');
 
       // 四档：首次阵亡复活（M2修复：与不朽衣解耦，各自一次）
       // 此前用共享的 victim.revived 互斥：幽冥先触发后置 revived=true，不朽衣再看到即直接 return

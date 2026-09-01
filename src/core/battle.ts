@@ -594,7 +594,9 @@ export class Battle implements BattleApi {
   addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void {
     if (!dst.alive || amount <= 0) return;
     const amt = amount * (1 + (src?.trait.shieldAmp ?? 0));
+    const before = dst.shield;
     dst.shield = Math.min(dst.shield + amt, dst.maxHp * SHIELD_CAP_RATIO);
+    const added = dst.shield - before;
     // 护盾以"持续状态"形式存在，到期时清空
     const existing = dst.statuses.find((s) => s.kind === 'shield');
     if (existing) {
@@ -603,7 +605,7 @@ export class Battle implements BattleApi {
     } else {
       dst.statuses.push({ kind: 'shield', ticks: Math.round(dur * TICK_RATE), value: dst.shield, srcUid: src?.uid ?? -1 });
     }
-    this.emit({ t: 'shield', tick: this.tick, uid: dst.uid, amount: Math.round(amt), total: Math.round(dst.shield) });
+    this.emit({ t: 'shield', tick: this.tick, uid: dst.uid, amount: Math.round(added), total: Math.round(dst.shield) });
     this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind: 'shield', dur, value: Math.round(amt), added: true });
   }
 
@@ -730,6 +732,18 @@ export class Battle implements BattleApi {
 
   revive(u: Unit, hpPct: number, src: Unit): void {
     if (u.alive) return;
+    // Reserve a destination before changing state. A failed revive must remain
+    // a complete death state rather than creating an alive, unoccupied unit.
+    let dest = this.nearestFreeCellTo(src.cell, 3);
+    if (!dest) {
+      for (let r = 0; r < BOARD_ROWS && !dest; r++) {
+        for (let c = 0; c < BOARD_COLS && !dest; c++) {
+          if (this.occ[cellIndex(c, r)] === -1) dest = { c, r };
+        }
+      }
+    }
+    if (!dest) return;
+
     u.alive = true;
     u.revived = true;
     u.hp = Math.max(1, Math.round(u.maxHp * hpPct));
@@ -746,36 +760,8 @@ export class Battle implements BattleApi {
     u.moveCd = 0;
     u.retargetCd = 0;
     u.targetUid = -1;
-    // 复活到施法者附近的空格；近处满则全盘扫描。
-    // 仍找不到空格时退回死亡位置并接管占位 —— 单位不能因为"没格子"而凭空消失。
-    let placed = false;
-    for (let ring = 0; ring <= 3 && !placed; ring++) {
-      for (let dr = -ring; dr <= ring && !placed; dr++) {
-        for (let dc = -ring; dc <= ring && !placed; dc++) {
-          const c = src.cell.c + dc;
-          const r = src.cell.r + dr;
-          if (!inBounds(c, r)) continue;
-          if (this.occ[cellIndex(c, r)] !== -1) continue;
-          u.cell = { c, r };
-          this.occ[cellIndex(c, r)] = u.uid;
-          placed = true;
-        }
-      }
-    }
-    if (!placed) {
-      for (let r = 0; r < BOARD_ROWS && !placed; r++) {
-        for (let c = 0; c < BOARD_COLS && !placed; c++) {
-          if (this.occ[cellIndex(c, r)] !== -1) continue;
-          u.cell = { c, r };
-          this.occ[cellIndex(c, r)] = u.uid;
-          placed = true;
-        }
-      }
-    }
-    // 满盘兜底取消：无条件覆盖死格会与占据者双双幽灵化（occ 指复活者、
-    // 占据者的 cell 仍指此格，寻路可穿透）。复活是增益，没有格子就放弃，
-    // 单位保持死亡 —— 守恒与不变量优先于个体复活。
-    if (!placed) return;
+    u.cell = dest;
+    this.occ[cellIndex(dest.c, dest.r)] = u.uid;
     this.emit({ t: 'heal', tick: this.tick, srcUid: src.uid, dstUid: u.uid, amount: u.hp });
   }
 
