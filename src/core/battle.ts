@@ -604,11 +604,7 @@ export class Battle implements BattleApi {
     return final;
   }
 
-  /**
-   * 治疗。`source` 保留为签名的一部分（与 DamageOptions.source 同族），
-   * 当前所有来源的治疗量计算不区分来源 —— 钩子需要区分来源时据此扩展。
-   */
-  heal(src: Unit | null, dst: Unit, amount: number, _source: 'skill' | 'trait' | 'item'): number {
+  heal(src: Unit | null, dst: Unit, amount: number, source: 'skill' | 'trait' | 'item'): number {
     if (!dst.alive) return 0;
     if (!Number.isFinite(amount)) throw new Error(`非法治疗值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (amount <= 0) return 0;
@@ -628,6 +624,7 @@ export class Battle implements BattleApi {
     if (overflow > 0.5) {
       for (const fn of this.hooks.get(dst.team)?.onHealOverflow ?? []) fn(this, dst, src, overflow);
     }
+    void source;
     return healed;
   }
 

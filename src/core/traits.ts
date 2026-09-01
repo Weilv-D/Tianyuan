@@ -274,19 +274,22 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       const pen = t('pen', 0);
       for (const u of members) u.trait.armorPen = Math.min(0.85, u.trait.armorPen + pen);
     }
-    // 每 5 秒永久 +10% 攻速（低档，仅一档生效）
-    if (tier < 1) {
-      api.hooksOf(team).onTick.push((a, _t, tick) => {
-        if (tick === 0 || tick % (5 * TICK_RATE) !== 0) return;
-        for (const u of members) {
-          if (!u.alive) continue;
-          u.permAspdPct += t('tickAspd', 0.1);
-          a.emit({ t: 'status', tick, uid: u.uid, kind: 'jiguanStack', dur: 0, value: 1, added: true });
-        }
-      });
+    if (tier >= 0) {
+      // 每 5 秒永久 +10% 攻速（低档）
+      if (tier < 1) {
+        api.hooksOf(team).onTick.push((a, _t, tick) => {
+          if (tick === 0 || tick % (5 * TICK_RATE) !== 0) return;
+          for (const u of members) {
+            if (!u.alive) continue;
+            u.permAspdPct += t('tickAspd', 0.1);
+            a.emit({ t: 'status', tick, uid: u.uid, kind: 'jiguanStack', dur: 0, value: 1, added: true });
+          }
+        });
+      }
     }
 
-    // 围攻（傀儡海 · 2v4 结构边的立项解，DESIGN §十三）：
+    if (tier >= 0) {
+      // 围攻（傀儡海 · 2v4 结构边的立项解，DESIGN §十三）：
       // 另一名友军在近窗内先动了手，本成员跟进攻击时追加物理伤 —— 傀儡海
       // "围而攻之"的机制化。两个内禀约束让它避开 M/N 线证伪的老路：
       //   1) 追加量 × effArmor/(100+effArmor) —— crush 同款自缩放，对甲墙
@@ -683,19 +686,14 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
   },
 };
 
-/**
- * 某队在某羁绊上的成员列表与「同名去重」后的计数。
- * 注意：返回的计数是"拥有该羁绊的棋子数（同名只计一次）"——
- * 真正的达成档位由 applyTraits 依据 breakpoints 另行写入 m.trait.tier，
- * 本函数只回答"有哪些成员、算几张"，不判定档位。
- */
-export function computeActiveTraits(units: Unit[], traitId: string): { members: Unit[]; count: number } {
+/** 计算某队在某羁绊上的成员列表与达成档位 */
+export function computeActiveTraits(units: Unit[], traitId: string): { members: Unit[]; tier: number; count: number } {
   const members = units.filter(
     (u) => !u.isMinion && (u.entry.origins.includes(traitId) || u.entry.classes.includes(traitId)),
   );
   // 同名棋子只计一次（升星不叠加羁绊数）
   const unique = new Set(members.map((u) => u.entry.id));
-  return { members, count: unique.size };
+  return { members, tier: 0, count: unique.size };
 }
 
 /**
