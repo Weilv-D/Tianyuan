@@ -274,68 +274,64 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       const pen = t('pen', 0);
       for (const u of members) u.trait.armorPen = Math.min(0.85, u.trait.armorPen + pen);
     }
-    if (tier >= 0) {
-      // 每 5 秒永久 +10% 攻速（低档）
-      if (tier < 1) {
-        api.hooksOf(team).onTick.push((a, _t, tick) => {
-          if (tick === 0 || tick % (5 * TICK_RATE) !== 0) return;
-          for (const u of members) {
-            if (!u.alive) continue;
-            u.permAspdPct += t('tickAspd', 0.1);
-            a.emit({ t: 'status', tick, uid: u.uid, kind: 'jiguanStack', dur: 0, value: 1, added: true });
-          }
-        });
-      }
+    // 每 5 秒永久 +10% 攻速（低档）
+    if (tier < 1) {
+      api.hooksOf(team).onTick.push((a, _t, tick) => {
+        if (tick === 0 || tick % (5 * TICK_RATE) !== 0) return;
+        for (const u of members) {
+          if (!u.alive) continue;
+          u.permAspdPct += t('tickAspd', 0.1);
+          a.emit({ t: 'status', tick, uid: u.uid, kind: 'jiguanStack', dur: 0, value: 1, added: true });
+        }
+      });
     }
 
-    if (tier >= 0) {
-      // 围攻（傀儡海 · 2v4 结构边的立项解，DESIGN §十三）：
-      // 另一名友军在近窗内先动了手，本成员跟进攻击时追加物理伤 —— 傀儡海
-      // "围而攻之"的机制化。两个内禀约束让它避开 M/N 线证伪的老路：
-      //   1) 追加量 × effArmor/(100+effArmor) —— crush 同款自缩放，对甲墙
-      //      （荆棘 66~102 甲 → 系数 0.40~0.51）特异，对低甲施法队（后期/
-      //      亡语 16~30 甲 → ≤0.23）近乎无感，不重演 giant@0.20 的 +65p
-      //      非目标边漂移；
-      //   2) 随本体普攻结算，天然吃 noReflect 通道，不会被荆棘二次反弹放大。
-      // 默认 0 = 冬眠，行为与历史逐字节一致；供 sim:ab / sim:sweep 扫档定装。
-      // 定档（2026-08-31，CRN n=250 双向）：gangAtk 6 / 破阵开 / 护卫 t2 卸甲 0.5
-      // → 「机关→荆棘」21.0%（原 0%），其余九边 0.0p（破阵判据结构性隔离）。
-      const gangAtk = t('gangAtk', 6);
-      const gangMinArmor = t('gangMinArmor', 0);
-      const gangTargetT2 = t('gangTargetT2', 1);
-      if (gangAtk > 0) {
-        const windowTicks = Math.max(1, Math.round(t('gangWindow', 0.75) * TICK_RATE));
-        const lastHit = new Map<number, { tick: number; srcUid: number }>();
-        let nowTick = 0;
-        api.hooksOf(team).onTick.push((_a, _t, tick) => {
-          nowTick = tick;
-        });
-        // onDamageTaken 按【受害者队伍】分发（battle.ts 钩子分发口径）：
-        // 要观测"友军打了敌方"，recorder 必须挂在敌方队伍的 hooks 上。
-        for (const foe of api.enemyTeamsOf(team)) {
-          api.hooksOf(foe).onDamageTaken.push((_a, dst, src, _amount, _type, _opts) => {
-            if (!src || src === dst || src.team !== team) return;
-            if (!dst.alive) return;
-            lastHit.set(dst.uid, { tick: nowTick, srcUid: src.uid });
-          });
-        }
-        api.hooksOf(team).onPreAttack.push((_a, src, dst, mod) => {
-          if (!isMember(members, src)) return;
-          const rec = lastHit.get(dst.uid);
-          if (!rec || rec.srcUid === src.uid) return;
-          if (nowTick - rec.tick > windowTicks) return;
-          // 攻坚门槛（双重，均可独立关闭）：
-          //   gangTargetT2 —— 破阵特攻：只认「护卫羁绊达 t2 金甲阵」的队伍成员。
-          //     甲值判据（gangMinArmor）的教训：磐的技能 armorUp+40 会瞬时过线，
-          //     令后期/亡语的单前排（磐）被围攻速清 → 整队体系崩（0→100p）。
-          //     改判"队伍级护卫 t2"后，围攻的火力被结构性锁定在 2v4 的金刚阵上，
-          //     其余九边零 collateral。
-          //   gangMinArmor —— 通用甲值门槛（0 = 不设），留作微调工具。
-          if (gangTargetT2 > 0 && (dst.trait.tier['guardian'] ?? -1) < 2) return;
-          if (gangMinArmor > 0 && effArmor(dst) < gangMinArmor) return;
-          mod.bonusPhysical += src.atk * gangAtk * (effArmor(dst) / (100 + effArmor(dst)));
+    // 围攻（傀儡海 · 2v4 结构边的立项解，DESIGN §十三）：
+    // 另一名友军在近窗内先动了手，本成员跟进攻击时追加物理伤 —— 傀儡海
+    // "围而攻之"的机制化。两个内禀约束让它避开 M/N 线证伪的老路：
+    //   1) 追加量 × effArmor/(100+effArmor) —— crush 同款自缩放，对甲墙
+    //      （荆棘 66~102 甲 → 系数 0.40~0.51）特异，对低甲施法队（后期/
+    //      亡语 16~30 甲 → ≤0.23）近乎无感，不重演 giant@0.20 的 +65p
+    //      非目标边漂移；
+    //   2) 随本体普攻结算，天然吃 noReflect 通道，不会被荆棘二次反弹放大。
+    // 默认 0 = 冬眠，行为与历史逐字节一致；供 sim:ab / sim:sweep 扫档定装。
+    // 定档（2026-08-31，CRN n=250 双向）：gangAtk 6 / 破阵开 / 护卫 t2 卸甲 0.5
+    // → 「机关→荆棘」21.0%（原 0%），其余九边 0.0p（破阵判据结构性隔离）。
+    const gangAtk = t('gangAtk', 6);
+    const gangMinArmor = t('gangMinArmor', 0);
+    const gangTargetT2 = t('gangTargetT2', 1);
+    if (gangAtk > 0) {
+      const windowTicks = Math.max(1, Math.round(t('gangWindow', 0.75) * TICK_RATE));
+      const lastHit = new Map<number, { tick: number; srcUid: number }>();
+      let nowTick = 0;
+      api.hooksOf(team).onTick.push((_a, _t, tick) => {
+        nowTick = tick;
+      });
+      // onDamageTaken 按【受害者队伍】分发（battle.ts 钩子分发口径）：
+      // 要观测"友军打了敌方"，recorder 必须挂在敌方队伍的 hooks 上。
+      for (const foe of api.enemyTeamsOf(team)) {
+        api.hooksOf(foe).onDamageTaken.push((_a, dst, src, _amount, _type, _opts) => {
+          if (!src || src === dst || src.team !== team) return;
+          if (!dst.alive) return;
+          lastHit.set(dst.uid, { tick: nowTick, srcUid: src.uid });
         });
       }
+      api.hooksOf(team).onPreAttack.push((_a, src, dst, mod) => {
+        if (!isMember(members, src)) return;
+        const rec = lastHit.get(dst.uid);
+        if (!rec || rec.srcUid === src.uid) return;
+        if (nowTick - rec.tick > windowTicks) return;
+        // 攻坚门槛（双重，均可独立关闭）：
+        //   gangTargetT2 —— 破阵特攻：只认「护卫羁绊达 t2 金甲阵」的队伍成员。
+        //     甲值判据（gangMinArmor）的教训：磐的技能 armorUp+40 会瞬时过线，
+        //     令后期/亡语的单前排（磐）被围攻速清 → 整队体系崩（0→100p）。
+        //     改判"队伍级护卫 t2"后，围攻的火力被结构性锁定在 2v4 的金刚阵上，
+        //     其余九边零 collateral。
+        //   gangMinArmor —— 通用甲值门槛（0 = 不设），留作微调工具。
+        if (gangTargetT2 > 0 && (dst.trait.tier['guardian'] ?? -1) < 2) return;
+        if (gangMinArmor > 0 && effArmor(dst) < gangMinArmor) return;
+        mod.bonusPhysical += src.atk * gangAtk * (effArmor(dst) / (100 + effArmor(dst)));
+      });
     }
     if (tier >= 1) {
       api.hooksOf(team).onAttackHit.push((_a, src) => {
@@ -686,14 +682,18 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
   },
 };
 
-/** 计算某队在某羁绊上的成员列表与达成档位 */
-export function computeActiveTraits(units: Unit[], traitId: string): { members: Unit[]; tier: number; count: number } {
+/**
+ * 某队在某羁绊上的成员列表与「同名去重」后的计数。
+ * 返回的 count 是"拥有该羁绊的棋子数（同名只计一次）"；真正的达成档位由
+ * applyTraits 依据 breakpoints 另行写入 m.trait.tier，本函数不判定档位。
+ */
+export function computeActiveTraits(units: Unit[], traitId: string): { members: Unit[]; count: number } {
   const members = units.filter(
     (u) => !u.isMinion && (u.entry.origins.includes(traitId) || u.entry.classes.includes(traitId)),
   );
   // 同名棋子只计一次（升星不叠加羁绊数）
   const unique = new Set(members.map((u) => u.entry.id));
-  return { members, tier: 0, count: unique.size };
+  return { members, count: unique.size };
 }
 
 /**
