@@ -10,7 +10,8 @@
  */
 import { Battle } from '../src/core/battle';
 import { hashNumbers } from '../src/core/rng';
-import { PRESET_COMPS, buildTeam, randomComp, type CompSpec } from '../src/game/comp';
+import { PRESET_COMPS, buildTeam, type CompSpec } from '../src/game/comp';
+import { randomComp } from './lib/comp-random';
 import { BATTLE_TIMEOUT_TICKS, TICK_RATE } from '../src/core/config';
 import { CHAMPIONS, CHAMPION_BY_ID } from '../src/data/champions';
 import { TRAITS, TRAIT_BY_ID } from '../src/data/traits';

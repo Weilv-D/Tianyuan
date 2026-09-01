@@ -83,7 +83,7 @@ describe('玩家可感知的战斗规则', () => {
 
     const summoned = mkBattle(cornerPair(), 7, 1);
     const enemyChampion = summoned.units[1];
-    summoned.summon(enemyChampion, { c: 6, r: 1 }, 1, 1, '傀儡');
+    summoned.summon(enemyChampion, { c: 6, r: 1 }, 1, 1);
     enemyChampion.hp = 0;
     enemyChampion.alive = false;
     summoned.step();
@@ -92,7 +92,7 @@ describe('玩家可感知的战斗规则', () => {
 
     const minionOnly = mkBattle(cornerPair(), 8, TICK_RATE);
     const [summoner, lastEnemy] = minionOnly.units;
-    expect(minionOnly.summon(summoner, { c: 1, r: 6 }, 1, 1, '傀儡')).not.toBeNull();
+    expect(minionOnly.summon(summoner, { c: 1, r: 6 }, 1, 1)).not.toBeNull();
     minionOnly.dealDamage(null, summoner, summoner.maxHp * 2, 'true');
     minionOnly.dealDamage(null, lastEnemy, lastEnemy.maxHp * 2, 'true');
     minionOnly.step();

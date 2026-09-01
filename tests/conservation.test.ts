@@ -89,6 +89,38 @@ describe('玩家资产守恒', () => {
     expect(match.pool.snapshot()).toEqual(before.pool);
   });
 
+  it('满席买入遇四张同名：失败回滚是完整回滚（不留下白嫖的 2★）', () => {
+    const match = new Match(20260901, '测试', 'normal');
+    const p = match.human;
+    p.gold = 50;
+    const id = 'duanyue'; // 1 费
+    // 场上 2 张同名 1★ + 席上 1 张同名 victim —— 满席买入把同名凑到 4 张：
+    // 溢出位成为合成幸存者，合成消费的是两张旧子；失败路径必须把这场
+    // "没有付出的合成"一并还原，否则玩家白得一个 2★（单边守恒破坏）
+    p.board[boardIdx(0, 0)] = createUnit(id);
+    p.board[boardIdx(1, 0)] = createUnit(id);
+    p.bench[0] = createUnit(id);
+    for (let i = 1; i < BENCH_SLOTS; i++) p.bench[i] = createUnit('ajiu');
+    p.shop[0] = id;
+    const goldBefore = p.gold;
+    const poolBefore = match.pool.snapshot();
+    const boardIids = p.board.map((u) => u?.iid ?? null);
+    const benchIids = p.bench.map((u) => u?.iid ?? null);
+
+    const result = match.buy(p, 0);
+
+    expect(result).toMatchObject({ ok: false, reason: 'bench' });
+    expect(p.gold).toBe(goldBefore);
+    expect(match.pool.snapshot()).toEqual(poolBefore);
+    expect(p.shop[0]).toBe(id);
+    expect(p.board.map((u) => u?.iid ?? null)).toEqual(boardIids);
+    expect(p.bench.map((u) => u?.iid ?? null)).toEqual(benchIids);
+    // 全场仍是 3 张同名 1★：没有 2★ 产生，也没有旧子被吞
+    const copies = [...p.board, ...p.bench].filter((u) => u?.defId === id && u.star === 1).length;
+    expect(copies).toBe(3);
+    expect([...p.board, ...p.bench].some((u) => u?.defId === id && u.star === 2)).toBe(false);
+  });
+
   it('自动布阵溢出的棋子会卖回卡池，装备留在玩家器匣', () => {
     const level = 2;
     const ids = CHAMPIONS.filter((champion) => champion.cost <= 2)

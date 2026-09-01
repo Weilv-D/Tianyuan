@@ -30,6 +30,7 @@ import { CHAMPION_BY_ID, CHAMPION_IDS_BY_COST } from '../data/champions';
 import { computeTraits } from './comp';
 import { gainXp, computeIncome, xpToNext } from './economy';
 import { CardPool, rollShop } from './pool';
+import { restorePlayer, snapshotPlayer } from './undo';
 import { aiTakeTurn, AI_ROSTER, chooseAdventureIndex, makeProfile, type AiWorld } from './ai';
 import {
   COMBINED_ITEM_IDS,
@@ -519,7 +520,11 @@ export class Match implements AiWorld {
    *
    * 满席且持有 ≥2 张同名 1★（其中一张在备战席，作合成材料与落脚凭证）时，
    * 新子临时落到第 10 格溢出位，resolveMerges 把 3 张同名 1★ 并成 2★——
-   * 溢出位必然是组内槽位最高的一张、必然被吃掉，合并后裁回 9 格，席位净腾。
+   * 溢出位是组内槽位最高的一张、三张在册时必然被吃掉，合并后裁回 9 格，席位净腾。
+   * 若同名 1★ 在册达 4 张（场上 2 + 席上 2），溢出位会作为合成幸存者留在第 10 格，
+   * 此时合成消费的是**两张旧子** —— 任何失败路径都必须整体回滚到买入前：
+   * 用完整玩家快照（棋盘/备战席/器匣/金币/商店/卡池）还原，而不是只退金币。
+   * 否则"回滚了购买、却留下了白嫖的 2★"这类单边漂移会漏进玩家状态。
    * 两张同名都在场上、席上无同名 victim → 维持拒绝（保守口径：场上配对的
    * 合成重组只在席位充裕的常态路径发生）。任何入不了账的情况整体回滚。
    */
@@ -536,6 +541,8 @@ export class Match implements AiWorld {
       const hasBenchVictim = p.bench.some((u) => u !== null && u.defId === id && u.star === 1);
       if (!hasBenchVictim) return { ok: false, reason: 'bench' };
     }
+    // 快照必须先于取卡：从这里起任何失败都整体回滚（金币/卡池/商店格/棋盘/备战席/器匣）
+    const snap = snapshotPlayer(p, this.pool);
     // 卡池不足：保留商店格（缺货卡仍显示，点击提示「卡池不足」），不吞卡
     if (!this.pool.take(id)) return { ok: false, reason: 'pool' };
     p.gold -= def.cost;
@@ -543,16 +550,13 @@ export class Match implements AiWorld {
     const u = createUnit(id, 1);
 
     if (benchFull) {
-      // 溢出落位：0~8 已满，新子临时占第 10 格；合成吃掉它后裁回 9 格
+      // 溢出落位：0~8 已满，新子临时占第 10 格；三张在册时合成吃掉它后裁回 9 格
       p.bench.push(u);
       const merges = resolveMerges(p);
       while (p.bench.length > BENCH_SLOTS && p.bench[p.bench.length - 1] === null) p.bench.pop();
       if (merges.length === 0 || p.bench.length > BENCH_SLOTS) {
-        // 防御性兜底（3 张同名在册时合成必发生，理论不可达）：满席被破坏，整体回滚
-        p.bench.length = BENCH_SLOTS;
-        this.pool.giveUnit(id, 1);
-        p.gold += def.cost;
-        p.shop[slot] = id;
+        // 4 张同名在册时溢出位可能是合成幸存者（席位破坏）——整体回滚到买入前
+        restorePlayer(p, this.pool, snap);
         return { ok: false, reason: 'bench' };
       }
       this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★（满席即合）`);
@@ -566,9 +570,7 @@ export class Match implements AiWorld {
 
     // 常路径：新子直接落空格；落不下就整体回滚 —— 卡、钱、商店格一项都不能被吞掉
     if (addToBench(p, u) < 0) {
-      this.pool.giveUnit(id, 1);
-      p.gold += def.cost;
-      p.shop[slot] = id;
+      restorePlayer(p, this.pool, snap);
       return { ok: false, reason: 'bench' };
     }
     const merges = resolveMerges(p);

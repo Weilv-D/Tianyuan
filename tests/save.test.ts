@@ -4,6 +4,7 @@ import { clearSave, hasSave, loadMatch, saveMatch } from '../src/game/save';
 import { createUnit } from '../src/game/state';
 
 const SAVE_KEY = 'inkarena.save.v3';
+const DAILY_KEY = 'inkarena.save.v3.daily';
 const LEGACY_KEY = 'inkarena.save.v2';
 
 class MemoryStorage {
@@ -27,10 +28,33 @@ beforeEach(() => vi.stubGlobal('localStorage', new MemoryStorage()));
 afterEach(() => vi.unstubAllGlobals());
 
 describe('本地存档', () => {
-  it('保存后恢复的是同一局对局', () => {
+  it('保存后恢复的是同一局对局（按模式分键）', () => {
     const match = playedMatch();
     expect(saveMatch(match)).toBe(true);
-    expect(loadMatch()?.toJSON()).toEqual(match.toJSON());
+    expect(loadMatch('daily')?.toJSON()).toEqual(match.toJSON());
+  });
+
+  it('每日档与普通档分键，互不覆盖（v3.1）', () => {
+    const daily = playedMatch(); // mode = 'daily'
+    expect(saveMatch(daily)).toBe(true);
+    // 普通档入口读不到每日档 —— 此前两模式共用一键，玩每日会静默覆盖普通进度
+    expect(loadMatch()).toBeNull();
+    expect(hasSave()).toBe(false);
+    expect(hasSave('daily')).toBe(true);
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+    expect(localStorage.getItem(DAILY_KEY)).not.toBeNull();
+
+    // 两档并存时各自读写各自的键
+    const normal = new Match(777, '行者', 'normal');
+    normal.beginRound();
+    expect(saveMatch(normal)).toBe(true);
+    expect(loadMatch()?.toJSON()).toEqual(normal.toJSON());
+    expect(loadMatch('daily')?.toJSON()).toEqual(daily.toJSON());
+
+    // 终局/放弃只清本局模式：清每日档不动普通档
+    clearSave('daily');
+    expect(hasSave('daily')).toBe(false);
+    expect(hasSave()).toBe(true);
   });
 
   it('旧版存档会无损迁移并删除旧键', () => {
@@ -53,8 +77,8 @@ describe('本地存档', () => {
 
   it('清除存档后继续入口消失', () => {
     saveMatch(playedMatch());
-    expect(hasSave()).toBe(true);
-    clearSave();
-    expect(hasSave()).toBe(false);
+    expect(hasSave('daily')).toBe(true);
+    clearSave('daily');
+    expect(hasSave('daily')).toBe(false);
   });
 });

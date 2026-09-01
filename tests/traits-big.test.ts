@@ -98,7 +98,7 @@ describe('大羁绊玩法', () => {
       maxTicks: 600,
     }, null, false);
     const ally = battle.unitByUid(1)!;
-    const minion = battle.summon(battle.unitByUid(2)!, { c: 2, r: 6 }, 0.5, 0.5, '机关兽')!;
+    const minion = battle.summon(battle.unitByUid(2)!, { c: 2, r: 6 }, 0.5, 0.5)!;
     expect(minion.isMinion).toBe(true);
 
     const hpBefore = ally.hp;
@@ -120,7 +120,7 @@ describe('大羁绊玩法', () => {
       traits: { 0: [{ id: 'support', count: 2, tier: 1 }], 1: [] },
       maxTicks: 600,
     }, null, false);
-    const minion = battle.summon(battle.unitByUid(1)!, { c: 2, r: 6 }, 0.5, 0.5, '机关兽')!;
+    const minion = battle.summon(battle.unitByUid(1)!, { c: 2, r: 6 }, 0.5, 0.5)!;
     battle.dealDamage(battle.unitByUid(2)!, minion, 1e9, 'true');
     expect(minion.alive).toBe(false);
     for (const uid of [1, 2]) {

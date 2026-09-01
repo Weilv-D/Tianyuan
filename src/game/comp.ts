@@ -1,5 +1,5 @@
 import { BOARD_COLS } from '../core/config';
-import { CHAMPION_BY_ID, CHAMPIONS } from '../data/champions';
+import { CHAMPION_BY_ID } from '../data/champions';
 import { TRAIT_BY_ID } from '../data/traits';
 import { assignItems } from './inventory';
 import { UNIT_DEPTH, centerOutColumns } from './state';
@@ -190,30 +190,4 @@ export function buildTeam(spec: CompSpec, team: 0 | 1, uidBase: number, items: r
     items: carried[id],
   }));
   return { inputs, traits: computeTraits(ids) };
-}
-
-/** 随机阵容（用于"再来一局"的变化性） */
-export function randomComp(rng: () => number, size = 7): CompSpec {
-  const pool = [...CHAMPIONS];
-  const picked: string[] = [];
-  // 先随机挑一条主轴羁绊，再围绕它选人 —— 保证随机出来的阵容是"有思路的"
-  const anchors = ['jianzong', 'longyuan', 'shanhai', 'youming', 'yaozu', 'jiguan', 'tian', 'danding'];
-  const anchor = anchors[Math.floor(rng() * anchors.length)];
-  const inAnchor = pool.filter((c) => c.origins.includes(anchor) || c.classes.includes(anchor));
-  for (const c of inAnchor) {
-    if (picked.length >= Math.ceil(size * 0.6)) break;
-    picked.push(c.id);
-  }
-  const rest = pool.filter((c) => !picked.includes(c.id));
-  while (picked.length < size && rest.length > 0) {
-    picked.push(rest.splice(Math.floor(rng() * rest.length), 1)[0].id);
-  }
-  const units: Record<string, Star> = {};
-  for (let i = 0; i < picked.length; i++) {
-    const cost = CHAMPION_BY_ID[picked[i]].cost;
-    const r = rng();
-    const star: Star = cost >= 5 ? 1 : cost >= 4 ? (r < 0.25 ? 2 : 1) : r < 0.1 ? 3 : r < 0.45 ? 2 : 1;
-    units[picked[i]] = star;
-  }
-  return { name: '随机阵容', desc: '系统生成的对手阵容', units };
 }

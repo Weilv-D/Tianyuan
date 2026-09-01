@@ -332,8 +332,8 @@ const IMPL: Record<string, Impl> = {
       });
       skillDamage(a, u, curTarget, skillRaw(u, p.atk, p.sp, p.flat) * mult, type, p.forceCrit);
       if (p.status) {
-        const s = a.unitByUid(u.uid);
-        if (s) a.addStatus(s, s, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
+        // u 本就是权威引用（units 不摘陠除；已亡则 addStatus 内部按 !dst.alive 空转）
+        a.addStatus(u, u, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       }
       fired++;
       if (fired < shots) a.schedule(interval, fire);
@@ -415,7 +415,7 @@ const IMPL: Record<string, Impl> = {
             const r = u.cell.r + dr;
             if (!inBounds(c, r)) continue;
             if (api.occupied(c, r)) continue;
-            api.summon(u, { c, r }, p.summon.hpPct, p.summon.atkPct, p.summon.name);
+            api.summon(u, { c, r }, p.summon.hpPct, p.summon.atkPct);
             api.fx('summon', { cell: { c, r } });
             placed = true;
           }

@@ -85,8 +85,8 @@ export interface SkillParams {
   stackAtkOnHit?: number;
   /** 附加：击退格数 */
   knockback?: number;
-  /** 召唤物配置 */
-  summon?: { count: number; hpPct: number; atkPct: number; name: string };
+  /** 召唤物配置（召唤物沿用召唤者的立绘与身份，内核不单设名字） */
+  summon?: { count: number; hpPct: number; atkPct: number };
   /** DPS 类每秒倍率（field / beam 灼烧） */
   dpsSp?: number;
   /** 反弹比例（受到伤害的百分比） */
@@ -149,7 +149,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'duanyue_q',
     skillSpec: {
       kind: 'strike', name: '断岳式', target: 'currentTarget',
-      desc: '斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 35%，此击造成 200% 伤害。',
+      desc: '斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 {threshold}，此击造成 200% 伤害。',
       params: { atk: 2.8, sp: 0.4, type: 'physical', threshold: 0.35, flat: 0 },
     },
   },
@@ -326,7 +326,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'wujiu_q',
     skillSpec: {
       kind: 'strike', name: '无咎剑域', target: 'currentTarget',
-      desc: '剑气纵横，对目标及其周围 {radius} 格造成 {atk} 攻击力 + {sp} 法强的物理伤害；每命中一名敌人，永久 +6% 攻击力。',
+      desc: '剑气纵横，对目标及其周围 {radius} 格造成 {atk} 攻击力 + {sp} 法强的物理伤害；每命中一名敌人，永久 +{stackAtkOnHit} 攻击力。',
       params: { atk: 2.4, sp: 0.6, radius: 1, type: 'physical', stackAtkOnHit: 0.06 },
     },
   },
@@ -437,7 +437,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skillSpec: {
       kind: 'summon', name: '机关兽', target: 'self',
       desc: '召唤 {count} 只机关傀儡参战（继承 {hpPct} 生命与 {atkPct} 攻击力）；召唤时全体友军获得 6 秒 25% 攻速。',
-      params: { summon: { count: 2, hpPct: 0.55, atkPct: 0.75, name: '机关兽' }, status: { kind: 'aspdUp', dur: 6, value: 25 } },
+      params: { summon: { count: 2, hpPct: 0.55, atkPct: 0.75 }, status: { kind: 'aspdUp', dur: 6, value: 25 } },
     },
   },
   {
@@ -448,7 +448,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'qingming_q',
     skillSpec: {
       kind: 'dashStrike', name: '一剑霜寒', target: 'enemyFarthest',
-      desc: '瞬入敌方后排，对 {radius} 格内所有敌人造成 {atk} 攻击力、必定暴击的物理伤害；若造成击杀可再次施放（至多 2 次）。',
+      desc: '瞬入敌方后排，对 {radius} 格内所有敌人造成 {atk} 攻击力、必定暴击的物理伤害；若造成击杀可再次施放（至多 {maxRepeats} 次）。',
       params: { atk: 2.7, radius: 1, type: 'physical', forceCrit: true, resetOnKill: 1, maxRepeats: 2 },
     },
   },
@@ -522,7 +522,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'zhenfeng_q',
     skillSpec: {
       kind: 'strike', name: '开锋', target: 'currentTarget',
-      desc: '新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 30% 时造成 200% 伤害。',
+      desc: '新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 200% 伤害。',
       params: { atk: 2.5, type: 'physical', threshold: 0.3 },
     },
   },
@@ -830,7 +830,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'taibu_q',
     skillSpec: {
       kind: 'execute', name: '卜凶', target: 'allEnemies',
-      desc: '卜敌凶期：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 10% 生命。',
+      desc: '卜敌凶期：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 生命。',
       params: { sp: 1.7, type: 'true', threshold: 0.2, healPerExecute: 0.1 },
     },
   },
@@ -866,7 +866,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'zhaoye_q',
     skillSpec: {
       kind: 'dashStrike', name: '照夜', target: 'enemyFarthest',
-      desc: '照夜入敌阵：对 {radius} 格内所有敌人造成 {atk} 攻击力的物理伤害，必定暴击；若造成击杀可再次施放（至多 2 次）。',
+      desc: '照夜入敌阵：对 {radius} 格内所有敌人造成 {atk} 攻击力的物理伤害，必定暴击；若造成击杀可再次施放（至多 {maxRepeats} 次）。',
       params: { atk: 2.9, radius: 1, type: 'physical', forceCrit: true, resetOnKill: 1, maxRepeats: 2 },
     },
   },
@@ -981,6 +981,9 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   jumps: (p) => String(p.jumps ?? 1),
   knockback: (p) => String(p.knockback ?? 0),
   count: (p) => String(p.summon?.count ?? 0),
+  stackAtkOnHit: (p) => pctv(p.stackAtkOnHit),
+  maxRepeats: (p) => String(p.maxRepeats ?? 0),
+  healPerExecute: (p) => pctv(p.healPerExecute),
 };
 
 /** 描述模板回填：保证文案与数值永不脱节 */

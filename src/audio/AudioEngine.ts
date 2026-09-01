@@ -67,7 +67,13 @@ export class AudioEngine {
     }
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
-    this.ctx = new Ctor();
+    // 构造可被策略/隐私模式拒绝（resume/suspend 已有同口径降级）：失败即整体
+    // 回落"无音频"，后续 setVolume/play 依赖的 this.ctx===null 守卫自然生效
+    try {
+      this.ctx = new Ctor();
+    } catch {
+      return;
+    }
     const comp = this.ctx.createDynamicsCompressor();
     comp.threshold.value = -12;
     comp.knee.value = 24;

@@ -200,7 +200,7 @@ export interface BattleApi {
 
   teleport(u: Unit, cell: Cell, dur: number): void;
   knockback(u: Unit, from: Cell, distance: number): void;
-  summon(src: Unit, cell: Cell, hpPct: number, atkPct: number, name: string): Unit | null;
+  summon(src: Unit, cell: Cell, hpPct: number, atkPct: number): Unit | null;
   revive(u: Unit, hpPct: number, src: Unit): void;
   /** 生成一片持续区域（墨池 / 潮汐 / 明王火环） */
   addZone(o: ZoneOptions): void;

@@ -61,25 +61,39 @@ export class CardPool {
   }
 
   restore(data: Record<string, number>): void {
-    // 跨版本/脏档守卫：出现未知棋子 id 或非负整数之外的值，说明存档与本版
-    // 名单不一致 —— 逐项合并会凭空造卡/消卡（守恒破坏），整池重置回满池口径
-    // （与新开局同基线）。缺项 id（新版本新增棋子）按满池计入。
-    const known = new Set(CHAMPIONS.map((c) => c.id));
+    // 跨版本/脏档守卫：逐键清洗，而不是整池重置。整池重置会让一张坏键把
+    // 其余**未损坏**的键也膨胀回满池 —— 凭空造卡（守恒反向破坏）。
+    // 逐键裁决口径（全部朝守恒保守方向收）：
+    //   未知棋子 id（旧版名单残留）→ 丢弃该键（卡作废，不回池）；
+    //   非整数 / 负数 → 0；
+    //   超出本版池容（旧档池容不同）→ 钳到满池；
+    //   本版缺项（新版本新增棋子）→ 按满池计入（下面初始化天然覆盖）。
+    const next = new Map<string, number>();
+    for (const c of CHAMPIONS) next.set(c.id, POOL_COUNTS[c.cost] ?? 0);
+    let dirt = 0;
     for (const [k, v] of Object.entries(data)) {
       const champion = CHAMPIONS.find((c) => c.id === k);
-      const max = champion ? (POOL_COUNTS[champion.cost] ?? 0) : 0;
-      if (!known.has(k) || !Number.isInteger(v) || (v as number) < 0 || (v as number) > max) {
-        // 整池重置回满池（与新开局同基线）；发出警告便于坏档定位 ——
-        // 若反复出现，说明存档版本与代码名单长期错位，不能靠静默自愈掩盖
-        console.warn(`[pool] 存档卡池与本版名单不一致（key=${k} v=${v}），整池重置回满池`);
-        this.counts = new Map();
-        for (const c of CHAMPIONS) this.counts.set(c.id, POOL_COUNTS[c.cost] ?? 0);
-        return;
+      if (!champion) {
+        dirt++;
+        continue;
+      }
+      const max = POOL_COUNTS[champion.cost] ?? 0;
+      if (!Number.isInteger(v) || (v as number) < 0) {
+        next.set(k, 0);
+        dirt++;
+      } else if ((v as number) > max) {
+        next.set(k, max);
+        dirt++;
+      } else {
+        next.set(k, v as number);
       }
     }
-    for (const c of CHAMPIONS) {
-      this.counts.set(c.id, data[c.id] ?? POOL_COUNTS[c.cost] ?? 0);
+    // 告警合并为一次：便于坏档定位；若反复出现，说明存档版本与代码名单长期错位，
+    // 不能靠静默自愈掩盖
+    if (dirt > 0) {
+      console.warn(`[pool] 存档卡池与本版名单不一致，已清洗 ${dirt} 个键（丢弃/钳制），其余按档保留`);
     }
+    this.counts = next;
   }
 }
 

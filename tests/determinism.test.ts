@@ -20,7 +20,11 @@ describe('核心战斗', () => {
     const replay = play(424242);
     const other = play(424243);
 
-    expect(first.result.timeout || first.result.winner !== undefined).toBe(true);
+    // 收敛口径：winner 必须是 0/1，或者打满 maxTicks 以 timeout 收场。
+    // 不能写成 `winner !== undefined`：winner 的"未分胜负"值是 null 而非
+    // undefined，那样本断言恒真，战斗不收敛也照样通过
+    expect(first.result.timeout || first.result.winner !== null).toBe(true);
+    expect([0, 1, null]).toContain(first.result.winner);
     expect(replay).toEqual(first);
     expect(other.events).not.toBe(first.events);
   });

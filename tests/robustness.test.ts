@@ -32,9 +32,18 @@ describe('损坏输入与极端阵容', () => {
 
     const pool = new CardPool();
     const full = pool.snapshot();
+    // 脏键逐键清洗（v3.1 口径）：负数钳 0、未知 id 丢弃，其余未损坏的键
+    // 按档保留 —— 整池重置会让一张坏键把全池膨胀回满池（凭空造卡）
     pool.restore({ ajiu: -1, __unknown__: 3 });
-    expect(pool.snapshot()).toEqual(full);
+    const washed = pool.snapshot();
+    expect(washed.ajiu).toBe(0);
+    expect(washed.__unknown__).toBeUndefined();
+    for (const [k, v] of Object.entries(full)) {
+      if (k === 'ajiu' || k === '__unknown__') continue;
+      expect(washed[k], k).toBe(v);
+    }
 
+    // 超池容钳到满池，不产生超额资源
     pool.restore({ ...full, ajiu: full.ajiu + 1 });
     expect(pool.snapshot()).toEqual(full);
   });

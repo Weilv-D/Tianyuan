@@ -165,6 +165,8 @@ export class GameScene extends Phaser.Scene {
     } else if (data.daily) {
       // 每日挑战：种子由入口层注入（同一天任何时刻进入是同一局）；
       // seed 缺失时回退随机种子，normal 路径行为零变化。
+      // 每日档独立分键：进入即视为重开，先清昨日/上次中断的每日残档。
+      clearSave('daily');
       this.match = new Match(data.seed ?? ((Date.now() ^ 0x9e3779b1) >>> 0), '你', 'daily');
     } else {
       const loaded = data.fresh ? null : loadMatch();
@@ -781,14 +783,14 @@ export class GameScene extends Phaser.Scene {
 
   restart(): void {
     this.abandoned = true; // 阻止离场流程把已清档的旧局写回
-    clearSave();
+    clearSave(this.match.mode); // 只清本局模式的档：普通档重开不波及每日档，反之亦然
     this.scene.start('Game', { fresh: true });
   }
 
   /** 投降：放弃当前对局，清档回主菜单（设置面板里二次确认后才走到这里） */
   private resign(): void {
     this.abandoned = true;
-    clearSave();
+    clearSave(this.match.mode);
     this.scene.start('Menu', {});
   }
 

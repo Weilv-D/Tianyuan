@@ -7,22 +7,22 @@
  * v3（M4）：载荷新增 mode（对局模式）与 data.battleSnapshots（每场战斗回放快照，
  * 随 Match.toJSON 序列化）。v2 旧档在读档时自动迁移到 v3 键，迁移无损。
  *
+ * v3.1：普通档与每日挑战档**分键**（`inkarena.save.v3` / `inkarena.save.v3.daily`）。
+ * 此前两模式共用一个键，玩每日挑战会静默覆盖普通档进度、"继续对局"读回的是
+ * 每日残档 —— 进度被跨模式污染。载荷内的 mode 字段保留作自描述。
+ *
  * 容错原则：任何解析失败都当作"没有存档"，绝不让一个坏档把游戏卡在启动页。
  */
 
 import { Match } from './match';
-import type { PlayerState } from './state';
 
-const KEY = 'inkarena.save.v3';
-/** v2 旧键：只作迁移来源。迁移成功后清除，写回失败时保留（下次读档重试迁移）。 */
+/** 对局模式 → 存档键。普通档沿用 v3 原键（旧档无需迁移）。 */
+const KEY_BY_MODE: Record<Match['mode'], string> = {
+  normal: 'inkarena.save.v3',
+  daily: 'inkarena.save.v3.daily',
+};
+/** v2 旧键：只作迁移来源（v2 时代只有普通档）。迁移成功后清除，写回失败时保留（下次读档重试迁移）。 */
 const LEGACY_KEY = 'inkarena.save.v2';
-
-export interface SaveMeta {
-  round: number;
-  humanHp: number;
-  humanAlive: boolean;
-  savedAt: number;
-}
 
 interface SavePayload {
   v?: number;
@@ -50,11 +50,11 @@ function loadData(raw: string, expectV: number): ReturnType<Match['toJSON']> | n
   }
 }
 
-export function hasSave(): boolean {
+export function hasSave(mode: Match['mode'] = 'normal'): boolean {
   try {
-    if (localStorage.getItem(KEY) !== null) return true;
-    // 只有 v2 旧档也算有存档：读档时会被迁移，"继续"按钮必须亮
-    return localStorage.getItem(LEGACY_KEY) !== null;
+    if (localStorage.getItem(KEY_BY_MODE[mode]) !== null) return true;
+    // 只有 v2 旧档也算普通档有存档：读档时会被迁移，"继续"按钮必须亮
+    return mode === 'normal' && localStorage.getItem(LEGACY_KEY) !== null;
   } catch {
     return false;
   }
@@ -63,7 +63,7 @@ export function hasSave(): boolean {
 export function saveMatch(m: Match): boolean {
   try {
     const payload = { v: 3, savedAt: Date.now(), mode: m.mode, data: m.toJSON() };
-    localStorage.setItem(KEY, JSON.stringify(payload));
+    localStorage.setItem(KEY_BY_MODE[m.mode], JSON.stringify(payload));
     return true;
   } catch (e) {
     // 隐私模式 / 配额满：存档失败不应该影响正在进行的对局，但必须显式暴露，
@@ -77,15 +77,17 @@ export function saveMatch(m: Match): boolean {
   }
 }
 
-export function loadMatch(): Match | null {
+export function loadMatch(mode: Match['mode'] = 'normal'): Match | null {
   try {
-    const v3raw = localStorage.getItem(KEY);
-    if (v3raw) {
-      const data = loadData(v3raw, 3);
+    const key = KEY_BY_MODE[mode];
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const data = loadData(raw, 3);
       if (data) return Match.fromJSON(data);
-      // v3 键存在但损坏：不急着判负，继续尝试旧键兜底
+      // 键存在但损坏：不急着判负，继续尝试旧键兜底（仅普通档有旧键）
     }
-    // ── v3 缺失（或损坏）→ 读 v2 旧档做迁移 ──
+    if (mode !== 'normal') return null;
+    // ── 普通档缺失（或损坏）→ 读 v2 旧档做迁移 ──
     const legacyRaw = localStorage.getItem(LEGACY_KEY);
     if (!legacyRaw) return null;
     const data = loadData(legacyRaw, 2);
@@ -100,7 +102,7 @@ export function loadMatch(): Match | null {
     // 只判键存在会误报成功、下次启动重复迁移（回读失败 = 保留旧键重试）
     let migrated = false;
     try {
-      const w = JSON.parse(localStorage.getItem(KEY) ?? '0') as { data?: unknown };
+      const w = JSON.parse(localStorage.getItem(key) ?? '0') as { data?: unknown };
       migrated =
         !!w && typeof w === 'object' && 'data' in w && Match.fromJSON(w.data as Parameters<typeof Match.fromJSON>[0]).round === m.round;
     } catch {
@@ -119,25 +121,15 @@ export function loadMatch(): Match | null {
   }
 }
 
-export function clearSave(): void {
+/** 清除指定模式的存档。对局结束/放弃只清本局模式，不波及另一模式的进度。 */
+export function clearSave(mode: Match['mode'] = 'normal'): void {
   try {
-    localStorage.removeItem(KEY);
-    // 旧键一并清：否则"开新对局"后 hasSave 仍会因残留旧档亮"继续"
-    localStorage.removeItem(LEGACY_KEY);
+    localStorage.removeItem(KEY_BY_MODE[mode]);
+    // 旧键一并清（仅普通档）：否则"开新对局"后 hasSave 仍会因残留旧档亮"继续"
+    if (mode === 'normal') localStorage.removeItem(LEGACY_KEY);
   } catch {
     /* 忽略 */
   }
-}
-
-export function saveMeta(): SaveMeta | null {
-  const m = loadMatch();
-  if (!m) return null;
-  return {
-    round: m.round,
-    humanHp: m.human.hp,
-    humanAlive: m.human.alive,
-    savedAt: Date.now(),
-  };
 }
 
 /** 玩家偏好（音量等），与对局存档分开存，换局不丢 */
@@ -190,12 +182,4 @@ export function savePrefs(p: Preferences): void {
   } catch {
     /* 忽略 */
   }
-}
-
-/** 供 UI 展示用的一行摘要 */
-export function describeSave(): string {
-  const m = loadMatch();
-  if (!m) return '';
-  const p = m.players[0] as PlayerState | undefined;
-  return p ? `第 ${m.round} 回合 · 生命 ${p.hp} · 等级 ${p.level}` : `第 ${m.round} 回合`;
 }

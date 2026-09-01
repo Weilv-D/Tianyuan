@@ -31,7 +31,7 @@ export class ResultScene extends Phaser.Scene {
       this.scene.start('Menu', {});
       return;
     }
-    clearSave();
+    clearSave(match.mode); // 只清本局模式的档：终局结算不波及另一模式进度
 
     const order = match.standings();
     const human = match.human;

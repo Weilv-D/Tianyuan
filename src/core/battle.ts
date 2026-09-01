@@ -740,7 +740,7 @@ export class Battle implements BattleApi {
     }
   }
 
-  summon(src: Unit, cell: Cell, hpPct: number, atkPct: number, _name: string): Unit | null {
+  summon(src: Unit, cell: Cell, hpPct: number, atkPct: number): Unit | null {
     // 对象总量阀（含已阵亡单位）：units 数组整场只增不减，阀值防的是
     // 长战斗里的对象与遍历规模失控，不是棋盘占格（占格由 occ 守卫）。
     // 到阀时召唤静默省略 —— 召唤是增益而非承诺，不为此中断战斗。
@@ -781,6 +781,9 @@ export class Battle implements BattleApi {
 
   revive(u: Unit, hpPct: number, src: Unit): void {
     if (u.alive) return;
+    // 与 heal/dealDamage/addShield 同口径：比例入参非有限即数据污染，
+    // Math.round(NaN) 会把 NaN 静默写进 hp 并沿比例/超时裁定全链传播
+    if (!Number.isFinite(hpPct)) throw new Error(`非法复活比例: ${hpPct}（uid=${u.uid}）`);
     // 复活位置 = 死亡点（killUnit 落笔的 deathCell）；被占时取其邻近空格。
     // Reserve a destination before changing state. A failed revive must remain
     // a complete death state rather than creating an alive, unoccupied unit.

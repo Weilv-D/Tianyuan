@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { audio } from '../../audio/AudioEngine';
-import { loadMatch, loadPrefs } from '../../game/save';
+import { hasSave, loadPrefs } from '../../game/save';
 import { dailySeedFor, loadDailyBest, todayKey } from '../../game/daily';
 import { GAME_BUILD, GAME_VERSION } from '../../version';
 import { CHAMPIONS } from '../../data/champions';
@@ -81,8 +81,8 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // 入口
-    const hasSave = !!loadMatch();
+    // 入口（hasSave 是纯读：菜单不触发存档迁移写盘，迁移只在显式"继续"时发生）
+    const saveAvailable = hasSave();
     const prefs = loadPrefs();
     audio.setMuted(prefs.muted);
     audio.setLicensedMusicEnabled(prefs.licensedMusic);
@@ -101,7 +101,7 @@ export class MenuScene extends Phaser.Scene {
       return b;
     };
 
-    if (hasSave) {
+    if (saveAvailable) {
       mk('继 续 对 局', () => this.scene.start('Game', {}), { primary: true });
       mk('新 对 局', () => this.scene.start('Game', { fresh: true }));
     } else {
