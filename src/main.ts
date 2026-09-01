@@ -142,6 +142,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('autostart')
 // 开发期把 game 挂到 window，方便在控制台/自动化里检视场景状态与驱动对局
 if (import.meta.env.DEV) {
   (window as unknown as { __arena?: Phaser.Game }).__arena = game;
+  (window as unknown as { __tftAudio?: typeof audio }).__tftAudio = audio;
 
   // QA 探针：把 console 的报错/警告抄一份到 ring buffer，供自动化脚本读取。
   // 只抄不吞 —— 原始 console 行为完全不变，所以"无 console 报错"这条验收
