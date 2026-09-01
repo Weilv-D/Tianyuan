@@ -69,7 +69,9 @@ export class CardPool {
       const champion = CHAMPIONS.find((c) => c.id === k);
       const max = champion ? (POOL_COUNTS[champion.cost] ?? 0) : 0;
       if (!known.has(k) || !Number.isInteger(v) || (v as number) < 0 || (v as number) > max) {
-        // 整池重置回满池（与新开局同基线）
+        // 整池重置回满池（与新开局同基线）；发出警告便于坏档定位 ——
+        // 若反复出现，说明存档版本与代码名单长期错位，不能靠静默自愈掩盖
+        console.warn(`[pool] 存档卡池与本版名单不一致（key=${k} v=${v}），整池重置回满池`);
         this.counts = new Map();
         for (const c of CHAMPIONS) this.counts.set(c.id, POOL_COUNTS[c.cost] ?? 0);
         return;

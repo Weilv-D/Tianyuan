@@ -46,8 +46,6 @@ interface SceneData {
   daily?: boolean;
   /** 每日挑战的种子（MenuScene 算好注入；缺失时回退随机种子） */
   seed?: number;
-  /** 从图鉴返回：恢复进图鉴那一刻的备战剩余秒数（缺失 = 走常规 enterPrep 满时长） */
-  prepLeft?: number;
 }
 
 interface UndoEntry {
@@ -98,9 +96,6 @@ export class GameScene extends Phaser.Scene {
 
   // ── 场景私有 ──
   private prefs!: Preferences;
-  /** 备战剩余秒数：nav「图鉴」往返时经场景数据带回，倒计时不重置（只读） */
-  prepLeft = 0;
-  private timerUrgent = false;
   private toast: Phaser.GameObjects.Container | null = null;
   private onBeforeUnload: (() => void) | null = null;
   private saveTimer: Phaser.Time.TimerEvent | null = null;
@@ -131,7 +126,6 @@ export class GameScene extends Phaser.Scene {
     this.undoStack = [];
     this.toast = null;
     this.paused = false;
-    this.timerUrgent = false;
     this.selectedItem = null;
     this.unloadMode = false;
     // settingsPanel 内部持有已销毁的容器：不置空则 isOpen 永真，设置面板再也打不开
@@ -224,9 +218,6 @@ export class GameScene extends Phaser.Scene {
       }
       if (this.match.round === 0 || this.match.needsAdvanceOnLoad()) this.match.beginRound();
       this.enterPrep();
-      // 图鉴往返：倒计时从进图鉴那一刻续跑，而不是重置回满 ——
-      // 重置等于"翻图鉴免费续 35 秒"，备战期的时钟就不成时钟了
-      if (typeof data.prepLeft === 'number') this.prepLeft = data.prepLeft;
     }
 
     this.refreshAll();
@@ -242,24 +233,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
-    const dt = Math.min(0.05, delta / 1000);
-    if (this.phase === 'prep' && !this.busy && !this.paused) {
-      this.prepLeft -= dt;
-      if (this.prepLeft <= 0) {
-        this.prepLeft = 0;
-        this.startBattlePhase();
-      }
-      // setText 会触发整段文本重新栅格化 —— 只在秒数变化时更新
-      const label = `${Math.ceil(this.prepLeft)}s`;
-      if (label !== this.hud.timerText.text) this.hud.timerText.setText(label);
-      this.hud.timerBar.setValue(this.prepLeft / Math.max(1, this.match.prepSeconds()));
-      // 最后 5 秒进入"催促"状态：变色 + 心跳
-      const urgent = this.prepLeft <= 5;
-      if (urgent !== this.timerUrgent) {
-        this.timerUrgent = urgent;
-        this.hud.timerText.setColor(css(urgent ? CINNABAR.light : GILT.base));
-      }
-    }
+    void _time;
+    void delta;
+    // 备战不设倒计时（玩家公测反馈）：思考时间无限，开战完全由玩家手动
+    // （「开战」按钮 / 空格）。update 无每帧工作，保留空实现以备后续需求。
   }
 
   // ══════════════ 器匣点选 ══════════════
@@ -296,7 +273,9 @@ export class GameScene extends Phaser.Scene {
   onCombineInBar(from: number, to: number): void {
     const a = this.itemAt(from);
     const b = this.itemAt(to);
-    if (!a || !b || a === b) {
+    // 同 id 两件是合法配方（翠玦×2、法符×2 等）—— 不能按 id 判自拖；
+    // 同格落点已在 InputController 分流为"原地放下"，这里 from !== to 恒成立
+    if (!a || !b) {
       this.refreshAll();
       return;
     }
@@ -643,7 +622,6 @@ export class GameScene extends Phaser.Scene {
   private enterPrep(): void {
     this.phase = 'prep';
     this.busy = false;
-    this.prepLeft = this.match.prepSeconds();
     this.undoStack = [];
     saveMatch(this.match);
     audio.startBgm(this.match.round >= 14 ? 'final' : 'prep');
@@ -666,12 +644,18 @@ export class GameScene extends Phaser.Scene {
     // 若拖到结算之后再写，战斗中途刷新页面会把已结算一半的状态存下来，
     // 重新载入时 AI 战被二次结算
     this.flushSave();
-    // 奇遇恩赐过期即作废（无惩罚）：公共字段按契约由游戏层清空，面板同步收起
-    this.match.adventureOffer = null;
+    // 未点选的奇遇恩赐由系统代选一个（与 AI 同一选型纯函数，发放同入口）；
+    // 面板无论如何收起
+    if (this.match.resolveHumanAdventure()) {
+      this.showToast('未选择恩赐，已自动领取', true);
+      this.refreshAll();
+    }
     this.adventure.hide();
 
-    const pairings = this.match.makePairings();
-    this.match.pairings = pairings;
+    // 配对已在 beginRound 生成（备战期全程可侦查本轮对手）；此处只消费。
+    // 兜底：异常路径进场而配对缺失时补生成一次。
+    if (this.match.pairings.length === 0) this.match.pairings = this.match.makePairings();
+    const pairings = this.match.pairings;
 
     // 1) 全部战斗按配对顺序无头结算（含人类场 —— A3）。人类场随后由 BattleScene
     //    用同一 config 播放演出，判定只发生在这里：渲染永远不参与结算，
@@ -741,6 +725,10 @@ export class GameScene extends Phaser.Scene {
   private afterBattle(): void {
     const p = this.match.human;
 
+    // 无头结算已改写血量/淘汰态，HUD 必须先跟上再弹任何浮层 ——
+    // 否则淘汰面板会盖在"结算前"的过期数值上（看起来血没归零就被淘汰）
+    this.refreshAll();
+
     // 把玩家自己的结果顶到战报最上面 —— 玩家最关心的是自己这一场
     // 墨兽轮的掉落走战报，不再弹窗 —— 准备阶段的正反馈不该打断操作节奏
     if (p.lastOutcome === 'loss') {
@@ -776,7 +764,8 @@ export class GameScene extends Phaser.Scene {
     while (!this.match.isOver() && guard++ < 60) {
       this.match.beginRound();
       if (this.match.isOver()) break;
-      for (const pair of this.match.makePairings()) {
+      // beginRound 已生成本回合配对 —— 直接消费，避免二次生成重复记对手历史
+      for (const pair of this.match.pairings) {
         this.match.applyBattleResult(pair, this.match.runBattleHeadless(pair));
       }
       this.match.endRound();

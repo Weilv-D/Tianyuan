@@ -4,7 +4,7 @@ import { REROLL_COST } from '../../core/config';
 import { Bar, Button, FONT, enableScroll, makePanel } from '../../ui/kit';
 import { ItemChip, ShopCard, TraitRow } from '../../ui/cards';
 import { bakedImage } from '../view/bake';
-import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
+import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, SHADE, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
 import {
   ACT_BTN_H,
   ACT_BTN_W,
@@ -101,9 +101,12 @@ export class HudPanels {
   private traitModalScroll: ReturnType<typeof enableScroll> | null = null;
 
   constructor(private scene: GameScene) {
-    // 浮层开着时切场景（如开着羁绊全览直接开战）：容器随场景销毁，
-    // 但 scroll 的遮罩 Graphics 不在显示列表 —— SHUTDOWN 统一回收
+    // 切场景时（如开着羁绊全览直接开战）：容器随场景销毁，但 scroll 的
+    // 遮罩 Graphics 由 make.graphics(addToScene=false) 创建、不在显示列表，
+    // 场景关闭不会回收 —— SHUTDOWN 统一销毁，否则每次重开泄漏一枚
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.traitScroll?.destroy();
+      this.traitScroll = null;
       this.traitModalScroll?.destroy();
       this.traitModalScroll = null;
       this.traitModal = null;
@@ -128,7 +131,7 @@ export class HudPanels {
 
     // ── 左导航：楷/mono 双行 + 下划线 hover（样稿 .nl） ──
     const nav: [string, string, () => void][] = [
-      ['图 鉴', 'Codex', () => this.scene.scene.start('Codex', { from: 'Game', match: this.scene.match, prepLeft: this.scene.prepLeft })],
+      ['图 鉴', 'Codex', () => this.scene.scene.start('Codex', { from: 'Game', match: this.scene.match })],
       ['羁 绊', 'Bonds', () => this.openTraitModal()],
       ['阵 容', 'Legion', () => this.scoutNextOpponent()],
     ];
@@ -262,10 +265,12 @@ export class HudPanels {
       fontSize: 12,
     });
 
+    // 备战无倒计时：此处给常驻提示而非走秒（玩家公测后裁决 —— 手动开战）
     this.timerText = this.scene.add
-      .text(cx + 180, PHASE_Y, '', { fontFamily: FONT.mono, fontSize: '13px', color: css(GILT.base) })
+      .text(cx + 180, PHASE_Y - 6, '准备就绪 · 随时开战', { fontFamily: FONT.mono, fontSize: '11px', color: css(INK[300]), letterSpacing: 2 })
       .setOrigin(0, 0.5);
     this.timerBar = new Bar(this.scene, cx + 180, PHASE_Y + 12, 120, 2, GILT.base);
+    this.timerBar.setValue(1);
   }
 
   // ══════════════ 商肆（样稿 .scard 窄卡 × 5） ══════════════
@@ -550,7 +555,7 @@ export class HudPanels {
       this.traitModalScroll = null;
       return;
     }
-    const shade = this.scene.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setDepth(560).setInteractive();
+    const shade = this.scene.add.rectangle(0, 0, W, H, SHADE, 0.55).setOrigin(0).setDepth(560).setInteractive();
     const panelW = 640;
     const panelH = 720;
     const px = (W - panelW) / 2;
@@ -570,7 +575,18 @@ export class HudPanels {
     const content = this.scene.add.container(bodyX, bodyY).setDepth(562);
     const traits = this.scene.match.traitsOf(this.scene.match.human.board);
     const countOf = new Map(traits.map((t) => [t.id, t] as const));
-    let y = 0;
+    // 计数口径注记：玩家对「差一张凑档」的疑问集中在口径上（备战席算不算、
+    // 同名算几张）。档位全部可达（17 羁绊最高档 ≤ 各自 unique 棋子数）。
+    const note = this.scene.add
+      .text(0, 0, '计数只算场上棋子（备战席不计）；同名棋子只计一次。每档人数见各行「n/下一档」。', {
+        fontFamily: FONT.body,
+        fontSize: '11px',
+        color: css(PAPER[400]),
+        wordWrap: { width: panelW - 60 },
+      })
+      .setAlpha(0.9);
+    content.add(note);
+    let y = note.height + 6;
     for (const def of Object.values(TRAIT_BY_ID)) {
       const t = countOf.get(def.id);
       const count = t?.count ?? 0;

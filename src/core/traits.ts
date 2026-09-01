@@ -67,6 +67,10 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     const t = tuner('youming');
     const tier = members[0].trait.tier['youming'] ?? 0;
     api.hooksOf(members[0].team).onDeath.push((a, victim) => {
+      // 亡语口径：「阵亡棋子」只算棋子本体，召唤物不算（与 computeActiveTraits
+      // 排除 isMinion 同一口径，也与下方复活分支一致）—— 否则召唤物流可以
+      // 反复用廉价召唤物喂满回血与叠层。
+      if (victim.isMinion) return;
       // 阵亡补偿：为最近的存活友军回血。
       // M 残留专项双向试配均量化否决（scripts/ab-pair.ts / sim.ts 200）：
       //   下调 0.04 —— 「亡语→机关」+4.4p，机关（全矩阵下限）综合再降 0.9p，极差恶化；
@@ -667,6 +671,9 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         u.trait.shieldAmp += t('shieldAmp', 0.8);
       }
       api.hooksOf(members[0].team).onDeath.push((a, victim) => {
+        // 亡语口径：与幽冥/羁绊计数一致，「友军阵亡」只算棋子本体，
+        // 召唤物死亡不喂叠层（否则召唤物流可反复用廉价召唤物拉满 5 层攻速）。
+        if (victim.isMinion) return;
         for (const u of a.units) {
           if (!u.alive || u.team !== victim.team) continue;
           const cur = u.traitStacks['supportAspdStacks'] ?? 0;

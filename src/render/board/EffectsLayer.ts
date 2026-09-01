@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { FxKind } from '../../core/events';
-import { CINNABAR, GILT, MOON, PAPER, SPIRIT, VOID } from '../view/palette';
+import { CINNABAR, EMBER, FX_TINTS, GILT, MOON, PAPER, SPIRIT, VOID } from '../view/palette';
 import { TEX } from '../view/textures';
 import { CELL as BOARD_CELL } from './BoardView';
 import { motion } from '../view/motion';
@@ -33,6 +33,8 @@ export class EffectsLayer {
    * clear() 必须连它们一起销毁，否则残留在下一场战斗里继续播。
    */
   private readonly strays = new Set<Phaser.GameObjects.GameObject>();
+  /** 计数器补间登记（目标非显示对象，clear() 须显式 stop，见 counter()） */
+  private readonly counters = new Set<Phaser.Tweens.Tween>();
   private shakeAccum = 0;
   /** 代际计数：clear() 递增；迟到的延时回调据此自杀（C1） */
   private gen = 0;
@@ -60,10 +62,34 @@ export class EffectsLayer {
     return obj;
   }
 
+  /**
+   * 登记一个驱动数值的计数器补间（addCounter）。
+   * 计数器的补间目标是内部数值对象而不是显示对象，killTweensOf(显示对象)
+   * 够不到它 —— clear() 销毁 Graphics 后它仍会空转到 duration 结束，
+   * 并在紧接重开的下一场战斗里继续占用 onUpdate。统一走这里登记，
+   * clear() 一并 stop。
+   */
+  private counter(cfg: Phaser.Types.Tweens.NumberTweenBuilderConfig): Phaser.Tweens.Tween {
+    const tw = this.scene.tweens.addCounter(cfg);
+    this.counters.add(tw);
+    const drop = (): void => {
+      this.counters.delete(tw);
+    };
+    tw.once('complete', drop);
+    tw.once('stop', drop);
+    return tw;
+  }
+
   get shake(): number {
     const v = this.shakeAccum;
     this.shakeAccum = 0;
     return v;
+  }
+
+  /** hue 槽位 → 语义色（FX_TINTS 单一真源；未登记槽位回落 fallback） */
+  private tintOf(r: FxRequest, fallback: number): number {
+    const hue = r.params?.hue;
+    return (hue !== undefined && FX_TINTS[hue] !== undefined ? FX_TINTS[hue] : r.tint) ?? fallback;
   }
 
   private img(key: string, x: number, y: number, tint: number, additive = true): Phaser.GameObjects.Image {
@@ -140,7 +166,7 @@ export class EffectsLayer {
         this.groundMark(r);
         break;
       case 'burnTick':
-        this.tick(r, CINNABAR.light);
+        this.tick(r, EMBER.light);
         break;
       case 'bleedTick':
         this.tick(r, CINNABAR.base);
@@ -155,10 +181,13 @@ export class EffectsLayer {
   // 每次命中带随机相位角，连续对拼不重样；暴击是同语言的放大 + 第二重追环。
   private impact(r: FxRequest): void {
     const crit = (r.params?.crit ?? 0) > 0;
-    const hue = r.params?.hue ?? 0;
-    const tint = hue === 2 ? VOID.light : hue === 3 ? GILT.light : crit ? CINNABAR.light : PAPER[100];
+    // 色彩语义：hue 槽位表（物理朱 / 法术霁蓝 / 处决皓白……），未标注的普攻
+    // 落回宣纸白 —— 白核是「接触」，色晕才是「类型」
+    const tint = this.tintOf(r, crit ? CINNABAR.light : PAPER[100]);
     const base = crit ? 1.3 : 1;
     const spin = Math.random() * Math.PI * 2;
+    const isMagic = r.params?.hue === 2;
+    const isTrue = r.params?.hue === 6;
 
     // 白核闪点：小而快，是"接触"的那一瞬
     const flash = this.img(TEX.glow, r.x, r.y, PAPER[50]);
@@ -203,13 +232,18 @@ export class EffectsLayer {
     // 墨点飞溅
     this.burst(r.x, r.y, crit ? 12 : 6, tint, crit ? 260 : 150, crit ? 0.24 : 0.16);
 
-    // 六向墨花：随机起始角 + 飞行中自旋，给闪点"炸开"的方向感
+    // 六向墨花：随机起始角 + 飞行中自旋。形态分化：法术=等角六芒（符箓感）、
+    // 处决=正十字皓白（裁定感）、其余=随机相位普通墨花
     const petals = crit ? 8 : 6;
     for (let i = 0; i < petals; i++) {
-      const a = spin + (i / petals) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const a = isTrue
+        ? Math.PI / 4 + (i % 2) * Math.PI / 2 + Math.floor(i / 2) * Math.PI + spin * 0.1
+        : isMagic
+          ? (i / petals) * Math.PI * 2 + 0.26
+          : spin + (i / petals) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
       const reach = (crit ? 66 : 46) * base + Math.random() * 14;
-      const sp = this.img(TEX.spark, r.x + Math.cos(a) * 9, r.y + Math.sin(a) * 9, i % 2 ? tint : PAPER[100]);
-      sp.setRotation(a).setDisplaySize(34 * base, 2.2).setAlpha(0.85);
+      const sp = this.img(TEX.spark, r.x + Math.cos(a) * 9, r.y + Math.sin(a) * 9, isMagic || isTrue ? (i % 2 ? tint : PAPER[50]) : i % 2 ? tint : PAPER[100]);
+      sp.setRotation(a).setDisplaySize(34 * base, isTrue ? 3.2 : 2.2).setAlpha(0.9);
       this.scene.tweens.add({
         targets: sp,
         x: r.x + Math.cos(a) * reach,
@@ -270,7 +304,7 @@ export class EffectsLayer {
     const tx = r.tx ?? r.x;
     const ty = r.ty ?? r.y - 40;
     const ang = Math.atan2(ty - r.y, tx - r.x);
-    const tint = r.tint ?? PAPER[100];
+    const tint = this.tintOf(r, CINNABAR.light);
     const mx = (r.x + tx) / 2;
     const my = (r.y + ty) / 2 - 26;
 
@@ -359,7 +393,7 @@ export class EffectsLayer {
     const ty = r.ty ?? r.y;
     const ang = Math.atan2(ty - r.y, tx - r.x);
     const dist = Math.hypot(tx - r.x, ty - r.y) || 40;
-    const tint = r.tint ?? MOON.light;
+    const tint = this.tintOf(r, MOON.light);
     const s = this.img(TEX.spark, r.x, r.y - 30, tint);
     s.setRotation(ang).setDisplaySize(dist, 9).setAlpha(0.9);
     this.scene.tweens.add({
@@ -387,14 +421,38 @@ export class EffectsLayer {
   // ── 环爆：以自身为中心的冲击波 ──
   private nova(r: FxRequest): void {
     const rad = (r.radius ?? 1) * BOARD_CELL;
-    const tint = r.params?.hue === 2 ? VOID.light : r.tint ?? CINNABAR.light;
+    const tint = this.tintOf(r, CINNABAR.light);
+    // 地面墨染：范围落点的椭圆印记先铺开再退去 —— 「这一片都被波及」的底座
+    const stain = this.trackStray(this.scene.add.graphics());
+    stain.setDepth(11);
+    const drawStain = (a: number): void => {
+      if (!stain.active) return;
+      stain.clear();
+      stain.fillStyle(tint, 0.16 * a);
+      stain.fillEllipse(r.x, r.y, rad * 2.2 * (0.5 + 0.5 * a), rad * 1.3 * (0.5 + 0.5 * a));
+    };
+    this.counter({
+      from: 0,
+      to: 100,
+      duration: 260,
+      onUpdate: (tw) => drawStain((tw.getValue() ?? 0) / 100),
+      onComplete: () => {
+        this.counter({
+          from: 100,
+          to: 0,
+          duration: 460,
+          onUpdate: (tw) => drawStain((tw.getValue() ?? 0) / 100),
+          onComplete: () => stain.destroy(),
+        });
+      },
+    });
     for (let i = 0; i < 2; i++) {
       const ring = this.img(TEX.ring, r.x, r.y, tint);
       ring.setDisplaySize(40, 40).setAlpha(0.95);
       this.scene.tweens.add({
         targets: ring,
-        displayWidth: rad * (2.1 + i * 0.5),
-        displayHeight: rad * (2.1 + i * 0.5),
+        displayWidth: rad * (2.4 + i * 0.55),
+        displayHeight: rad * (2.4 + i * 0.55),
         alpha: 0,
         duration: 420 + i * 160,
         delay: i * 90,
@@ -403,7 +461,7 @@ export class EffectsLayer {
       });
     }
     const core = this.img(TEX.glow, r.x, r.y, tint);
-    core.setDisplaySize(rad * 0.6, rad * 0.6).setAlpha(0.6);
+    core.setDisplaySize(rad * 0.6, rad * 0.6).setAlpha(0.75);
     this.scene.tweens.add({
       targets: core,
       displayWidth: rad * 2.2,
@@ -435,7 +493,7 @@ export class EffectsLayer {
   // ── 范围爆发：落点先亮，再炸开 ──
   private burstFx(r: FxRequest): void {
     const rad = (r.radius ?? 1) * BOARD_CELL * 0.55;
-    const tint = r.params?.hue === 2 ? VOID.light : r.tint ?? GILT.light;
+    const tint = this.tintOf(r, GILT.light);
     const ring = this.img(TEX.ring, r.x, r.y, tint);
     ring.setDisplaySize(rad * 0.4, rad * 0.4).setAlpha(0.9);
     this.scene.tweens.add({
@@ -468,14 +526,14 @@ export class EffectsLayer {
     const ty = r.ty ?? r.y;
     const ang = Math.atan2(ty - r.y, tx - r.x);
     const dist = Math.hypot(tx - r.x, ty - r.y) || 200;
-    const tint = r.params?.hue === 5 ? SPIRIT.light : r.tint ?? VOID.light;
+    const tint = this.tintOf(r, VOID.light);
     const mx = (r.x + tx) / 2;
     const my = ((r.y - 30) + ty) / 2;
     for (let i = 0; i < 2; i++) {
       const s = this.img(TEX.spark, mx, my, i === 0 ? tint : PAPER[50]);
       s.setRotation(ang)
-        .setDisplaySize(dist * 1.1, i === 0 ? 34 : 12)
-        .setAlpha(i === 0 ? 0.55 : 0.9);
+        .setDisplaySize(dist * 1.1, i === 0 ? 44 : 12)
+        .setAlpha(i === 0 ? 0.62 : 0.9);
       this.scene.tweens.add({
         targets: s,
         alpha: 0,
@@ -485,6 +543,31 @@ export class EffectsLayer {
         onComplete: () => s.destroy(),
       });
     }
+    // 起点聚能：束线射出前，源头先收缩一瞬 —— 「蓄」的读感
+    const origin = this.img(TEX.glow, r.x, r.y - 30, tint);
+    origin.setDisplaySize(34, 34).setAlpha(0.9);
+    this.scene.tweens.add({
+      targets: origin,
+      displayWidth: 6,
+      displayHeight: 6,
+      alpha: 0,
+      duration: 240,
+      ease: 'Quad.easeIn',
+      onComplete: () => origin.destroy(),
+    });
+    // 终点光爆：束线到达处一朵小光花，与命中语言衔接
+    const land = this.img(TEX.glow, tx, ty, tint);
+    land.setDisplaySize(12, 12).setAlpha(0.95);
+    this.scene.tweens.add({
+      targets: land,
+      displayWidth: 52,
+      displayHeight: 52,
+      alpha: 0,
+      duration: 260,
+      delay: 120,
+      ease: 'Cubic.easeOut',
+      onComplete: () => land.destroy(),
+    });
     // 脉冲节点：束线上两枚亮点依次闪过，能量"流动"感
     for (let i = 0; i < 2; i++) {
       const t01 = 0.35 + i * 0.3;
@@ -509,15 +592,18 @@ export class EffectsLayer {
 
   // ── 蓄力法阵：预兆，让玩家有 0.3 秒的心理准备 ──
   private castRing(r: FxRequest): void {
-    const tint = r.tint ?? GILT.light;
+    // 施法环跟随技能语义色（hue 表）：一眼区分「谁在放哪一系的大招」；
+    // 未标注的施法落回鎏金
+    const tint = this.tintOf(r, GILT.light);
     // 旋开虚线环：八段短弧随收缩反向旋转——法阵"起手"的仪式感
     const g = this.trackStray(this.scene.add.graphics());
     g.setDepth(21);
     const seg = (t01: number): void => {
       if (!g.active) return;
       g.clear();
-      const rr = 75 - 59 * t01;
-      g.lineStyle(2, tint, 0.55 + 0.4 * t01);
+      // 96 → 30：环更大幅度收拢，落点更聚焦（1.25× 棋盘上原 75→16 存在感不足）
+      const rr = 96 - 66 * t01;
+      g.lineStyle(2.5, tint, 0.6 + 0.4 * t01);
       for (let i = 0; i < 8; i++) {
         const a0 = (i / 8) * Math.PI * 2 - t01 * 1.8;
         g.beginPath();
@@ -526,13 +612,25 @@ export class EffectsLayer {
       }
     };
     seg(0);
-    this.scene.tweens.addCounter({
+    this.counter({
       from: 0,
       to: 100,
-      duration: 420,
+      duration: 480,
       ease: 'Quad.easeIn',
       onUpdate: (tw) => seg((tw.getValue() ?? 0) / 100),
       onComplete: () => g.destroy(),
+    });
+    // 起手聚焦：中心一点金光收缩 —— 谁在吟唱，一眼可辨
+    const focus = this.img(TEX.glow, r.x, r.y - 14, tint);
+    focus.setDisplaySize(52, 52).setAlpha(0.85);
+    this.scene.tweens.add({
+      targets: focus,
+      displayWidth: 8,
+      displayHeight: 8,
+      alpha: 0,
+      duration: 460,
+      ease: 'Quad.easeIn',
+      onComplete: () => focus.destroy(),
     });
     const ring = this.img(TEX.ring, r.x, r.y, tint);
     ring.setDisplaySize(150, 150).setAlpha(0.35);
@@ -563,8 +661,8 @@ export class EffectsLayer {
     ring.setDisplaySize(30, 30).setAlpha(0.8);
     this.scene.tweens.add({
       targets: ring,
-      displayWidth: 120,
-      displayHeight: 120,
+      displayWidth: 140,
+      displayHeight: 140,
       y: r.y - 18,
       alpha: 0,
       duration: 620,
@@ -604,7 +702,7 @@ export class EffectsLayer {
         g.fillPath();
       };
       draw(0);
-      this.scene.tweens.addCounter({
+      this.counter({
         from: 0,
         to: 100,
         duration: 700,
@@ -639,6 +737,23 @@ export class EffectsLayer {
         });
       },
     });
+    // 四符点：盾面四角按序点亮再同熄 —— 「结界成形」的仪式感
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const dot = this.img(TEX.glow, r.x + Math.cos(a) * 30, r.y - 26 + Math.sin(a) * 34, MOON.light);
+      dot.setDisplaySize(6, 6).setAlpha(0);
+      this.scene.tweens.add({
+        targets: dot,
+        alpha: 0.95,
+        displayWidth: 10,
+        displayHeight: 10,
+        duration: 140,
+        delay: i * 70,
+        yoyo: true,
+        hold: 160,
+        onComplete: () => dot.destroy(),
+      });
+    }
   }
 
   private dashTrail(r: FxRequest): void {
@@ -677,7 +792,7 @@ export class EffectsLayer {
       }
     };
     drawGrid(1);
-    this.scene.tweens.addCounter({
+    this.counter({
       from: 100,
       to: 0,
       duration: 380,
@@ -706,11 +821,54 @@ export class EffectsLayer {
       ease: 'Cubic.easeOut',
       onComplete: () => ring.destroy(),
     });
+    // 墨涡：四道短弧从外圈向内旋入 —— 「墨被拧出来」的聚合感
+    for (let i = 0; i < 4; i++) {
+      const a0 = (i / 4) * Math.PI * 2 + 0.5;
+      const swirl = this.trackStray(this.scene.add.graphics());
+      swirl.setDepth(21);
+      const drawSwirl = (t01: number): void => {
+        if (!swirl.active) return;
+        swirl.clear();
+        const rr = 64 * (1 - t01) + 8;
+        const a = a0 + t01 * 2.2;
+        swirl.lineStyle(2, tint, 0.7 * (1 - t01));
+        swirl.beginPath();
+        swirl.arc(r.x, r.y - 18, rr, a, a + 0.9);
+        swirl.strokePath();
+      };
+      this.counter({
+        from: 0,
+        to: 100,
+        duration: 520,
+        ease: 'Quad.easeIn',
+        onUpdate: (tw) => drawSwirl((tw.getValue() ?? 0) / 100),
+        onComplete: () => swirl.destroy(),
+      });
+    }
     this.shakeAccum += 0.5;
   }
 
   private buffAura(r: FxRequest): void {
-    const tint = r.params?.hue === 2 ? VOID.light : r.params?.hue === 1 ? GILT.light : SPIRIT.light;
+    const tint = this.tintOf(r, SPIRIT.light);
+    // 描边扫环：一道细弧沿单位轮廓扫过一周 —— 「力量漫过全身」
+    const sweep = this.trackStray(this.scene.add.graphics());
+    sweep.setDepth(24);
+    const drawSweep = (t01: number): void => {
+      if (!sweep.active) return;
+      sweep.clear();
+      sweep.lineStyle(2.5, tint, 0.75 * (1 - t01 * 0.5));
+      sweep.beginPath();
+      sweep.arc(r.x, r.y - 26, 34, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * t01);
+      sweep.strokePath();
+    };
+    this.counter({
+      from: 0,
+      to: 100,
+      duration: 460,
+      ease: 'Cubic.easeOut',
+      onUpdate: (tw) => drawSweep((tw.getValue() ?? 0) / 100),
+      onComplete: () => sweep.destroy(),
+    });
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
       const p = this.img(TEX.glow, r.x + Math.cos(a) * 6, r.y - 30 + Math.sin(a) * 6, tint);
@@ -740,6 +898,20 @@ export class EffectsLayer {
       ease: 'Quad.easeIn',
       onComplete: () => ring.destroy(),
     });
+    // 收缩同时两滴墨下坠 —— 环向心、滴向下，「被侵蚀」的方向感
+    for (let i = 0; i < 2; i++) {
+      const drop = this.img(TEX.glow, r.x + (i === 0 ? -10 : 12), r.y - 48, tint, false);
+      drop.setDisplaySize(5, 9).setAlpha(0.8);
+      this.scene.tweens.add({
+        targets: drop,
+        y: drop.y + 26,
+        alpha: 0,
+        duration: 480,
+        delay: i * 110,
+        ease: 'Quad.easeIn',
+        onComplete: () => drop.destroy(),
+      });
+    }
   }
 
   /** 地面法阵：持续型区域，缓慢呼吸后消散 */
@@ -768,13 +940,13 @@ export class EffectsLayer {
       }
     };
     draw(0);
-    this.scene.tweens.addCounter({
+    this.counter({
       from: 0,
       to: 100,
       duration: telegraph ? Math.min(300, dur) : 260,
       onUpdate: (tw) => draw((tw.getValue() ?? 0) / 100),
       onComplete: () => {
-        this.scene.tweens.addCounter({
+        this.counter({
           from: 100,
           to: 0,
           duration: telegraph ? 200 : dur,
@@ -788,7 +960,7 @@ export class EffectsLayer {
 
   private tick(r: FxRequest, tint: number): void {
     // 形状分化：灼烧=火苗形上浮摇摆（亮朱）、流血=血珠下坠（深朱）
-    const burn = tint === CINNABAR.light;
+    const burn = tint === EMBER.light;
     const p = this.img(TEX.glow, r.x + (Math.random() - 0.5) * 22, r.y - 20 - Math.random() * 34, tint);
     if (burn) {
       p.setDisplaySize(10, 20).setAlpha(0.9);
@@ -833,6 +1005,10 @@ export class EffectsLayer {
     // destroy 目标，若目标已被 removeAll(true) 销毁，就是对尸体发后事
     const children = [...this.layer.getAll(), ...this.upper.getAll()];
     if (children.length > 0) this.scene.tweens.killTweensOf(children);
+    // 计数器补间的目标不是显示对象，killTweensOf 够不到 —— 显式停掉，
+    // 否则它们对已销毁的 Graphics 空转到 duration 结束，还可能拖进下一场
+    for (const tw of this.counters) tw.stop();
+    this.counters.clear();
     this.layer.removeAll(true);
     this.upper.removeAll(true);
     for (const s of [...this.strays]) s.destroy();

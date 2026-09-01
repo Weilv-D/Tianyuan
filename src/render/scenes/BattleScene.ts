@@ -804,6 +804,18 @@ export class BattleScene extends Phaser.Scene {
           }
         }
         this.fx.play({ kind: e.kind, x, y, tx, ty, radius: e.radius, params: e.params });
+        // 暴击打击感：棋盘层 1.8% 短脉冲（90ms 往返）—— 不动相机（震屏已有
+        // shake 分级），只让「盘面被砸了一下」的重量感落在暴击上
+        if (e.kind === 'impact' && (e.params?.crit ?? 0) > 0 && !motion.calm) {
+          const base = BATTLE_BOARD_SCALE;
+          this.tweens.add({
+            targets: this.boardLayer,
+            scaleX: { from: base * 1.018, to: base },
+            scaleY: { from: base * 1.018, to: base },
+            duration: 90,
+            ease: 'Quad.easeOut',
+          });
+        }
         break;
       }
 
@@ -831,7 +843,9 @@ export class BattleScene extends Phaser.Scene {
     em.setDepth(28);
     em.explode(14);
     this.trackStray(em);
-    this.time.delayedCall(1000, () => {
+    // 落场兜底销毁走 after()（clearBattle 统一取消）：strays 已随 clearBattle
+    // 销毁粒子，这个延时只是双保险，不应游离到下一场战斗的时钟里
+    this.after(1000, () => {
       if (em.active) em.destroy();
     });
   }

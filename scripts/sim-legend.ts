@@ -105,7 +105,7 @@ for (let i = 0; i < PRESET_COMPS.length; i++) {
 }
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
 console.log(`\n  天命组均值 ${pct(avg(legendRows))}（${legendRows.length} 项）　对照组均值 ${pct(avg(controlRows))}（${controlRows.length} 项）`);
-console.log('  设计带：天命组 72% ~ 85%（近乎终结悬念，可被装备/站位翻盘）；对照组应低于天命组');
+console.log('  设计口径（v1.9 定档）：天命组镜像 ≈98% 近乎接管终局，对照组（3★四费/三费）应显著低于天命组');
 
 // ── 口径 2：天命包贡献 = 升级价值(包开) − 升级价值(包关) ──
 // Patcher 是全局的，包关时 A 的 3★ 也失去天命 —— 于是「包关下的 2★→3★ 升级价值」

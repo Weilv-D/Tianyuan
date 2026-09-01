@@ -327,7 +327,9 @@ export function resolveMerges(p: PlayerState): MergeEvent[] {
       list.sort((a, b) => (a.where === b.where ? a.slot - b.slot : a.where === 'board' ? -1 : 1));
       const keep = list[0];
       const eat = list.slice(1, 3);
-      // 被吃掉的两张：身上的装备先退回器匣 —— 装备是玩家资产，合成不是回收站
+      // 被吃掉的两张：身上的装备先退回器匣 —— 装备是玩家资产，合成不是回收站。
+      // 退装直入 p.items 不做容量检查：与墨兽掉落同一守恒裁决（match.ts
+      // rollItemDrops 注释）—— 装备只进不出，主动卸装侧才严守 ITEM_BAR_SLOTS。
       for (const e of eat) {
         const eaten = e.where === 'board' ? p.board[e.slot] : p.bench[e.slot];
         if (eaten) for (const it of eaten.items) p.items.push(it);

@@ -158,4 +158,27 @@ describe('墨兽掉落表', () => {
     for (const id of lossDrop.items) expect(COMPONENT_IDS).toContain(id);
     expect(lossDrop.gold).toBe(20);
   });
+
+  it('超时平局：墨兽轮平局照样发保底（掉落真源表是全员无条件口径）', () => {
+    const match = new Match(7);
+    enterRound(match, 7);
+    match.pairings = match.makePairings();
+    const pair = match.pairings.find((p) => p.beast)!;
+    const goldBefore = match.human.gold;
+
+    const outcomes = match.applyBattleResult(pair, {
+      winner: null,
+      ticks: 1,
+      survivors: { 0: [], 1: [] },
+      remainingHpRatio: { 0: 0, 1: 0 },
+      timeout: true,
+    });
+
+    expect(match.human.lastOutcome).toBe('draw');
+    expect(outcomes[0].outcome).toBe('draw');
+    expect(outcomes[0].drops).toHaveLength(3); // 第 7 轮保底档
+    expect(outcomes[0].gold).toBe(12);
+    expect(match.human.gold - goldBefore).toBe(12);
+    expect(match.human.hp).toBe(PLAYER_START_HP); // 平局不掉血
+  });
 });

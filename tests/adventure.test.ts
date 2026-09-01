@@ -11,7 +11,7 @@ function enterRound(match: Match, round: number): void {
 }
 
 describe('奇遇回合', () => {
-  it('同一局种子产生相同选择，未选择的恩赐在开战时过期', () => {
+  it('同一局种子产生相同选择；未点选的恩赐在开战时由系统代选一个（与手动点选同入口发放）', () => {
     const first = new Match(20260830);
     const replay = new Match(20260830);
     enterRound(first, 4);
@@ -20,8 +20,24 @@ describe('奇遇回合', () => {
     expect(first.adventureOffer).not.toBeNull();
     expect(replay.adventureOffer).toEqual(first.adventureOffer);
 
-    first.makePairings();
+    const goldBefore = first.human.gold;
+    const benchBefore = first.human.bench.filter(Boolean).length;
+    const boardBefore = first.human.board.filter(Boolean).length;
+    const xpBefore = first.human.xp;
+    expect(first.resolveHumanAdventure()).toBe(true);
+    // 代选后 offer 清空，且玩家实际拿到了某一种恩赐（金/件/经验/援军/等级五选一）
     expect(first.adventureOffer).toBeNull();
+    const gained =
+      first.human.gold > goldBefore ||
+      first.human.xp > xpBefore ||
+      first.human.bench.filter(Boolean).length > benchBefore ||
+      first.human.board.filter(Boolean).length > boardBefore ||
+      first.human.items.length > 0;
+    expect(gained).toBe(true);
+    // 二次代选不可重复领取
+    expect(first.resolveHumanAdventure()).toBe(false);
+    // 代选走纯函数选型：同种子同局面必同选择（对局层确定性契约）
+    expect(replay.resolveHumanAdventure()).toBe(true);
   });
 
   it('金币和援军恩赐通过现有经济与卡池发放', () => {

@@ -3,11 +3,14 @@
  *
  * 两条用途：AI 每回合收拾自己的阵容；以及给玩家的「一键布阵」按钮（新手友好要求）。
  *
- * 布阵原则：
- * 1. 同名棋子场上只留 1 张（星级最高的那张），其余留在备战席等合成。
+ * 布阵原则（1.9.1 同名放开后重订）：
+ * 1. 先保证羁绊覆盖：每个名字优先上最强的一张 —— distinct 名字带来的羁绊
+ *    是第一收益；人口仍有空位时，再按战力补同名第二张（1.7.0 起同名可同场，
+ *    布阵尊重玩家的同名堆场策略，不再强制撤下）。
  * 2. 至少保证 2 个前排 —— 没有前排，后排会在第一轮技能循环内被刺客和 AOE 清干净，
  *    这是新手最常见的"我明明棋子很好却打不过"的原因。
  * 3. 同纵深内按战力估值从中心向两侧铺开，保证阵型对称。
+ * 4. 溢出（人口+席位都满）才卖：卖是最后手段，不是整理手段。
  */
 
 import { BOARD_COLS, BENCH_SLOTS } from '../core/config';
@@ -44,29 +47,26 @@ export function autoArrange(p: PlayerState, pool: CardPool): number {
   const owned = allUnits(p);
   if (owned.length === 0) return 0;
 
-  // 同名只保留最强的那张上场。1.7.0 手动可同名堆场（canPlace 放开），
-  // 但"布阵"的语义仍是去冗余：羁绊按唯一计数，同名第二张零羁绊收益，
-  // 撤回备战席正好充当 resolveMerges 的合成料——这不是旧契约残留，是整理本身。
-  const bestByName = new Map<string, UnitInstance>();
-  for (const u of owned) {
-    const cur = bestByName.get(u.defId);
-    if (!cur || u.star > cur.star || (u.star === cur.star && powerScore(u) > powerScore(cur))) {
-      bestByName.set(u.defId, u);
-    }
-  }
-  const roster = [...bestByName.values()];
-  const cap = Math.min(boardCap(p), roster.length);
-
-  const byScore = [...roster].sort((a, b) => powerScore(b) - powerScore(a));
+  const cap = Math.min(boardCap(p), owned.length);
+  const byScore = [...owned].sort((a, b) => powerScore(b) - powerScore(a));
   const chosen: UnitInstance[] = [];
   const take = (u: UnitInstance) => {
     if (chosen.length < cap && !chosen.includes(u)) chosen.push(u);
   };
 
-  // 先锁定前排：至少 2 个纵深 < 0.5 的
+  // 1) 先锁 2 个前排（全局战力序里最强的两个坦克）
   const tanks = byScore.filter((u) => depthOf(u.defId) < 0.5);
   for (let i = 0; i < Math.min(2, tanks.length); i++) take(tanks[i]);
-  // 其余按战力补足
+  // 2) distinct 覆盖：每个名字上最强的一张（byScore 已按战力降序，首个即最强）
+  const bestByName = new Map<string, UnitInstance>();
+  for (const u of byScore) {
+    if (!bestByName.has(u.defId)) bestByName.set(u.defId, u);
+  }
+  for (const u of bestByName.values()) {
+    if (chosen.length >= cap) break;
+    take(u);
+  }
+  // 3) 人口仍有空位：按战力补同名重复张（尊重 1.7.0 起的同名堆场策略）
   for (const u of byScore) {
     if (chosen.length >= cap) break;
     take(u);

@@ -68,6 +68,35 @@ export const VOID = {
   glow: 0xb8c8e2,
 } as const;
 
+// ── 酡橙：灼烧 / 熔炼。朱砂与旧金之间的火色，哑光 ──
+export const EMBER = {
+  deep: 0x7a4520,
+  base: 0xc98a4e,
+  light: 0xe8ad72,
+} as const;
+
+// ── 霁青：寒冰 / 引导束。玉青与夜蓝之间的冷调，无紫 ──
+export const CERU = {
+  deep: 0x2e5560,
+  base: 0x7fb0bd,
+  light: 0xa8d2da,
+} as const;
+
+/**
+ * 特效语义色表（单一真源）。EffectsLayer 按 core 发出的 hue 槽位取色；
+ * 语义在 core 发射点注释与本表双向对齐，新增槽位先在这里登记。
+ * 红线不变：夜宴体系内取色、禁荧光禁紫。
+ */
+export const FX_TINTS: Record<number, number> = {
+  0: CINNABAR.light, // 物理冲击 / 破盾新星
+  1: GILT.light,     // 增益 / 战吼 / 击杀强化
+  2: VOID.light,     // 法术爆发 / 范围法伤
+  3: CERU.light,     // 引导束 / 贯穿光线（原 3 金与施法环混淆，改霁青）
+  4: SPIRIT.light,   // 治疗
+  5: CERU.base,      // 连锁闪电 / 穿透链
+  6: PAPER[50],      // 处决 / 真实伤害（皓白金）
+};
+
 // ── 月白：环境光 / 护盾 / 中立信息。雾青灰 ──
 export const MOON = {
   deep: 0x56616e,

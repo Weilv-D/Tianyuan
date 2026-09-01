@@ -59,7 +59,7 @@ export class EliminatedOverlay {
     panel.add(title);
 
     const line1 = this.scene.add
-      .text(0, -bh / 2 + 122, `你在第 ${round} 回合被淘汰`, {
+      .text(0, -bh / 2 + 122, `你在第 ${round} 回合被淘汰${p.lastDamage > 0 ? `　终战 -${p.lastDamage} 生命` : ''}`, {
         fontFamily: FONT.body, fontSize: '15px', color: css(PAPER[200]),
       })
       .setOrigin(0.5, 0);

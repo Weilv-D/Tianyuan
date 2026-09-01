@@ -165,7 +165,8 @@ if (args.some((a) => a.startsWith('--match'))) {
         }
         aiTakeTurn(m, m.human);
       }
-      m.pairings = m.makePairings();
+      // beginRound 已生成配对（makePairings 会重复记对手历史与 rng 消费）
+      // m.pairings 保持 beginRound 产物
       for (const pair of m.pairings) m.applyBattleResult(pair, m.runBattleHeadless(pair));
       m.endRound();
       guard++;

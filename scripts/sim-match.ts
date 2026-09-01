@@ -70,7 +70,8 @@ function runOne(seed: number, gameIndex: number, stat: Stat): void {
         }
         aiTakeTurn(m, m.human);
       }
-      m.pairings = m.makePairings();
+      // beginRound 已生成配对（makePairings 会重复记对手历史与 rng 消费）
+      // m.pairings 保持 beginRound 产物
       for (const pair of m.pairings) {
         const res = m.runBattleHeadless(pair);
         m.applyBattleResult(pair, res);
@@ -223,7 +224,8 @@ withOverrides(overrides, () => {
         }
         aiTakeTurn(m, m.human);
       }
-      m.pairings = m.makePairings();
+      // beginRound 已生成配对（makePairings 会重复记对手历史与 rng 消费）
+      // m.pairings 保持 beginRound 产物
       for (const pair of m.pairings) {
         m.applyBattleResult(pair, m.runBattleHeadless(pair));
       }

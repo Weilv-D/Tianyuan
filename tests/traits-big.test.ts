@@ -85,4 +85,48 @@ describe('大羁绊玩法', () => {
     expect(victim.alive).toBe(true);
     expect(victim.traitStacks['youmingRevived']).toBe(1);
   });
+
+  it('召唤物阵亡不触发幽冥亡语回血（亡语只认棋子本体）', () => {
+    const battle = new Battle({
+      seed: 44,
+      units: [
+        { uid: 1, defId: 'yeyou', team: 0, star: 1, cell: { c: 0, r: 6 } },
+        { uid: 2, defId: 'yeyou', team: 0, star: 1, cell: { c: 1, r: 6 } },
+        { uid: 9, defId: 'jingyu', team: 1, star: 1, cell: { c: 7, r: 1 } },
+      ],
+      traits: { 0: [{ id: 'youming', count: 2, tier: 0 }], 1: [] },
+      maxTicks: 600,
+    }, null, false);
+    const ally = battle.unitByUid(1)!;
+    const minion = battle.summon(battle.unitByUid(2)!, { c: 2, r: 6 }, 0.5, 0.5, '机关兽')!;
+    expect(minion.isMinion).toBe(true);
+
+    const hpBefore = ally.hp;
+    minion.hp = 1;
+    battle.dealDamage(battle.unitByUid(2)!, minion, 1e9, 'true');
+    expect(minion.alive).toBe(false);
+    // 若亡语把召唤物当「阵亡棋子」，最近友军会回 6% 召唤物最大生命
+    expect(ally.hp).toBe(hpBefore);
+  });
+
+  it('召唤物阵亡不喂丹师攻速叠层', () => {
+    const battle = new Battle({
+      seed: 45,
+      units: [
+        { uid: 1, defId: 'qinghe', team: 0, star: 1, cell: { c: 0, r: 6 } },
+        { uid: 2, defId: 'baitao', team: 0, star: 1, cell: { c: 1, r: 6 } },
+        { uid: 9, defId: 'jingyu', team: 1, star: 1, cell: { c: 7, r: 1 } },
+      ],
+      traits: { 0: [{ id: 'support', count: 2, tier: 1 }], 1: [] },
+      maxTicks: 600,
+    }, null, false);
+    const minion = battle.summon(battle.unitByUid(1)!, { c: 2, r: 6 }, 0.5, 0.5, '机关兽')!;
+    battle.dealDamage(battle.unitByUid(2)!, minion, 1e9, 'true');
+    expect(minion.alive).toBe(false);
+    for (const uid of [1, 2]) {
+      const u = battle.unitByUid(uid)!;
+      expect(u.traitStacks['supportAspdStacks'] ?? 0).toBe(0);
+      expect(u.statuses.some((s) => s.kind === 'aspdUp')).toBe(false);
+    }
+  });
 });

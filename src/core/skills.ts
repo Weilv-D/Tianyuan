@@ -409,6 +409,8 @@ const IMPL: Record<string, Impl> = {
       for (let ring = 1; ring <= 3 && !placed; ring++) {
         for (let dr = -ring; dr <= ring && !placed; dr++) {
           for (let dc = -ring; dc <= ring && !placed; dc++) {
+            // 只扫当前环：方形环遍历会把内环格子重扫一遍（与 battle.nearestFreeCellTo 同口径）
+            if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue;
             const c = u.cell.c + dc;
             const r = u.cell.r + dr;
             if (!inBounds(c, r)) continue;

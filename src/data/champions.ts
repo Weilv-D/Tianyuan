@@ -149,7 +149,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'duanyue_q',
     skillSpec: {
       kind: 'strike', name: '断岳式', target: 'currentTarget',
-      desc: '斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 35%，伤害翻倍。',
+      desc: '斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 35%，此击造成 200% 伤害。',
       params: { atk: 2.8, sp: 0.4, type: 'physical', threshold: 0.35, flat: 0 },
     },
   },
@@ -522,7 +522,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'zhenfeng_q',
     skillSpec: {
       kind: 'strike', name: '开锋', target: 'currentTarget',
-      desc: '新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 30% 时伤害翻倍。',
+      desc: '新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 30% 时造成 200% 伤害。',
       params: { atk: 2.5, type: 'physical', threshold: 0.3 },
     },
   },
@@ -878,7 +878,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'muyuan_q',
     skillSpec: {
       kind: 'strike', name: '鸢喙', target: 'currentTarget',
-      desc: '木鸢俯击：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时伤害翻倍。',
+      desc: '木鸢俯击：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 200% 伤害。',
       params: { atk: 3.1, type: 'physical', threshold: 0.28 },
     },
   },

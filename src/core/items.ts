@@ -24,6 +24,14 @@ export interface ItemEffects {
   params: Record<string, number>;
 }
 
+/**
+ * 装备数值的三层聚合口径（全表统一，勿单件破例）：
+ *   bonus / mods —— 按件**求和**（两件玄甲就是两份护甲，玩家直觉一致）；
+ *   params（钩子参数）—— 同键取 **max**：同一单位穿两件同钩装备时，行为钩子
+ *   只注册一次、数值取最强一件（如两件贯日枪只结算一件的 40% 附加）。
+ *   比率类参数取 max 是防乘区爆炸的既定裁决（warBanner 同注释）；
+ *   图鉴与合成提示按此口径描述，UI 不承诺"叠加"。
+ */
 export function itemEffects(itemIds: readonly string[]): ItemEffects {
   const bonus: Record<string, number> = {};
   const mods: Record<string, number> = {};

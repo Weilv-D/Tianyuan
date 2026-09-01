@@ -9,6 +9,10 @@ import { preloadAiPieces } from './render/art/piece/aiBake';
 import { preloadItemArt } from './render/board/itemIcons';
 import { preloadSealFont } from './render/board/traitIcons';
 import { VIEW_K } from './render/view/viewScale';
+// 全局字号包装必须与下方 descent 垫高同处一条模块链：先经 textScale 放大
+// 声明字号，updateText 才能按"渲染字号"算余量。场景都经 kit 间接依赖它，
+// 这里显式引入把顺序钉死，防止未来某条 import 链绕开。
+import './render/view/textScale';
 
 /**
  * 直角体系（ART_BIBLE §9.2）：全项目禁用圆角矩形。

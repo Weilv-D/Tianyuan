@@ -77,6 +77,11 @@ export function bakeItemIcons(scene: Phaser.Scene): void {
     }
 
     // ── 二级：程序几何图（兜底） ──
+    // DEV 下缺 AI 立绘给出提示：兜底不白块，但"以为有图实际缺图"应在
+    // 开发期暴露而不是靠美术走查发现
+    if (import.meta.env.DEV && !hasItemArt(item.id)) {
+      console.warn(`[itemIcons] 缺少 AI 立绘，使用程序几何兜底: ${item.id}`);
+    }
     const g = scene.make.graphics({ x: 0, y: 0 }, false);
     const { main, line } = paletteOf(item.tier);
     drawGlyph(g, item.glyph, S, main, line);

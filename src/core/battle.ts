@@ -113,8 +113,9 @@ export class Battle implements BattleApi {
     }
 
     // 2) 套用羁绊（按队伍字典序，先数值后钩子）
-    // ⚠ 顺序契约：钩子按"羁绊 id 字典序 → 装备"的固定顺序注册，
-    //    SHIELD_CAP_RATIO 等全局上限的"谁先吃满额度"依赖此顺序 —— 改动前先想清楚。
+    // ⚠ 顺序契约：钩子按"羁绊 id 字典序 → 装备（items.ts 内固定文件序）"
+    //    的顺序注册，SHIELD_CAP_RATIO 等全局上限的"谁先吃满额度"依赖此顺序
+    //    —— 改动前先想清楚。装备侧不得改为无序集合遍历。
     const teams = [...new Set(this.units.map((u) => u.team))].sort((a, b) => a - b);
     for (const team of teams) {
       if (!this.hooks.has(team)) this.hooks.set(team, createHooks());
@@ -430,7 +431,13 @@ export class Battle implements BattleApi {
   // ───────────────── 数值结算 ─────────────────
 
   dealDamage(src: Unit | null, dst: Unit, raw: number, type: DamageType, opts: DamageOptions = {}): number {
-    if (!dst.alive || raw <= 0) return 0;
+    // 数值口径：NaN/Infinity 是数据污染 —— 它不满足 raw <= 0，会绕过守卫把
+    // dst.hp 打成 NaN 并沿血量比例/超时裁定全链路静默传播，必须立即终止；
+    // 非正数是合法空操作且真实存在（0 法强单位的天庭破盾新星、收到已清零
+    // incoming 的兼爱分摊），维持原 no-op 口径。
+    if (!dst.alive) return 0;
+    if (!Number.isFinite(raw)) throw new Error(`非法伤害值: ${raw}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
+    if (raw <= 0) return 0;
     const source = opts.source ?? 'skill';
 
     // 无敌
@@ -598,7 +605,9 @@ export class Battle implements BattleApi {
   }
 
   heal(src: Unit | null, dst: Unit, amount: number, source: 'skill' | 'trait' | 'item'): number {
-    if (!dst.alive || amount <= 0) return 0;
+    if (!dst.alive) return 0;
+    if (!Number.isFinite(amount)) throw new Error(`非法治疗值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
+    if (amount <= 0) return 0;
     let amt = amount * (1 + (src?.trait.healAmp ?? 0));
     let wound = 0;
     for (const s of dst.statuses) if (s.kind === 'wound') wound += s.value;
@@ -625,7 +634,9 @@ export class Battle implements BattleApi {
    * 续盾是"刷新"而非"叠加"：时长取剩余与新增的较大者，数值并入总量。
    */
   addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void {
-    if (!dst.alive || amount <= 0) return;
+    if (!dst.alive) return;
+    if (!Number.isFinite(amount)) throw new Error(`非法护盾值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
+    if (amount <= 0) return;
     const amt = amount * (1 + (src?.trait.shieldAmp ?? 0));
     const before = dst.shield;
     dst.shield = Math.min(dst.shield + amt, dst.maxHp * SHIELD_CAP_RATIO);
@@ -666,7 +677,9 @@ export class Battle implements BattleApi {
   }
 
   addDot(src: Unit, dst: Unit, kind: 'burn' | 'bleed', dps: number, dur: number, type: DamageType): void {
-    if (!dst.alive || dps <= 0) return;
+    if (!dst.alive) return;
+    if (!Number.isFinite(dps)) throw new Error(`非法持续伤害值: ${dps}（src=${src.uid} dst=${dst.uid}）`);
+    if (dps <= 0) return;
     // 结算类型随状态走（burn=法术、bleed 由调用方定，山海传 'true'），
     // 不能在 tickDots 里按 kind 硬编码 —— 否则"流血走真实伤害"的设计失效
     dst.statuses.push({ kind, ticks: Math.round(dur * TICK_RATE), value: dps, srcUid: src.uid, dtype: type });
@@ -728,6 +741,9 @@ export class Battle implements BattleApi {
   }
 
   summon(src: Unit, cell: Cell, hpPct: number, atkPct: number, _name: string): Unit | null {
+    // 对象总量阀（含已阵亡单位）：units 数组整场只增不减，阀值防的是
+    // 长战斗里的对象与遍历规模失控，不是棋盘占格（占格由 occ 守卫）。
+    // 到阀时召唤静默省略 —— 召唤是增益而非承诺，不为此中断战斗。
     if (this.units.length >= 64) return null;
     // 落点防护下沉到内核：与 teleport() 同一口径。
     // 此前这里直接覆写 occ —— 越界写会写到表外、占格写会把原单位变成"幽灵"，

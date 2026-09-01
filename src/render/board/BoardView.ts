@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
 import { BOARD_COLS, BOARD_ROWS } from '../../core/config';
-import { BOARD_PAD } from '../view/layout';
+import { BOARD_PAD, BOARD_SIZE, CELL, GRID_H, GRID_W } from '../view/layout';
 import { CINNABAR, GILT, INK, MOON, PAPER, PAPER_TINT, SPIRIT } from '../view/palette';
 import { TEX } from '../view/textures';
 
-/** 大漆盘：准备与战斗共用同一张 640 盘（样稿 min(62vh,46vw) 的落地值） */
-export const CELL = 72;
-export const GRID_W = CELL * BOARD_COLS; // 576 格线宽
-export const GRID_H = CELL * BOARD_ROWS;
-export const BOARD_W = GRID_W + BOARD_PAD * 2; // 640 含漆盘边
+/**
+ * 大漆盘：准备与战斗共用同一张 640 盘（样稿 min(62vh,46vw) 的落地值）。
+ * 几何常量唯一真源在 view/layout —— 此处只消费；对外转出 CELL 供
+ * 棋盘系（EffectsLayer/BattleScene）引用，盘面总尺寸取 layout 的 BOARD_SIZE。
+ */
+export { CELL };
+export const BOARD_W = BOARD_SIZE; // 640 含漆盘边
 export const BOARD_H = BOARD_W;
 
 const TEX_LACQUER = 'lacquerBoard_v3';

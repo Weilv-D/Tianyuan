@@ -51,16 +51,13 @@ export class CodexScene extends Phaser.Scene {
     super({ key: 'Codex' });
   }
 
-  create(data: { from?: 'Menu' | 'Game'; match?: unknown; prepLeft?: number }): void {
+  create(data: { from?: 'Menu' | 'Game'; match?: unknown }): void {
     baseZoom(this);
     resetCursorOnShutdown(this);
     // 从对局进入（nav「图鉴」）时返回对局（存档在 GameScene shutdown 时已落盘）；
-    // 对局引用与备战剩余秒数原样带回，GameScene 据此续跑倒计时
+    // 对局引用原样带回。备战无倒计时（手动开战），无需带回剩余秒数
     this.backTo = data.from === 'Game' ? 'Game' : 'Menu';
-    this.backData =
-      data.from === 'Game'
-        ? { match: data.match, ...(typeof data.prepLeft === 'number' ? { prepLeft: data.prepLeft } : {}) }
-        : {};
+    this.backData = data.from === 'Game' ? { match: data.match } : {};
     buildTextures(this);
     grainOverlay(this);
     bakeSilhouettes(this);

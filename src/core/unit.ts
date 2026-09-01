@@ -1,4 +1,4 @@
-import { GLOBAL_HP_SCALE, LEGEND_T3, STAR_HP_SCALE, STAR_POWER_SCALE, RESIST_CAP } from './config';
+import { GLOBAL_HP_SCALE, LEGEND_T3, RESIST_CAP, STAR_HP_SCALE, STAR_POWER_SCALE, T3_ELITE_COST4 } from './config';
 import { itemEffects } from './items';
 import { createTraitState, type BattleApi, type TraitState } from './api';
 import { CHAMPION_BY_ID, type ChampionEntry } from '../data/champions';
@@ -100,6 +100,14 @@ export function createUnit(input: BattleUnitInput): Unit {
   if (!Number.isInteger(input.star) || input.star < 1 || input.star > 3) {
     throw new Error(`非法星级: ${input.star}（${input.defId}）`);
   }
+  // 数值入口校验：`??` 只挡 null/undefined，NaN/Infinity 会穿过 Math.max 与
+  // Math.round 直接写进面板 —— 扫参实验/误配数据的污染必须在边界终止
+  if (input.powMult !== undefined && !Number.isFinite(input.powMult)) {
+    throw new Error(`非法 powMult: ${input.powMult}（${input.defId}）`);
+  }
+  for (const [k, v] of Object.entries(input.bonus ?? {})) {
+    if (!Number.isFinite(v)) throw new Error(`非法 bonus.${k}: ${v}（${input.defId}）`);
+  }
   const b = entry.base;
   const si = input.star - 1;
   const hpScale = STAR_HP_SCALE[si];
@@ -115,10 +123,15 @@ export function createUnit(input: BattleUnitInput): Unit {
   const legend = entry.cost === 5 && input.star === 3 && !input.monster;
   const legendHp = legend ? LEGEND_T3.hpMult : 1;
   const legendPow = legend ? LEGEND_T3.powerMult : 1;
+  // 三星四费「登峰」（T3_ELITE_COST4）：数值乘区，无机制包（见 config 注释）。
+  // monster 排除与天命同口径 —— 墨兽后期池含四费 3★，不排除则 PvE 静默吃档。
+  const elite = entry.cost === 4 && input.star === 3 && !input.monster;
+  const eliteHp = elite ? T3_ELITE_COST4.hpMult : 1;
+  const elitePow = elite ? T3_ELITE_COST4.powerMult : 1;
 
   // 下界 1：负向 bonus（扫参实验/误配装备）把 maxHp 打到 ≤0 时，
   // 下游 hp 比例、超时裁定会除零/NaN，整场战斗的确定性随之报废
-  const maxHp = Math.max(1, Math.round(b.hp * hpScale * GLOBAL_HP_SCALE * legendHp + (bonus.hp ?? 0)));
+  const maxHp = Math.max(1, Math.round(b.hp * hpScale * GLOBAL_HP_SCALE * legendHp * eliteHp + (bonus.hp ?? 0)));
   const startMp = Math.min(b.startMp + (bonus.startMp ?? 0), b.maxMp);
 
   return {
@@ -131,8 +144,8 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     maxHp,
     hp: maxHp,
-    atk: Math.max(1, Math.round(b.atk * powScale * legendPow * (input.powMult ?? 1) + (bonus.atk ?? 0))),
-    sp: Math.round(b.sp * powScale * legendPow + (bonus.sp ?? 0)),
+    atk: Math.max(1, Math.round(b.atk * powScale * legendPow * elitePow * (input.powMult ?? 1) + (bonus.atk ?? 0))),
+    sp: Math.round(b.sp * powScale * legendPow * elitePow + (bonus.sp ?? 0)),
     baseArmor: b.armor + (bonus.armor ?? 0),
     baseMr: b.mr + (bonus.mr ?? 0),
     baseAspd: b.aspd * (1 + (bonus.aspd ?? 0)),

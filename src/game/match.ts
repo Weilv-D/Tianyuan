@@ -19,9 +19,6 @@ import {
   MATCH_TUNING,
   MAX_LEVEL,
   PLAYER_START_HP,
-  PREP_SECONDS,
-  PREP_SECONDS_LATE,
-  PREP_LATE_FROM_ROUND,
   REROLL_COST,
   ROUND_BASE_DAMAGE,
   SHOP_SLOTS,
@@ -294,10 +291,6 @@ export class Match implements AiWorld {
     });
   }
 
-  prepSeconds(): number {
-    return this.round >= PREP_LATE_FROM_ROUND ? PREP_SECONDS_LATE : PREP_SECONDS;
-  }
-
   /**
    * 读档时是否需要先推进回合（A2：防回合二次结算）。
    *
@@ -335,6 +328,24 @@ export class Match implements AiWorld {
     if (!opt) return; // 非法下标：不发放、不清空，调用方可重试
     this.grantAdventure(this.human, opt, offer.round);
     this.adventureOffer = null;
+  }
+
+  /**
+   * 开战时人类仍未点选奇遇恩赐：按「均衡」原型的偏好序代选一个并发放。
+   * 选型是纯函数（不消耗 rng），发放走与手动点选完全相同的 grantAdventure
+   * —— 自动选择只是替玩家按下按钮，不引入任何额外口径。
+   */
+  resolveHumanAdventure(): boolean {
+    const offer = this.adventureOffer;
+    if (!offer) return false;
+    // 「老谋」偏好序（item 优先）：未点选的默认口 —— 成品装备是唯一买不到的资源
+    const idx = chooseAdventureIndex(makeProfile('balanced'), offer);
+    const opt = offer.options[idx];
+    if (!opt) return false;
+    this.grantAdventure(this.human, opt, offer.round);
+    this.adventureOffer = null;
+    this.log.push(`你自动选择了恩赐「${opt.title}」`);
+    return true;
   }
 
   /**
@@ -460,8 +471,8 @@ export class Match implements AiWorld {
 
     // 奇遇轮（M3）：全员共享同一份恩赐选项。掷点位置固定在墨兽阵容生成之后、
     // 收入结算之前 —— 同一种子的 rng 流 ⇒ 完全相同的 offer（对局层确定性契约）。
-    // 非奇遇轮显式置空，清掉任何残留。
-    this.adventureOffer = this.isAdventureRound() ? rollAdventureOffer(this.round, this.rng) : null;
+    // 非奇遇轮显式置空，清掉任何残留；人类已淘汰时不再生成（快进路径无人可选）。
+    this.adventureOffer = this.isAdventureRound() && this.human.alive ? rollAdventureOffer(this.round, this.rng) : null;
 
     for (const p of this.alivePlayers()) {
       // 1) 结算上一回合的收入（第一回合没有上一回合）
@@ -494,6 +505,11 @@ export class Match implements AiWorld {
     }
 
     this.log.push(`第 ${this.round} 回合 · 准备 · 存活 ${this.aliveCount()} 人`);
+
+    // 5) 配对在回合开始即生成（原先拖到开战前）：备战期全程可侦查本轮对手
+    //    （nav「阵容」/敌情面板），不是开战瞬间的黑箱抽签。rng 消费顺序相应
+    //    前移 —— 跨版本的旧存档继续对局时 rng 流自此分叉，属预期行为。
+    if (!this.isOver()) this.pairings = this.makePairings();
   }
 
   // ── 玩家动作 ──────────────────────────────────────────
@@ -645,9 +661,6 @@ export class Match implements AiWorld {
    * 若还没有人被淘汰，则轮空（不掉血也不加连胜）。
    */
   makePairings(): Pairing[] {
-    // 战斗阶段开始处（渲染层 startBattlePhase → makePairings）：清空未选的奇遇恩赐。
-    // 过期无惩罚 —— 恩赐是馈赠不是任务，漏选不该变成扣血。
-    this.adventureOffer = null;
     // 墨兽轮：每个存活玩家各自单挑同一只墨兽，玩家固定在下半场
     if (this.isBeastRound()) {
       return this.alivePlayers().map((p) => ({ a: p.idx, b: -1, ghost: -1, swap: true, beast: true }));
@@ -813,7 +826,10 @@ export class Match implements AiWorld {
       pa.lastOutcome = 'draw';
       pa.streak = 0;
       pa.lastDamage = 0;
-      out.push({ idx: pa.idx, outcome: 'draw', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [], gold: 0 });
+      // 墨兽轮平局照样走保底（按败野档）：掉落真源表是「全员无条件」口径，
+      // 胜/负/平三态都必须至少发保底，不能让超时平局吞掉下限
+      const drawDrop = pair.beast ? this.rollItemDrops(pa, false) : { items: [], gold: 0 };
+      out.push({ idx: pa.idx, outcome: 'draw', damage: 0, hpAfter: pa.hp, eliminated: false, drops: drawDrop.items, gold: drawDrop.gold });
       if (pair.b >= 0) {
         const pb = this.players[pair.b];
         pb.lastOutcome = 'draw';
@@ -903,6 +919,9 @@ export class Match implements AiWorld {
    * @returns 实发明细（组件/成品 ids 与金币数），调用方写入 RoundOutcome 供战报呈现
    */
   private rollItemDrops(p: PlayerState, won: boolean): { items: string[]; gold: number } {
+    // 真源表只覆盖墨兽轮：非墨兽轮误入此处说明调用方守卫丢了，
+    // 宁可发空也不回落到首档/末档（那会把掉落表之外的轮次映射成 1 轮档）
+    if (!this.isBeastRound()) return { items: [], gold: 0 };
     const tier =
       BEAST_DROP_SCHEDULE.find((t) => t.round === this.round) ??
       (this.round < BEAST_DROP_SCHEDULE[0].round ? BEAST_DROP_SCHEDULE[0] : BEAST_DROP_SCHEDULE[BEAST_DROP_SCHEDULE.length - 1]);
