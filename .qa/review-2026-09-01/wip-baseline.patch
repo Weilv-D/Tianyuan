@@ -1,0 +1,1109 @@
+diff --git a/package.json b/package.json
+index 69e0fe1..d93bd19 100644
+--- a/package.json
++++ b/package.json
+@@ -25,6 +25,7 @@
+     "sim:ab": "tsx scripts/ab-pair.ts",
+     "sim:shop": "tsx scripts/sim-shop.ts",
+     "sim:big": "tsx scripts/sim-bigorigins.ts",
++    "sim:legend": "tsx scripts/sim-legend.ts",
+     "roster": "tsx scripts/roster.ts",
+     "gold": "tsx scripts/gold-value.ts",
+     "beast": "tsx scripts/check-beast.ts",
+diff --git a/scripts/lib/patch.ts b/scripts/lib/patch.ts
+index c46d11b..1e649cd 100644
+--- a/scripts/lib/patch.ts
++++ b/scripts/lib/patch.ts
+@@ -1,8 +1,9 @@
+ /**
+  * 数值补丁层 —— 扫描框架的写入面。
+  *
+- * 路径语法（四类，全部指向"已存在的数字字段"，禁止凭空造字段）：
+- *   cfg.<字段>                    机制软化常量（core/config.ts 的 MECH 对象字段）
++ * 路径语法（五类，全部指向"已存在的数字字段"，禁止凭空造字段）：
++ *   cfg.<字段>                    机制软化常量（core/config.ts 的 MECH / MATCH_TUNING 字段）
++ *   legend.<字段>                 天命包数值（core/config.ts 的 LEGEND_T3 数字字段）
+  *   champ.<defId>.base.<field>    基础面板：hp/atk/sp/armor/mr/aspd/range/moveTime/startMp/maxMp/critChance/critMult
+  *   champ.<defId>.skill.<param>   技能参数：skillSpec.params 里的数字键（如 atk、value、radius）
+  *   trait.<id>.scale              整条羁绊等比缩放
+@@ -13,7 +14,7 @@
+  */
+ import { CHAMPION_BY_ID } from '../../src/data/champions';
+ import { resetTuning, TRAIT_TUNING, TRAIT_TUNING_KEYS } from '../../src/data/tuning';
+-import { MATCH_TUNING, MECH } from '../../src/core/config';
++import { LEGEND_T3, MATCH_TUNING, MECH } from '../../src/core/config';
+ 
+ export type Overrides = Record<string, number>;
+ 
+@@ -54,6 +55,14 @@ export class Patcher {
+       setNumber(target as unknown as Record<string, unknown>, field, value, path, this.journal);
+       return;
+     }
++    // legend.<字段>：天命包单点覆盖（sim-legend 的口径 2 用它把包归零）
++    const legendM = /^legend\.([A-Za-z0-9_]+)$/.exec(path);
++    if (legendM) {
++      const field = legendM[1];
++      if (!(field in LEGEND_T3)) throw new Error(`LEGEND_T3 里没有字段 ${field}：${path}`);
++      setNumber(LEGEND_T3 as unknown as Record<string, unknown>, field, value, path, this.journal);
++      return;
++    }
+     const m = /^([a-z]+)\.([A-Za-z0-9_]+)\.(.+)$/.exec(path);
+     if (!m) throw new Error(`patch 路径不合法（应为 cfg.x / champ.x.y / trait.x.y）：${path}`);
+ 
+diff --git a/src/core/api.ts b/src/core/api.ts
+index faf6507..4c7a255 100644
+--- a/src/core/api.ts
++++ b/src/core/api.ts
+@@ -26,6 +26,12 @@ export interface TraitState {
+   shieldAmp: number;
+   manaPerSec: number;
+   hpRegenPctPerSec: number;
++  /** 承受伤害转化法力的倍率（装备：狮心盾）。1 = 原口径。 */
++  manaFromDamageMult: number;
++  /** 技能暴击率（装备：惊雷锤）。dealDamage 对 source='skill' 的伤害按此掷骰。 */
++  skillCritChance: number;
++  /** 技能暴击倍率（绝对值；0 = 回落持有者普攻暴伤）。 */
++  skillCritMult: number;
+   /** 已激活羁绊 → 档位+1（0 表示未激活）。供战斗内循环做 O(1) 查询。 */
+   tier: Record<string, number>;
+   /** 累计伤害加深（余烬阶段等全局效果单独处理） */
+@@ -44,6 +50,9 @@ export function createTraitState(): TraitState {
+     shieldAmp: 0,
+     manaPerSec: 0,
+     hpRegenPctPerSec: 0,
++    manaFromDamageMult: 1,
++    skillCritChance: 0,
++    skillCritMult: 0,
+     tier: {},
+   };
+ }
+diff --git a/src/core/battle.ts b/src/core/battle.ts
+index 74f5f5f..2cc03b0 100644
+--- a/src/core/battle.ts
++++ b/src/core/battle.ts
+@@ -456,12 +456,23 @@ export class Battle implements BattleApi {
+     // 暴击：唯一的结算点。调用方若已掷骰（普攻 / 神射必爆），以 forceCrit 传入结果，
+     // 此处只乘一次倍率、不再掷骰 —— 否则暴伤变成倍率的平方、暴击率变成 1-(1-p)²。
+     // canCrit=true 表示"由这里掷骰"（如机关第 4 击的附加物伤）。
++    // 技能暴击（惊雷锤）：caller 未掷骰且未开放 canCrit 的 skill 伤害，
++    // 按持有者 skillCritChance 掷骰，倍率优先用装备给的绝对值。
+     let crit = false;
+     const callerDecided = opts.forceCrit === true;
+     const canCrit = callerDecided || opts.canCrit === true;
+     if (src && canCrit) {
+       crit = callerDecided || this.rng.chance(Math.max(0, src.critChance));
+       if (crit) amount *= src.critMult;
++    } else if (
++      src &&
++      !callerDecided &&
++      opts.canCrit !== true &&
++      source === 'skill' &&
++      src.trait.skillCritChance > 0
++    ) {
++      crit = this.rng.chance(Math.min(1, src.trait.skillCritChance));
++      if (crit) amount *= src.trait.skillCritMult > 0 ? src.trait.skillCritMult : src.critMult;
+     }
+ 
+     // 易伤
+@@ -537,8 +548,11 @@ export class Battle implements BattleApi {
+     dst.takenDamage += final;
+     if (src) src.dealtDamage += final;
+ 
+-    // 受击回蓝
+-    const manaGain = Math.min(MANA_FROM_DAMAGE_CAP, (final / dst.maxHp) * MANA_FROM_DAMAGE_RATIO);
++    // 受击回蓝（manaFromDamageMult：装备的承伤转蓝增幅，护盾吸收额计入 final）
++    const manaGain = Math.min(
++      MANA_FROM_DAMAGE_CAP,
++      (final / dst.maxHp) * MANA_FROM_DAMAGE_RATIO * dst.trait.manaFromDamageMult,
++    );
+     if (!dst.isMinion && dst.manaLock <= 0) {
+       dst.mp = Math.min(dst.maxMp, dst.mp + manaGain);
+     }
+diff --git a/src/core/config.ts b/src/core/config.ts
+index 0e5f10c..766251b 100644
+--- a/src/core/config.ts
++++ b/src/core/config.ts
+@@ -132,17 +132,26 @@ export const STAR_SKILL_SCALE: readonly [number, number, number] = [1, 1.5, 2.25
+ /**
+  * 三星五费的"天命护持"包：三星五费应当是终结局面的存在，
+  * 常规三星倍率（3.24/2.1）远不足以表达。数值在天命倍率上再乘，
+- * 并附带四项机制：免疫控制、开战护盾、全能吸血、体量增幅（渲染层读同源值）。
++ * 并附带机制：免疫控制、开战护盾、全能吸血、技能增伤、体量增幅（渲染层读同源值）。
++ *
++ * [v1.9 大加强定档]（scripts/sim-legend.ts 配对实测，6 预设 × 互为对手 ×
++ * 双向镜像，N=96）：旧包（1.6/1.5/0.15/0.25）下「同阵容五费 2★→3★」的
++ * 镜像升级胜率仅 +23%，"追出天命"的改变感远低于一颗同费用普通三费三星；
++ * 新包（2.0/2.0/0.2/0.35 + 技能 1.25）实测 +52%（47.6%→74.1%）——
++ * 天命落地近乎终结悬念，但不越"必胜"红线（满配对局仍可被装备差/站位翻盘）。
++ * 配套：AI 估值常量（state.ts powerScore 的 legend 加项）同步 60→90。
+  */
+ export const LEGEND_T3 = {
+   /** 3★ 生命在天命层再乘 */
+-  hpMult: 1.6,
++  hpMult: 2.0,
+   /** 3★ 攻击/法强在天命层再乘 */
+-  powerMult: 1.5,
++  powerMult: 2.0,
++  /** 技能数值在天命层再乘（skills.skillRaw 出口统一结算） */
++  skillMult: 1.25,
+   /** 全能吸血（普攻与技能都吃） */
+-  omnivamp: 0.15,
++  omnivamp: 0.2,
+   /** 开战护盾（最大生命百分比） */
+-  startShieldPct: 0.25,
++  startShieldPct: 0.35,
+   /** 免疫控制（addStatus 的 CONTROL_KINDS 全系拒绝） */
+   ccImmune: true,
+   /** 渲染体量增幅（UnitView 叠加在星级缩放之后） */
+diff --git a/src/core/items.ts b/src/core/items.ts
+index 7490893..8a519e8 100644
+--- a/src/core/items.ts
++++ b/src/core/items.ts
+@@ -13,6 +13,7 @@
+ 
+ import { ITEM_BY_ID, type ItemBonus, type ItemMods, type ItemHookId } from '../data/items';
+ import type { BattleApi, TraitState } from './api';
++import type { StatusKind } from './types';
+ import type { Unit } from './unit';
+ 
+ /** 一件装备拆出来的三层效果 */
+@@ -67,6 +68,10 @@ export function applyItemMods(u: Unit, itemIds: readonly string[]): void {
+   if (mods.hpRegenPctPerSec) t.hpRegenPctPerSec += mods.hpRegenPctPerSec;
+   if (mods.healAmp) t.healAmp += mods.healAmp;
+   if (mods.allDr) t.allDr = Math.min(0.9, t.allDr + mods.allDr);
++  // 倍率/绝对值语义的字段取最大而不是求和：两把狮心盾不该把承伤转蓝叠到 1.6
++  if (mods.manaFromDamageMult) t.manaFromDamageMult = Math.max(t.manaFromDamageMult, mods.manaFromDamageMult);
++  if (mods.skillCritChance) t.skillCritChance = Math.min(1, t.skillCritChance + mods.skillCritChance);
++  if (mods.skillCritMult) t.skillCritMult = Math.max(t.skillCritMult, mods.skillCritMult);
+ }
+ 
+ /**
+@@ -171,6 +176,217 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
+       });
+     });
+   }
++
++  // ── v1.9 全配方扩展（17 个钩子）。共用纪律：
++  //  · onTick 类钩子按注册队伍闭包过滤 u.team !== team，防止双队重复结算；
++  //  · 叠层走 permAtkPct/permAspdPct 的「增量累加 + traitStacks 记此前值」，
++    // 与疾风弓 momentum 同一套安全模式（禁止按总量重算，会覆盖羁绊成长）；
++  //  · 计数/冷却用 traitStacks，一次性消耗用 itemUsed。 ──
++
++  // 贯日枪：普攻命中追加 40% 法强的法术伤害（onAttackHit 恒为普攻命中）
++  if (units.some((u) => has(u, 'sunSpear'))) {
++    h.onAttackHit.push((a, src, dst) => {
++      if (!has(src, 'sunSpear') || !src.alive || !dst.alive) return;
++      const ratio = paramOf(src, 'spRatio');
++      if (ratio <= 0) return;
++      a.dealDamage(src, dst, src.sp * ratio, 'magic', { source: 'item' });
++    });
++  }
++
++  // 寒渊镰：普攻减速（slow 同时压攻速与移速，追击/风筝双向生效）
++  if (units.some((u) => has(u, 'frost'))) {
++    h.onAttackHit.push((a, src, dst) => {
++      if (!has(src, 'frost') || !src.alive || !dst.alive) return;
++      a.addStatus(src, dst, 'slow', paramOf(src, 'slowDur'), paramOf(src, 'slowPct'));
++    });
++  }
++
++  // 缚龙爪：损血叠攻。节流 0.2s，按「应得值 - 此前值」增量写入 permAtkPct
++  if (units.some((u) => has(u, 'berserk'))) {
++    h.onTick.push((a, team, tick) => {
++      if (tick % 6 !== 0) return;
++      for (const u of a.units) {
++        if (u.team !== team || !u.alive || !has(u, 'berserk')) continue;
++        const per = paramOf(u, 'atkPerStep');
++        const step = paramOf(u, 'stepPct');
++        const cap = paramOf(u, 'capPct') * 100;
++        const steps = Math.floor((1 - u.hp / u.maxHp) / Math.max(0.01, step));
++        const v = Math.min(cap, steps * per);
++        const prev = u.traitStacks['fulongPrev'] ?? 0;
++        if (v === prev) continue;
++        u.permAtkPct += (v - prev) / 100;
++        u.traitStacks['fulongPrev'] = v;
++      }
++    });
++  }
++
++  // 流星弩：击杀后攻速爆发（aspdUp 可叠，按层数上限封顶）
++  if (units.some((u) => has(u, 'killFrenzy'))) {
++    h.onKill.push((a, killer) => {
++      if (!has(killer, 'killFrenzy') || !killer.alive) return;
++      const stacks = killer.statuses.filter((s) => s.kind === 'aspdUp').length;
++      if (stacks >= paramOf(killer, 'maxStacks')) return;
++      a.addStatus(killer, killer, 'aspdUp', paramOf(killer, 'dur'), paramOf(killer, 'aspdPct'));
++      a.fx('buffAura', { uid: killer.uid, params: { hue: 0 } });
++    });
++  }
++
++  // 赤练鞭：普攻上易伤（vulnerability 非叠加种类 → 自动刷新时长/取最大值）
++  if (units.some((u) => has(u, 'venom'))) {
++    h.onAttackHit.push((a, src, dst) => {
++      if (!has(src, 'venom') || !src.alive || !dst.alive) return;
++      a.addStatus(src, dst, 'vulnerability', paramOf(src, 'vulnDur'), paramOf(src, 'vulnPct'));
++    });
++  }
++
++  // 青圭杖：施法后自盾（法系前排的"打完一轮还有余量"）
++  if (units.some((u) => has(u, 'castShield'))) {
++    h.onCast.push((a, u) => {
++      if (!has(u, 'castShield') || !u.alive) return;
++      a.addShield(u, u, u.maxHp * paramOf(u, 'shieldPct'), paramOf(u, 'shieldDur'));
++    });
++  }
++
++  // 追风履：每秒 +1.5% 攻速成长（增量累加，封顶 16 秒 × 1.5）
++  if (units.some((u) => has(u, 'windRunner'))) {
++    h.onTick.push((a, team, tick) => {
++      if (tick % 30 !== 0) return;
++      for (const u of a.units) {
++        if (u.team !== team || !u.alive || !has(u, 'windRunner')) continue;
++        const per = paramOf(u, 'aspdPerSec');
++        const maxStacks = Math.floor(paramOf(u, 'capPct') / Math.max(0.01, per));
++        const prev = u.traitStacks['zhuifengStacks'] ?? 0;
++        if (prev >= maxStacks) continue;
++        u.traitStacks['zhuifengStacks'] = prev + 1;
++        u.permAspdPct += per / 100;
++      }
++    });
++  }
++
++  // 玄铁重甲：周期净化自身减益（按优先序摘一个，5 秒一次）
++  if (units.some((u) => has(u, 'ironPurge'))) {
++    const PURGE_ORDER: readonly StatusKind[] = [
++      'stun', 'silence', 'disarm', 'wound', 'slow',
++      'burn', 'bleed', 'vulnerability', 'armorShred', 'mrShred', 'taunt',
++    ];
++    h.onTick.push((a, team, tick) => {
++      for (const u of a.units) {
++        if (u.team !== team || !u.alive || !has(u, 'ironPurge')) continue;
++        if (tick % Math.max(1, Math.round(paramOf(u, 'everyTicks'))) !== 0) continue;
++        for (const kind of PURGE_ORDER) {
++          if (!u.statuses.some((s) => s.kind === kind)) continue;
++          a.removeStatus(u, kind);
++          a.fx('buffAura', { uid: u.uid });
++          break;
++        }
++      }
++    });
++  }
++
++  // 紫电镰：施法后攻速爆发
++  if (units.some((u) => has(u, 'castAspd'))) {
++    h.onCast.push((a, u) => {
++      if (!has(u, 'castAspd') || !u.alive) return;
++      const stacks = u.statuses.filter((s) => s.kind === 'aspdUp').length;
++      if (stacks >= paramOf(u, 'maxStacks')) return;
++      a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'));
++      a.fx('buffAura', { uid: u.uid, params: { hue: 2 } });
++    });
++  }
++
++  // 引魂灯：施法后治疗生命最低的友军（按持有者法强折算）
++  if (units.some((u) => has(u, 'castHeal'))) {
++    h.onCast.push((a, u) => {
++      if (!has(u, 'castHeal') || !u.alive) return;
++      const t = a.resolveTargets(u, 'allyLowestHp', 1)[0];
++      if (!t) return;
++      const healed = a.heal(u, t, u.sp * paramOf(u, 'healSpRatio'), 'item');
++      if (healed > 0.5) a.fx('healWave', { uid: t.uid });
++    });
++  }
++
++  // 垂天翼：开战攻速（onBattleStart 每队各注册一次，has() 天然按持有者过滤）
++  if (units.some((u) => has(u, 'wingStart'))) {
++    h.onBattleStart.push((a, team) => {
++      for (const u of a.units) {
++        if (u.team !== team || !u.alive || !has(u, 'wingStart')) continue;
++        a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'));
++      }
++    });
++  }
++
++  // 九尾面：施法后标记，下一次普攻必爆 + 追加法伤（onPreAttack 消费标记）
++  if (units.some((u) => has(u, 'foxReady'))) {
++    h.onCast.push((_a, u) => {
++      if (has(u, 'foxReady') && u.alive) u.traitStacks['jiuweiReady'] = 1;
++    });
++    h.onPreAttack.push((_a, src, _dst, mod) => {
++      if (!has(src, 'foxReady') || !src.traitStacks['jiuweiReady']) return;
++      src.traitStacks['jiuweiReady'] = 0;
++      mod.forceCrit = true;
++      mod.bonusMagic += src.sp * paramOf(src, 'bonusSpRatio');
++    });
++  }
++
++  // 拂尘扇：每第 N 次普攻缴械目标
++  if (units.some((u) => has(u, 'disarmSwat'))) {
++    h.onAttackHit.push((a, src, dst) => {
++      if (!has(src, 'disarmSwat') || !src.alive || !dst.alive) return;
++      const every = Math.max(2, Math.round(paramOf(src, 'everyHits')));
++      const n = ((src.traitStacks['fuchenHits'] ?? 0) as number) + 1;
++      if (n < every) {
++        src.traitStacks['fuchenHits'] = n;
++        return;
++      }
++      src.traitStacks['fuchenHits'] = 0;
++      a.addStatus(src, dst, 'disarm', paramOf(src, 'disarmDur'), 0);
++    });
++  }
++
++  // 霜翎环：普攻命中按最大生命百分比回复（amount ≤0 = 被闪避/护盾全吃，不回）
++  if (units.some((u) => has(u, 'onHitHeal'))) {
++    h.onAttackHit.push((a, src, _dst, amount) => {
++      if (!has(src, 'onHitHeal') || !src.alive) return;
++      if ((amount ?? 0) <= 0) return;
++      a.heal(src, src, src.maxHp * paramOf(src, 'healPct'), 'item');
++    });
++  }
++
++  // 紫金炉：普攻命中额外回蓝（与内核每次普攻 +10 并行，吃法力锁与上限）
++  if (units.some((u) => has(u, 'critMana'))) {
++    h.onAttackHit.push((_a, src) => {
++      if (!has(src, 'critMana') || !src.alive || src.isMinion) return;
++      if (src.manaLock > 0) return;
++      src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'mpPerHit'));
++    });
++  }
++
++  // 墨龙旗：开战为全体友军上减伤（多面旗不重复结算，params 聚合本就取最大）
++  if (units.some((u) => has(u, 'warBanner'))) {
++    h.onBattleStart.push((a, team) => {
++      const holder = a.units.find((u) => u.team === team && u.alive && has(u, 'warBanner'));
++      if (!holder) return;
++      for (const al of a.units) {
++        if (al.team !== team || !al.alive) continue;
++        a.addStatus(holder, al, 'dr', paramOf(holder, 'dur'), paramOf(holder, 'drPct'));
++      }
++      a.fx('shieldWall', { team });
++    });
++  }
++
++  // 摄魂铃：受普攻概率眩晕攻击者，内置冷却（traitStacks 存下次可触发 tick）
++  if (units.some((u) => has(u, 'bellStun'))) {
++    h.onDamageTaken.push((a, dst, src, _amount, _type, opts) => {
++      if (!has(dst, 'bellStun') || !dst.alive || !src || !src.alive) return;
++      if (opts.source !== 'attack') return;
++      const next = dst.traitStacks['shehunNextTick'] ?? 0;
++      if (a.tick < next) return;
++      if (!a.rng.chance(paramOf(dst, 'chance'))) return;
++      dst.traitStacks['shehunNextTick'] = a.tick + paramOf(dst, 'cdTicks');
++      a.addStatus(dst, src, 'stun', paramOf(dst, 'stunDur'), 0);
++      a.fx('debuffMark', { uid: src.uid });
++    });
++  }
+ }
+ 
+ function paramOf(u: Unit, key: string): number {
+diff --git a/src/core/skills.ts b/src/core/skills.ts
+index 9b1ebf7..0c111f4 100644
+--- a/src/core/skills.ts
++++ b/src/core/skills.ts
+@@ -1,7 +1,7 @@
+ import type { BattleApi } from './api';
+ import { chebyshev, inBounds } from './grid';
+ import { effAtk, effSp, hasStatus, type Unit } from './unit';
+-import { STAR_SKILL_SCALE, TICK_RATE } from './config';
++import { LEGEND_T3, STAR_SKILL_SCALE, TICK_RATE } from './config';
+ import type { SkillSpec, TargetMode } from '../data/champions';
+ import type { Cell, DamageType, StatusKind } from './types';
+ 
+@@ -27,9 +27,15 @@ const BUFF_KINDS = new Set<StatusKind>([
+   'dr', 'spellCharge', 'ccImmune', 'drain',
+ ]);
+ 
+-/** 技能原始伤害 = (攻击力 × atk倍率 + 法强 × sp倍率 + 固定值) × 星级技能倍率 */
++/** 技能原始伤害 = (攻击力 × atk倍率 + 法强 × sp倍率 + 固定值) × 星级技能倍率 × 天命倍率 */
+ export function skillRaw(u: Unit, atk = 0, sp = 0, flat = 0): number {
+-  return (atk * effAtk(u) + sp * effSp(u) + flat) * STAR_SKILL_SCALE[u.star - 1];
++  // 天命技能乘区：与 unit.ts 的 legend 判定同口径（墨兽/召唤物不天命）
++  const legend = u.entry.cost === 5 && u.star === 3 && !u.isMinion && !u.isMonster;
++  return (
++    (atk * effAtk(u) + sp * effSp(u) + flat) *
++    STAR_SKILL_SCALE[u.star - 1] *
++    (legend ? LEGEND_T3.skillMult : 1)
++  );
+ }
+ 
+ /**
+diff --git a/src/data/items.ts b/src/data/items.ts
+index 995b2e0..53ca953 100644
+--- a/src/data/items.ts
++++ b/src/data/items.ts
+@@ -5,9 +5,11 @@
+  * 纯属性装备（"+50 攻击"）不会改变玩家的决策，它只是把已有玩法数值放大；
+  * 带机制的装备（"击杀回复 18% 生命"）会改变玩家的构筑与站位思路。
+  *
+- * 8 个组件 → 28 种两两组合，这里实装 14 种。剩下的组合不是"没做完"，
+- * 而是刻意留白：给玩家留出"这两个合出来会是什么"的探索空间，
+- * 同时避免 28 件装备带来的认知负担。
++ * 8 个组件两两组合（含同件）共 36 种配方，**全配方实装**（v1.9 起）：
++ * 任何两件组件拖到一起必定合成 —— "这两个合出来会是什么"的探索
++ * 由配方表的多样性承担，而不是靠"合不出来"留白。
++ * 全表只有两件刻意保留的**白板位**：混元珠（纯法强）与紫霄珠（纯暴击）——
++ * "把一条属性堆到极致"的最朴素路线，各保留一条不被机制绑架的去处。
+  */
+ 
+ export type ItemTier = 'component' | 'combined';
+@@ -47,10 +49,43 @@ export interface ItemMods {
+   healAmp: number;
+   /** 全类型减伤。魔抗装之所以要带上它，见「玄冥衣」条目下的说明。 */
+   allDr: number;
++  /** 承受伤害转化法力的倍率（狮心盾：被打=回蓝加速）。多件取最大。 */
++  manaFromDamageMult: number;
++  /** 技能暴击率（惊雷锤）。多件求和，封顶 1。 */
++  skillCritChance: number;
++  /** 技能暴击倍率（绝对值语义，多件取最大；0 = 用持有者普攻暴伤）。 */
++  skillCritMult: number;
+ }
+ 
+-/** 需要钩子实现的机制 */
+-export type ItemHookId = 'executeHeal' | 'immortal' | 'thorns' | 'momentum' | 'healToShield';
++/**
++ * 需要钩子实现的机制。
++ *
++ * 命名按装备语义而非效果名（hook 是"这件装备的机制"，不是"通用词条"）：
++ * v1.9 全配方后共 22 个，全部实装在 core/items.ts 的 applyItemHooks。
++ */
++export type ItemHookId =
++  | 'executeHeal' // 断魂刃：击杀回复
++  | 'immortal' // 鹤龄镜：延迟复活
++  | 'thorns' // 玄武甲：物理反弹
++  | 'momentum' // 疾风弓：普攻叠攻速
++  | 'healToShield' // 回天灯：治疗溢出转护盾
++  | 'sunSpear' // 贯日枪：普攻追加法伤
++  | 'frost' // 寒渊镰：普攻减速
++  | 'berserk' // 缚龙爪：损血叠攻
++  | 'killFrenzy' // 流星弩：击杀攻速爆发
++  | 'venom' // 赤练鞭：普攻上易伤
++  | 'castShield' // 青圭杖：施法得盾
++  | 'windRunner' // 追风履：每秒成长攻速
++  | 'ironPurge' // 玄铁重甲：周期净化
++  | 'castAspd' // 紫电镰：施法攻速爆发
++  | 'castHeal' // 引魂灯：施法治疗最低友军
++  | 'wingStart' // 垂天翼：开战攻速
++  | 'foxReady' // 九尾面：施法后必爆强击
++  | 'disarmSwat' // 拂尘扇：计数缴械
++  | 'onHitHeal' // 霜翎环：普攻回复(按最大生命)
++  | 'critMana' // 紫金炉：普攻回蓝
++  | 'warBanner' // 墨龙旗：开战全队减伤
++  | 'bellStun'; // 摄魂铃：受击概率眩晕
+ 
+ export interface ItemDef {
+   id: string;
+@@ -341,12 +376,12 @@ export const ITEMS: readonly ItemDef[] = [
+     id: 'huitian',
+     name: '回天灯',
+     tier: 'combined',
+-    desc: '法强 +12，初始法力 +28，每秒回蓝 +4，治疗提升 30%。其治疗若溢出，溢出量的 70% 转为护盾。',
++    desc: '法强 +14，初始法力 +28，每秒回蓝 +4，治疗提升 40%。其治疗若溢出，溢出量的 85% 转为护盾。',
+     recipe: ['fafu', 'fafu'],
+-    bonus: { sp: 12, startMp: 28 },
+-    mods: { manaPerSec: 4, healAmp: 0.3 },
++    bonus: { sp: 14, startMp: 28 },
++    mods: { manaPerSec: 4, healAmp: 0.4 },
+     hooks: ['healToShield'],
+-    params: { shieldPct: 0.7 },
++    params: { shieldPct: 0.85 },
+     glyph: 'rebirth',
+   },
+   {
+@@ -359,6 +394,253 @@ export const ITEMS: readonly ItemDef[] = [
+     mods: { hpRegenPctPerSec: 0.015 },
+     glyph: 'titan',
+   },
++
++  // ── 合成装备 · v1.9 全配方扩展（22 件）────────────────
++  // 数值口径与一期一致：面板 ≈ 两组件之和（主轴略溢价），机制是强度主体；
++  // 档位全部经 scripts/sim-items.ts 配对实测后定档（详见各条目注记）。
++  {
++    // 攻+法的混合出装通道。追加法伤按持有者法强折算 —— 法核拿了是锦上添花，
++    // 攻核拿只有 20 点法强的底子，天然把这件推向双修 carry。
++    id: 'guanri',
++    name: '贯日枪',
++    tier: 'combined',
++    desc: '攻击力 +18，法强 +20。普攻命中追加 40% 法强的法术伤害。',
++    recipe: ['moren', 'lingzhu'],
++    bonus: { atk: 18, sp: 20 },
++    hooks: ['sunSpear'],
++    params: { spRatio: 0.4 },
++    glyph: 'lance',
++  },
++  {
++    id: 'qinggui',
++    name: '青圭杖',
++    tier: 'combined',
++    desc: '护甲 +18，法强 +20，技能伤害 +10%。施法后获得 10% 最大生命的护盾，持续 4 秒。',
++    recipe: ['xuanjia', 'lingzhu'],
++    bonus: { armor: 18, sp: 20 },
++    mods: { skillAmp: 0.1 },
++    hooks: ['castShield'],
++    params: { shieldPct: 0.1, shieldDur: 4 },
++    glyph: 'voidpearl',
++  },
++  {
++    id: 'hanyuan',
++    name: '寒渊镰',
++    tier: 'combined',
++    desc: '攻击力 +16，攻速 +16%。普攻使命中目标减速 20%（攻速与移速），持续 2 秒。',
++    recipe: ['moren', 'yunlv'],
++    bonus: { atk: 16, aspd: 0.16 },
++    hooks: ['frost'],
++    params: { slowPct: 20, slowDur: 2 },
++    glyph: 'soulblade',
++  },
++  {
++    id: 'jinglei',
++    name: '惊雷锤',
++    tier: 'combined',
++    desc: '法强 +26，暴击率 +10%，攻击力 +6。技能伤害可暴击（30% 概率，1.4 倍）。',
++    recipe: ['lingzhu', 'quantao'],
++    bonus: { sp: 26, critChance: 0.1, atk: 6 },
++    mods: { skillCritChance: 0.3, skillCritMult: 1.4 },
++    glyph: 'chaosorb',
++  },
++  {
++    id: 'chilian',
++    name: '赤练鞭',
++    tier: 'combined',
++    desc: '攻击力 +14，魔抗 +14，生命 +100。普攻使命中目标受伤加深 12%，持续 3 秒。',
++    recipe: ['moren', 'doupeng'],
++    bonus: { atk: 14, mr: 14, hp: 100 },
++    hooks: ['venom'],
++    params: { vulnPct: 12, vulnDur: 3 },
++    glyph: 'bloodfang',
++  },
++  {
++    id: 'liuxing',
++    name: '流星弩',
++    tier: 'combined',
++    desc: '攻击力 +20，初始法力 +12。击杀后获得 5 秒 40% 攻速（至多 2 层）。',
++    recipe: ['moren', 'fafu'],
++    bonus: { atk: 20, startMp: 12 },
++    hooks: ['killFrenzy'],
++    params: { aspdPct: 40, dur: 5, maxStacks: 2 },
++    glyph: 'gale',
++  },
++  {
++    id: 'fuchen',
++    name: '拂尘扇',
++    tier: 'combined',
++    desc: '攻速 +14%，魔抗 +14，生命 +100。每第 4 次普攻缴械目标 1.2 秒。',
++    recipe: ['yunlv', 'doupeng'],
++    bonus: { aspd: 0.14, mr: 14, hp: 100 },
++    hooks: ['disarmSwat'],
++    params: { everyHits: 4, disarmDur: 1.2 },
++    glyph: 'gale',
++  },
++  {
++    id: 'zidian',
++    name: '紫电镰',
++    tier: 'combined',
++    desc: '法强 +24，攻速 +16%。施法后获得 5 秒 45% 攻速（至多 2 层）。',
++    recipe: ['lingzhu', 'yunlv'],
++    bonus: { sp: 24, aspd: 0.16 },
++    hooks: ['castAspd'],
++    params: { aspdPct: 45, dur: 5, maxStacks: 2 },
++    glyph: 'shadow',
++  },
++  {
++    id: 'shuangling',
++    name: '霜翎环',
++    tier: 'combined',
++    desc: '生命 +200，暴击率 +12%，攻击力 +8。普攻命中回复 1.5% 最大生命。',
++    recipe: ['xueyu', 'quantao'],
++    bonus: { hp: 200, critChance: 0.12, atk: 8 },
++    hooks: ['onHitHeal'],
++    params: { healPct: 0.015 },
++    glyph: 'chaosorb',
++  },
++  {
++    // 承伤转蓝是"被打"的正反馈 —— 前排穿着它施法循环显著前移，
++    // 与法符（初始法力）分属"起手快"与"转得快"两种法力装定位。
++    id: 'shixin',
++    name: '狮心盾',
++    tier: 'combined',
++    desc: '护甲 +26，暴击率 +12%，攻击力 +8。承受伤害转化的法力提高 40%。',
++    recipe: ['xuanjia', 'quantao'],
++    bonus: { armor: 26, critChance: 0.12, atk: 8 },
++    mods: { manaFromDamageMult: 1.4 },
++    glyph: 'stupa',
++  },
++  {
++    id: 'yinhun',
++    name: '引魂灯',
++    tier: 'combined',
++    desc: '法强 +22，魔抗 +14，生命 +100。施法后为生命最低的友军回复 70% 法强的生命。',
++    recipe: ['lingzhu', 'doupeng'],
++    bonus: { sp: 22, mr: 14, hp: 100 },
++    hooks: ['castHeal'],
++    params: { healSpRatio: 0.7 },
++    glyph: 'rebirth',
++  },
++  {
++    id: 'shehun',
++    name: '摄魂铃',
++    tier: 'combined',
++    desc: '暴击率 +10%，魔抗 +18，生命 +150。受到普攻时 25% 概率眩晕攻击者 1 秒（每 2.5 秒至多触发一次）。',
++    recipe: ['quantao', 'doupeng'],
++    bonus: { critChance: 0.1, mr: 18, hp: 150 },
++    hooks: ['bellStun'],
++    params: { chance: 0.25, stunDur: 1.0, cdTicks: 75 },
++    glyph: 'undying',
++  },
++  {
++    id: 'zijin',
++    name: '紫金炉',
++    tier: 'combined',
++    desc: '初始法力 +12，暴击率 +15%，攻击力 +8。普攻命中额外回复 4 点法力。',
++    recipe: ['fafu', 'quantao'],
++    bonus: { startMp: 12, critChance: 0.15, atk: 8 },
++    hooks: ['critMana'],
++    params: { mpPerHit: 4 },
++    glyph: 'voidpearl',
++  },
++  {
++    id: 'jiaowei',
++    name: '焦尾琴',
++    tier: 'combined',
++    desc: '护甲 +22，初始法力 +16，每秒回蓝 +3。',
++    recipe: ['xuanjia', 'fafu'],
++    bonus: { armor: 22, startMp: 16 },
++    mods: { manaPerSec: 3 },
++    glyph: 'talisman',
++  },
++  {
++    id: 'molongqi',
++    name: '墨龙旗',
++    tier: 'combined',
++    desc: '初始法力 +14，魔抗 +14，生命 +100。开战时全体友军获得 8 秒 18% 减伤。',
++    recipe: ['fafu', 'doupeng'],
++    bonus: { startMp: 14, mr: 14, hp: 100 },
++    hooks: ['warBanner'],
++    params: { drPct: 18, dur: 8 },
++    glyph: 'darkrobe',
++  },
++  {
++    id: 'jiuwei',
++    name: '九尾面',
++    tier: 'combined',
++    desc: '攻速 +16%，初始法力 +12。施法后，下一次普攻必定暴击并追加 180% 法强的法术伤害。',
++    recipe: ['yunlv', 'fafu'],
++    bonus: { aspd: 0.16, startMp: 12 },
++    hooks: ['foxReady'],
++    params: { bonusSpRatio: 1.8 },
++    glyph: 'shadow',
++  },
++  {
++    id: 'chuitian',
++    name: '垂天翼',
++    tier: 'combined',
++    desc: '攻速 +16%，生命 +200。开战时获得 8 秒 30% 攻速。',
++    recipe: ['yunlv', 'xueyu'],
++    bonus: { aspd: 0.16, hp: 200 },
++    hooks: ['wingStart'],
++    params: { aspdPct: 30, dur: 8 },
++    glyph: 'cloak',
++  },
++  {
++    id: 'xuantie',
++    name: '玄铁重甲',
++    tier: 'combined',
++    desc: '护甲 +24，魔抗 +18，生命 +150。每 5 秒净化自身的一个减益状态。',
++    recipe: ['xuanjia', 'doupeng'],
++    bonus: { armor: 24, mr: 18, hp: 150 },
++    hooks: ['ironPurge'],
++    params: { everyTicks: 150 },
++    glyph: 'turtle',
++  },
++  {
++    id: 'fulong',
++    name: '缚龙爪',
++    tier: 'combined',
++    desc: '攻击力 +16，生命 +200。生命每损失 10%，攻击力 +4%（至多 +32%）。',
++    recipe: ['moren', 'xueyu'],
++    bonus: { atk: 16, hp: 200 },
++    hooks: ['berserk'],
++    params: { atkPerStep: 4, stepPct: 0.1, capPct: 0.32 },
++    glyph: 'gauntlet',
++  },
++  {
++    id: 'zhuifeng',
++    name: '追风履',
++    tier: 'combined',
++    desc: '护甲 +16，攻速 +16%。开战后每秒获得 1.5% 攻速，至多 +24%。',
++    recipe: ['xuanjia', 'yunlv'],
++    bonus: { armor: 16, aspd: 0.16 },
++    hooks: ['windRunner'],
++    params: { aspdPerSec: 1.5, capPct: 24 },
++    glyph: 'boot',
++  },
++  {
++    id: 'cuidai',
++    name: '翠玉带',
++    tier: 'combined',
++    desc: '生命 +300，初始法力 +14，每秒回蓝 +1，治疗提升 35%。',
++    recipe: ['xueyu', 'fafu'],
++    bonus: { hp: 300, startMp: 14 },
++    mods: { healAmp: 0.35, manaPerSec: 1 },
++    glyph: 'jade',
++  },
++  {
++    // 白板位（与混元珠并列）：暴击的极致数值，不带机制。
++    // 暴击期望 = 24% × (1.5+0.4-1) ≈ 22%，与混元珠 48 法强同为"一条路走到黑"的出口。
++    id: 'zixiaozhu',
++    name: '紫霄珠',
++    tier: 'combined',
++    desc: '暴击率 +30%，暴击伤害 +50%。',
++    recipe: ['quantao', 'quantao'],
++    bonus: { critChance: 0.3, critMult: 0.5 },
++    glyph: 'chaosorb',
++  },
+ ];
+ 
+ export const ITEM_BY_ID: Record<string, ItemDef> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+diff --git a/src/game/inventory.ts b/src/game/inventory.ts
+index fbba3f3..e53eaf6 100644
+--- a/src/game/inventory.ts
++++ b/src/game/inventory.ts
+@@ -190,14 +190,23 @@ export function itemAxes(itemId: string, defId: string, star: number): [number,
+     (ib.critChance ?? 0) * 40 +
+     (ib.critMult ?? 0) * 25 +
+     (ib.omnivamp ?? 0) * 30 +
+-    (ib.lifesteal ?? 0) * 20;
+-  const sp = (ib.sp ?? 0) * 1.6 + (im.skillAmp ?? 0) * 120 + (im.manaPerSec ?? 0) * 12 + (ib.startMp ?? 0) * 1.2;
++    (ib.lifesteal ?? 0) * 20 +
++    (im.armorPen ?? 0) * 55;
++  const sp =
++    (ib.sp ?? 0) * 1.6 +
++    (im.skillAmp ?? 0) * 120 +
++    (im.manaPerSec ?? 0) * 12 +
++    (ib.startMp ?? 0) * 1.2 +
++    (im.skillCritChance ?? 0) * 60 +
++    (im.healAmp ?? 0) * 60 +
++    (im.manaFromDamageMult ? (im.manaFromDamageMult - 1) * 90 : 0);
+   const tank =
+     (ib.hp ?? 0) * 0.02 +
+     (ib.armor ?? 0) * 0.6 +
+     (ib.mr ?? 0) * 0.6 +
+     (im.physicalDr ?? 0) * 160 +
+     (im.magicDr ?? 0) * 160 +
++    (im.allDr ?? 0) * 160 +
+     (im.hpRegenPctPerSec ?? 0) * 900;
+   return [atk, sp, tank];
+ }
+diff --git a/src/game/state.ts b/src/game/state.ts
+index e7392ba..7cbaea1 100644
+--- a/src/game/state.ts
++++ b/src/game/state.ts
+@@ -225,8 +225,8 @@ export function powerScore(u: UnitInstance): number {
+   const sp = def.base.sp * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1) * powM;
+   // 生命按 0.35 折算成"战力"，避免纯肉棋子在估值里虚高
+   return hp * 0.012 + atk * 1.0 + sp * 0.8 + (def.base.range >= 3 ? 4 : 0) + s * 6
+-    // 机制包（25% 开战盾 + 15% 全能吸血 + 免控）的粗估常量
+-    + (legend ? 60 : 0);
++    // 机制包（35% 开战盾 + 20% 全能吸血 + 免控 + 技能 1.25×）的粗估常量
++    + (legend ? 90 : 0);
+ }
+ 
+ // ── 增删 ────────────────────────────────────────────────
+diff --git a/src/render/board/unitLayout.ts b/src/render/board/unitLayout.ts
+index 7a53a6a..8552845 100644
+--- a/src/render/board/unitLayout.ts
++++ b/src/render/board/unitLayout.ts
+@@ -37,10 +37,12 @@ export const HP_BAR_H = 4.5;
+ export const MANA_BAR_H = 3.5;
+ export const BAR_W = 44;
+ export const PIP_HALF = 3.6;
+-export const ITEM_ICON = 12;
+-export const ITEM_GAP = 4;
+-/** 装备行满编宽 —— 恰等于血条宽，头顶横带完全对齐 */
+-export const ITEM_ROW_W = 3 * ITEM_ICON + 2 * ITEM_GAP; // 44
++// v1.9 放大：12→16。装备是"这局打得怎么样"的第一手情报，12px 在实机 DPR 缩放下
++// 几乎不可读；16px 后装备行(54)仍窄于格距 72，邻格不串行。
++export const ITEM_ICON = 16;
++export const ITEM_GAP = 3;
++/** 装备行满编宽 —— 略宽于血条，三枚图标仍是头顶横带的视觉主体 */
++export const ITEM_ROW_W = 3 * ITEM_ICON + 2 * ITEM_GAP; // 54
+ 
+ // ── 头顶栈净距（世界 px）──────────────────────────────
+ export const HEAD_GAP = {
+diff --git a/src/render/game/InputController.ts b/src/render/game/InputController.ts
+index 5b98810..d080891 100644
+--- a/src/render/game/InputController.ts
++++ b/src/render/game/InputController.ts
+@@ -34,8 +34,9 @@ export class InputController {
+   private dragUnit: UnitInstance | null = null;
+   private dragFrom: { where: 'board' | 'bench'; slot: number } | null = null;
+   private dragGhost: UnitPortrait | null = null;
+-  /** 正在拖拽的装备（从装备栏拖向棋子） */
++  /** 正在拖拽的装备（从装备栏拖向棋子；拖向器匣另一组件 = 直接合成） */
+   private dragItemId: string | null = null;
++  private dragItemFrom = -1;
+   private dragItemGhost: Phaser.GameObjects.Image | null = null;
+ 
+   // 悬停详情
+@@ -57,6 +58,7 @@ export class InputController {
+       this.dragItemGhost.destroy();
+       this.dragItemGhost = null;
+       this.dragItemId = null;
++      this.dragItemFrom = -1;
+     }
+   };
+ 
+@@ -72,6 +74,7 @@ export class InputController {
+     this.dragUnit = null;
+     this.dragFrom = null;
+     this.dragItemId = null;
++    this.dragItemFrom = -1;
+     if (this.dragItemGhost) {
+       this.dragItemGhost.destroy();
+       this.dragItemGhost = null;
+@@ -117,7 +120,7 @@ export class InputController {
+       // 1) 装备栏里的一格 → 开始拖这件装备
+       const chip = hitItemChip(x, y);
+       if (chip >= 0 && this.scene.itemAt(chip)) {
+-        this.beginItemDrag(this.scene.itemAt(chip)!, x, y);
++        this.beginItemDrag(chip, this.scene.itemAt(chip)!, x, y);
+         return;
+       }
+ 
+@@ -222,25 +225,40 @@ export class InputController {
+ 
+   // ══════════════ 装备拖拽 ══════════════
+ 
+-  private beginItemDrag(itemId: string, x: number, y: number): void {
++  private beginItemDrag(fromIdx: number, itemId: string, x: number, y: number): void {
+     this.dragItemId = itemId;
++    this.dragItemFrom = fromIdx;
+     const key = itemIconKey(itemId);
+-    this.dragItemGhost = this.scene.add.image(x, y, key).setDisplaySize(52, 52).setDepth(320).setAlpha(0.92);
++    // v1.9 放大：ghost 52→64，与放大后的器匣/头顶图标同一可读口径
++    this.dragItemGhost = this.scene.add.image(x, y, key).setDisplaySize(64, 64).setDepth(320).setAlpha(0.92);
+     audio.play('ui');
+   }
+ 
+   private endItemDrag(x: number, y: number): void {
+     const id = this.dragItemId;
++    const fromIdx = this.dragItemFrom;
+     if (this.dragItemGhost) {
+       this.dragItemGhost.destroy();
+       this.dragItemGhost = null;
+     }
+     this.dragItemId = null;
++    this.dragItemFrom = -1;
+     // 阶段守卫：拖拽中途已开战，装备状态随之锁定，放弃这次穿戴
+     if (this.scene.phase !== 'prep' || this.scene.busy) {
+       this.scene.refreshAll();
+       return;
+     }
++    // v1.9 全配方：组件拖到器匣里的另一组件上 = 原地合成（不再需要经过棋子）。
++    // 落在自身格 = 原地放下，什么都不做。
++    const dropChip = hitItemChip(x, y);
++    if (dropChip >= 0) {
++      if (dropChip !== fromIdx && id && this.scene.itemAt(dropChip)) {
++        this.scene.onCombineInBar(fromIdx, dropChip);
++        return;
++      }
++      this.scene.refreshAll();
++      return;
++    }
+     const where = hitSource(x, y);
+     if (!id || !where) {
+       this.scene.refreshAll();
+diff --git a/src/render/game/SceneRefresh.ts b/src/render/game/SceneRefresh.ts
+index 6b0f189..a490757 100644
+--- a/src/render/game/SceneRefresh.ts
++++ b/src/render/game/SceneRefresh.ts
+@@ -136,7 +136,8 @@ export class SceneRefresh {
+       this.scene.hud.itemChips[i].setAlpha(this.scene.selectedItem && this.scene.selectedItem !== this.scene.itemAt(i) ? 0.55 : 1);
+     }
+     const n = p.items.length;
+-    this.scene.hud.itemHint.setText(n === 0 ? '' : `${n} 件待装`);
++    // 全配方后组件拖组件即合成 —— 手势在提示行里带上一句，玩家不必去图鉴查谱
++    this.scene.hud.itemHint.setText(n === 0 ? '' : `${n} 件待装 · 拖到棋子装配，拖到组件直接合成`);
+   }
+ 
+   // ══════════════ 羁绊轨（左：小篆徽章 + 计数，悬停出详情） ══════════════
+diff --git a/src/render/scenes/CodexScene.ts b/src/render/scenes/CodexScene.ts
+index 4116374..76c3af8 100644
+--- a/src/render/scenes/CodexScene.ts
++++ b/src/render/scenes/CodexScene.ts
+@@ -264,7 +264,8 @@ export class CodexScene extends Phaser.Scene {
+       list.forEach((it, i) => {
+         const col = i % cols;
+         const row = Math.floor(i / cols);
+-        const px = col * (chipSize + 96) + 4;
++        // 格距随图标放大收紧（旧 96 是给 46 图标的疏排）
++        const px = col * (chipSize + 64) + 4;
+         const py = y + row * (chipSize + 34);
+         const chip = new ItemChip(this, px, py, chipSize, () => undefined);
+         chip.setItem(it.id);
+@@ -293,8 +294,9 @@ export class CodexScene extends Phaser.Scene {
+ 
+     const comps = ITEMS.filter((i) => i.tier === 'component');
+     const comb = ITEMS.filter((i) => i.tier === 'combined');
+-    section('组 件', comps, 46, 4);
+-    section('成 品（神兵）', comb, 46, 4);
++    // v1.9 全配方 36 件成品：格距按 4 列收排（格距 96 → 72），图 46→56 放大
++    section('组 件', comps, 56, 4);
++    section('成 品（神兵）', comb, 56, 4);
+ 
+     // 合成表：A + B → C
+     c.add(
+@@ -309,7 +311,7 @@ export class CodexScene extends Phaser.Scene {
+       const row = this.add.container(0, y);
+       const draw = (id: string, x: number) => {
+         if (this.textures.exists(itemIconKey(id))) {
+-          row.add(this.add.image(x, 10, itemIconKey(id)).setDisplaySize(22, 22).setOrigin(0, 0));
++          row.add(this.add.image(x, 8, itemIconKey(id)).setDisplaySize(30, 30).setOrigin(0, 0));
+         }
+         row.add(
+           this.add
+diff --git a/src/render/scenes/GameScene.ts b/src/render/scenes/GameScene.ts
+index c8dd1bc..908e9a8 100644
+--- a/src/render/scenes/GameScene.ts
++++ b/src/render/scenes/GameScene.ts
+@@ -6,7 +6,7 @@ import { autoArrange } from '../../game/arrange';
+ import { restorePlayer, snapshotPlayer, type PlayerSnapshot } from '../../game/undo';
+ import { findUnit, type UnitInstance } from '../../game/state';
+ import { autoEquip, equipItem, unequipAll, unequipItem, MAX_ITEMS_PER_UNIT } from '../../game/inventory';
+-import { ITEM_BY_ID } from '../../data/items';
++import { ITEM_BY_ID, combine } from '../../data/items';
+ import { clearSave, loadMatch, loadPrefs, saveMatch, type Preferences } from '../../game/save';
+ import { audio } from '../../audio/AudioEngine';
+ import { FONT, resetCursorOnShutdown } from '../../ui/kit';
+@@ -289,6 +289,39 @@ export class GameScene extends Phaser.Scene {
+ 
+   // ══════════════ 装备操作 ══════════════
+ 
++  /**
++   * 器匣内合成：组件 A 拖到组件 B 上，原地合出成品（v1.9 全配方）。
++   * 结果落在靠前的那个格位 —— 先摘后放，其余装备的格位保持稳定。
++   */
++  onCombineInBar(from: number, to: number): void {
++    const a = this.itemAt(from);
++    const b = this.itemAt(to);
++    if (!a || !b || a === b) {
++      this.refreshAll();
++      return;
++    }
++    const out = combine(a, b);
++    if (!out) {
++      // 全配方下不可达（36/36 两两可合），守在这里只是防未来加"不成装"组合
++      this.showToast('这两件合不出东西', true);
++      audio.play('warn');
++      this.refreshAll();
++      return;
++    }
++    this.pushUndo('器匣合成');
++    const p = this.match.human;
++    const lo = Math.min(from, to);
++    const hi = Math.max(from, to);
++    p.items.splice(hi, 1);
++    p.items.splice(lo, 1, out);
++    this.selectedItem = null;
++    this.exitUnloadMode();
++    audio.play('coin');
++    // 合成神装是这局的高光之一，与拖到棋子上的合成共用同一场演出
++    this.celebrate('item', ITEM_BY_ID[out].name);
++    this.afterAction();
++  }
++
+   onEquip(u: UnitInstance, itemId: string): void {
+     this.pushUndo('装配');
+     const r = equipItem(this.match.human, u.iid, itemId);
+diff --git a/src/render/view/hudLayout.ts b/src/render/view/hudLayout.ts
+index d78a0eb..56a143c 100644
+--- a/src/render/view/hudLayout.ts
++++ b/src/render/view/hudLayout.ts
+@@ -148,13 +148,14 @@ export function reportRowFitsSide(): boolean {
+ // 历史事故：cards.ts 放大图标（0.17→0.22）后 hitTest 未同步，点装备卸单件
+ // 错位 4~6px。公式收拢到这里，两侧只许引用、不许再各写一份。
+ 
+-/** 单枚装备图标的边长（sz = 棋子卡边长） */
++/** 单枚装备图标的边长（sz = 棋子卡边长）。v1.9 放大：0.22→0.26 —— 点选热区与
++ *  可读性同步扩大；3×(0.26sz)+2×2 在 66px 卡内仍留 ≥8px 右缘。 */
+ export function portraitItemSlotSize(sz: number): number {
+-  return Math.max(13, Math.round(sz * 0.22));
++  return Math.max(14, Math.round(sz * 0.26));
+ }
+ 
+ /** 图标间缝与卡内左上起点 */
+-export const PORTRAIT_ITEM_GAP = 3;
++export const PORTRAIT_ITEM_GAP = 2;
+ export const PORTRAIT_ITEM_PAD = { x: 4, y: 5 } as const;
+ 
+ /** 第 i 枚图标的矩形（卡局部坐标，左上原点）。供 cards.ts 定位与 hitTest 命中。 */
+diff --git a/src/ui/cards.ts b/src/ui/cards.ts
+index 6e1d79a..0407e73 100644
+--- a/src/ui/cards.ts
++++ b/src/ui/cards.ts
+@@ -616,7 +616,9 @@ export class ItemChip extends Phaser.GameObjects.Container {
+     const key = itemIconKey(id);
+     if (this.scene.textures.exists(key)) {
+       this.img.setTexture(key);
+-      this.img.setDisplaySize(this.chipSize - 12, this.chipSize - 12);
++      // v1.9 放大：52 格内图标 40→47，只留 2.5px 描边呼吸 —— 器匣是玩家
++      // 停留最久的装备界面，图标必须一眼可辨
++      this.img.setDisplaySize(this.chipSize - 5, this.chipSize - 5);
+       this.img.setPosition(this.chipSize / 2, this.chipSize / 2);
+       this.img.setVisible(true);
+     }
+diff --git a/src/ui/tooltip.ts b/src/ui/tooltip.ts
+index ca068a6..a74b83f 100644
+--- a/src/ui/tooltip.ts
++++ b/src/ui/tooltip.ts
+@@ -1,5 +1,5 @@
+ import Phaser from 'phaser';
+-import { ITEMS, ITEM_BY_ID } from '../data/items';
++import { ITEM_BY_ID } from '../data/items';
+ import { itemIconKey } from '../render/board/itemIcons';
+ import { GILT, INK, PAPER, css } from '../render/view/palette';
+ import { FONT } from './kit';
+@@ -67,18 +67,19 @@ export class ItemTooltip {
+     const nameColor = def.tier === 'combined' ? GILT.light : PAPER[100];
+     let y = 0;
+ 
+-    // 首行：图标 + 名（成品鎏金、组件月白）
++    // 首行：图标 + 名（成品鎏金、组件月白）。v1.9 放大：26→36 —— 提示卡
++    // 是玩家读装备的唯一出口，图标必须与名字同权重
+     const icon = this.scene.add
+-      .image(14, 14, itemIconKey(itemId))
+-      .setDisplaySize(26, 26)
++      .image(14, 12, itemIconKey(itemId))
++      .setDisplaySize(36, 36)
+       .setOrigin(0, 0);
+     c.add(icon);
+     c.add(
+       this.scene.add
+-        .text(48, 15, def.name, { fontFamily: FONT.title, fontSize: '15px', color: css(nameColor) })
++        .text(58, 15, def.name, { fontFamily: FONT.title, fontSize: '16px', color: css(nameColor) })
+         .setOrigin(0, 0)
+     );
+-    y = 44;
++    y = 52;
+ 
+     const desc = this.scene.add
+       .text(14, y, def.desc, {
+@@ -91,16 +92,14 @@ export class ItemTooltip {
+     c.add(desc);
+     y += desc.height + 8;
+ 
+-    // 合成信息：成品给来源，组件给去向
++    // 合成信息：成品给来源；组件在全配方（36/36）下与任意组件必有合成，
++    // 逐一列出去向（8 条）只会淹没提示卡，改为一句话
+     let recipeLine = '';
+     if (def.tier === 'combined' && def.recipe) {
+       const [a, b] = def.recipe;
+       recipeLine = `由 ${ITEM_BY_ID[a]?.name ?? a} + ${ITEM_BY_ID[b]?.name ?? b} 合成`;
+     } else if (def.tier === 'component') {
+-      const outs = ITEMS.filter((it) => it.tier === 'combined' && it.recipe?.includes(itemId)).map(
+-        (it) => it.name
+-      );
+-      if (outs.length > 0) recipeLine = `可合成 ${outs.join(' · ')}`;
++      recipeLine = '与任意组件拖到一起即可合成成品';
+     }
+     if (recipeLine) {
+       const rec = this.scene.add
