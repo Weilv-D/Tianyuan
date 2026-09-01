@@ -190,14 +190,23 @@ export function itemAxes(itemId: string, defId: string, star: number): [number, 
     (ib.critChance ?? 0) * 40 +
     (ib.critMult ?? 0) * 25 +
     (ib.omnivamp ?? 0) * 30 +
-    (ib.lifesteal ?? 0) * 20;
-  const sp = (ib.sp ?? 0) * 1.6 + (im.skillAmp ?? 0) * 120 + (im.manaPerSec ?? 0) * 12 + (ib.startMp ?? 0) * 1.2;
+    (ib.lifesteal ?? 0) * 20 +
+    (im.armorPen ?? 0) * 55;
+  const sp =
+    (ib.sp ?? 0) * 1.6 +
+    (im.skillAmp ?? 0) * 120 +
+    (im.manaPerSec ?? 0) * 12 +
+    (ib.startMp ?? 0) * 1.2 +
+    (im.skillCritChance ?? 0) * 60 +
+    (im.healAmp ?? 0) * 60 +
+    (im.manaFromDamageMult ? (im.manaFromDamageMult - 1) * 90 : 0);
   const tank =
     (ib.hp ?? 0) * 0.02 +
     (ib.armor ?? 0) * 0.6 +
     (ib.mr ?? 0) * 0.6 +
     (im.physicalDr ?? 0) * 160 +
     (im.magicDr ?? 0) * 160 +
+    (im.allDr ?? 0) * 160 +
     (im.hpRegenPctPerSec ?? 0) * 900;
   return [atk, sp, tank];
 }

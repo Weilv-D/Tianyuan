@@ -13,6 +13,7 @@
 
 import { ITEM_BY_ID, type ItemBonus, type ItemMods, type ItemHookId } from '../data/items';
 import type { BattleApi, TraitState } from './api';
+import type { StatusKind } from './types';
 import type { Unit } from './unit';
 
 /** 一件装备拆出来的三层效果 */
@@ -67,6 +68,10 @@ export function applyItemMods(u: Unit, itemIds: readonly string[]): void {
   if (mods.hpRegenPctPerSec) t.hpRegenPctPerSec += mods.hpRegenPctPerSec;
   if (mods.healAmp) t.healAmp += mods.healAmp;
   if (mods.allDr) t.allDr = Math.min(0.9, t.allDr + mods.allDr);
+  // 倍率/绝对值语义的字段取最大而不是求和：两把狮心盾不该把承伤转蓝叠到 1.6
+  if (mods.manaFromDamageMult) t.manaFromDamageMult = Math.max(t.manaFromDamageMult, mods.manaFromDamageMult);
+  if (mods.skillCritChance) t.skillCritChance = Math.min(1, t.skillCritChance + mods.skillCritChance);
+  if (mods.skillCritMult) t.skillCritMult = Math.max(t.skillCritMult, mods.skillCritMult);
 }
 
 /**
@@ -169,6 +174,217 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
         uid: victim.uid,
         kind: 'buffAura',
       });
+    });
+  }
+
+  // ── v1.9 全配方扩展（17 个钩子）。共用纪律：
+  //  · onTick 类钩子按注册队伍闭包过滤 u.team !== team，防止双队重复结算；
+  //  · 叠层走 permAtkPct/permAspdPct 的「增量累加 + traitStacks 记此前值」，
+    // 与疾风弓 momentum 同一套安全模式（禁止按总量重算，会覆盖羁绊成长）；
+  //  · 计数/冷却用 traitStacks，一次性消耗用 itemUsed。 ──
+
+  // 贯日枪：普攻命中追加 40% 法强的法术伤害（onAttackHit 恒为普攻命中）
+  if (units.some((u) => has(u, 'sunSpear'))) {
+    h.onAttackHit.push((a, src, dst) => {
+      if (!has(src, 'sunSpear') || !src.alive || !dst.alive) return;
+      const ratio = paramOf(src, 'spRatio');
+      if (ratio <= 0) return;
+      a.dealDamage(src, dst, src.sp * ratio, 'magic', { source: 'item' });
+    });
+  }
+
+  // 寒渊镰：普攻减速（slow 同时压攻速与移速，追击/风筝双向生效）
+  if (units.some((u) => has(u, 'frost'))) {
+    h.onAttackHit.push((a, src, dst) => {
+      if (!has(src, 'frost') || !src.alive || !dst.alive) return;
+      a.addStatus(src, dst, 'slow', paramOf(src, 'slowDur'), paramOf(src, 'slowPct'));
+    });
+  }
+
+  // 缚龙爪：损血叠攻。节流 0.2s，按「应得值 - 此前值」增量写入 permAtkPct
+  if (units.some((u) => has(u, 'berserk'))) {
+    h.onTick.push((a, team, tick) => {
+      if (tick % 6 !== 0) return;
+      for (const u of a.units) {
+        if (u.team !== team || !u.alive || !has(u, 'berserk')) continue;
+        const per = paramOf(u, 'atkPerStep');
+        const step = paramOf(u, 'stepPct');
+        const cap = paramOf(u, 'capPct') * 100;
+        const steps = Math.floor((1 - u.hp / u.maxHp) / Math.max(0.01, step));
+        const v = Math.min(cap, steps * per);
+        const prev = u.traitStacks['fulongPrev'] ?? 0;
+        if (v === prev) continue;
+        u.permAtkPct += (v - prev) / 100;
+        u.traitStacks['fulongPrev'] = v;
+      }
+    });
+  }
+
+  // 流星弩：击杀后攻速爆发（aspdUp 可叠，按层数上限封顶）
+  if (units.some((u) => has(u, 'killFrenzy'))) {
+    h.onKill.push((a, killer) => {
+      if (!has(killer, 'killFrenzy') || !killer.alive) return;
+      const stacks = killer.statuses.filter((s) => s.kind === 'aspdUp').length;
+      if (stacks >= paramOf(killer, 'maxStacks')) return;
+      a.addStatus(killer, killer, 'aspdUp', paramOf(killer, 'dur'), paramOf(killer, 'aspdPct'));
+      a.fx('buffAura', { uid: killer.uid, params: { hue: 0 } });
+    });
+  }
+
+  // 赤练鞭：普攻上易伤（vulnerability 非叠加种类 → 自动刷新时长/取最大值）
+  if (units.some((u) => has(u, 'venom'))) {
+    h.onAttackHit.push((a, src, dst) => {
+      if (!has(src, 'venom') || !src.alive || !dst.alive) return;
+      a.addStatus(src, dst, 'vulnerability', paramOf(src, 'vulnDur'), paramOf(src, 'vulnPct'));
+    });
+  }
+
+  // 青圭杖：施法后自盾（法系前排的"打完一轮还有余量"）
+  if (units.some((u) => has(u, 'castShield'))) {
+    h.onCast.push((a, u) => {
+      if (!has(u, 'castShield') || !u.alive) return;
+      a.addShield(u, u, u.maxHp * paramOf(u, 'shieldPct'), paramOf(u, 'shieldDur'));
+    });
+  }
+
+  // 追风履：每秒 +1.5% 攻速成长（增量累加，封顶 16 秒 × 1.5）
+  if (units.some((u) => has(u, 'windRunner'))) {
+    h.onTick.push((a, team, tick) => {
+      if (tick % 30 !== 0) return;
+      for (const u of a.units) {
+        if (u.team !== team || !u.alive || !has(u, 'windRunner')) continue;
+        const per = paramOf(u, 'aspdPerSec');
+        const maxStacks = Math.floor(paramOf(u, 'capPct') / Math.max(0.01, per));
+        const prev = u.traitStacks['zhuifengStacks'] ?? 0;
+        if (prev >= maxStacks) continue;
+        u.traitStacks['zhuifengStacks'] = prev + 1;
+        u.permAspdPct += per / 100;
+      }
+    });
+  }
+
+  // 玄铁重甲：周期净化自身减益（按优先序摘一个，5 秒一次）
+  if (units.some((u) => has(u, 'ironPurge'))) {
+    const PURGE_ORDER: readonly StatusKind[] = [
+      'stun', 'silence', 'disarm', 'wound', 'slow',
+      'burn', 'bleed', 'vulnerability', 'armorShred', 'mrShred', 'taunt',
+    ];
+    h.onTick.push((a, team, tick) => {
+      for (const u of a.units) {
+        if (u.team !== team || !u.alive || !has(u, 'ironPurge')) continue;
+        if (tick % Math.max(1, Math.round(paramOf(u, 'everyTicks'))) !== 0) continue;
+        for (const kind of PURGE_ORDER) {
+          if (!u.statuses.some((s) => s.kind === kind)) continue;
+          a.removeStatus(u, kind);
+          a.fx('buffAura', { uid: u.uid });
+          break;
+        }
+      }
+    });
+  }
+
+  // 紫电镰：施法后攻速爆发
+  if (units.some((u) => has(u, 'castAspd'))) {
+    h.onCast.push((a, u) => {
+      if (!has(u, 'castAspd') || !u.alive) return;
+      const stacks = u.statuses.filter((s) => s.kind === 'aspdUp').length;
+      if (stacks >= paramOf(u, 'maxStacks')) return;
+      a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'));
+      a.fx('buffAura', { uid: u.uid, params: { hue: 2 } });
+    });
+  }
+
+  // 引魂灯：施法后治疗生命最低的友军（按持有者法强折算）
+  if (units.some((u) => has(u, 'castHeal'))) {
+    h.onCast.push((a, u) => {
+      if (!has(u, 'castHeal') || !u.alive) return;
+      const t = a.resolveTargets(u, 'allyLowestHp', 1)[0];
+      if (!t) return;
+      const healed = a.heal(u, t, u.sp * paramOf(u, 'healSpRatio'), 'item');
+      if (healed > 0.5) a.fx('healWave', { uid: t.uid });
+    });
+  }
+
+  // 垂天翼：开战攻速（onBattleStart 每队各注册一次，has() 天然按持有者过滤）
+  if (units.some((u) => has(u, 'wingStart'))) {
+    h.onBattleStart.push((a, team) => {
+      for (const u of a.units) {
+        if (u.team !== team || !u.alive || !has(u, 'wingStart')) continue;
+        a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'));
+      }
+    });
+  }
+
+  // 九尾面：施法后标记，下一次普攻必爆 + 追加法伤（onPreAttack 消费标记）
+  if (units.some((u) => has(u, 'foxReady'))) {
+    h.onCast.push((_a, u) => {
+      if (has(u, 'foxReady') && u.alive) u.traitStacks['jiuweiReady'] = 1;
+    });
+    h.onPreAttack.push((_a, src, _dst, mod) => {
+      if (!has(src, 'foxReady') || !src.traitStacks['jiuweiReady']) return;
+      src.traitStacks['jiuweiReady'] = 0;
+      mod.forceCrit = true;
+      mod.bonusMagic += src.sp * paramOf(src, 'bonusSpRatio');
+    });
+  }
+
+  // 拂尘扇：每第 N 次普攻缴械目标
+  if (units.some((u) => has(u, 'disarmSwat'))) {
+    h.onAttackHit.push((a, src, dst) => {
+      if (!has(src, 'disarmSwat') || !src.alive || !dst.alive) return;
+      const every = Math.max(2, Math.round(paramOf(src, 'everyHits')));
+      const n = ((src.traitStacks['fuchenHits'] ?? 0) as number) + 1;
+      if (n < every) {
+        src.traitStacks['fuchenHits'] = n;
+        return;
+      }
+      src.traitStacks['fuchenHits'] = 0;
+      a.addStatus(src, dst, 'disarm', paramOf(src, 'disarmDur'), 0);
+    });
+  }
+
+  // 霜翎环：普攻命中按最大生命百分比回复（amount ≤0 = 被闪避/护盾全吃，不回）
+  if (units.some((u) => has(u, 'onHitHeal'))) {
+    h.onAttackHit.push((a, src, _dst, amount) => {
+      if (!has(src, 'onHitHeal') || !src.alive) return;
+      if ((amount ?? 0) <= 0) return;
+      a.heal(src, src, src.maxHp * paramOf(src, 'healPct'), 'item');
+    });
+  }
+
+  // 紫金炉：普攻命中额外回蓝（与内核每次普攻 +10 并行，吃法力锁与上限）
+  if (units.some((u) => has(u, 'critMana'))) {
+    h.onAttackHit.push((_a, src) => {
+      if (!has(src, 'critMana') || !src.alive || src.isMinion) return;
+      if (src.manaLock > 0) return;
+      src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'mpPerHit'));
+    });
+  }
+
+  // 墨龙旗：开战为全体友军上减伤（多面旗不重复结算，params 聚合本就取最大）
+  if (units.some((u) => has(u, 'warBanner'))) {
+    h.onBattleStart.push((a, team) => {
+      const holder = a.units.find((u) => u.team === team && u.alive && has(u, 'warBanner'));
+      if (!holder) return;
+      for (const al of a.units) {
+        if (al.team !== team || !al.alive) continue;
+        a.addStatus(holder, al, 'dr', paramOf(holder, 'dur'), paramOf(holder, 'drPct'));
+      }
+      a.fx('shieldWall', { team });
+    });
+  }
+
+  // 摄魂铃：受普攻概率眩晕攻击者，内置冷却（traitStacks 存下次可触发 tick）
+  if (units.some((u) => has(u, 'bellStun'))) {
+    h.onDamageTaken.push((a, dst, src, _amount, _type, opts) => {
+      if (!has(dst, 'bellStun') || !dst.alive || !src || !src.alive) return;
+      if (opts.source !== 'attack') return;
+      const next = dst.traitStacks['shehunNextTick'] ?? 0;
+      if (a.tick < next) return;
+      if (!a.rng.chance(paramOf(dst, 'chance'))) return;
+      dst.traitStacks['shehunNextTick'] = a.tick + paramOf(dst, 'cdTicks');
+      a.addStatus(dst, src, 'stun', paramOf(dst, 'stunDur'), 0);
+      a.fx('debuffMark', { uid: src.uid });
     });
   }
 }

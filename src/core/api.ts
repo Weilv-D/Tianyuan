@@ -26,6 +26,12 @@ export interface TraitState {
   shieldAmp: number;
   manaPerSec: number;
   hpRegenPctPerSec: number;
+  /** 承受伤害转化法力的倍率（装备：狮心盾）。1 = 原口径。 */
+  manaFromDamageMult: number;
+  /** 技能暴击率（装备：惊雷锤）。dealDamage 对 source='skill' 的伤害按此掷骰。 */
+  skillCritChance: number;
+  /** 技能暴击倍率（绝对值；0 = 回落持有者普攻暴伤）。 */
+  skillCritMult: number;
   /** 已激活羁绊 → 档位+1（0 表示未激活）。供战斗内循环做 O(1) 查询。 */
   tier: Record<string, number>;
   /** 累计伤害加深（余烬阶段等全局效果单独处理） */
@@ -44,6 +50,9 @@ export function createTraitState(): TraitState {
     shieldAmp: 0,
     manaPerSec: 0,
     hpRegenPctPerSec: 0,
+    manaFromDamageMult: 1,
+    skillCritChance: 0,
+    skillCritMult: 0,
     tier: {},
   };
 }

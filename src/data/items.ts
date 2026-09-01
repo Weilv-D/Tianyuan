@@ -5,9 +5,11 @@
  * 纯属性装备（"+50 攻击"）不会改变玩家的决策，它只是把已有玩法数值放大；
  * 带机制的装备（"击杀回复 18% 生命"）会改变玩家的构筑与站位思路。
  *
- * 8 个组件 → 28 种两两组合，这里实装 14 种。剩下的组合不是"没做完"，
- * 而是刻意留白：给玩家留出"这两个合出来会是什么"的探索空间，
- * 同时避免 28 件装备带来的认知负担。
+ * 8 个组件两两组合（含同件）共 36 种配方，**全配方实装**（v1.9 起）：
+ * 任何两件组件拖到一起必定合成 —— "这两个合出来会是什么"的探索
+ * 由配方表的多样性承担，而不是靠"合不出来"留白。
+ * 全表只有两件刻意保留的**白板位**：混元珠（纯法强）与紫霄珠（纯暴击）——
+ * "把一条属性堆到极致"的最朴素路线，各保留一条不被机制绑架的去处。
  */
 
 export type ItemTier = 'component' | 'combined';
@@ -47,10 +49,43 @@ export interface ItemMods {
   healAmp: number;
   /** 全类型减伤。魔抗装之所以要带上它，见「玄冥衣」条目下的说明。 */
   allDr: number;
+  /** 承受伤害转化法力的倍率（狮心盾：被打=回蓝加速）。多件取最大。 */
+  manaFromDamageMult: number;
+  /** 技能暴击率（惊雷锤）。多件求和，封顶 1。 */
+  skillCritChance: number;
+  /** 技能暴击倍率（绝对值语义，多件取最大；0 = 用持有者普攻暴伤）。 */
+  skillCritMult: number;
 }
 
-/** 需要钩子实现的机制 */
-export type ItemHookId = 'executeHeal' | 'immortal' | 'thorns' | 'momentum' | 'healToShield';
+/**
+ * 需要钩子实现的机制。
+ *
+ * 命名按装备语义而非效果名（hook 是"这件装备的机制"，不是"通用词条"）：
+ * v1.9 全配方后共 22 个，全部实装在 core/items.ts 的 applyItemHooks。
+ */
+export type ItemHookId =
+  | 'executeHeal' // 断魂刃：击杀回复
+  | 'immortal' // 鹤龄镜：延迟复活
+  | 'thorns' // 玄武甲：物理反弹
+  | 'momentum' // 疾风弓：普攻叠攻速
+  | 'healToShield' // 回天灯：治疗溢出转护盾
+  | 'sunSpear' // 贯日枪：普攻追加法伤
+  | 'frost' // 寒渊镰：普攻减速
+  | 'berserk' // 缚龙爪：损血叠攻
+  | 'killFrenzy' // 流星弩：击杀攻速爆发
+  | 'venom' // 赤练鞭：普攻上易伤
+  | 'castShield' // 青圭杖：施法得盾
+  | 'windRunner' // 追风履：每秒成长攻速
+  | 'ironPurge' // 玄铁重甲：周期净化
+  | 'castAspd' // 紫电镰：施法攻速爆发
+  | 'castHeal' // 引魂灯：施法治疗最低友军
+  | 'wingStart' // 垂天翼：开战攻速
+  | 'foxReady' // 九尾面：施法后必爆强击
+  | 'disarmSwat' // 拂尘扇：计数缴械
+  | 'onHitHeal' // 霜翎环：普攻回复(按最大生命)
+  | 'critMana' // 紫金炉：普攻回蓝
+  | 'warBanner' // 墨龙旗：开战全队减伤
+  | 'bellStun'; // 摄魂铃：受击概率眩晕
 
 export interface ItemDef {
   id: string;
@@ -154,8 +189,10 @@ export const ITEMS: readonly ItemDef[] = [
     id: 'fafu',
     name: '法符',
     tier: 'component',
-    desc: '法强 +48，生命 +90。初始法力 +12，每秒回蓝 +1。',
-    bonus: { startMp: 12, sp: 48, hp: 90 },
+    // v1.9 调档：+7.9% 全表最强组件（第二名 +3.7%），拆开价值压过全部 8 条
+    // 法符配方的合成收益。sp 48→38、生命 90→70 后组件仍居首，合成门槛回落。
+    desc: '法强 +38，生命 +70。初始法力 +12，每秒回蓝 +1。',
+    bonus: { startMp: 12, sp: 38, hp: 70 },
     mods: { manaPerSec: 1 },
     glyph: 'talisman',
   },
@@ -239,9 +276,9 @@ export const ITEMS: readonly ItemDef[] = [
     id: 'hunyuan',
     name: '混元珠',
     tier: 'combined',
-    desc: '法强 +48。',
+    desc: '法强 +56。',
     recipe: ['lingzhu', 'lingzhu'],
-    bonus: { sp: 48 },
+    bonus: { sp: 56 },
     glyph: 'chaosorb',
   },
   {
@@ -341,12 +378,12 @@ export const ITEMS: readonly ItemDef[] = [
     id: 'huitian',
     name: '回天灯',
     tier: 'combined',
-    desc: '法强 +12，初始法力 +28，每秒回蓝 +4，治疗提升 30%。其治疗若溢出，溢出量的 70% 转为护盾。',
+    desc: '法强 +14，初始法力 +28，每秒回蓝 +4，治疗提升 45%。其治疗若溢出，溢出量的 95% 转为护盾。',
     recipe: ['fafu', 'fafu'],
-    bonus: { sp: 12, startMp: 28 },
-    mods: { manaPerSec: 4, healAmp: 0.3 },
+    bonus: { sp: 14, startMp: 28 },
+    mods: { manaPerSec: 4, healAmp: 0.45 },
     hooks: ['healToShield'],
-    params: { shieldPct: 0.7 },
+    params: { shieldPct: 0.95 },
     glyph: 'rebirth',
   },
   {
@@ -358,6 +395,253 @@ export const ITEMS: readonly ItemDef[] = [
     bonus: { hp: 520 },
     mods: { hpRegenPctPerSec: 0.015 },
     glyph: 'titan',
+  },
+
+  // ── 合成装备 · v1.9 全配方扩展（22 件）────────────────
+  // 数值口径与一期一致：面板 ≈ 两组件之和（主轴略溢价），机制是强度主体；
+  // 档位全部经 scripts/sim-items.ts 配对实测后定档（详见各条目注记）。
+  {
+    // 攻+法的混合出装通道。追加法伤按持有者法强折算 —— 法核拿了是锦上添花，
+    // 攻核拿只有 20 点法强的底子，天然把这件推向双修 carry。
+    id: 'guanri',
+    name: '贯日枪',
+    tier: 'combined',
+    desc: '攻击力 +18，法强 +20。普攻命中追加 40% 法强的法术伤害。',
+    recipe: ['moren', 'lingzhu'],
+    bonus: { atk: 18, sp: 20 },
+    hooks: ['sunSpear'],
+    params: { spRatio: 0.4 },
+    glyph: 'lance',
+  },
+  {
+    id: 'qinggui',
+    name: '青圭杖',
+    tier: 'combined',
+    desc: '护甲 +18，法强 +20，技能伤害 +10%。施法后获得 10% 最大生命的护盾，持续 4 秒。',
+    recipe: ['xuanjia', 'lingzhu'],
+    bonus: { armor: 18, sp: 20 },
+    mods: { skillAmp: 0.1 },
+    hooks: ['castShield'],
+    params: { shieldPct: 0.1, shieldDur: 4 },
+    glyph: 'voidpearl',
+  },
+  {
+    id: 'hanyuan',
+    name: '寒渊镰',
+    tier: 'combined',
+    desc: '攻击力 +16，攻速 +16%。普攻使命中目标减速 20%（攻速与移速），持续 2 秒。',
+    recipe: ['moren', 'yunlv'],
+    bonus: { atk: 16, aspd: 0.16 },
+    hooks: ['frost'],
+    params: { slowPct: 20, slowDur: 2 },
+    glyph: 'soulblade',
+  },
+  {
+    id: 'jinglei',
+    name: '惊雷锤',
+    tier: 'combined',
+    desc: '法强 +26，暴击率 +10%，攻击力 +6。技能伤害可暴击（30% 概率，1.4 倍）。',
+    recipe: ['lingzhu', 'quantao'],
+    bonus: { sp: 26, critChance: 0.1, atk: 6 },
+    mods: { skillCritChance: 0.3, skillCritMult: 1.4 },
+    glyph: 'chaosorb',
+  },
+  {
+    id: 'chilian',
+    name: '赤练鞭',
+    tier: 'combined',
+    desc: '攻击力 +14，魔抗 +14，生命 +100。普攻使命中目标受伤加深 12%，持续 3 秒。',
+    recipe: ['moren', 'doupeng'],
+    bonus: { atk: 14, mr: 14, hp: 100 },
+    hooks: ['venom'],
+    params: { vulnPct: 12, vulnDur: 3 },
+    glyph: 'bloodfang',
+  },
+  {
+    id: 'liuxing',
+    name: '流星弩',
+    tier: 'combined',
+    desc: '攻速 +12%，攻击力 +24，初始法力 +12。击杀后获得 5 秒 50% 攻速（至多 2 层）。',
+    recipe: ['moren', 'fafu'],
+    bonus: { atk: 24, aspd: 0.12, startMp: 12 },
+    hooks: ['killFrenzy'],
+    params: { aspdPct: 50, dur: 5, maxStacks: 2 },
+    glyph: 'gale',
+  },
+  {
+    id: 'fuchen',
+    name: '拂尘扇',
+    tier: 'combined',
+    desc: '攻速 +14%，魔抗 +14，生命 +100。每第 4 次普攻缴械目标 1.2 秒。',
+    recipe: ['yunlv', 'doupeng'],
+    bonus: { aspd: 0.14, mr: 14, hp: 100 },
+    hooks: ['disarmSwat'],
+    params: { everyHits: 4, disarmDur: 1.2 },
+    glyph: 'gale',
+  },
+  {
+    id: 'zidian',
+    name: '紫电镰',
+    tier: 'combined',
+    desc: '法强 +24，攻速 +16%。施法后获得 5 秒 45% 攻速（至多 2 层）。',
+    recipe: ['lingzhu', 'yunlv'],
+    bonus: { sp: 24, aspd: 0.16 },
+    hooks: ['castAspd'],
+    params: { aspdPct: 45, dur: 5, maxStacks: 2 },
+    glyph: 'shadow',
+  },
+  {
+    id: 'shuangling',
+    name: '霜翎环',
+    tier: 'combined',
+    desc: '生命 +200，暴击率 +12%，攻击力 +8。普攻命中回复 1.5% 最大生命。',
+    recipe: ['xueyu', 'quantao'],
+    bonus: { hp: 200, critChance: 0.12, atk: 8 },
+    hooks: ['onHitHeal'],
+    params: { healPct: 0.015 },
+    glyph: 'chaosorb',
+  },
+  {
+    // 承伤转蓝是"被打"的正反馈 —— 前排穿着它施法循环显著前移，
+    // 与法符（初始法力）分属"起手快"与"转得快"两种法力装定位。
+    id: 'shixin',
+    name: '狮心盾',
+    tier: 'combined',
+    desc: '护甲 +26，暴击率 +12%，攻击力 +8。承受伤害转化的法力提高 40%。',
+    recipe: ['xuanjia', 'quantao'],
+    bonus: { armor: 26, critChance: 0.12, atk: 8 },
+    mods: { manaFromDamageMult: 1.4 },
+    glyph: 'stupa',
+  },
+  {
+    id: 'yinhun',
+    name: '引魂灯',
+    tier: 'combined',
+    desc: '法强 +22，魔抗 +14，生命 +100。施法后为生命最低的友军回复 70% 法强的生命。',
+    recipe: ['lingzhu', 'doupeng'],
+    bonus: { sp: 22, mr: 14, hp: 100 },
+    hooks: ['castHeal'],
+    params: { healSpRatio: 0.7 },
+    glyph: 'rebirth',
+  },
+  {
+    id: 'shehun',
+    name: '摄魂铃',
+    tier: 'combined',
+    desc: '暴击率 +12%，攻击力 +8，魔抗 +18，生命 +160。受到普攻时 30% 概率眩晕攻击者 1 秒（每 2 秒至多触发一次）。',
+    recipe: ['quantao', 'doupeng'],
+    bonus: { critChance: 0.12, atk: 8, mr: 18, hp: 160 },
+    hooks: ['bellStun'],
+    params: { chance: 0.3, stunDur: 1.0, cdTicks: 60 },
+    glyph: 'undying',
+  },
+  {
+    id: 'zijin',
+    name: '紫金炉',
+    tier: 'combined',
+    desc: '初始法力 +12，暴击率 +18%，攻击力 +8。普攻命中额外回复 6 点法力。',
+    recipe: ['fafu', 'quantao'],
+    bonus: { startMp: 12, critChance: 0.18, atk: 8 },
+    hooks: ['critMana'],
+    params: { mpPerHit: 6 },
+    glyph: 'voidpearl',
+  },
+  {
+    id: 'jiaowei',
+    name: '焦尾琴',
+    tier: 'combined',
+    desc: '护甲 +26，初始法力 +18，每秒回蓝 +5。',
+    recipe: ['xuanjia', 'fafu'],
+    bonus: { armor: 26, startMp: 18 },
+    mods: { manaPerSec: 5 },
+    glyph: 'talisman',
+  },
+  {
+    id: 'molongqi',
+    name: '墨龙旗',
+    tier: 'combined',
+    desc: '初始法力 +16，魔抗 +14，生命 +100。开战时全体友军获得 8 秒 18% 减伤。',
+    recipe: ['fafu', 'doupeng'],
+    bonus: { startMp: 16, mr: 14, hp: 100 },
+    hooks: ['warBanner'],
+    params: { drPct: 18, dur: 8 },
+    glyph: 'darkrobe',
+  },
+  {
+    id: 'jiuwei',
+    name: '九尾面',
+    tier: 'combined',
+    desc: '攻速 +20%，初始法力 +14。施法后，下一次普攻必定暴击并追加 240% 法强的法术伤害。',
+    recipe: ['yunlv', 'fafu'],
+    bonus: { aspd: 0.2, startMp: 14 },
+    hooks: ['foxReady'],
+    params: { bonusSpRatio: 2.4 },
+    glyph: 'shadow',
+  },
+  {
+    id: 'chuitian',
+    name: '垂天翼',
+    tier: 'combined',
+    desc: '攻速 +16%，生命 +200。开战时获得 8 秒 30% 攻速。',
+    recipe: ['yunlv', 'xueyu'],
+    bonus: { aspd: 0.16, hp: 200 },
+    hooks: ['wingStart'],
+    params: { aspdPct: 30, dur: 8 },
+    glyph: 'cloak',
+  },
+  {
+    id: 'xuantie',
+    name: '玄铁重甲',
+    tier: 'combined',
+    desc: '护甲 +24，魔抗 +18，生命 +150。每 5 秒净化自身的一个减益状态。',
+    recipe: ['xuanjia', 'doupeng'],
+    bonus: { armor: 24, mr: 18, hp: 150 },
+    hooks: ['ironPurge'],
+    params: { everyTicks: 150 },
+    glyph: 'turtle',
+  },
+  {
+    id: 'fulong',
+    name: '缚龙爪',
+    tier: 'combined',
+    desc: '攻击力 +16，生命 +200。生命每损失 10%，攻击力 +4%（至多 +32%）。',
+    recipe: ['moren', 'xueyu'],
+    bonus: { atk: 16, hp: 200 },
+    hooks: ['berserk'],
+    params: { atkPerStep: 4, stepPct: 0.1, capPct: 0.32 },
+    glyph: 'gauntlet',
+  },
+  {
+    id: 'zhuifeng',
+    name: '追风履',
+    tier: 'combined',
+    desc: '护甲 +16，攻速 +16%。开战后每秒获得 1.5% 攻速，至多 +24%。',
+    recipe: ['xuanjia', 'yunlv'],
+    bonus: { armor: 16, aspd: 0.16 },
+    hooks: ['windRunner'],
+    params: { aspdPerSec: 1.5, capPct: 24 },
+    glyph: 'boot',
+  },
+  {
+    id: 'cuidai',
+    name: '翠玉带',
+    tier: 'combined',
+    desc: '生命 +340，初始法力 +16，每秒回蓝 +2，治疗提升 45%。',
+    recipe: ['xueyu', 'fafu'],
+    bonus: { hp: 340, startMp: 16 },
+    mods: { healAmp: 0.45, manaPerSec: 2 },
+    glyph: 'jade',
+  },
+  {
+    // 白板位（与混元珠并列）：暴击的极致数值，不带机制。
+    // 暴击期望 = 24% × (1.5+0.4-1) ≈ 22%，与混元珠 48 法强同为"一条路走到黑"的出口。
+    id: 'zixiaozhu',
+    name: '紫霄珠',
+    tier: 'combined',
+    desc: '暴击率 +30%，暴击伤害 +50%。',
+    recipe: ['quantao', 'quantao'],
+    bonus: { critChance: 0.3, critMult: 0.5 },
+    glyph: 'chaosorb',
   },
 ];
 
