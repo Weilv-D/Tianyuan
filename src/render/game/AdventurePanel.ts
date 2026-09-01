@@ -77,12 +77,41 @@ export class AdventurePanel {
   private build(offer: AdventureOffer): void {
     const cards = offer.options.filter(Boolean).slice(0, 3);
     if (cards.length === 0) return;
-    const cardW = 232;
-    const cardH = 116;
+    const cardW = 264;
     const gap = 12;
     const padX = 16;
     const headerH = 36;
     const w = cards.length * cardW + (cards.length - 1) * gap + padX * 2;
+
+    // 卡高由内容实测推导（两遍构建）：先建标题/描述量高，再取三卡最大底缘。
+    // 定高 116 的旧制里描述带只有 64px，textScale ×1.12 后四行描述 ≈66px 顶穿卡底。
+    // 标题钳两行、描述钳四行（66px）同时是面板 contract 的守卫：
+    // 面板底 ≤ 86+36+150+12=284，最多没入己方棋盘第 2 行（280 止），不遮第 3 行。
+    const drafts = cards.map((opt) => {
+      const title = this.scene.add.text(0, 0, opt.title, {
+        fontFamily: FONT.title,
+        fontSize: '15px',
+        color: css(PAPER[100]),
+        wordWrap: { useAdvancedWrap: true, width: cardW - 58 },
+      });
+      while (title.height > 36 && title.text.length > 4) {
+        title.setText(title.text.slice(0, -2).trimEnd() + '…');
+      }
+      const desc = this.scene.add.text(0, 0, opt.desc, {
+        fontFamily: FONT.body,
+        fontSize: '13px',
+        color: css(PAPER[300]),
+        wordWrap: { useAdvancedWrap: true, width: cardW - 24 },
+        lineSpacing: 3,
+      });
+      while (desc.height > 66 && desc.text.length > 4) {
+        desc.setText(desc.text.slice(0, -2).trimEnd() + '…');
+      }
+      return { title, desc };
+    });
+    // 描述带起点随最高标题走：定值 52 在两行标题下与标题第二行贴死
+    const descY = 12 + Math.max(...drafts.map((d) => d.title.height)) + 10;
+    const cardH = Math.max(116, ...drafts.map((d) => descY + d.desc.height + 12));
     const h = headerH + cardH + 12;
     const x = Math.round((W - w) / 2);
     const y = 86;
@@ -118,6 +147,7 @@ export class AdventurePanel {
     };
 
     cards.forEach((opt, i) => {
+      const { title, desc } = drafts[i];
       const cx = padX + i * (cardW + gap);
       const cy = headerH - 6;
       const card = this.scene.add.container(cx, cy);
@@ -149,26 +179,10 @@ export class AdventurePanel {
           })
           .setOrigin(0.5)
       );
-      const title = this.scene.add.text(46, 12, opt.title, {
-        fontFamily: FONT.title,
-        fontSize: '15px',
-        color: css(PAPER[100]),
-        wordWrap: { useAdvancedWrap: true, width: cardW - 58 },
-      });
-      // 标题钳在两行内，描述固定从 y=52 起 —— 长标题不再压进描述带
-      while (title.height > 36 && title.text.length > 4) {
-        title.setText(title.text.slice(0, -2).trimEnd() + '…');
-      }
+      title.setPosition(46, 12);
       card.add(title);
-      card.add(
-        this.scene.add.text(12, 52, opt.desc, {
-          fontFamily: FONT.body,
-          fontSize: '13px',
-          color: css(PAPER[300]),
-          wordWrap: { useAdvancedWrap: true, width: cardW - 24 },
-          lineSpacing: 3,
-        })
-      );
+      desc.setPosition(12, descY);
+      card.add(desc);
       card.setSize(cardW, cardH);
       card.setInteractive(new Phaser.Geom.Rectangle(0, 0, cardW, cardH), Phaser.Geom.Rectangle.Contains);
       card.on('pointerover', () => {

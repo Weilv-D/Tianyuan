@@ -853,8 +853,17 @@ export class BattleScene extends Phaser.Scene {
     shade.fillRect(0, 0, W, H);
     panel.add(shade);
 
+    // 战报：伤害 / 承伤 / 治疗 排行。行数先取 —— 面板高、按钮位都从它推导，
+    // 纵向只有一条依赖链（战报带 → 按钮顶 → 面板高）。定高 340 的旧制里
+    // 按钮顶 by+278 压住末行文字底 by+280，五级战报必与「返回」相撞。
+    const shown = this.buildScoreboard().slice(0, 5);
+    const ROW_PITCH = 24;
+    const BTN_H = 42;
+    const listBottom = 166 + shown.length * ROW_PITCH; // 战报带底（ry 终值，已含一行空距）
+    const btnTopRel = listBottom + 10; // 末行行箱残余下延 ~6px + 净距
+    const bh = btnTopRel + BTN_H + 24; // 按钮底到面板底衬 24
+
     const bw = 620;
-    const bh = 340;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
     const card = this.add.graphics();
@@ -893,10 +902,9 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     panel.add(sub);
 
-    // 战报：伤害 / 承伤 / 治疗 排行
-    const rows = this.buildScoreboard();
+    // 战报行（行距 24，最多 5 行）
     let ry = by + 166;
-    for (const r of rows.slice(0, 5)) {
+    for (const r of shown) {
       const t = this.add
         .text(bx + 60, ry, `${r.name}`, { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[200]) })
         .setOrigin(0, 0);
@@ -910,19 +918,19 @@ export class BattleScene extends Phaser.Scene {
         .text(bx + 450, ry, `治 ${Math.round(r.heal)}`, { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) })
         .setOrigin(1, 0);
       panel.add([t, d, k, h]);
-      ry += 24;
+      ry += ROW_PITCH;
     }
 
     const isMatch = !!this.matchCtx;
     const btnLabel = isMatch ? '返 回' : '再 来 一 局';
-    const btn = new Button(this, W / 2 - 90, by + bh - 62, btnLabel, () => {
+    const btn = new Button(this, W / 2 - 90, by + btnTopRel, btnLabel, () => {
       if (this.matchCtx) {
         this.returnToGame();
       } else {
         panel.destroy();
         this.restart();
       }
-    }, { width: 180, height: 42, variant: 'primary' });
+    }, { width: 180, height: BTN_H, variant: 'primary' });
     panel.add(btn);
 
     panel.setAlpha(0);
