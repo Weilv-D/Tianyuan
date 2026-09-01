@@ -23,6 +23,7 @@
     "sim:match": "tsx scripts/sim-match.ts",
     "sim:items": "tsx scripts/sim-items.ts",
     "sim:ab": "tsx scripts/ab-pair.ts",
+    "sim:shop": "tsx scripts/sim-shop.ts",
     "sim:big": "tsx scripts/sim-bigorigins.ts",
     "roster": "tsx scripts/roster.ts",
     "gold": "tsx scripts/gold-value.ts",
