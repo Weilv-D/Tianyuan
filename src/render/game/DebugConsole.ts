@@ -63,7 +63,8 @@ export class DebugConsole {
       c.add(b);
     }
     c.add(this.scene.add.text(-320, 20, '快捷键：Ctrl+~ 唤起/关闭', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]) }).setOrigin(0, 0));
-    c.add(new Button(this.scene, 210, 210, '关闭', () => this.toggle(), { width: 100, height: 36, variant: 'primary' }));
+    // 关闭钮收进面板内：y=210 时底缘 247 越过面板底框 240（bg 外扩 1px）
+    c.add(new Button(this.scene, 210, 192, '关闭', () => this.toggle(), { width: 100, height: 36, variant: 'primary' }));
     // Esc 也能关
   }
 
