@@ -22,13 +22,16 @@ import { Rng } from '../src/core/rng';
 // ── 参数解析 ──────────────────────────────────────────
 const args = process.argv.slice(2);
 const nTrials = Number(args.find((a) => a.startsWith('--n='))?.slice(4) ?? 8000);
+if (!Number.isInteger(nTrials) || nTrials <= 0) throw new Error(`--n 必须是正整数，收到 ${nTrials}`);
 let table: readonly (readonly number[])[] = SHOP_ODDS;
 for (const a of args) {
   const m = /^--t(\d)=(.+)$/.exec(a);
   if (m) {
     const lv = Number(m[1]);
     const row = m[2].split(',').map(Number);
-    if (row.length !== 5 || row.some((x) => !Number.isFinite(x))) throw new Error(`行格式错误：${a}`);
+    if (row.length !== 5 || row.some((x) => !Number.isFinite(x) || x < 0) || row.reduce((sum, x) => sum + x, 0) !== 100) {
+      throw new Error(`行格式错误（需要 5 个非负数且合计 100）：${a}`);
+    }
     table = table.map((r, i) => (i === lv - 1 ? row : r));
   }
 }
@@ -110,7 +113,7 @@ for (const g of GOALS) {
 // ── 3. 可选：整局配对臂（与 sim:match 同种子调度）──────
 if (args.some((a) => a.startsWith('--match'))) {
   const { Match } = await import('../src/game/match');
-  const { aiTakeTurn, makeProfile } = await import('../src/game/ai');
+  const { aiTakeTurn, chooseAdventureIndex, makeProfile } = await import('../src/game/ai');
   const N = Number(args.find((a) => a.startsWith('--match='))?.slice(8) ?? 200);
   // AI 档位在线覆盖：--prof=hyperroll:rollFloor=12,mergeBias=3.2（可多次出现）。
   // 只允许数字档位键 —— 名单/偏好是数组，不属于 A/B 通道。
@@ -132,6 +135,7 @@ if (args.some((a) => a.startsWith('--match'))) {
   const archs = ['aggro', 'econ', 'balanced', 'hyperroll', 'greedy'] as const;
   const rounds: number[] = [];
   const winArch = new Map<string, number>();
+  const entriesByArch = new Map<string, number>();
   const rankBy = new Map<string, number[]>();
   const star3 = new Map<string, number[]>();
   const levelBy = new Map<string, number[]>();
@@ -155,7 +159,12 @@ if (args.some((a) => a.startsWith('--match'))) {
     while (!m.isOver() && guard < 60) {
       m.beginRound();
       if (m.isOver()) break;
-      if (m.human.alive) aiTakeTurn(m, m.human);
+      if (m.human.alive) {
+        if (m.human.ai && m.adventureOffer) {
+          m.resolveAdventure(chooseAdventureIndex(m.human.ai, m.adventureOffer));
+        }
+        aiTakeTurn(m, m.human);
+      }
       m.pairings = m.makePairings();
       for (const pair of m.pairings) m.applyBattleResult(pair, m.runBattleHeadless(pair));
       m.endRound();
@@ -174,6 +183,7 @@ if (args.some((a) => a.startsWith('--match'))) {
     }
     for (const p of m.players) {
       const arch = p.isHuman ? humanArch : (p.ai?.arch ?? '?');
+      entriesByArch.set(arch, (entriesByArch.get(arch) ?? 0) + 1);
       (rankBy.get(arch) ?? rankBy.set(arch, []).get(arch)!).push(p.rank || 8);
       const units = [...p.board.filter(Boolean), ...p.bench.filter(Boolean)];
       const s3 = units.filter((u) => u && u.star >= 3).length;
@@ -193,12 +203,13 @@ if (args.some((a) => a.startsWith('--match'))) {
   console.log(`\n━━ 整局 ${N} 局（配对种子）━━`);
   console.log(`回合均值 ${avg(rounds).toFixed(1)}   冠军等级 ${avg(champLevels).toFixed(2)}`);
   console.log('原型：平均名次 / 终局三星 / 终局等级 / 终局金币 / 夺冠%');
-  const totalWin = [...winArch.values()].reduce((a, b) => a + b, 0) || 1;
   for (const [arch, ranks] of [...rankBy.entries()].sort((a, b) => avg(a[1]) - avg(b[1]))) {
     const lv = levelBy.get(arch) ?? [];
     const s3 = star3.get(arch) ?? [];
     const gd = goldBy.get(arch) ?? [];
-    console.log(`  ${arch.padEnd(10)} ${avg(ranks).toFixed(2)}  ${avg(s3).toFixed(3)}  ${avg(lv).toFixed(2)}  ${avg(gd).toFixed(1)}  ${(((winArch.get(arch) ?? 0) / totalWin) * 100).toFixed(1)}%`);
+    const entryCount = entriesByArch.get(arch) ?? 0;
+    const winRate = entryCount > 0 ? (winArch.get(arch) ?? 0) / entryCount : 0;
+    console.log(`  ${arch.padEnd(10)} ${avg(ranks).toFixed(2)}  ${avg(s3).toFixed(3)}  ${avg(lv).toFixed(2)}  ${avg(gd).toFixed(1)}  ${(winRate * 100).toFixed(1)}%`);
   }
   console.log(`全局面 3★ 总数/局 ${(totalStar3 / N).toFixed(3)}   冠军场上 ≥2★ 五费均值 ${(fiveStar2OnChamp / N).toFixed(3)}`);
   console.log(`3★ 分解（件/${N}局，按费用 1→5）：${star3ByCost.slice(1).join(' / ')}`);

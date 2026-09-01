@@ -45,4 +45,7 @@ for (const c of PRESET_COMPS) {
 
 console.log('');
 if (allOk) console.log('  ✓ 全部预设造价落在目标区间内，对拍结果反映的是羁绊强度');
-else console.log('  ✗ 存在造价越界的预设，对拍结果会被造价污染');
+else {
+  console.log('  ✗ 存在造价越界的预设，对拍结果会被造价污染');
+  process.exitCode = 1;
+}

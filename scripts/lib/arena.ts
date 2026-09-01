@@ -84,7 +84,7 @@ export function runMatrix(n = 80, seedBase = 20260829): MatrixResult {
 }
 
 /** 配对二项噪声带（每流派有效样本 = 2×(len-1)×n 局）。CRN 配对下的真实噪声更小，这里是保守上界 */
-export function noiseBand(n: number, comps = PRESET_COMPS.length): number {
+export function noiseBand(n: number, comps = PRESET_COMPS.length, z = 2): number {
   const eff = 2 * (comps - 1) * n;
-  return 2 * Math.sqrt(0.25 / eff); // ≈ ±2σ
+  return z * Math.sqrt(0.25 / eff);
 }

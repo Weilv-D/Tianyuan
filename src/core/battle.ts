@@ -32,6 +32,7 @@ import {
   type BattleApi,
   type BattleHooks,
   type DamageOptions,
+  type IncomingDamage,
   type ZoneOptions,
 } from './api';
 import type { BattleEvent, EventSink, FxKind, SpawnInfo } from './events';
@@ -497,6 +498,14 @@ export class Battle implements BattleApi {
       if (amount > cap) amount = cap;
     }
 
+    // 伤害重定向在目标护盾/生命扣除前确定，但派生伤害延后到本次命中完整
+    // 结算后执行。这样“转由友军承担”不会变成目标吃满后再追加一份伤害。
+    const incoming: IncomingDamage = { amount, deferred: [] };
+    for (const fn of this.hooks.get(dst.team)?.onIncomingDamage ?? []) {
+      fn(this, dst, src, incoming, type, opts);
+    }
+    amount = Math.max(0, incoming.amount);
+
     // 护盾吸收
     let absorbed = 0;
     if (dst.shield > 0) {
@@ -561,6 +570,7 @@ export class Battle implements BattleApi {
     for (const fn of this.hooks.get(dst.team)?.onDamageTaken ?? []) fn(this, dst, src, final, type, opts);
 
     if (kill) this.killUnit(dst, src);
+    for (const apply of incoming.deferred) apply();
     return final;
   }
 
@@ -606,7 +616,7 @@ export class Battle implements BattleApi {
       dst.statuses.push({ kind: 'shield', ticks: Math.round(dur * TICK_RATE), value: dst.shield, srcUid: src?.uid ?? -1 });
     }
     this.emit({ t: 'shield', tick: this.tick, uid: dst.uid, amount: Math.round(added), total: Math.round(dst.shield) });
-    this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind: 'shield', dur, value: Math.round(amt), added: true });
+    this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind: 'shield', dur, value: Math.round(dst.shield), added: true });
   }
 
   addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number): void {
@@ -806,12 +816,13 @@ export class Battle implements BattleApi {
       for (const fn of h.onTick) fn(this, team, this.tick);
     }
 
-    // 2) 状态计时 + 持续效果
-    this.tickStatuses();
+    // 2) 持续效果先结算末跳，再递减并清理状态。反过来会让恰好在效果间隔
+    // 到期的 DoT 先被删掉，2 秒效果只跳 3 次而不是 4 次。
     if (this.tick % EFFECT_INTERVAL === 0) {
       this.tickDots();
       this.tickZones();
     }
+    this.tickStatuses();
 
     // 3) 延迟任务（按 (tick, seq) 排序，保证确定）
     if (this.scheduled.length > 0) {
@@ -1085,7 +1096,8 @@ export class Battle implements BattleApi {
     }
     if (aliveByTeam.size === 1) {
       const winner = [...aliveByTeam.keys()][0];
-      this.finish(winner, false);
+      const hasChampion = this.units.some((u) => u.alive && !u.isMinion && u.team === winner);
+      this.finish(hasChampion ? winner : null, false);
       return;
     }
     if (aliveByTeam.size === 0) {

@@ -42,10 +42,10 @@ interface RunStats {
   fingerprint: number;
 }
 
-function runPair(specA: CompSpec, specB: CompSpec, n: number): RunStats {
+function runPair(specA: CompSpec, specB: CompSpec, n: number, seedBase = 1000): RunStats {
   const st: RunStats = { wins: 0, losses: 0, draws: 0, totalTicks: 0, timeouts: 0, fingerprint: 0 };
   for (let i = 0; i < n; i++) {
-    const seed = 1000 + i * 7919;
+    const seed = seedBase + i * 7919;
     const a = buildTeam(specA, 0, 1);
     const b = buildTeam(specB, 1, 200);
     const battle = new Battle(
@@ -93,9 +93,16 @@ function auditData(): string[] {
   if (ids.size !== CHAMPIONS.length) issues.push('存在重复的棋子 id');
   // 同费用内组合唯一 —— 玩家在同一档位里不该看到两张"同羁绊同职业"的卡
   const combos = new Set(CHAMPIONS.map((c) => `${c.cost}|${c.origins.join()}|${c.classes.join()}`));
-  const byCost = new Set(CHAMPIONS.map((c) => `${c.cost}`));
   if (combos.size !== CHAMPIONS.length) issues.push('同费用内存在重复的职业/种族组合');
-  void byCost;
+  // 预设造价必须处于同一带，否则矩阵测到的是金币差而不是羁绊差。
+  const copies = [0, 1, 3, 9];
+  for (const comp of PRESET_COMPS) {
+    const gold = Object.entries(comp.units).reduce(
+      (sum, [id, star]) => sum + (CHAMPION_BY_ID[id]?.cost ?? 0) * copies[star],
+      0,
+    );
+    if (gold < 52 || gold > 58) issues.push(`预设「${comp.name}」造价 ${gold} 金，超出 52~58 金基线`);
+  }
   return issues;
 }
 
@@ -131,6 +138,7 @@ const issues = auditData();
 console.log('【配置自检】');
 if (issues.length === 0) console.log('  ✓ 全部羁绊档位可达，棋子数据自洽');
 else issues.forEach((i) => console.log(`  ✗ ${i}`));
+if (issues.length > 0) process.exit(1);
 
 console.log('\n【确定性】');
 const det = determinismCheck();
@@ -208,12 +216,15 @@ let firstWin = 0;
 let mirrorBattles = 0;
 for (let i = 0; i < 300; i++) {
   const spec = randomComp(rnd, 7);
-  const st = runPair(spec, spec, 2);
+  // 每个随机阵容使用独立战斗种子。此前 300 组都重复 seed 1000/8919，
+  // 600 局的样本量因此被高估，先后手结论会被两个种子主导。
+  const st = runPair(spec, spec, 2, 2_000_000 + i * 2 * 7919);
   firstWin += st.wins;
   mirrorBattles += 2;
 }
 const firstRate = firstWin / mirrorBattles;
-console.log(`  下方阵营（team 1）胜率 ${(firstRate * 100).toFixed(1)}%  ${Math.abs(firstRate - 0.5) < 0.08 ? '✓ 无明显先后手偏差' : '⚠ 存在站位偏差'}`);
+const firstBand = 2 * Math.sqrt(0.25 / mirrorBattles);
+console.log(`  下方阵营（team 1）胜率 ${(firstRate * 100).toFixed(1)}%  95% 噪声带 ±${(firstBand * 100).toFixed(1)}p  ${Math.abs(firstRate - 0.5) < firstBand ? '✓ 无明显先后手偏差' : '⚠ 存在站位偏差'}`);
 
 const dt = (Date.now() - t0) / 1000;
 console.log(`\n共 ${totalBattles + mirrorBattles} 局，耗时 ${dt.toFixed(2)}s（${Math.round((totalBattles + mirrorBattles) / dt)} 局/秒）`);

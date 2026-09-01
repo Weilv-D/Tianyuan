@@ -560,7 +560,12 @@ export class Match implements AiWorld {
       this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★`);
     }
     // 新手友好：人口有空位就自动上场
-    if (this.settings.autoDeploy) this.tryAutoDeploy(p, u.iid);
+    if (this.settings.autoDeploy) {
+      const upgraded = merges.length > 0
+        ? p.bench.find((b) => b !== null && b.defId === id && b.star > 1)
+        : u;
+      if (upgraded) this.tryAutoDeploy(p, upgraded.iid);
+    }
     return { ok: true };
   }
 

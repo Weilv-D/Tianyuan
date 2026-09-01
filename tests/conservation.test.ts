@@ -54,6 +54,25 @@ describe('玩家资产守恒', () => {
     expect(match.pool.snapshot()).toEqual(poolBefore);
   });
 
+  it('买入第三张触发合成后会把合成产物自动上场', () => {
+    const match = new Match(2028);
+    const player = match.human;
+    player.gold = 50;
+    player.level = 3;
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    player.bench[0] = createUnit('pan');
+    player.bench[1] = createUnit('pan');
+    player.shop[0] = 'pan';
+
+    expect(match.buy(player, 0).ok).toBe(true);
+
+    const deployed = player.board.filter((unit) => unit?.defId === 'pan');
+    expect(deployed).toHaveLength(1);
+    expect(deployed[0]?.star).toBe(2);
+    expect(player.bench.every((unit) => unit?.defId !== 'pan')).toBe(true);
+  });
+
   it('备战席满且无法合成时，购买整体回滚', () => {
     const match = new Match(2026);
     const player = match.human;

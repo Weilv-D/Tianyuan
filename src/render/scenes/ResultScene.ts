@@ -25,13 +25,13 @@ export class ResultScene extends Phaser.Scene {
     resetCursorOnShutdown(this);
     buildTextures(this);
     grainOverlay(this);
+    audio.stopBgm();
     const match = data.match;
     if (!match) {
       this.scene.start('Menu', {});
       return;
     }
     clearSave();
-    audio.stopBgm();
 
     const order = match.standings();
     const human = match.human;

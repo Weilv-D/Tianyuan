@@ -198,8 +198,8 @@ const logit = (p: number): number => {
   const q = Math.min(0.98, Math.max(0.02, p));
   return Math.log(q / (1 - q));
 };
-const stackWin: number[] = [];
-for (let k = 0; k <= 3; k++) {
+const stackWin: number[] = [0];
+for (let k = 1; k <= 3; k++) {
   let sum = 0;
   let cnt = 0;
   for (let i = 0; i < COMPS; i++) {
@@ -209,7 +209,7 @@ for (let k = 0; k <= 3; k++) {
       cnt++;
     }
   }
-  stackWin.push(sum / cnt);
+  stackWin[k] = sum / cnt;
 }
 console.log('\n【3a 同件堆叠】断魂刃 ×0/1/2/3（机制不叠加，仅属性线性）');
 let prevD = 0;
@@ -225,8 +225,8 @@ console.log(`  ${stackDim ? '✓ 同件堆叠边际递减成立' : '⚠ 同件�
 
 const CURVE_ITEMS = ['duanhun', 'pojia', 'xueyin'];
 console.log(`\n【3b 异件协同】（${CURVE_ITEMS.map((i) => ITEMS.find((x) => x.id === i)?.name).join('、')}）以 logit 边际度量`);
-const mixWin: number[] = [];
-for (let k = 0; k <= 3; k++) {
+const mixWin: number[] = [0];
+for (let k = 1; k <= 3; k++) {
   let sum = 0;
   let cnt = 0;
   for (let i = 0; i < COMPS; i++) {
@@ -236,7 +236,7 @@ for (let k = 0; k <= 3; k++) {
       cnt++;
     }
   }
-  mixWin.push(sum / cnt);
+  mixWin[k] = sum / cnt;
 }
 const logitMarg: number[] = [];
 for (let k = 1; k <= 3; k++) {
@@ -255,6 +255,7 @@ if (warn.length) {
 }
 
 const dt = (Date.now() - t0) / 1000;
-const total = (ITEMS.length + 3) * GAMES_PER_ITEM;
+// 22 件单件 + 3 个同件档 + 3 个异件档；0 件基准恒为 0，不再浪费对局重跑。
+const total = (ITEMS.length + 6) * GAMES_PER_ITEM;
 console.log(`\n共约 ${total} 局，耗时 ${dt.toFixed(1)}s（${Math.round(total / dt)} 局/秒）`);
 console.log(`装备总数 ${ITEMS.length}（组件 ${comp.length} / 成品 ${comb.length}）`);

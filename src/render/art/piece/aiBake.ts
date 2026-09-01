@@ -43,8 +43,14 @@ export async function preloadAiPieces(): Promise<number> {
     urls.map(([id, url]) =>
       new Promise<void>((resolve) => {
         const img = new Image();
-        const done = () => resolve();
-        window.setTimeout(done, 3000);
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeout);
+          resolve();
+        };
+        const timeout = window.setTimeout(done, 3000);
         img.onload = () => {
           cache.set(id, img);
           done();

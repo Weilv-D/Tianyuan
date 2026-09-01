@@ -58,10 +58,9 @@ if (specPath) {
     const [k, v] = kv.split('=');
     ov[k.trim()] = Number(v);
   }
-  spec = { name: 'quick-ab', axes: [{ path: Object.keys(ov).join('+'), values: [NaN] }], note: `--set ${setArg}` };
+  spec = { name: 'quick-ab', axes: [], note: `--set ${setArg}` };
   // quick-ab 只跑一组：把 overrides 挂在 axis 之外单独处理
   (spec as SweepSpec & { single?: Overrides }).single = ov;
-  spec.axes = [];
 } else {
   console.error('用法：npm run sim:sweep -- <spec.json> | --set path=value[,path=value]');
   process.exit(1);
@@ -78,8 +77,10 @@ interface ConfigResult {
 console.log(`═════════ 百战天元 · 数值灵敏度扫描 ═════════`);
 console.log(`spec ${spec.name}   每对 ${nPerPair} 局 × ${PRESET_COMPS.length}×${PRESET_COMPS.length - 1} 配对   种子 ${seedBase}（全配置共用 = CRN）`);
 if (spec.note) console.log(`note  ${spec.note}`);
-const band = noiseBand(nPerPair);
-console.log(`噪声带 ±${(band * 100).toFixed(1)}%（配对二项 2σ 上界；CRN 配对下实际更小）\n`);
+// 同时查看 6 个流派时用 Bonferroni 95% 临界值 z≈2.64，避免“至少一项”
+// 的假阳性率随着流派数膨胀。CRN 下真实噪声更小，此处仍取保守上界。
+const band = noiseBand(nPerPair, PRESET_COMPS.length, 2.64);
+console.log(`同步噪声带 ±${(band * 100).toFixed(1)}%（6 流派 Bonferroni 95%；CRN 配对下实际更小）\n`);
 
 const t0 = Date.now();
 const results: ConfigResult[] = [];
@@ -120,7 +121,7 @@ for (let r = 1; r < results.length; r++) {
   const deltas = res.winRate.map((w, i) => w - base.winRate[i]);
   const movers = deltas
     .map((d, i) => ({ d, i }))
-    .filter((x) => Math.abs(x.d) >= band * 0.6)
+    .filter((x) => Math.abs(x.d) >= band)
     .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))
     .slice(0, 4);
   console.log(`\n${label}`);

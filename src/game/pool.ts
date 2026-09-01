@@ -66,7 +66,9 @@ export class CardPool {
     // （与新开局同基线）。缺项 id（新版本新增棋子）按满池计入。
     const known = new Set(CHAMPIONS.map((c) => c.id));
     for (const [k, v] of Object.entries(data)) {
-      if (!known.has(k) || !Number.isInteger(v) || (v as number) < 0) {
+      const champion = CHAMPIONS.find((c) => c.id === k);
+      const max = champion ? (POOL_COUNTS[champion.cost] ?? 0) : 0;
+      if (!known.has(k) || !Number.isInteger(v) || (v as number) < 0 || (v as number) > max) {
         // 整池重置回满池（与新开局同基线）
         this.counts = new Map();
         for (const c of CHAMPIONS) this.counts.set(c.id, POOL_COUNTS[c.cost] ?? 0);

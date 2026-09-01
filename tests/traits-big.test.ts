@@ -31,8 +31,16 @@ describe('大羁绊玩法', () => {
     const enemy = battle.unitByUid(90)!;
     const members = MOMEN.map((_, index) => battle.unitByUid(10 + index)!);
 
-    battle.dealDamage(enemy, ally, 1000, 'physical', { source: 'attack' });
-    expect(members.some((member) => member.takenDamage > 0)).toBe(true);
+    const allyLoss = battle.dealDamage(enemy, ally, 1000, 'physical', { source: 'attack' });
+    const sharedLoss = members.reduce((sum, member) => sum + member.takenDamage, 0);
+
+    const noShare = momenBattle();
+    const baselineAlly = noShare.unitByUid(30)!;
+    const baselineLoss = noShare.dealDamage(noShare.unitByUid(90)!, baselineAlly, 1000, 'physical', { source: 'attack', noShare: true });
+
+    expect(allyLoss).toBeCloseTo(baselineLoss * 0.7, 4);
+    expect(sharedLoss).toBeGreaterThan(0);
+    expect(allyLoss + sharedLoss).toBeLessThan(baselineLoss);
 
     const second = momenBattle();
     second.dealDamage(second.unitByUid(90)!, second.unitByUid(10)!, 1000, 'physical', { source: 'attack' });

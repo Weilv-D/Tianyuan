@@ -109,46 +109,61 @@ export interface CompSpec {
  */
 export const PRESET_COMPS: readonly CompSpec[] = [
   {
-    name: '快攻压制 · 剑宗刺客',
-    desc: '四剑宗三刺客四武将，跳后排切法师，滚雪球。',
+    name: '快攻 · 4剑宗3刺客',
+    desc: '4剑宗(20%暴击/18%破甲/击杀回蓝)3刺客4武将，1秒后跳后排切方士。',
     units: { duanyue: 3, wujiu: 2, canghao: 2, chitong: 2, yingsha: 2, ajiu: 2, qingming: 2 },
   },
   {
-    name: '后期大招 · 龙渊方士',
+    name: '法爆 · 4龙渊4方士',
     // 原版是"六方士四龙渊"，只有一个护卫当前排 —— 六个后排挤在一起，
     // 被剑宗刺客一轮跳脸就打穿，诊断显示 7 个方士里 4 个到死没放出技能。
     // 加前排后它从 24.8% 直接跳到 98.8%：这个游戏里**前排的有无
     // 是第一支配变量**，比任何羁绊数值都大。
-    desc: '四龙渊四方士三护卫，前排站住，后排一发定胜负。',
+    desc: '4龙渊(32%技能增幅)4方士(16%护盾/魔抗 shred)三护卫，前排站住后排一发定胜负。',
     units: { yuansu: 2, aoyin: 2, moyu: 2, yinglong: 1, canglan: 2, pan: 2, zhenyue: 2 },
   },
   {
-    name: '荆棘反伤 · 护卫山海',
+    name: '护卫 · 6护卫2山海',
     // 原版七个全是护卫/武将，一点输出都没有，纯靠荆棘反弹和流血磨 ——
     // 打不死人就是打不死人。第七格换成朱炎（方士/山海），
     // 让它有至少一个能主动制造伤害的单位。
-    desc: '六护卫二山海，荆棘反弹 + 流血磨血，站得住就赢。',
+    desc: '6护卫(55%攻击/荆棘52%)2山海(16%流血)，站得住就赢。',
     units: { pan: 2, lingxiao: 2, xuanwu: 2, budong: 2, zhenyue: 2, canglan: 1, zhuyan: 2 },
   },
   {
-    name: '亡语续航 · 幽冥术士',
+    name: '幽冥 · 4幽冥3术士',
     // 原版七个全是后排（术士/方士/丹师），零前排 —— 四幽冥的复活
     // 根本来不及触发就被冲垮。让出两个格子给护卫，复活机制才有意义。
-    desc: '四幽冥三术士二护卫，死了还能再战一轮。',
+    desc: '4幽冥(10%复活)3术士(30%真伤)二护卫，死了再战。',
     units: { yeyou: 2, moyu: 2, dasiming: 2, shidian: 2, jiuying: 2, pan: 2, xuanwu: 2 },
   },
   {
-    name: '机关召唤 · 傀儡海',
-    desc: '四机关召唤流，用数量淹没对手。',
+    name: '机关 · 4机关3神射',
+    desc: '4机关(22甲/9%叠攻速)3神射(15%攻击)，数量压制。',
     units: { gongshu: 2, muji: 2, pan: 2, budong: 2, canghao: 2, jingyu: 3, qinghe: 3 },
   },
   {
-    name: '妖族吸血 · 化形反击',
+    name: '妖族 · 4妖族4武将',
     // 原版四武将是三个 1~3 费的便宜货，整个阵容没有一个能打的 carry；
     // 全能吸血再高也没东西可吸。把 1 费的断岳换成 5 费的昊天，
     // 四武将档位不变，但终于有了输出核心。
-    desc: '四妖族四武将，全能吸血，残血化形反杀。',
+    desc: '4妖族(36%吸血/化形)4武将(45%攻击)，残血反杀。',
     units: { ajiu: 3, chitong: 2, jiuying: 2, qingqiu: 1, wujiu: 2, canghao: 2, haotian: 1 },
+  },
+  {
+    name: '天庭 · 4天庭',
+    desc: '4天庭(20%护盾/破盾法爆)双五费天王2星，覆盖天庭/丹鼎/丹师（实战7人口高费）。',
+    units: { lingxiao: 2, yaoguang: 2, xinhuan: 2, zhenyue: 2, haotian: 2, gouchen: 1, qinghe: 2 },
+  },
+  {
+    name: '墨门 · 6墨门',
+    desc: '6墨门(8%团队减伤/2%回血)墨翟2星，贴近实战7人口成型。',
+    units: { moyan: 3, yunchu: 2, chiji: 2, guicheng: 2, xuanji: 2, baitao: 2, mozhai: 2 },
+  },
+  {
+    name: '兵家 · 5兵家',
+    desc: '5兵家(26%攻击/20%攻速)百战滚雪球，武将/神射混搭，贴合实战中期锁血。',
+    units: { zhenfeng: 3, jinghong: 3, xijue: 2, paoche: 2, guzhen: 2, canghao: 2, jingyu: 3 },
   },
 ];
 

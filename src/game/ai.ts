@@ -54,7 +54,6 @@ export interface AiWorld {
 
 const ARCHETYPE: Record<AiArchetype, Omit<AiProfile, 'arch' | 'label'>> = {
   // 血勇：早早提战力，靠连胜滚雪球
-  // 血勇：早早提战力，靠连胜滚雪球
   // 奇遇偏好 reinforce/components：连胜窗口期要的是"这一回合就能多打出一口血"的即战力 ——
   // 援军 2★ 直接落场形成战力，组件当场就能合成装上；等级即人口即战力；
   // 金币/经验是慢变量，等不起。

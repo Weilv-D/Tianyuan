@@ -11,7 +11,7 @@
  */
 
 import { Match } from '../src/game/match';
-import { AI_ROSTER, aiTakeTurn, makeProfile, type AiArchetype } from '../src/game/ai';
+import { aiTakeTurn, chooseAdventureIndex, makeProfile, type AiArchetype } from '../src/game/ai';
 import { boardCount } from '../src/game/state';
 import { withOverrides, type Overrides } from './lib/patch';
 
@@ -32,6 +32,8 @@ const MAX_ROUNDS = 60;
 interface Stat {
   rounds: number[];
   winnerArch: Map<string, number>;
+  /** 各原型累计参赛席位数，夺冠率必须以它为分母。 */
+  entriesByArch: Map<string, number>;
   winnerLevel: number[];
   winnerBoardSize: number[];
   eliminations: number[];
@@ -44,18 +46,30 @@ interface Stat {
   levelByArch: Map<string, number[]>;
 }
 
-function runOne(seed: number, humanArch: AiArchetype, stat: Stat): void {
+function assignRotatingProfiles(m: Match, gameIndex: number): void {
+  for (const p of m.players) {
+    const arch = archs[(gameIndex * m.players.length + p.idx) % archs.length];
+    p.ai = makeProfile(arch);
+  }
+}
+
+function runOne(seed: number, gameIndex: number, stat: Stat): void {
   try {
     const m = new Match(seed);
-    m.human.ai = makeProfile(humanArch);
-    m.human.name = `[模拟]${humanArch}`;
+    assignRotatingProfiles(m, gameIndex);
+    m.human.name = `[模拟]${m.human.ai?.arch ?? 'balanced'}`;
 
     let guard = 0;
     while (!m.isOver() && guard < MAX_ROUNDS) {
       m.beginRound();
       if (m.isOver()) break;
       // 人类席位交给 AI 托管，这样整局能自动跑完
-      if (m.human.alive) aiTakeTurn(m, m.human);
+      if (m.human.alive) {
+        if (m.human.ai && m.adventureOffer) {
+          m.resolveAdventure(chooseAdventureIndex(m.human.ai, m.adventureOffer));
+        }
+        aiTakeTurn(m, m.human);
+      }
       m.pairings = m.makePairings();
       for (const pair of m.pairings) {
         const res = m.runBattleHeadless(pair);
@@ -73,14 +87,15 @@ function runOne(seed: number, humanArch: AiArchetype, stat: Stat): void {
     stat.rounds.push(m.round);
     const champ = m.players.find((p) => p.rank === 1);
     if (champ) {
-      const arch = champ.isHuman ? humanArch : (champ.ai?.arch ?? '?');
+      const arch = champ.ai?.arch ?? '?';
       stat.winnerArch.set(arch, (stat.winnerArch.get(arch) ?? 0) + 1);
       stat.winnerLevel.push(champ.level);
       stat.winnerBoardSize.push(boardCount(champ));
     }
     stat.eliminations.push(m.players.filter((p) => !p.alive).length);
     for (const p of m.players) {
-      const arch = p.isHuman ? humanArch : (p.ai?.arch ?? '?');
+      const arch = p.ai?.arch ?? '?';
+      stat.entriesByArch.set(arch, (stat.entriesByArch.get(arch) ?? 0) + 1);
       const arr = stat.rankByArch.get(arch) ?? [];
       arr.push(p.rank || 8);
       stat.rankByArch.set(arch, arr);
@@ -112,6 +127,7 @@ function med(a: readonly number[]): number {
 const stat: Stat = {
   rounds: [],
   winnerArch: new Map(),
+  entriesByArch: new Map(),
   winnerLevel: [],
   winnerBoardSize: [],
   eliminations: [],
@@ -122,6 +138,10 @@ const stat: Stat = {
 };
 
 const archs: AiArchetype[] = ['aggro', 'econ', 'balanced', 'hyperroll', 'greedy'];
+if (!Number.isInteger(N) || N <= 0) {
+  console.error(`✗ 对局数必须是正整数，收到：${rest[0] ?? '(缺省)'}`);
+  process.exit(1);
+}
 console.log(`模拟 ${N} 局完整对局（8 人）…`);
 if (Object.keys(overrides).length > 0) {
   console.log(`覆盖：${Object.entries(overrides).map(([k, v]) => `${k}=${v}`).join('，')}\n`);
@@ -131,7 +151,7 @@ if (Object.keys(overrides).length > 0) {
 const t0 = Date.now();
 withOverrides(overrides, () => {
   for (let i = 0; i < N; i++) {
-    runOne((i * 2654435761) >>> 0, archs[i % archs.length], stat);
+    runOne((i * 2654435761) >>> 0, i, stat);
   }
 });
 const ms = Date.now() - t0;
@@ -158,11 +178,14 @@ if (ok > 0) {
   console.log(`冠军场上人数 平均 ${avg(stat.winnerBoardSize).toFixed(1)}\n`);
 }
 
-console.log('原型夺冠次数：');
-const total = [...stat.winnerArch.values()].reduce((a, b) => a + b, 0) || 1;
-for (const [arch, n] of [...stat.winnerArch.entries()].sort((a, b) => b[1] - a[1])) {
-  const bar = '█'.repeat(Math.round((n / total) * 40));
-  console.log(`  ${arch.padEnd(10)} ${String(n).padStart(4)}  ${((n / total) * 100).toFixed(1).padStart(5)}%  ${bar}`);
+console.log('原型席位夺冠率（夺冠数 / 该原型参赛席位数）：');
+const winRows = [...stat.entriesByArch.entries()]
+  .map(([arch, entries]) => ({ arch, entries, wins: stat.winnerArch.get(arch) ?? 0 }))
+  .sort((a, b) => b.wins / b.entries - a.wins / a.entries);
+for (const { arch, entries, wins } of winRows) {
+  const rate = wins / entries;
+  const bar = '█'.repeat(Math.round(rate * 80));
+  console.log(`  ${arch.padEnd(10)} ${String(wins).padStart(4)}/${String(entries).padEnd(5)} ${(rate * 100).toFixed(1).padStart(5)}%  ${bar}`);
 }
 
 console.log('\n原型平均名次（越小越好，理论均值为 4.5）：');
@@ -189,12 +212,17 @@ const seatRanks: number[][] = Array.from({ length: 8 }, () => []);
 withOverrides(overrides, () => {
   for (let i = 0; i < Math.min(N, 120); i++) {
     const m = new Match((i * 40503) >>> 0);
-    m.human.ai = makeProfile('balanced');
+    assignRotatingProfiles(m, i);
     let guard = 0;
     while (!m.isOver() && guard < MAX_ROUNDS) {
       m.beginRound();
       if (m.isOver()) break;
-      if (m.human.alive) aiTakeTurn(m, m.human);
+      if (m.human.alive) {
+        if (m.human.ai && m.adventureOffer) {
+          m.resolveAdventure(chooseAdventureIndex(m.human.ai, m.adventureOffer));
+        }
+        aiTakeTurn(m, m.human);
+      }
       m.pairings = m.makePairings();
       for (const pair of m.pairings) {
         m.applyBattleResult(pair, m.runBattleHeadless(pair));
@@ -207,7 +235,7 @@ withOverrides(overrides, () => {
 });
 let seatLine = '  ';
 for (let i = 0; i < 8; i++) {
-  seatLine += `${i === 0 ? '人类' : AI_ROSTER[i - 1].arch.slice(0, 4)}:${avg(seatRanks[i]).toFixed(2)}  `;
+  seatLine += `${i === 0 ? '人类' : `座${i}`}:${avg(seatRanks[i]).toFixed(2)}  `;
 }
 console.log(seatLine);
 

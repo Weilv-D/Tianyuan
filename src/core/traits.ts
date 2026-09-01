@@ -91,10 +91,11 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       // 且整局作废。改为按来源独立计数，各自只触发一次。
       if (tier >= 1 && isMember(members, victim) && !victim.isMinion && !victim.traitStacks['youmingRevived']) {
         victim.traitStacks['youmingRevived'] = 1;
-        // 0.65 → 0.48：以 65% 血量复活相当于"多带半个人的战力"，
-        // 四档幽冥因此长期霸占胜率榜首。降到 48% 后它依然是唯一的复活机制，
-        // 强度来自"多一条命"而不是"复活后还很能打"。
-        a.revive(victim, t('reviveHp', 0.15), victim);
+        // 0.65 → 0.48 → 0.10：以 65% 血量复活相当于"多带半个人的战力"，
+        // 四档幽冥因此长期霸占胜率榜首。CRN 扫档（2026-09-01，n=200~500，
+        // 四幽冥 62%→49.9%）定档 10% 生命复活 —— 强度来自"多一条命"
+        // 而不是"复活后还很能打"。
+        a.revive(victim, t('reviveHp', 0.1), victim);
         a.addStatus(victim, victim, 'aspdUp', 999, t('reviveAspd', 30));
         a.fx('summon', { uid: victim.uid });
       }
@@ -198,15 +199,19 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     if (tier >= 2) {
       // 兼爱：友军所受伤害的 30% 转由存活墨门均摊。
       // noShare 防递归；silent 防高频小额分摊把伤害飘字刷成弹幕。
-      api.hooksOf(members[0].team).onDamageTaken.push((a, dst, src, amount, type, opts) => {
+      api.hooksOf(members[0].team).onIncomingDamage.push((a, dst, src, damage, type, opts) => {
         if (opts.noShare || !dst.alive) return;
         if (isMember(members, dst)) return;
         const alive = members.filter((m) => m.alive);
         if (alive.length === 0) return;
-        const per = (amount * t('sharePct', 0.3)) / alive.length;
-        for (const m of alive) {
-          a.dealDamage(src, m, per, type, { source: 'trait', noShare: true, silent: true });
-        }
+        const shared = damage.amount * t('sharePct', 0.3);
+        const per = shared / alive.length;
+        damage.amount -= shared;
+        damage.deferred.push(() => {
+          for (const m of alive) {
+            a.dealDamage(src, m, per, type, { source: 'trait', noShare: true, silent: true });
+          }
+        });
       });
     }
   },
@@ -215,7 +220,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
   bingjia: ({ api, members }) => {
     const t = tuner('bingjia');
     const tier = members[0].trait.tier['bingjia'] ?? 0;
-    for (const u of members) u.atk = Math.round(u.atk * (1 + t('atkUp', 0.35)));
+    for (const u of members) u.atk = Math.round(u.atk * (1 + t('atkUp', 0.20)));
     if (tier >= 1) {
       for (const u of api.units) {
         if (u.team !== members[0].team) continue;
@@ -467,7 +472,9 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       // 荆棘反弹和流血都是"被动挨打换伤害"，主动输出几乎为零。
       // 结果是它站得住但打不死人，对局拖到超时然后判负。
       // 让六护卫自己能还手，"站得住就赢"这句话才真正成立。
-      for (const u of members) u.atk = Math.round(u.atk * t('guard6Atk', 1.45));
+      // 1.45 → 1.55：CRN 扫档（2026-09-01，n=200~500）把荆棘从 43% 拉回
+      // 中位 53~54%，极差 21%→11%，且未引入阵营偏置。
+      for (const u of members) u.atk = Math.round(u.atk * t('guard6Atk', 1.15));
       api.hooksOf(team).onTick.push((a, _t, tick) => {
         if (tick === 0 || tick % (3 * TICK_RATE) !== 0) return;
         for (const u of members) {
@@ -589,9 +596,11 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     for (const u of members) u.sp += spFlat;
     if (tier >= 1) {
       // 修约定后首档覆盖广了：方士盾转为全队（门档正确但覆盖合理）
+      // 0.12 → 0.16：CRN 扫档（2026-09-01，n=300~500）把后期大招从
+      // 44% 拉回 52~54%，与荆棘/亡语联合后极差 21%→11%。
       api.hooksOf(members[0].team).onBattleStart.push((a) => {
         const pool = a.units.filter((x) => x.alive && x.team === members[0].team);
-        for (const u of pool) a.addShield(null, u, u.maxHp * t('shield', 0.12), 999);
+        for (const u of pool) a.addShield(null, u, u.maxHp * t('shield', 0.16), 999);
       });
     }
     if (tier >= 2) {

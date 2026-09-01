@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_LEVEL } from '../src/core/config';
-import { computeIncome, gainXp, xpToNext } from '../src/game/economy';
+import { computeIncome, gainXp, interestOf, xpToNext } from '../src/game/economy';
 import { makePlayer } from './helpers';
 
 describe('对局经济', () => {
@@ -26,5 +26,10 @@ describe('对局经济', () => {
     gainXp(player, 999);
     expect(player.level).toBe(MAX_LEVEL);
     expect(player.xp).toBe(0);
+  });
+
+  it('损坏状态中的负金币不会产生负利息', () => {
+    expect(interestOf(-1)).toBe(0);
+    expect(computeIncome(makePlayer({ gold: -20 }), false).interest).toBe(0);
   });
 });

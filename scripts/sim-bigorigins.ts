@@ -1,8 +1,10 @@
 /**
- * 大地域羁绊强度探针 —— 回答「墨门九守 / 兵家百战到底有多强」。
+ * 大地域羁绊强度探针 —— 回答「墨门/兵家满羁绊到底有多强」。
  *
- * 用两个满羁绊阵容（2★ 为主）对拍六套预设流派 + 互打，
- * 输出双向平均胜率。定位锚点：胜率显著高于 50%（强），但不是 100%（统治）；
+ * 主矩阵（PRESET_COMPS，现 9 套）已覆盖 6墨门/5兵家的**同造价同人口**成型强度
+ * （7人口 52~58金，见 src/game/comp.ts），与实战中期锁血一致。
+ * 本探针额外对比 9墨门/8兵家的**天花板**（9人口 65/56金，2★为主），用于
+ * 回答"高roll是否统治"。定位锚点：胜率显著高于 50%（强），但不是 100%（统治）；
  * 「仅次于三星五费」= 顶级构筑之一，而非无敌。
  *
  * 运行： npx tsx scripts/sim-bigorigins.ts [每对局数]
@@ -17,13 +19,13 @@ if (!Number.isInteger(N) || N <= 0) {
 }
 
 const MOMEN9: CompSpec = {
-  name: '墨门九守',
-  desc: '九墨门：兼爱分摊 + 全队减伤。',
+  name: '墨门九守·天花板',
+  desc: '9墨门（65金，9人口天胡）：兼爱30%分摊+20%墨门减伤，与主矩阵6墨门(57金)对比看9人口提升。',
   units: { moyan: 2, yunchu: 2, chiji: 2, guicheng: 2, xuanji: 2, baitao: 2, yusuan: 2, moliu: 2, mozhai: 1 },
 };
 const BINGJIA8: CompSpec = {
-  name: '兵家百战',
-  desc: '八兵家 + 墨岩补位：百战滚雪球。',
+  name: '兵家八阵·天花板',
+  desc: '8兵家+墨岩补位（56金，9人口天胡）：百战滚雪球，与主矩阵5兵家(54金)对比看8人口提升。',
   units: { zhenfeng: 2, jinghong: 2, xijue: 2, paoche: 2, guzhen: 2, podu: 2, zhechong: 2, taibu: 1, moyan: 2 },
 };
 
@@ -44,7 +46,7 @@ function pairWin(i: CompSpec, j: CompSpec, n: number, seedBase: number): number 
   return sum / (n * 2);
 }
 
-console.log(`═════════ 百战天元 · 大地域羁绊强度探针（每对 ${N}×2 局，双向） ═════════\n`);
+console.log(`═════════ 百战天元 · 大地域羁绊强度探针（每对 ${N}×2 局，双向；主矩阵 ${PRESET_COMPS.length} 套） ═════════\n`);
 const t0 = Date.now();
 for (const big of [MOMEN9, BINGJIA8]) {
   const row: string[] = [];
@@ -57,7 +59,7 @@ for (const big of [MOMEN9, BINGJIA8]) {
     cnt++;
   }
   console.log(`【${big.name}】`);
-  console.log(`  对六预设胜率: ${row.join('　')}`);
+  console.log(`  对${PRESET_COMPS.length}预设胜率: ${row.join('　')}`);
   console.log(`  平均胜率 ${((sum / cnt) * 100).toFixed(1)}%（>72% 为"成型即强"，>85% 为统治级警报）`);
   console.log('');
 }

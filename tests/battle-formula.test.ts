@@ -33,6 +33,7 @@ describe('玩家可感知的战斗规则', () => {
       }
       return total;
     };
+    expect(dotTotal('true')).toBe(240);
     expect(dotTotal('true')).toBeGreaterThan(dotTotal('magic'));
   });
 
@@ -60,9 +61,14 @@ describe('玩家可感知的战斗规则', () => {
 
     battle.addShield(null, target, 328, 5);
 
-    const event = battle.drainEvents().find((candidate) => candidate.t === 'shield');
+    const events = battle.drainEvents();
+    const event = events.find((candidate) => candidate.t === 'shield');
     expect(event?.amount).toBe(41);
     expect(event?.total).toBe(Math.round(target.shield));
+    const status = events.find((candidate) => candidate.t === 'status' && candidate.kind === 'shield');
+    expect(status?.t).toBe('status');
+    if (status?.t !== 'status') throw new Error('缺少护盾状态事件');
+    expect(status.value).toBe(Math.round(target.shield));
   });
 
   it('超时按双方存活生命判定，势均力敌时平局', () => {
@@ -83,6 +89,15 @@ describe('玩家可感知的战斗规则', () => {
     summoned.step();
     expect(summoned.result?.timeout).toBe(true);
     expect(summoned.result?.winner).toBe(0);
+
+    const minionOnly = mkBattle(cornerPair(), 8, TICK_RATE);
+    const [summoner, lastEnemy] = minionOnly.units;
+    expect(minionOnly.summon(summoner, { c: 1, r: 6 }, 1, 1, '傀儡')).not.toBeNull();
+    minionOnly.dealDamage(null, summoner, summoner.maxHp * 2, 'true');
+    minionOnly.dealDamage(null, lastEnemy, lastEnemy.maxHp * 2, 'true');
+    minionOnly.step();
+    expect(minionOnly.result?.timeout).toBe(false);
+    expect(minionOnly.result?.winner).toBeNull();
   });
 
   it('损坏的战斗阵容在开战前被拒绝', () => {

@@ -26,7 +26,7 @@ export interface IncomeBreakdown {
 }
 
 export function interestOf(gold: number): number {
-  return Math.min(INCOME_INTEREST_MAX, Math.floor(gold / INCOME_INTEREST_TIER));
+  return Math.max(0, Math.min(INCOME_INTEREST_MAX, Math.floor(gold / INCOME_INTEREST_TIER)));
 }
 
 /** 连胜 / 连败奖励。连败给得更晚但同样有上限 —— 这是"连败翻盘路径"的经济基础。 */

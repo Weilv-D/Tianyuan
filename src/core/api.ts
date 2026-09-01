@@ -67,6 +67,15 @@ export interface DamageOptions {
 }
 
 /**
+ * 抗性、减伤与真伤上限结算后的伤害包。
+ * 重定向类机制可以减少目标实际承受量，并把派生伤害延后到本次命中完成后执行。
+ */
+export interface IncomingDamage {
+  amount: number;
+  deferred: (() => void)[];
+}
+
+/**
  * 普攻结算前的可变修正包。
  * 神射"每 3 次必爆"、龙渊"施法后附伤"、机关"每 4 次额外伤害"都通过这个口子注入，
  * 战斗主循环只认这一个契约，加新机制不必改循环。
@@ -86,6 +95,7 @@ export interface BattleHooks {
   onPreAttack: ((api: BattleApi, src: Unit, dst: Unit, mod: AttackModifier) => void)[];
   onAttackHit: ((api: BattleApi, src: Unit, dst: Unit, amount: number, type: DamageType) => void)[];
   onDamageDealt: ((api: BattleApi, src: Unit, dst: Unit, amount: number, type: DamageType, source: string) => void)[];
+  onIncomingDamage: ((api: BattleApi, dst: Unit, src: Unit | null, damage: IncomingDamage, type: DamageType, opts: DamageOptions) => void)[];
   onDamageTaken: ((api: BattleApi, dst: Unit, src: Unit | null, amount: number, type: DamageType, opts: DamageOptions) => void)[];
   onKill: ((api: BattleApi, killer: Unit, victim: Unit) => void)[];
   onDeath: ((api: BattleApi, victim: Unit, killer: Unit | null) => void)[];
@@ -103,6 +113,7 @@ export function createHooks(): BattleHooks {
     onPreAttack: [],
     onAttackHit: [],
     onDamageDealt: [],
+    onIncomingDamage: [],
     onDamageTaken: [],
     onKill: [],
     onDeath: [],

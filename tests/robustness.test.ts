@@ -24,6 +24,9 @@ describe('损坏输入与极端阵容', () => {
     const full = pool.snapshot();
     pool.restore({ ajiu: -1, __unknown__: 3 });
     expect(pool.snapshot()).toEqual(full);
+
+    pool.restore({ ...full, ajiu: full.ajiu + 1 });
+    expect(pool.snapshot()).toEqual(full);
   });
 
   it('墨兽阵容在各阶段都按宣告数量实际落地', () => {

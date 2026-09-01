@@ -136,7 +136,7 @@ const S = (
 ) => ({ hp, atk, sp, armor, mr, aspd, range, moveTime, startMp, maxMp, critChance, critMult });
 
 /**
- * 32 名棋子。费用分布 7/7/7/7/4。
+ * 64 名棋子。费用分布 14/14/14/12/10。
  * 每个棋子同时归属 1 条地域羁绊 + 1 条职业羁绊，无重复组合（保证每张卡都是唯一的构筑拼图）。
  */
 export const CHAMPIONS: readonly ChampionEntry[] = [
@@ -230,7 +230,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'lingxiao', name: '凌霄', title: '天兵', cost: 2 as Rarity,
     origins: ['tian'], classes: ['guardian'], cls: 'guardian',
-    base: S(900, 56, 0, 32, 32, 0.6, 1, 0.58, 0, 70),
+    base: S(900, 90, 0, 32, 32, 0.6, 1, 0.58, 0, 70),
     silhouette: 'spearVanguard', hue: 0xa8853f,
     skill: 'lingxiao_q',
     skillSpec: {
@@ -393,7 +393,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'xinhuan', name: '辛环', title: '雷部', cost: 3 as Rarity,
     origins: ['tian'], classes: ['mage'], cls: 'mage',
-    base: S(690, 36, 90, 20, 32, 0.65, 4, 0.6, 0, 72),
+    base: S(690, 36, 160, 20, 32, 0.65, 4, 0.6, 0, 72),
     silhouette: 'talismanMage', hue: 0xc9a96a,
     skill: 'xinhuan_q',
     skillSpec: {
@@ -407,7 +407,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'zhenyue', name: '镇岳', title: '天王', cost: 4 as Rarity,
     origins: ['tian'], classes: ['guardian'], cls: 'guardian',
-    base: S(1180, 70, 0, 44, 42, 0.6, 1, 0.55, 0, 90),
+    base: S(1180, 110, 0, 44, 42, 0.6, 1, 0.55, 0, 90),
     silhouette: 'spearVanguard', hue: 0xa8853f,
     skill: 'zhenyue_q',
     skillSpec: {
@@ -493,7 +493,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'moyan', name: '墨岩', title: '石匠', cost: 1 as Rarity,
     origins: ['momen'], classes: ['guardian'], cls: 'guardian',
-    base: S(880, 36, 0, 36, 34, 0.55, 1, 0.62, 0, 65),
+    base: S(880, 75, 0, 36, 34, 0.55, 1, 0.62, 0, 65),
     silhouette: 'stoneGuard', hue: 0x6e6152,
     skill: 'moyan_q',
     skillSpec: {
@@ -505,7 +505,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'yunchu', name: '云杼', title: '织机师', cost: 1 as Rarity,
     origins: ['momen'], classes: ['mage'], cls: 'mage',
-    base: S(560, 34, 52, 16, 28, 0.6, 3, 0.6, 0, 55),
+    base: S(560, 34, 120, 16, 28, 0.6, 3, 0.6, 0, 55),
     silhouette: 'talismanMage', hue: 0x7286ad,
     skill: 'yunchu_q',
     skillSpec: {
@@ -579,7 +579,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'chiji', name: '驰机', title: '机士', cost: 2 as Rarity,
     origins: ['momen'], classes: ['warrior'], cls: 'warrior',
-    base: S(820, 60, 0, 30, 24, 0.65, 1, 0.5, 0, 60),
+    base: S(820, 105, 0, 30, 24, 0.65, 1, 0.5, 0, 60),
     silhouette: 'spearVanguard', hue: 0x7a8aa0,
     skill: 'chiji_q',
     skillSpec: {
@@ -591,7 +591,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'guicheng', name: '圭城', title: '筑城吏', cost: 2 as Rarity,
     origins: ['momen'], classes: ['guardian'], cls: 'guardian',
-    base: S(940, 42, 0, 34, 34, 0.55, 1, 0.62, 0, 70),
+    base: S(940, 85, 0, 34, 34, 0.55, 1, 0.62, 0, 70),
     silhouette: 'stoneGuard', hue: 0x7c7261,
     skill: 'guicheng_q',
     skillSpec: {
@@ -627,7 +627,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'yaoguang', name: '瑶光', title: '星使', cost: 2 as Rarity,
     origins: ['tian'], classes: ['mage'], cls: 'mage',
-    base: S(620, 36, 62, 20, 30, 0.65, 3, 0.6, 0, 56),
+    base: S(620, 36, 120, 20, 30, 0.65, 3, 0.6, 0, 56),
     silhouette: 'talismanMage', hue: 0xcbb060,
     skill: 'yaoguang_q',
     skillSpec: {
@@ -665,7 +665,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'xuanji', name: '璇玑', title: '玑衡师', cost: 3 as Rarity,
     origins: ['momen'], classes: ['mage'], cls: 'mage',
-    base: S(680, 36, 78, 20, 32, 0.65, 3, 0.6, 0, 70),
+    base: S(680, 36, 160, 20, 32, 0.65, 3, 0.6, 0, 70),
     silhouette: 'talismanMage', hue: 0x56648c,
     skill: 'xuanji_q',
     skillSpec: {
@@ -677,7 +677,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'baitao', name: '白陶', title: '陶正', cost: 3 as Rarity,
     origins: ['momen'], classes: ['support'], cls: 'support',
-    base: S(640, 34, 56, 20, 30, 0.6, 3, 0.6, 15, 60),
+    base: S(640, 34, 130, 20, 30, 0.6, 3, 0.6, 15, 60),
     silhouette: 'gourdHealer', hue: 0xd6c6a4,
     skill: 'baitao_q',
     skillSpec: {
@@ -813,7 +813,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'mozhai', name: '墨翟', title: '巨子', cost: 5 as Rarity,
     origins: ['momen'], classes: ['guardian'], cls: 'guardian',
-    base: S(1220, 58, 60, 46, 46, 0.6, 1, 0.6, 0, 95),
+    base: S(1220, 120, 60, 46, 46, 0.6, 1, 0.6, 0, 95),
     silhouette: 'bannerSupport', hue: 0x4c4640,
     skill: 'mozhai_q',
     skillSpec: {
@@ -837,7 +837,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'gouchen', name: '勾陈', title: '勾陈帝', cost: 5 as Rarity,
     origins: ['tian'], classes: ['mage'], cls: 'mage',
-    base: S(1020, 52, 132, 36, 44, 0.7, 4, 0.55, 0, 90),
+    base: S(1020, 52, 240, 36, 44, 0.7, 4, 0.55, 0, 90),
     silhouette: 'talismanMage', hue: 0x66789c,
     skill: 'gouchen_q',
     skillSpec: {
@@ -916,7 +916,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'haotian', name: '昊天', title: '天帝', cost: 5 as Rarity,
     origins: ['tian'], classes: ['warrior'], cls: 'warrior',
-    base: S(1180, 124, 64, 40, 42, 0.8, 1, 0.5, 0, 110, 0.25, 1.6),
+    base: S(1180, 190, 64, 40, 42, 0.8, 1, 0.5, 0, 110, 0.25, 1.6),
     silhouette: 'bladeGeneral', hue: 0xcbb060,
     skill: 'haotian_q',
     skillSpec: {

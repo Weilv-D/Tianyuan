@@ -10,13 +10,15 @@
 //
 // 门禁：代码/包版本一致 + 类型/边界/核心行为 + 依赖与资源审计 + 双形态构建。
 // 构建全程写临时目录，成功后才原子替换 dist/ 与 release/ —— 中途失败时上一版产物完好。
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, rmSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const run = (cmd) => execSync(cmd, { cwd: root, stdio: 'inherit', shell: true });
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const run = (command, args) => execFileSync(command, args, { cwd: root, stdio: 'inherit', shell: false });
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 // 版本一致性门禁：version.ts（界面落款）与 package.json 必须同值，
@@ -38,19 +40,23 @@ console.log(`\n[1/5] 类型 + 架构边界 + 核心行为 + 生产依赖审计�
 if (process.argv.includes('--skip-typecheck')) {
   console.log('  (--skip-typecheck: skip repo-wide typecheck)');
 } else {
-  run('npm run typecheck');
+  run(npm, ['run', 'typecheck']);
 }
-run('npm run check:boundaries');
-run('npm test');
-run('npm run audit:deps');
+run(npm, ['run', 'check:boundaries']);
+run(npm, ['test']);
+run(npm, ['run', 'audit:deps']);
 
 console.log(`\n[2/5] 第三方授权与音乐资源审计 + 静态托管构建 → dist.tmp/`);
+// 上次进程若在原子替换前中断，临时目录可能残留旧文件。每次从空目录
+// 开始，避免旧 dist-web 子项被 cpSync 合并进新分发包。
+rmSync(distTmp, { recursive: true, force: true });
+rmSync(relTmp, { recursive: true, force: true });
 mkdirSync(relTmp, { recursive: true });
-run('node scripts/audit-music.mjs release.tmp/THIRD_PARTY_LICENSES.txt');
-run('npx vite build --outDir dist.tmp --emptyOutDir');
+run(process.execPath, ['scripts/audit-music.mjs', 'release.tmp/THIRD_PARTY_LICENSES.txt']);
+run(npx, ['vite', 'build', '--outDir', 'dist.tmp', '--emptyOutDir']);
 
 console.log(`\n[3/5] 单文件构建 → release.tmp/百战天元.html`);
-run('npx vite build --mode singlefile --outDir release.tmp/single --emptyOutDir');
+run(npx, ['vite', 'build', '--mode', 'singlefile', '--outDir', 'release.tmp/single', '--emptyOutDir']);
 renameSync(path.join(relTmp, 'single/index.html'), path.join(relTmp, '百战天元.html'));
 rmSync(path.join(relTmp, 'single'), { recursive: true, force: true });
 cpSync(distTmp, path.join(relTmp, 'dist-web'), { recursive: true });
@@ -81,7 +87,14 @@ writeFileSync(
 
 console.log(`\n[4/5] 打包 zip`);
 const zip = `百战天元-${version}-web.zip`;
-run(`node scripts/zip.mjs "release.tmp/${zip}" "release.tmp/百战天元.html" "release.tmp/dist-web" "release.tmp/使用说明.txt" "release.tmp/THIRD_PARTY_LICENSES.txt"`);
+run(process.execPath, [
+  'scripts/zip.mjs',
+  `release.tmp/${zip}`,
+  'release.tmp/百战天元.html',
+  'release.tmp/dist-web',
+  'release.tmp/使用说明.txt',
+  'release.tmp/THIRD_PARTY_LICENSES.txt',
+]);
 
 // 产物体检：单文件不得残留任何外链资源（src=/href= 指向文件的引用，
 // 单双引号都查；再扫 CSS url() 与 srcset —— 漏一种写法就漏一类资源）
