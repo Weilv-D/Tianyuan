@@ -31,21 +31,22 @@ const sellArea = {
 };
 
 describe('高分屏输入', () => {
-  it('K=2 下所有己方棋盘格和备战席仍命中正确位置', () => {
-    const scale = 2;
-    for (let row = 0; row < HALF_ROWS; row++) {
-      for (let col = 0; col < 8; col++) {
-        const x = GRID_X + col * CELL + CELL / 2;
-        const y = GRID_Y + (row + HALF_ROWS) * CELL + CELL / 2;
-        const point = screenToWorld(x * scale, y * scale, scale);
-        expect(hitSource(point.x, point.y)).toEqual({ where: 'board', slot: row * 8 + col });
+  it('常见缩放下所有己方棋盘格和备战席仍命中正确位置', () => {
+    for (const scale of [1, 1.25, 1.5, 2]) {
+      for (let row = 0; row < HALF_ROWS; row++) {
+        for (let col = 0; col < 8; col++) {
+          const x = GRID_X + col * CELL + CELL / 2;
+          const y = GRID_Y + (row + HALF_ROWS) * CELL + CELL / 2;
+          const point = screenToWorld(x * scale, y * scale, scale);
+          expect(hitSource(point.x, point.y), `K=${scale}`).toEqual({ where: 'board', slot: row * 8 + col });
+        }
       }
-    }
-    for (let slot = 0; slot < 9; slot++) {
-      const x = BENCH_X + slot * BENCH_CELL + BENCH_CELL / 2;
-      const y = BENCH_Y + BENCH_CELL / 2;
-      const point = screenToWorld(x * scale, y * scale, scale);
-      expect(hitSource(point.x, point.y)).toEqual({ where: 'bench', slot });
+      for (let slot = 0; slot < 9; slot++) {
+        const x = BENCH_X + slot * BENCH_CELL + BENCH_CELL / 2;
+        const y = BENCH_Y + BENCH_CELL / 2;
+        const point = screenToWorld(x * scale, y * scale, scale);
+        expect(hitSource(point.x, point.y), `K=${scale}`).toEqual({ where: 'bench', slot });
+      }
     }
   });
 

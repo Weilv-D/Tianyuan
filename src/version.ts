@@ -3,8 +3,7 @@
  *
  * 这是版本信息的唯一真源：
  *  - 主菜单（MenuScene）左下角落款从此取值；
- *  - 金种子快照 tests/__golden__/battle-golden.json 的元信息从此取值。
- * 发版时与 package.json 的 version 字段同步手改，三处一致即为锁版状态。
+ * 发版时与 package.json 同步，并在 CHANGELOG 记录同一版本，三处一致即为锁版状态。
  * 游戏逻辑严禁引用时间与随机源 —— 这里只有两个常量，供展示层安全使用。
  */
 

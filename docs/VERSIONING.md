@@ -22,7 +22,7 @@
 
 | 位置 | 字段 | 消费方 |
 |---|---|---|
-| `src/version.ts` | `GAME_VERSION` / `GAME_BUILD` | 主菜单落款、金种子快照元信息 |
+| `src/version.ts` | `GAME_VERSION` / `GAME_BUILD` | 主菜单落款 |
 | `package.json` | `version` | 发布脚本（zip 命名、使用说明） |
 | `docs/CHANGELOG.md` | 顶部条目 | 人类可读的发布历史 |
 
@@ -32,20 +32,19 @@
 ## 3. 发布流程（每个版本一条 commit）
 
 ```
-npm run typecheck        # 1. 类型零错误
-npm test                 # 2. 全量回归绿（数量写进 QA.md §1/§3/§11）
-npm run release          # 3. 版本校验 + 测试 + 双形态构建 + zip + 产物体检
+npm run qa               # 1. 类型 + 核心行为 + 生产构建
+npm run release          # 2. 版本校验 + 专项审计 + 双形态构建 + zip + 产物体检
 ```
 
 发布纪律：
 
 1. **一条版本一条 commit**，消息以 `feat:/fix:/chore:` 开头并在正文列出要点；
    该 commit 即版本的锚点（tag 可选，commit 本身可追溯）。
-2. **金种子快照**：任何影响战斗内核的改动（`core/`、`data/`、涉及 rng 消费顺序的
-   `game/` 改动）落地后跑 `UPDATE_GOLDEN=1 npm test` 再生 `battle-golden.json`，
-   并在 CHANGELOG 条目中注明漂移的用例与原因。不允许无记录的金种子变更。
+2. **确定性回归**：任何影响战斗内核的改动（`core/`、`data/`、涉及 rng 消费顺序的
+   `game/` 改动）落地后跑 `npm test`，确认真实阵容同 seed 可重演；不维护会随正常
+   平衡调整整体漂移的逐字段金快照。
 3. **平衡断面**：改了 `data/` 数值或超时/裁定口径，必须重跑 `npm run sim` 并把
-   新极差/先手写回 QA.md §4 与 README 的平衡态段。
+   新极差/先手写回 DESIGN §十二与 README 的平衡态段。
 4. **文档同步先于 commit**：CHANGELOG 新条目 + QA/README 中被本次改动影响的所有
    数字（测试数、包体、性能、平衡值）一次改齐，不留"下个版本再补"。
 
@@ -63,8 +62,8 @@ npm run release          # 3. 版本校验 + 测试 + 双形态构建 + zip + �
 | 变更面 | 必须同步的文档 |
 |---|---|
 | 版本号 | `src/version.ts` + `package.json` + CHANGELOG 顶部 |
-| 测试数量/覆盖 | QA.md §1 / §3 / §11 |
-| 数值与平衡 | QA.md §4 + README 平衡态段 +（机制级）DESIGN |
+| 测试数量/覆盖 | QA.md §5 + README 快速命令 |
+| 数值与平衡 | DESIGN §十二 + README 平衡态段 |
 | 视觉/布局规格 | ART_BIBLE（代码镜像：`palette.ts` / `kit.ts`） |
 | 操作/打包/产物 | README 对应节 |
 | 发布流程变更 | 本文（VERSIONING.md） |
