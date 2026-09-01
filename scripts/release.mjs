@@ -102,17 +102,51 @@ console.log(`\n[5/5] 原子替换 dist/ 与 release/`);
 // 全部构建成功才走到这里：旧产物此刻才被替换，中途任何失败都不损上一版。
 // 替换走「旧→.bak → 新落位 → 删 .bak」三步：rm+rename 两步版若 rename 被
 // 占用/跨盘打断，旧产物已删新产物未落位，发布损坏且不可回滚。
+function safeMove(src, dst, label) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      renameSync(src, dst);
+      return;
+    } catch (err) {
+      const code = err && err.code;
+      const retryable = code === 'EPERM' || code === 'EBUSY' || code === 'EXDEV';
+      if (retryable && attempt < 2) {
+        const delay = 300 * (attempt + 1);
+        console.warn(`  rename ${label} 被占用，重试 ${attempt + 1}/2 (${delay}ms)…`);
+        const until = Date.now() + delay;
+        while (Date.now() < until) {}
+        continue;
+      }
+      if (retryable) {
+        console.warn(`  rename 失败(${code})，改用复制 fallback: ${label}`);
+        cpSync(src, dst, { recursive: true });
+        rmSync(src, { recursive: true, force: true });
+        return;
+      }
+      throw err;
+    }
+  }
+}
+
 for (const [tmp, dest] of [[distTmp, DIST], [relTmp, RELEASE]]) {
   const bak = `${dest}.bak`;
   const hadOld = existsSync(dest);
-  if (hadOld) renameSync(dest, bak);
+  if (hadOld) {
+    if (existsSync(bak)) rmSync(bak, { recursive: true, force: true });
+    try {
+      safeMove(dest, bak, `${dest} -> ${bak}`);
+    } catch (err) {
+      console.error(`✗ 无法备份旧产物 ${dest}: ${err.message}`);
+      throw err;
+    }
+  }
   try {
-    renameSync(tmp, dest);
+    safeMove(tmp, dest, `${tmp} -> ${dest}`);
   } catch (err) {
-    if (hadOld) renameSync(bak, dest); // 新版落位失败：旧版回滚复位
+    if (hadOld) { try { safeMove(bak, dest, `${bak} -> ${dest} (回滚)`); } catch {} }
     throw err;
   }
-  if (hadOld) rmSync(bak, { recursive: true, force: true });
+  if (hadOld && existsSync(bak)) rmSync(bak, { recursive: true, force: true });
 }
 
 console.log(`
