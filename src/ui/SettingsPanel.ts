@@ -134,6 +134,9 @@ export class SettingsPanel {
         prefs[s.key] = Math.round(v * 20) / 20;
         draw();
         audio.setVolume(s.key === 'volBgm' ? 'bgm' : s.key === 'volSfx' ? 'sfx' : 'ui', prefs[s.key]);
+        // 音量是活偏好：拖动即落盘（close() 的 savePrefs 只覆盖"正常关闭"路径，
+        // 设置面板在对局场景里可能因开战/切场景而不经 close 直接销毁）
+        savePrefs(this.host.prefs);
       };
       // 滑杆取值用的是世界系轨道几何，而 p.x 是画布像素（1920K 系）——先换算（A1）
       const localOf = (p: Phaser.Input.Pointer) =>
@@ -153,6 +156,7 @@ export class SettingsPanel {
       audio.setVolume('bgm', prefs.volBgm);
       audio.setVolume('sfx', prefs.volSfx);
       audio.setVolume('ui', prefs.volUi);
+      savePrefs(this.host.prefs);
       muteBtn.setText(prefs.muted ? '已静音' : '静音');
     }, { width: 150, height: 40 });
     panel.add(muteBtn);
