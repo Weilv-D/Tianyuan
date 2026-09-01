@@ -206,22 +206,22 @@ export const ITEMS: readonly ItemDef[] = [
     id: 'xueyin',
     name: '血饮',
     tier: 'combined',
-    desc: '攻击力 +18，暴击率 +10%。获得 18% 全能吸血。',
+    desc: '攻击力 +24，暴击率 +12%。获得 18% 全能吸血。',
     recipe: ['moren', 'quantao'],
-    bonus: { atk: 18, critChance: 0.1, omnivamp: 0.18 },
+    bonus: { atk: 24, critChance: 0.12, omnivamp: 0.18 },
     glyph: 'bloodfang',
   },
   {
     // 纯减伤装在"胜率增量"这个口径下天然吃亏 —— 你是靠杀人赢的，不是靠活着赢的。
-    // 但 +3.8% 已经低到玩家不会想合它了，所以补上 6% 全类型减伤，
-    // 让它真正配上"不动"这个名字：不只是抗物理，是全面站得住。
+    // 8% 全类型减伤让它真正配上"不动"这个名字；全表配对复测为 +4.9%，
+    // 合成比双组件多 +3.3 个百分点。
     id: 'budong',
     name: '不动明王',
     tier: 'combined',
-    desc: '护甲 +28。受到的物理伤害降低 15%，所有伤害降低 6%。',
+    desc: '护甲 +28。受到的物理伤害降低 15%，所有伤害降低 8%。',
     recipe: ['xuanjia', 'xuanjia'],
     bonus: { armor: 28 },
-    mods: { physicalDr: 0.15, allDr: 0.06 },
+    mods: { physicalDr: 0.15, allDr: 0.08 },
     glyph: 'stupa',
   },
   {
@@ -245,17 +245,14 @@ export const ITEMS: readonly ItemDef[] = [
     glyph: 'chaosorb',
   },
   {
-    // M2 调平（sim:items 配对实测，每件 960 局）：原值（法强 22 / 初始法力 15 /
-    // 技能增幅 18%）实测 -1.8%，为全表成品最低。法强 22→32 仅 +0.3 个百分点
-    // （-1.8%→-1.5%），去除初始法力后 +4.7%（该参数实测承载 -6.2 个百分点，
-    // 与组件法符 startMp 12 + 回蓝 1 = -10.3% 的证据一致），落回成品带内。
-    // 技能增幅维持 18%。
+    // 全表同种子配对复测中，32 法强仍不足以覆盖双组件机会成本；补到 64 法强、
+    // 90 生命后单件 +11.2%，合成比双组件多 +2.2 个百分点，技能增幅维持 18%。
     id: 'taixu',
     name: '太虚经',
     tier: 'combined',
-    desc: '法强 +32。技能伤害 +18%。',
+    desc: '法强 +64，生命 +90。技能伤害 +18%。',
     recipe: ['lingzhu', 'fafu'],
-    bonus: { sp: 32 },
+    bonus: { sp: 64, hp: 90 },
     mods: { skillAmp: 0.18 },
     glyph: 'voidpearl',
   },
@@ -300,14 +297,15 @@ export const ITEMS: readonly ItemDef[] = [
     // 原版纯魔抗装，实测只有 +1.5%，是所有成品里最弱的 —— 原因不是数值给少了，
     // 而是**这个游戏里魔抗本身就是废属性**：六套预设主力全是物理输出，
     // 堆魔抗等于空过一件装备。所以改成"魔抗为主 + 全类型减伤"，
-    // 保留对法术的特化定位，同时不至于对物理阵容完全无效。
+    // 保留对法术的特化定位，同时不至于对物理阵容完全无效。补足生命与减伤后
+    // 单件 +4.2%，合成比双组件多 +0.6 个百分点，是当前成品带下沿。
     id: 'xuanming',
     name: '玄冥衣',
     tier: 'combined',
-    desc: '魔抗 +26，护甲 +16。受到的所有伤害降低 8%。',
+    desc: '生命 +180，魔抗 +26，护甲 +16。受到的所有伤害降低 12%。',
     recipe: ['doupeng', 'doupeng'],
-    bonus: { mr: 26, armor: 16 },
-    mods: { allDr: 0.08 },
+    bonus: { hp: 180, mr: 26, armor: 16 },
+    mods: { allDr: 0.12 },
     glyph: 'darkrobe',
   },
   {
@@ -338,13 +336,14 @@ export const ITEMS: readonly ItemDef[] = [
     // 原版合成收益 -2.0%，全场最差 —— 两个法符拆开给两个辅助，比合一件
     // 给一个人更划算。回蓝是线性收益，翻倍没有质变，所以给它一个
     // "溢出不浪费"的机制：治疗满血目标时，溢出的部分转成护盾。
-    // 这条同时解决了丹师/治疗流最大的痛点——满血时治疗全浪费。
+    // 这条同时解决了丹师/治疗流最大的痛点——满血时治疗全浪费；补 12 法强后
+    // 单件 +15.7%，合成比双组件多 +0.9 个百分点，仍在全表边界内。
     id: 'huitian',
     name: '回天灯',
     tier: 'combined',
-    desc: '初始法力 +28，每秒回蓝 +4，治疗提升 30%。其治疗若溢出，溢出量的 70% 转为护盾。',
+    desc: '法强 +12，初始法力 +28，每秒回蓝 +4，治疗提升 30%。其治疗若溢出，溢出量的 70% 转为护盾。',
     recipe: ['fafu', 'fafu'],
-    bonus: { startMp: 28 },
+    bonus: { sp: 12, startMp: 28 },
     mods: { manaPerSec: 4, healAmp: 0.3 },
     hooks: ['healToShield'],
     params: { shieldPct: 0.7 },
@@ -381,4 +380,3 @@ export const RECIPE_INDEX: Record<string, string> = (() => {
 export function combine(a: string, b: string): string | null {
   return RECIPE_INDEX[[a, b].sort().join('+')] ?? null;
 }
-
