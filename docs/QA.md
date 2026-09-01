@@ -20,7 +20,7 @@
 | 层级 | 入口 | 解决的问题 | 执行时机 |
 |---|---|---|---|
 | 静态正确性 | `npm run typecheck` | 类型错误、无效调用、未使用代码 | 每次改动 |
-| 架构边界 | `npm run check:boundaries` | 内核越层依赖、浏览器 API 和非确定性随机源 | 每次改动 |
+| 架构边界 | `npm run check:boundaries` | 全部七层（core/data/game/render/ui/audio/music）的越层依赖、浏览器 API 和非确定性随机源 | 每次改动 |
 | 核心行为 | `npm test` | 玩法、资产、存档、回放、输入是否破坏 | 每次改动 |
 | 生产可构建 | `npm run build:app` | Vite 生产打包与资源解析是否成功 | 每次改动 |
 | 默认 QA | `npm run qa` | 依次执行以上四层 | 交付前、CI |
