@@ -80,6 +80,36 @@ import { VIEW_K } from './render/view/viewScale';
 }
 
 /**
+ * 文字底部削切的根治：Phaser 按浏览器上报的字体度量（ascent+descent）给
+ * 文本纹理画布定高，而部分平台/字体组合（本作宋体族小字号实证，2026-09-01
+ * 设置面板页脚 D/ESC 整行削底）上报的 descent 小于真实字形墨迹，画布在
+ * 基线附近就截止——无下延的大写字母底部被水平削平。updateText 是纹理
+ * 重建的唯一咽喉，在此给 metrics.descent 追加安全余量：画布只在基线
+ * 下方变高，墨迹位置与 origin 锚点完全不动；余量随字号比例放大。
+ * setStyle 换字体重建度量（伤害飘字等）后 markers 随新对象消失，
+ * 「无标记即再补」自然覆盖该路径。
+ */
+{
+  const proto = Phaser.GameObjects.Text.prototype as unknown as Record<string, (...a: unknown[]) => unknown>;
+  const prev = proto.updateText;
+  if (!(prev as { __descentPadded?: boolean }).__descentPadded) {
+    const wrapped = function (this: Phaser.GameObjects.Text, ...args: unknown[]) {
+      const size = (this.style as unknown as {
+        metrics?: { ascent: number; descent: number; fontSize: number; __descentPadded?: boolean };
+      })?.metrics;
+      if (size && !size.__descentPadded) {
+        size.descent += Math.max(2, Math.round(size.fontSize * 0.12));
+        size.fontSize = size.ascent + size.descent;
+        size.__descentPadded = true;
+      }
+      return prev.apply(this, args);
+    } as ((...a: unknown[]) => unknown) & { __descentPadded?: boolean };
+    wrapped.__descentPadded = true;
+    proto.updateText = wrapped;
+  }
+}
+
+/**
  * 启动入口。
  *
  * 设计分辨率固定 1920×1080，用 Scale.FIT 等比适配任意 16:9 窗口 ——
