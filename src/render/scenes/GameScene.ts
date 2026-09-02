@@ -678,6 +678,14 @@ export class GameScene extends Phaser.Scene {
     //    用同一 config 播放演出，判定只发生在这里：渲染永远不参与结算，
     //    墨兽轮掉落的 rng 消费顺序与无头模拟逐位一致（确定性契约）。
     const humanPair = pairings.find((p) => p.a === 0 || p.b === 0);
+    // 我方/对手是否空阵、本场战斗配置，都必须在结算前取证：settleRound 若把任一方
+    // 打至淘汰，eliminate 会当场清空其棋盘 —— 事后读棋盘会把"上阵后战死"误判成
+    // "未上阵"，终局最后一战因此被当作弃权局吞掉；事后重建 config 也会让演出与
+    // 判定不一致（2026-09-02 实机复现修复）。对手棋盘用人类视角语义
+    //（boardFacedByHuman：人类可能是 pair.a 也可能是 pair.b）。
+    const meEmptyBefore = this.match.human.board.every((u) => u === null);
+    const oppEmptyBefore = humanPair ? this.match.boardFacedByHuman(humanPair).every((u) => u === null) : false;
+    const humanConfig = humanPair ? this.match.buildBattleConfig(humanPair, humanPair.swap) : null;
     const reports: string[] = [];
     const outcomes = this.match.settleRound();
     pairings.forEach((pair, i) => {
@@ -686,21 +694,33 @@ export class GameScene extends Phaser.Scene {
     });
 
     // 2) 玩家自己的战斗
-    if (!humanPair || !this.match.human.alive) {
+    // 注意不得以"结算后 human.alive"决定跳过演出：settleRound 已在本块上方
+    // 无头完成判定，人类若在本轮战败淘汰，alive 已翻 false —— 但他的最后一战
+    // 仍然要打给玩家看（对手满阵也照样吞掉整场战斗，终局表现就是"点开战
+    // 直接弹结算页"）。淘汰态交给 afterBattle 的淘汰演出承接。
+    if (!humanPair) {
       this.lastReport = reports.join('\n');
       this.finishRound();
       return;
     }
     // 空阵对手直胜：对手零上场子时不入 BattleScene（避免 1-tick 零条计分板）
-    // 判定已在本轮 settleRound 内按弃权口径完成，这里只收尾
+    // 判定已在本轮 settleRound 内按弃权口径完成，这里只收尾。
+    // 空阵判定一律用结算前快照（meEmptyBefore / oppEmptyBefore）。
     if (humanPair) {
-      const oppBoard = this.match.boardOfOpponent(humanPair);
-      const oppEmpty = oppBoard.every((u) => u === null);
-      const meEmpty = this.match.human.board.every((u) => u === null);
-      if (oppEmpty || meEmpty) {
-        // 将"我方弃权/对手弃权"顶到战报首行，避免只有"胜/败"却看不到原因
-        const tag = meEmpty && oppEmpty ? '双方均未上阵 · 平局' : oppEmpty ? '对手未上阵 · 直接胜利' : '我方未上阵 · 直接败北';
-        this.lastReport = `${tag}\n${reports.join('\n')}`.trim();
+      const oppEmpty = oppEmptyBefore;
+      const meEmpty = meEmptyBefore;
+      // 轮空（无对手）与空阵弃权是两回事：轮空不掉血、不计胜负、连胜保留，
+      // 战报行由 afterBattle 的「你 本轮轮空」承担 —— 绝不能落「直接胜利」标签
+      const isBye = !humanPair.beast && humanPair.b < 0 && humanPair.ghost < 0;
+      if (isBye || oppEmpty || meEmpty) {
+        const tag = isBye
+          ? ''
+          : meEmpty && oppEmpty
+            ? '双方均未上阵 · 平局'
+            : oppEmpty
+              ? '对手未上阵 · 直接胜利'
+              : '我方未上阵 · 直接败北';
+        this.lastReport = tag ? `${tag}\n${reports.join('\n')}`.trim() : reports.join('\n');
         this.finishRound();
         return;
       }
@@ -709,7 +729,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshAll();
 
     audio.playPluck(196); // 徵音起手：开战的弦响
-    fadeTo(this, 'Battle', { match: this.match, pair: humanPair });
+    fadeTo(this, 'Battle', { match: this.match, pair: humanPair, config: humanConfig ?? undefined });
   }
 
   private describeOutcome(pair: Pairing, outs: RoundOutcome[]): string {
@@ -771,12 +791,15 @@ export class GameScene extends Phaser.Scene {
       this.lastReport = `你 本轮轮空\n${this.lastReport}`.trim();
     }
 
-    if (this.match.isOver()) {
-      this.showFinalStandings();
-      return;
-    }
+    // 淘汰演出优先于终局判定：终局轮战死（2 人残局败北）也要先看到
+    // 「你被淘汰」，确认后再进终局结算 —— 否则最后一战被无头结算吞掉后，
+    // 连淘汰面板都不弹，玩家直接被闪送到结算页（2026-09-02 实机复现修复）
     if (!p.alive) {
       this.eliminated.show(p, this.match.round, () => this.fastForward(), () => this.restart());
+      return;
+    }
+    if (this.match.isOver()) {
+      this.showFinalStandings();
       return;
     }
 

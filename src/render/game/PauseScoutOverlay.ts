@@ -1,6 +1,7 @@
 /** 职责：准备阶段的暂停遮罩（冻结倒计时、操作不受限）与对手侦查面板（只读快照）两块覆盖层。 */
 import Phaser from 'phaser';
 import { TRAIT_BY_ID } from '../../data/traits';
+import type { Pairing } from '../../game/match';
 import { FONT, Button } from '../../ui/kit';
 import { UnitPortrait } from '../../ui/cards';
 import { audio } from '../../audio/AudioEngine';
@@ -58,9 +59,24 @@ export class PauseScoutOverlay {
 
   /** 侦查对手：点击计分板行查看其当前棋盘与羁绊（只读快照，不影响任何判定） */
   showOpponentBoard(idx: number): void {
-    this.closeScout();
     const p = this.scene.match.players[idx];
     if (!p) return;
+    this.showBoardPanel(p.name, `生命 ${p.hp}　等级 ${p.level}`, p.board);
+  }
+
+  /**
+   * 侦查墨影：奇数存活轮落单对手的阵地 = 出局玩家的阵容快照（boardOfOpponent
+   * 同一真源）。此前墨影轮直接拒绝侦查（"本轮无对手可侦查"），玩家无从备战。
+   */
+  showGhostBoard(pair: Pairing): void {
+    const owner = this.scene.match.players[pair.ghost];
+    this.showBoardPanel('墨 影', `沿用〔${owner?.name ?? ''}〕出局阵容`, this.scene.match.boardOfOpponent(pair));
+  }
+
+  /** 阵地面板本体：真人棋盘与墨影快照共用（只读，不触判定） */
+  private showBoardPanel(title: string, sub: string, board: readonly (import('../../game/state').UnitInstance | null)[]): void {
+    this.closeScout();
+    const p = { board: board ?? [] };
     const panel = this.scene.add.container(0, 0).setDepth(860);
     const bw = 780;
     const bh = 600;
@@ -83,12 +99,12 @@ export class PauseScoutOverlay {
     panel.add(g);
     panel.add(
       this.scene.add
-        .text(bx + 28, by + 20, `${p.name} 的阵地`, { fontFamily: FONT.title, fontSize: '22px', color: css(PAPER[100]) })
+        .text(bx + 28, by + 20, `${title} 的阵地`, { fontFamily: FONT.title, fontSize: '22px', color: css(PAPER[100]) })
         .setOrigin(0, 0)
     );
     panel.add(
       this.scene.add
-        .text(bx + bw - 28, by + 30, `生命 ${p.hp}　等级 ${p.level}`, {
+        .text(bx + bw - 28, by + 30, sub, {
           fontFamily: FONT.body,
           fontSize: '13px',
           color: css(PAPER[400]),

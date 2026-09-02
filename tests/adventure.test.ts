@@ -24,12 +24,14 @@ describe('奇遇回合', () => {
     const benchBefore = first.human.bench.filter(Boolean).length;
     const boardBefore = first.human.board.filter(Boolean).length;
     const xpBefore = first.human.xp;
+    const levelBefore = first.human.level;
     expect(first.resolveHumanAdventure()).toBe(true);
     // 代选后 offer 清空，且玩家实际拿到了某一种恩赐（金/件/经验/援军/等级五选一）
     expect(first.adventureOffer).toBeNull();
     const gained =
       first.human.gold > goldBefore ||
       first.human.xp > xpBefore ||
+      first.human.level > levelBefore ||
       first.human.bench.filter(Boolean).length > benchBefore ||
       first.human.board.filter(Boolean).length > boardBefore ||
       first.human.items.length > 0;

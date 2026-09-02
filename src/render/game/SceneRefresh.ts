@@ -277,15 +277,22 @@ export class SceneRefresh {
   private refreshIntel(): void {
     const pr = this.scene.match.pairings.find((x) => x.a === 0 || x.b === 0);
     const other = pr ? (pr.a === 0 ? pr.b : pr.a) : -2;
-    const sig = `${pr?.beast ? 'b' : other}`;
+    const sig = `${pr?.beast ? 'b' : other}#${pr?.ghost ?? -1}`;
     const p = this.scene.match.human;
-    const boardSig =
-      other >= 0
-        ? (this.scene.match.players[other].board
-            .filter((u): u is NonNullable<typeof u> => !!u)
-            .map((u) => `${u.defId}${u.star}`)
-            .join(',') || '')
-        : '';
+    // 敌情预览的棋盘真源：真人对手读其当前棋盘；墨影读出局阵容快照
+    //（boardOfOpponent 同一入口，备战期看到的就是开战要打的）
+    const previewBoard =
+      pr && !pr.beast && other < 0 && pr.ghost >= 0
+        ? this.scene.match.boardOfOpponent(pr)
+        : other >= 0
+          ? this.scene.match.players[other].board
+          : null;
+    const boardSig = previewBoard
+      ? (previewBoard
+          .filter((u): u is NonNullable<typeof u> => !!u)
+          .map((u) => `${u.defId}${u.star}`)
+          .join(',') || '')
+      : '';
     const full = `${sig}#${boardSig}#${p.gold}`;
     if (full === this.intelSig) return;
     this.intelSig = full;
@@ -307,13 +314,39 @@ export class SceneRefresh {
       return;
     }
     if (other < 0) {
-      setTextIf(this.scene.hud.opponentText, pr.ghost >= 0 ? '墨 影' : '轮 空');
+      // 墨影（奇数存活轮的落单对手）：沿用出局玩家的阵容快照，敌情必须可读 ——
+      // 此前只挂"墨 影"二字、预览区全空，终局 3~5 人轮次看起来就像"对手空场"
+      if (pr.ghost >= 0) {
+        setTextIf(this.scene.hud.opponentText, '墨 影');
+        this.renderIntelPreview(previewBoard);
+        const owner = this.scene.match.players[pr.ghost];
+        this.scene.hud.intelContainer.add(
+          this.scene.add.text(0, 104, `沿用〔${owner?.name ?? ''}〕出局阵容`, {
+            fontFamily: FONT.body,
+            fontSize: '11px',
+            color: css(MOON.base),
+          })
+        );
+      } else {
+        setTextIf(this.scene.hud.opponentText, '轮 空');
+        this.scene.hud.intelContainer.add(
+          this.scene.add.text(0, 8, '本轮无对手 · 不掉血不计胜负', {
+            fontFamily: FONT.body,
+            fontSize: '12px',
+            color: css(PAPER[400]),
+          })
+        );
+      }
       return;
     }
     const foe = this.scene.match.players[other];
     setTextIf(this.scene.hud.opponentText, foe.name);
+    this.renderIntelPreview(foe.board);
+  }
 
-    const units = foe.board.filter((u): u is NonNullable<typeof u> => !!u);
+  /** 敌情主力三员预览（真人对手与墨影共用一套渲染；空棋盘落「尚在整军」占位） */
+  private renderIntelPreview(board: readonly (import('../../game/state').UnitInstance | null)[] | null): void {
+    const units = (board ?? []).filter((u): u is NonNullable<typeof u> => !!u);
     units.sort((a, b) => b.star - a.star || (CHAMPION_BY_ID[b.defId]?.cost ?? 0) - (CHAMPION_BY_ID[a.defId]?.cost ?? 0));
     units.slice(0, 3).forEach((u, i) => {
       const def = CHAMPION_BY_ID[u.defId];

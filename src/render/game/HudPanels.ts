@@ -678,16 +678,22 @@ export class HudPanels {
     return this.traitModal !== null;
   }
 
-  /** nav「阵容」：直接侦查本轮对手（墨兽轮提示无可侦） */
+  /** nav「阵容」：直接侦查本轮对手（墨兽轮提示无可侦；墨影轮侦查出局阵容快照） */
   private scoutNextOpponent(): void {
     const pr = this.scene.match.pairings.find((x) => x.a === 0 || x.b === 0);
     if (!pr) {
       this.scene.showToast('开战后方可侦查');
       return;
     }
+    if (pr.beast) {
+      this.scene.showToast('墨兽轮 · 无阵可侦');
+      return;
+    }
     const other = pr.a === 0 ? pr.b : pr.a;
-    if (pr.beast || other < 0) {
-      this.scene.showToast(pr.beast ? '墨兽轮 · 无阵可侦' : '本轮无对手可侦查');
+    if (other < 0) {
+      // 墨影（奇数存活轮的落单对手）：阵容快照可侦查；轮空无对手
+      if (pr.ghost >= 0) this.scene.pauseScout.showGhostBoard(pr);
+      else this.scene.showToast('本轮轮空 · 无对手');
       return;
     }
     this.scene.pauseScout.showOpponentBoard(other);

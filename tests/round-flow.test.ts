@@ -4,6 +4,7 @@ import { COMPONENT_IDS } from '../src/data/items';
 import { COMBINED_ITEM_IDS, adventureGold, adventureReinforceCost, adventureStage, adventureXp } from '../src/game/adventure';
 import { ADVENTURE_ROUND_SCHEDULE, BEAST_DROP_SCHEDULE, BEAST_ROUND_SCHEDULE, Match } from '../src/game/match';
 import { createUnit } from '../src/game/state';
+import { makeProfile } from '../src/game/ai';
 
 /** 逐轮推进到目标回合（不结算战斗 —— 调度与掉落断言不依赖 AI 战局） */
 function enterRound(match: Match, round: number): void {
@@ -180,5 +181,45 @@ describe('墨兽掉落表', () => {
     expect(outcomes[0].gold).toBe(12);
     expect(match.human.gold - goldBefore).toBe(12);
     expect(match.human.hp).toBe(PLAYER_START_HP); // 平局不掉血
+  });
+});
+
+describe('AI 开局阵容下限（2026-09-02 空阵修复回归）', () => {
+  it('任何原型任何种子，第 1 回合结束后至少持有 1 张棋子 —— 不存在零上阵开局', () => {
+    // 回归背景：孤注(mergeBias 3.6) 曾把"开新线惩罚"放大到 21.6 分，
+    // 开局整店评不过阈值，52% 对局以空阵开局 —— 玩家侧表现为
+    // "对手未上阵 · 直接胜利"的零对抗局。空手急救 + 惩罚封顶后必须绝迹。
+    for (let seed = 1; seed <= 40; seed++) {
+      const match = new Match(seed);
+      match.beginRound();
+      for (const p of match.alivePlayers()) {
+        if (p.isHuman) continue; // 测试里人类不行动，只约束 AI
+        const total = match.players[p.idx].board.filter(Boolean).length + match.players[p.idx].bench.filter(Boolean).length;
+        expect(total, `seed=${seed} ${p.name}（${p.ai?.arch}）开局 ${total} 张棋子`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('整局无头快进：任何回合任何存活 AI 都不上空阵棋盘', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const match = new Match(seed);
+      match.human.ai = makeProfile('balanced');
+      let guard = 0;
+      while (!match.isOver() && guard++ < 60) {
+        match.beginRound();
+        if (match.isOver()) break;
+        for (const p of match.alivePlayers()) {
+          if (p.isHuman) continue;
+          expect(
+            p.board.filter(Boolean).length,
+            `seed=${seed} r=${match.round} ${p.name} 空阵`,
+          ).toBeGreaterThan(0);
+        }
+        for (const pair of match.pairings) {
+          match.applyBattleResult(pair, match.runBattleHeadless(pair));
+        }
+        match.endRound();
+      }
+    }
   });
 });

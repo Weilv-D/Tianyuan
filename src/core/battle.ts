@@ -71,6 +71,13 @@ export class Battle implements BattleApi {
   private readonly occ = new Int16Array(BOARD_COLS * BOARD_ROWS).fill(-1);
   private zones: Zone[] = [];
   private scheduled: ScheduledTask[] = [];
+  /**
+   * 待复活占位（uid → 归属队）。鹤龄镜这类"阵亡 N 秒后复活"的延迟通道注册于此：
+   * checkEnd 看到"一方清零但仍有未兑现的复活"时不判胜负 —— 否则持有者作为
+   * 本队最后单位阵亡时，复活窗会被即时胜负判定吞掉，装备恰在其最该生效的场合失效。
+   * 任务到期即删除条目，不存在永不兑现的悬空项；超时裁定照常兜底。
+   */
+  private pendingRevives = new Map<number, TeamId>();
   private seq = 0;
   private nextUid = 1;
   private zoneId = 1;
@@ -835,6 +842,22 @@ export class Battle implements BattleApi {
     this.scheduled.push({ atTick: this.tick + Math.max(1, Math.round(delaySeconds * TICK_RATE)), seq: this.seq++, fn });
   }
 
+  /**
+   * 延迟复活专用通道：除 schedule 的延迟语义外，把 uid 记入 pendingRevives，
+   * 让 checkEnd 在复活兑现前不终局。到期先删占位再复活（复活失败也不悬空）。
+   */
+  scheduleRevive(u: Unit, delaySeconds: number, hpPct: number): void {
+    this.pendingRevives.set(u.uid, u.team);
+    this.scheduled.push({
+      atTick: this.tick + Math.max(1, Math.round(delaySeconds * TICK_RATE)),
+      seq: this.seq++,
+      fn: (api) => {
+        this.pendingRevives.delete(u.uid);
+        if (!u.alive) api.revive(u, hpPct, u);
+      },
+    });
+  }
+
   // ───────────────── 死亡 ─────────────────
 
   private killUnit(u: Unit, killer: Unit | null): void {
@@ -1148,13 +1171,20 @@ export class Battle implements BattleApi {
       if (!u.alive) continue;
       aliveByTeam.set(u.team, (aliveByTeam.get(u.team) ?? 0) + 1);
     }
+    // 只对「已无存活单位的一方」的待复活等待：胜方自身的待复活无关胜负
+    //（胜负已定，复活窗随终局取消），不为它白等 2 秒。
+    const revivePendingForWipedTeam = [...this.pendingRevives.values()].some((t) => !aliveByTeam.has(t));
     if (aliveByTeam.size === 1) {
+      // 复活窗未兑现（鹤龄镜延迟复活）：空窗期间胜方无处输出（选目标安全空转），
+      // 最多等到任务到期；复活兑现后战斗继续，超时裁定照常兜底
+      if (revivePendingForWipedTeam) return;
       const winner = [...aliveByTeam.keys()][0];
       const hasChampion = this.units.some((u) => u.alive && !u.isMinion && u.team === winner);
       this.finish(hasChampion ? winner : null, false);
       return;
     }
     if (aliveByTeam.size === 0) {
+      if (revivePendingForWipedTeam) return;
       this.finish(null, false);
       return;
     }

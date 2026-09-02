@@ -207,6 +207,11 @@ export interface BattleApi {
 
   /** 延迟执行（秒）。用于弹幕、延迟雷击、多段剑雨。 */
   schedule(delaySeconds: number, fn: (api: BattleApi) => void): void;
+  /**
+   * 延迟复活（秒）：除延迟语义外，在复活兑现前 checkEnd 不终局 ——
+   * 否则持有者作为本队最后单位阵亡时，复活窗会被即时胜负判定吞掉。
+   */
+  scheduleRevive(u: Unit, delaySeconds: number, hpPct: number): void;
 
   /** 余烬阶段的全局增伤 */
   overtimeAmp(): number;

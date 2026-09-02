@@ -171,11 +171,11 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (victim.alive) return;
       victim.itemUsed.add('immortal');
       const delay = paramOf(victim, 'reviveDelay');
-      const doRevive = (api: BattleApi): void => {
-        if (!victim.alive) api.revive(victim, paramOf(victim, 'hpPct'), victim);
-      };
-      if (delay > 0) a.schedule(delay, doRevive);
-      else doRevive(a);
+      // 延迟复活必须走 scheduleRevive 专用通道：checkEnd 在本队全灭时
+      // 会即时判胜负，普通 schedule 的复活窗会被提前终局吞掉
+      //（持有者恰在最该复活的"最后单位阵亡"场合拿到一件哑装备）。
+      if (delay > 0) a.scheduleRevive(victim, delay, paramOf(victim, 'hpPct'));
+      else if (!victim.alive) a.revive(victim, paramOf(victim, 'hpPct'), victim);
       a.emit({
         t: 'fx',
         tick: a.tick,

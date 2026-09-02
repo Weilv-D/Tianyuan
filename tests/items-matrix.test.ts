@@ -238,6 +238,22 @@ describe('装备钩子回归（v1.9 新件）', () => {
     expect(a.cell).toEqual(deathCell); // 死亡点未被占 → 原地起身
   });
 
+  it('鹤龄镜：本队最后单位阵亡时复活窗不被提前终局吞掉（1v1 无队友）', () => {
+    const battle = mkBattle([
+      unitInput('pan', 0, { c: 2, r: 5 }, { items: ['buxiu'] }),
+      unitInput('jingyu', 1, { c: 7, r: 0 }),
+    ]);
+    const a = byDef(battle, 'pan');
+    battle.dealDamage(byDef(battle, 'jingyu'), a, 10 ** 6, 'true');
+    expect(a.alive).toBe(false);
+    // 复活窗未兑现：持有方虽全灭，checkEnd 不得提前判负
+    for (let i = 0; i < 30; i++) battle.step();
+    expect(battle.finished).toBe(false);
+    // 2 秒复活窗到期后必须真实复活（复活事件 = 以自身为源的 heal）
+    for (let i = 0; i < 90 && !battle.finished; i++) battle.step();
+    expect(battle.events.some((e) => e.t === 'heal' && e.srcUid === a.uid && e.dstUid === a.uid)).toBe(true);
+  });
+
   it('惊雷锤：技能伤害可暴击（种子确定某次 crit）', () => {
     const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }, { items: ['jinglei'] }), unitInput('jingyu', 1, { c: 7, r: 1 })], 777, 900);
     const a = byDef(battle, 'pan');

@@ -71,8 +71,11 @@ export class BattleScene extends Phaser.Scene {
   /**
    * 对局模式：由 GameScene 传入正在进行的对局与本场配对。
    * 为空则是 M1 的"阵容对拍"演示模式。
+   * config 是 GameScene 在无头结算**之前**预构建的战斗配置：结算若淘汰了
+   * 任一方，eliminate 会清空其棋盘，事后重建 config 会与判定不一致
+   * （演出变成空场秒胜/秒败）—— 演出必须用与判定同一份输入。
    */
-  private matchCtx: { match: Match; pair: Pairing } | null = null;
+  private matchCtx: { match: Match; pair: Pairing; config?: BattleConfig } | null = null;
   /** 墨兽的 uid 集合（渲染层据此换用墨色剪影） */
   private monsterUids = new Set<number>();
   /** 观众（人类玩家）所在队号。演示模式固定为 0。 */
@@ -122,8 +125,8 @@ export class BattleScene extends Phaser.Scene {
     super({ key: 'Battle' });
   }
 
-  init(data: { match?: Match; pair?: Pairing }): void {
-    this.matchCtx = data.match && data.pair ? { match: data.match, pair: data.pair } : null;
+  init(data: { match?: Match; pair?: Pairing; config?: BattleConfig }): void {
+    this.matchCtx = data.match && data.pair ? { match: data.match, pair: data.pair, config: data.config } : null;
   }
 
   create(): void {
@@ -338,9 +341,10 @@ export class BattleScene extends Phaser.Scene {
 
     let cfg: BattleConfig;
     if (this.matchCtx) {
-      // 对局模式：配置直接来自 Match，与无头模拟用的是同一份东西 ——
-      // 所以模拟出来的平衡数据就是玩家实际看到的战斗。
-      cfg = this.matchCtx.match.buildBattleConfig(this.matchCtx.pair, this.matchCtx.pair.swap);
+      // 对局模式：优先用 GameScene 预构建的 config（与无头判定同一份输入 ——
+      // 结算若已淘汰一方，事后重建会读到被 eliminate 清空的棋盘）；
+      // 缺省回退现场构建（旧调用路径兼容）
+      cfg = this.matchCtx.config ?? this.matchCtx.match.buildBattleConfig(this.matchCtx.pair, this.matchCtx.pair.swap);
     } else {
       const a = buildTeam(this.compA, 0, 1);
       const b = buildTeam(this.compB, 1, 200);

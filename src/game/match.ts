@@ -934,6 +934,18 @@ export class Match implements AiWorld {
     return pair.b >= 0 ? this.players[pair.b].board : (this.ghosts.get(pair.ghost) ?? emptyBoard());
   }
 
+  /**
+   * 人类视角的本场对手棋盘。与 boardOfOpponent（**pair.a 的对手**）严格区分：
+   * 人类在配对中可能是 a 也可能是 b（makePairings 的洗牌序决定），对手永远是
+   * "另一方"。此前渲染层把它当"我的对手"用，人类为 b 的回合会读到自己的棋盘
+   * —— 战败淘汰后棋盘被清空，就被误判成"对手未上阵·直接胜利"并吞掉最后一战。
+   */
+  boardFacedByHuman(pair: Pairing): readonly (UnitInstance | null)[] {
+    if (pair.beast) return this.beastBoard ?? emptyBoard();
+    if (pair.b === 0) return this.players[pair.a].board;
+    return this.boardOfOpponent(pair);
+  }
+
   /** 某个队伍对应的玩家序号。-1 = 墨影（已淘汰玩家的残影） */
   playerIdxOfTeam(pair: Pairing, team: 0 | 1): number {
     const teamOfA: 0 | 1 = pair.swap ? 1 : 0;

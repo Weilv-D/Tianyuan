@@ -293,8 +293,17 @@ export function scoreCard(p: PlayerState, defId: string, round: number, prof: Ai
   // 压力越大（备战席越满），越只能买"能推进已有进度"的牌。
   const owned = copiesOf(p, defId, 1) + copiesOf(p, defId, 2);
   if (owned === 0) {
-    const pressure = benchCount(p) / BENCH_SLOTS;
-    s -= (6 + pressure * 22) * Math.max(0.5, prof.mergeBias);
+    if (allUnits(p).length === 0) {
+      // 空手急救：一张棋子都没有时，任何买得起的牌都是急救。没有这一档，
+      // 高 mergeBias 原型（孤注 3.6）开局即把开新线惩罚吃到 21.6 分，
+      // 整店评不过阈值，以零上阵开局 —— 玩家侧就是"对手未上阵"的零对抗局。
+      s += 48;
+    } else {
+      const pressure = benchCount(p) / BENCH_SLOTS;
+      // mergeBias 封顶 1.6：搜三型原型对"摊大饼"的厌恶保留个性空间，
+      // 但不允许放大到整店一张都评不过的死区（孤注 3.6×6 = 21.6 分起步）。
+      s -= (6 + pressure * 22) * Math.min(1.6, Math.max(0.5, prof.mergeBias));
+    }
   }
 
   return s;
