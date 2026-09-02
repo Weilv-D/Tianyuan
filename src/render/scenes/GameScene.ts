@@ -115,6 +115,8 @@ export class GameScene extends Phaser.Scene {
   private streakBefore = 0;
   /** 投降/重开后置真：阻止 SHUTDOWN 与 beforeunload 把已放弃的存档写回去 */
   private abandoned = false;
+  /** 本局存档失败是否已提示过（配额满的 toast 只弹一次，连续动作不刷屏；成功后复位） */
+  private saveFailNotified = false;
 
   constructor() {
     super({ key: 'Game' });
@@ -145,6 +147,7 @@ export class GameScene extends Phaser.Scene {
     this.settingsPanel = null;
     this.abandoned = false;
     this.streakBefore = 0;
+    this.saveFailNotified = false;
     // 战报必须跨越"战斗场景往返"（resultPending 回来时 afterBattle 要读它），
     // 只在真正开新局时清空，避免把上一局的战报带进新一局的准备阶段
     if (!data.resultPending) this.lastReport = '';
@@ -377,7 +380,8 @@ export class GameScene extends Phaser.Scene {
 
   onUnequip(u: UnitInstance, itemId: string): void {
     this.pushUndo('卸下');
-    if (unequipItem(this.match.human, u.iid, itemId)) {
+    const r = unequipItem(this.match.human, u.iid, itemId);
+    if (r.ok) {
       audio.play('ui');
       const def = ITEM_BY_ID[itemId];
       this.showToast(
@@ -387,6 +391,7 @@ export class GameScene extends Phaser.Scene {
       );
     } else {
       this.undoStack.pop();
+      this.showToast(r.reason ?? '无法卸下', true);
     }
     this.afterAction();
   }
@@ -526,7 +531,9 @@ export class GameScene extends Phaser.Scene {
     this.saveTimer = this.time.delayedCall(600, () => {
       this.saveTimer = null;
       if (this.abandoned) return;
-      saveMatch(this.match);
+      // 写盘失败要给玩家可见反馈：配额满时静默失败会让「继续」读到旧档、
+      // 回退若干回合且无提示（M4 确立的失败可见纪律）
+      this.persistMatch();
     });
   }
 
@@ -536,7 +543,7 @@ export class GameScene extends Phaser.Scene {
     if (this.saveTimer) {
       this.saveTimer.remove();
       this.saveTimer = null;
-      saveMatch(this.match);
+      this.persistMatch();
     }
   }
 
@@ -659,11 +666,25 @@ export class GameScene extends Phaser.Scene {
 
   // ══════════════ 回合流转 ══════════════
 
+  /**
+   * 统一的存档出口：成功则复位"已提示"标记；失败则按需弹一次配额提示
+   * （所有落盘点共用同一可见性口径，避免有的路径弹、有的路径静默）。
+   */
+  private persistMatch(): boolean {
+    const ok = saveMatch(this.match);
+    if (ok) this.saveFailNotified = false;
+    else if (!this.saveFailNotified) {
+      this.saveFailNotified = true;
+      this.showToast('存档失败：浏览器存储已满，请清理后继续', true);
+    }
+    return ok;
+  }
+
   private enterPrep(): void {
     this.phase = 'prep';
     this.busy = false;
     this.undoStack = [];
-    saveMatch(this.match);
+    this.persistMatch();
     audio.startBgm(this.match.round >= 14 ? 'final' : 'prep');
     this.refreshAll();
   }
@@ -790,7 +811,7 @@ export class GameScene extends Phaser.Scene {
   private finishRound(): void {
     this.busy = true;
     this.match.endRound();
-    saveMatch(this.match);
+    this.persistMatch();
     this.afterBattle();
   }
 

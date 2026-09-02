@@ -13,7 +13,7 @@
  *    的牌、少刷一次商店）。完全理性的对手看起来最假。
  */
 
-import { BENCH_SLOTS, PLAYER_START_HP, REROLL_COST, SHOP_SLOTS, XP_BUY_COST } from '../core/config';
+import { BENCH_SLOTS, INCOME_BASE, INCOME_INTEREST_MAX, INCOME_INTEREST_TIER, PLAYER_START_HP, REROLL_COST, SHOP_SLOTS, XP_BUY_COST } from '../core/config';
 import { CHAMPION_BY_ID } from '../data/champions';
 import { computeTraits } from './comp';
 import { autoArrange } from './arrange';
@@ -415,7 +415,10 @@ export function aiTakeTurn(w: AiWorld, p: PlayerState): void {
   }
 }
 
-/** 下一次准备阶段预计能拿到的钱（基础收入 + 利息的粗略估计） */
+/** 下一次准备阶段预计能拿到的钱（基础收入 + 利息的粗略估计）。
+ *  与 economy.computeIncome 同源：基础收入/利息上限/利息档距全部读 config 真源，
+ *  不落字面量 —— 经济常量调整时 AI 锁店阈值自动跟随，不会按旧值误判买不买得起。
+ *  连胜/连败档金无法预知（取决于本回合结果），按中位 2 金粗估。 */
 function projectedNextIncome(p: PlayerState): number {
-  return 5 + Math.min(5, Math.floor(p.gold / 10)) + 2;
+  return INCOME_BASE + Math.min(INCOME_INTEREST_MAX, Math.floor(p.gold / INCOME_INTEREST_TIER)) + 2;
 }

@@ -113,16 +113,27 @@ export function runPool(
       pendingTimers.clear();
     };
     const killAll = (): void => {
-      for (const p of children) p.kill();
+      for (const p of children) {
+        try { p.disconnect(); } catch { /* 已断开的子进程 */ }
+        try { p.kill(); } catch { /* 已退出的子进程 */ }
+      }
     };
     const finish = (): void => {
       if (settled) return;
       settled = true;
       clearAllTimers();
-      for (const p of children) p.send({ type: 'shutdown' });
-      // 兜底强杀：shutdown 消息丢失时别让命令挂住（unref 不阻塞进程退出）
+      for (const p of children) {
+        try {
+          if (p.connected) p.send({ type: 'shutdown' });
+        } catch {
+          /* 子进程已退出：send 抛 EPIPE 属正常竞争，忽略 */
+        }
+      }
+      // 兜底强杀：shutdown 消息丢失时别让命令挂住。计时器纳入 pendingTimers 统一
+      // 清理，且 unref 不阻塞进程退出 —— 正常路径 finish 后立即 resolve，本定时器
+      // 在 2s 内被 clearAllTimers 清掉，不会残留到触发
       const t = setTimeout(killAll, 2000);
-      t.unref?.();
+      trackTimer(t);
       resolve(results as PoolResult[]);
     };
     const fail = (err: Error): void => {

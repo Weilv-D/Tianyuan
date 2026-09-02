@@ -9,6 +9,12 @@
  *   trait.<id>.scale              整条羁绊等比缩放
  *   trait.<id>.<key>              羁绊单点覆盖（key 必须是 tuning.ts TRAIT_TUNE_KEYS 登记键，
  *                                 与 core/traits.ts 里 tune() 的读取键同源 —— 拼错当场报错）
+ *
+ * 可 cfg. 覆盖的面 = MECH + MATCH_TUNING 两个数字块（sweep/sensitivity.json 的
+ * cfg.* 键只在这两块的字段名内合法）。config.ts 其余常量（GLOBAL_HP_SCALE、
+ * STAR_*_SCALE、POOL_COUNTS、SHOP_ODDS、ROUND_BASE_DAMAGE、XP_* 等）不在此列 ——
+ * 它们是"调平衡改源码"的那一面，不参与线上扫描覆盖；需要扫它们请改源码后重跑。
+ * LEGEND_T3 单独走 legend.* 前缀（口径 2 把天命包归零时用）。
  */
 import { CHAMPION_BY_ID } from '../../src/data/champions';
 import { resetTuning, TRAIT_TUNING, TRAIT_TUNING_KEYS, TRAIT_TUNE_KEYS } from '../../src/data/tuning';

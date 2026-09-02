@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BENCH_SLOTS } from '../src/core/config';
 import { CHAMPIONS } from '../src/data/champions';
 import { autoArrange } from '../src/game/arrange';
+import { unequipItem } from '../src/game/inventory';
 import { Match } from '../src/game/match';
 import { CardPool } from '../src/game/pool';
 import {
@@ -147,5 +148,88 @@ describe('玩家资产守恒', () => {
     expect(itemCount(held, player.items)).toBe(ids.length);
     expect(refund).toBeGreaterThan(0);
     expect(player.gold).toBe(refund);
+  });
+
+  it('卖出带装备的棋子：成品拆回组件、卡回池、金币照返（装备不蒸发）', () => {
+    const match = new Match(20260903, '测试', 'normal');
+    const player = match.human;
+    player.gold = 50;
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    player.items = [];
+    const poolBefore = match.pool.snapshot();
+    // 组件 moren + 成品 guanri（recipe [moren, lingzhu]，拆回两组件）
+    player.bench[0] = createUnit('pan');
+    const unit = player.bench[0]!;
+    unit.items = ['moren', 'guanri'];
+    const goldBefore = player.gold;
+    const id = unit.defId;
+    const star = unit.star;
+
+    expect(match.sell(player, unit.iid)).toBe(true);
+
+    // 装备守恒：1 件成品（拆 2）+ 1 组件 → 器匣多了 3 件
+    expect(player.items).toHaveLength(3);
+    // 卡回池：pan 1★ 回到池（池计数对称）
+    expect(match.pool.snapshot()).toEqual({ ...poolBefore, [id]: poolBefore[id] + 1 });
+    // 金币按卖价返还（与星级匹配）
+    const refunded = sellValue({ defId: id, star, items: [] } as unknown as UnitInstance);
+    expect(player.gold).toBe(goldBefore + refunded);
+    // 棋子确实离场
+    expect(player.bench.every((u) => u === null || u.defId !== 'pan')).toBe(true);
+  });
+
+  it('满席合成 + 自动上场路径：溢出位被搬走后席位裁回 9 格（length 不变式）', () => {
+    const match = new Match(20260904, '测试', 'normal');
+    match.settings.autoDeploy = true;
+    const player = match.human;
+    player.gold = 50;
+    player.level = 3; // 人口 3 → 有空格可自动上场
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    // 备战席占满 9 格：7 张 ajiu 占位 + 2 张同名 1★ pan（合成材料）
+    for (let i = 0; i < BENCH_SLOTS; i++) player.bench[i] = createUnit('ajiu');
+    player.bench[0] = createUnit('pan');
+    player.bench[1] = createUnit('pan');
+    player.board[boardIdx(0, 0)] = createUnit('ajiu'); // 场上也有一张，3 人口占 1
+    player.shop[0] = 'pan';
+
+    expect(match.buy(player, 0).ok).toBe(true);
+
+    // 满席买 pan → 溢出位第 10 格 → 三张 1★ 合 2★ → 自动上场搬走 → 席位 9
+    expect(player.bench).toHaveLength(BENCH_SLOTS);
+    expect(player.board.some((u) => u?.defId === 'pan' && u.star === 2)).toBe(true);
+    expect(player.bench.every((u) => u === null || u.defId !== 'pan')).toBe(true);
+  });
+
+  it('单件卸装严守器匣容量：放不下时整体拒绝（与批量卸载同口径）', () => {
+    const match = new Match(20260905, '测试', 'normal');
+    const player = match.human;
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    const u = createUnit('pan');
+    u.items = ['guanri']; // 成品 → 拆两组件
+    player.bench[0] = u;
+    // 器匣已满（10 格）：成品卸下要占 2 格，放不下
+    player.items = Array.from({ length: 10 }, (_, i) => `comp${i}`);
+
+    const r = unequipItem(player, u.iid, 'guanri');
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/器匣/);
+    expect(player.items).toHaveLength(10);
+    expect(player.bench[0]?.items).toEqual(['guanri']); // 装回原样，无部分卸下
+
+    // 腾出 1 格仍不够（要 2 格）：继续拒绝
+    player.items.pop();
+    const r2 = unequipItem(player, u.iid, 'guanri');
+    expect(r2.ok).toBe(false);
+
+    // 腾出 2 格才放行，且拆回两个组件（10 − 2 次 pop + 2 = 10）
+    player.items.pop();
+    const r3 = unequipItem(player, u.iid, 'guanri');
+    expect(r3.ok).toBe(true);
+    expect(player.items).toHaveLength(10);
+    expect(player.bench[0]?.items).toEqual([]);
   });
 });

@@ -84,21 +84,27 @@ export function equipItem(p: PlayerState, iid: number, itemId: string): EquipRes
 /**
  * 卸下一件装备回到装备栏。
  * 成品会拆回它原本的两个组件 —— 见文件头的取舍说明。
+ *
+ * 容量口径与 unequipAll 一致（玩家主动卸装严守 ITEM_BAR_SLOTS，放不下即拒绝）：
+ * 单件逐个卸装若不做预检，可把器匣撑过版面 10 格 —— 与批量路径「all-or-nothing」
+ * 的语义分裂，玩家看到"卸了一部分、另一部分没回来"会误以为装备蒸发。
+ * 上游剥离路径（卖出/合成吃子/淘汰）不受此限，见 stripItems 注释。
  */
-export function unequipItem(p: PlayerState, iid: number, itemId: string): boolean {
+export function unequipItem(p: PlayerState, iid: number, itemId: string): { ok: boolean; reason?: string } {
   const u = findUnit(p, iid);
-  if (!u) return false;
+  if (!u) return { ok: false, reason: '找不到这个棋子' };
   const i = u.items.indexOf(itemId);
-  if (i < 0) return false;
-  u.items.splice(i, 1);
-
+  if (i < 0) return { ok: false, reason: '身上没有这件装备' };
   const def = ITEM_BY_ID[itemId];
+  const gain = def?.tier === 'combined' && def.recipe ? 2 : 1;
+  if (p.items.length + gain > ITEM_BAR_SLOTS) return { ok: false, reason: '器匣空间不足' };
+  u.items.splice(i, 1);
   if (def?.tier === 'combined' && def.recipe) {
     p.items.push(def.recipe[0], def.recipe[1]);
   } else {
     p.items.push(itemId);
   }
-  return true;
+  return { ok: true };
 }
 
 /**

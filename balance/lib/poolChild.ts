@@ -83,6 +83,11 @@ process.on('message', (msg: InMsg) => {
   }
   if (msg.type === 'job' && msg.kind === 'item') {
     try {
+      // item 作业无补丁，但必须先复位上一枚 pair 作业可能残留的 cfg./羁绊覆盖：
+      // 混合作业池（同一 runPool 先 pair 后 item）若沿用旧补丁，装备维度读数会被
+      // 前一配置的覆盖污染（pairedItemsDelta 内部同样调用 ensureOverrides 复位，
+      // 但入口显式复位让"本作业无补丁"不依赖 engine 的实现细节）
+      ensureOverrides({});
       const d = pairedItemsDelta(msg.i, msg.j, msg.items, msg.n, msg.seedBase, comps);
       process.send!({ type: 'result', kind: 'item', itemKey: msg.itemKey, i: msg.i, j: msg.j, ...d });
     } catch (err) {

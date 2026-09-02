@@ -76,12 +76,19 @@ export class InputController {
     return this.dragGhost !== null || this.dragItemGhost !== null;
   }
 
-  /** 全屏浮层（设置/调试/羁绊全览/侦查）是否打开 —— 键盘快捷键的统一让路口径 */
+  /** 全屏浮层（设置/调试/羁绊全览/成员卡/侦查）是否打开 —— 键盘快捷键的统一让路口径。
+   *  注意：成员卡（traitMembers）是钉住型浮层，同样要让路 D/F/E/空格/Z/1-5 ——
+   *  只挡 pointerdown 而不挡键盘，会出现"卡钉着按 D 仍刷新商店"的穿透。 */
   private overlayOpen(): boolean {
     const s = this.scene;
-    return !!(s.settingsPanel?.isOpen || s.debug.isOpen || s.hud.traitModalOpen || s.pauseScout.scoutPanel);
+    return !!(
+      s.settingsPanel?.isOpen ||
+      s.debug.isOpen ||
+      s.hud.traitModalOpen ||
+      s.pauseScout.scoutPanel ||
+      s.traitMembers.isOpen
+    );
   }
-
   /** 页面隐藏：中止拖拽/点选（稳定引用，供 game.events 注册/摘除） */
   private onGameHidden = (): void => {
     this.pendingUnit = null;

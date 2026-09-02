@@ -48,7 +48,8 @@ export interface SkillParams {
   /** 固定基础值（随技能星级倍率缩放） */
   flat?: number;
   type?: 'physical' | 'magic' | 'true';
-  /** 范围半径（切比雪夫格） */
+  /** 范围半径（切比雪夫格数：1 = 周围 8 格邻域，非欧氏距离 —— 与 grid.chebyshev
+   *  与 battle.unitsInRadius 同一口径，数值策划按"几格"读，勿当像素/欧氏半径） */
   radius?: number;
   /** 持续秒数 */
   dur?: number;

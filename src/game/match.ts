@@ -548,7 +548,10 @@ export class Match implements AiWorld {
       if (!hasBenchVictim) return { ok: false, reason: 'bench' };
     }
     // 快照必须先于取卡：从这里起任何失败都整体回滚（金币/卡池/商店格/棋盘/备战席/器匣）
-    const snap = snapshotPlayer(p, this.pool);
+    // 快照 scope 与撤销层对齐（棋盘/席/金币/等级/商店/器匣/池/奇遇）——buy 虽不直接
+    // 改动奇遇与随机流，但回滚与 undo.ts restorePlayer 走同一完整口径，避免未来在
+    // buy 内引入 rng/奇遇消费时出现"只回滚了下半场"的错位
+    const snap = snapshotPlayer(p, this.pool, this.adventureOffer);
     // 卡池不足：保留商店格（缺货卡仍显示，点击提示「卡池不足」），不吞卡
     if (!this.pool.take(id)) return { ok: false, reason: 'pool' };
     p.gold -= def.cost;
@@ -563,6 +566,9 @@ export class Match implements AiWorld {
       if (merges.length === 0 || p.bench.length > BENCH_SLOTS) {
         // 4 张同名在册时溢出位可能是合成幸存者（席位破坏）——整体回滚到买入前
         restorePlayer(p, this.pool, snap);
+        // 奇遇恩赐与随机流不在 buy 的改动范围内，但回滚与撤销层同取完整快照口径：
+        // adventureOffer 一并还原，未来 buy 内新增 rng 消费时不会出现只回滚了半场
+        this.adventureOffer = snap.adventureOffer;
         return { ok: false, reason: 'bench' };
       }
       this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★（满席即合）`);
@@ -571,12 +577,17 @@ export class Match implements AiWorld {
         const upgraded = p.bench.find((b) => b !== null && b.defId === id && b.star > 1);
         if (upgraded) this.tryAutoDeploy(p, upgraded.iid);
       }
+      // 自动上场把溢出位（第 10 格）的合成幸存者搬走后，席位可能又空出尾截：
+      // 必须再裁一次，否则 p.bench.length 停在 10，违反 BENCH_SLOTS=9 不变式，
+      // 备战席长度从此 10 格（第 10 格恒 null，视觉多一格、遍历多一空位）
+      while (p.bench.length > BENCH_SLOTS && p.bench[p.bench.length - 1] === null) p.bench.pop();
       return { ok: true };
     }
 
     // 常路径：新子直接落空格；落不下就整体回滚 —— 卡、钱、商店格一项都不能被吞掉
     if (addToBench(p, u) < 0) {
       restorePlayer(p, this.pool, snap);
+      this.adventureOffer = snap.adventureOffer;
       return { ok: false, reason: 'bench' };
     }
     const merges = resolveMerges(p);
