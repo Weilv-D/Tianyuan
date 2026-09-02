@@ -65,6 +65,14 @@ const layers = [
     allowedLayers: new Set(['music']),
     allowPackages: true,
   },
+  {
+    // src 根部散文件（main.ts 启动组合根 / version.ts 常量）：作为组合根放行
+    // 全部层与 npm 包，但引用目标仍必须落在已知桶内 —— 拼错目录、依赖不存在的
+    // 模块照常报错。此层不设 forbiddenApis（入口本来就要碰 window/document）。
+    name: 'root',
+    allowedLayers: new Set(['core', 'data', 'game', 'render', 'ui', 'audio', 'music', 'assets', 'root']),
+    allowPackages: true,
+  },
 ];
 
 function sourceFiles(directory) {
@@ -112,51 +120,71 @@ function importedSpecifiers(source) {
 const violations = [];
 let checkedFiles = 0;
 
-for (const layer of layers) {
-  for (const file of sourceFiles(resolve(srcRoot, layer.name))) {
-    checkedFiles += 1;
-    const source = readFileSync(file, 'utf8');
-    const code = withoutComments(source);
-    const apiCode = withoutStrings(code);
-    const displayPath = relative(root, file).split(sep).join('/');
+function checkLayerFile(file, layer) {
+  checkedFiles += 1;
+  const source = readFileSync(file, 'utf8');
+  const code = withoutComments(source);
+  const apiCode = withoutStrings(code);
+  const displayPath = relative(root, file).split(sep).join('/');
 
-    for (const imported of importedSpecifiers(code)) {
-      const { specifier, index } = imported;
-      if (!specifier.startsWith('.')) {
-        // 表现层/组件层正常引用 npm 包（phaser 等）；内核三层保持"零包依赖"纪律
-        if (!layer.allowPackages) {
-          violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得直接依赖包 ${specifier}`);
-        }
-        continue;
+  for (const imported of importedSpecifiers(code)) {
+    const { specifier, index } = imported;
+    if (!specifier.startsWith('.')) {
+      // 表现层/组件层正常引用 npm 包（phaser 等）；内核三层保持"零包依赖"纪律
+      if (!layer.allowPackages) {
+        violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得直接依赖包 ${specifier}`);
       }
-      const relPath = relative(srcRoot, resolve(dirname(file), specifier)).split(sep).join('/');
-      // TS 导入惯例省略 .ts 扩展名；白名单与 target 归属都按去扩展名口径比较
-      const modPath = relPath.replace(/\.ts$/, '');
-      // src 根目录下的散文件（version）归入 root 桶
-      const target = modPath.includes('/') ? modPath.split('/')[0] : 'root';
-      if (layer.allowedGameModules && target === 'game') {
-        // 带白名单的层：game 目录只放行名单内的模块，名单外一律报错
-        if (!layer.allowedGameModules.has(modPath)) {
-          violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得依赖 src/${modPath}（game 白名单外）`);
-        }
-        continue;
-      }
-      if (!layer.allowedLayers.has(target)) {
-        violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得依赖 src/${target}`);
-      }
+      continue;
     }
-
-    for (const match of code.matchAll(/\bimport\s*\(\s*(?!['"])/g)) {
-      violations.push(`${displayPath}:${lineNumber(code, match.index ?? 0)} 动态 import 必须使用字面量路径`);
-    }
-
-    for (const [label, pattern, allowedFiles] of layer.forbiddenApis ?? []) {
-      if (allowedFiles?.has(displayPath)) continue;
-      for (const match of apiCode.matchAll(pattern)) {
-        violations.push(`${displayPath}:${lineNumber(code, match.index ?? 0)} 禁止 ${label}`);
+    const relPath = relative(srcRoot, resolve(dirname(file), specifier)).split(sep).join('/');
+    // TS 导入惯例省略 .ts 扩展名；白名单与 target 归属都按去扩展名口径比较
+    const modPath = relPath.replace(/\.ts$/, '');
+    // src 根目录下的散文件（version）归入 root 桶
+    const target = modPath.includes('/') ? modPath.split('/')[0] : 'root';
+    if (layer.allowedGameModules && target === 'game') {
+      // 带白名单的层：game 目录只放行名单内的模块，名单外一律报错
+      if (!layer.allowedGameModules.has(modPath)) {
+        violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得依赖 src/${modPath}（game 白名单外）`);
       }
+      continue;
+    }
+    if (!layer.allowedLayers.has(target)) {
+      violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得依赖 src/${target}`);
     }
   }
+
+  for (const match of code.matchAll(/\bimport\s*\(\s*(?!['"])/g)) {
+    violations.push(`${displayPath}:${lineNumber(code, match.index ?? 0)} 动态 import 必须使用字面量路径`);
+  }
+
+  for (const [label, pattern, allowedFiles] of layer.forbiddenApis ?? []) {
+    if (allowedFiles?.has(displayPath)) continue;
+    for (const match of apiCode.matchAll(pattern)) {
+      violations.push(`${displayPath}:${lineNumber(code, match.index ?? 0)} 禁止 ${label}`);
+    }
+  }
+}
+
+// 七个子目录逐层检查；root 层文件（src 根部散文件）单独归堆检查 ——
+// 否则 main.ts / version.ts 永远在门禁视野之外，规则加严也拦不住它们。
+const allSrcFiles = sourceFiles(srcRoot);
+const layerDirNames = new Set(layers.filter((l) => l.name !== 'root').map((l) => l.name));
+const layerByName = new Map(layers.map((l) => [l.name, l]));
+for (const layer of layers) {
+  if (layer.name === 'root') continue;
+  for (const file of sourceFiles(resolve(srcRoot, layer.name))) {
+    checkLayerFile(file, layer);
+  }
+}
+for (const file of allSrcFiles) {
+  const first = relative(srcRoot, file).split(sep)[0];
+  if (!layerDirNames.has(first)) checkLayerFile(file, layerByName.get('root'));
+}
+// 覆盖完整性：每个 src 文件必须恰好被检一次（层目录与 root 归堆互斥且并集为全量）。
+// 断言挡住未来"新增目录忘了挂进 layers"的漂移。
+if (checkedFiles !== allSrcFiles.length) {
+  console.error(`架构边界检查失败：覆盖计数漂移（检查 ${checkedFiles} 个，src 实有 ${allSrcFiles.length} 个）`);
+  process.exit(1);
 }
 
 if (violations.length > 0) {
@@ -165,4 +193,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log(`架构边界通过：${checkedFiles} 个 src 文件（core/data/game/render/ui/audio/music）。`);
+console.log(`架构边界通过：${checkedFiles} 个 src 文件（core/data/game/render/ui/audio/music + 根组合层）。`);

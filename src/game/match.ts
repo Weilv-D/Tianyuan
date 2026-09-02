@@ -924,9 +924,10 @@ export class Match implements AiWorld {
     // 真源表只覆盖墨兽轮：非墨兽轮误入此处说明调用方守卫丢了，
     // 宁可发空也不回落到首档/末档（那会把掉落表之外的轮次映射成 1 轮档）
     if (!this.isBeastRound()) return { items: [], gold: 0 };
-    const tier =
-      BEAST_DROP_SCHEDULE.find((t) => t.round === this.round) ??
-      (this.round < BEAST_DROP_SCHEDULE[0].round ? BEAST_DROP_SCHEDULE[0] : BEAST_DROP_SCHEDULE[BEAST_DROP_SCHEDULE.length - 1]);
+    // 墨兽轮但无掉落档 = 两张调度表失同步。静默映射到首/末档会把漏配
+    // 掩盖成"看起来正常的一档掉落"，按失败可见纪律当场终止
+    const tier = BEAST_DROP_SCHEDULE.find((t) => t.round === this.round);
+    if (!tier) throw new Error(`墨兽轮 ${this.round} 无掉落档：BEAST_DROP_SCHEDULE 与墨兽轮调度表失同步`);
     const comp = tier.comp + (won ? tier.winComp : 0);
     const items: string[] = [];
     for (let i = 0; i < comp; i++) {

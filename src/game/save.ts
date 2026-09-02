@@ -62,6 +62,8 @@ export function hasSave(mode: Match['mode'] = 'normal'): boolean {
 
 export function saveMatch(m: Match): boolean {
   try {
+    // savedAt 仅排查用元数据：不进 seed/rng 流，不影响对局确定性
+    //（game 层 Date.now 的唯一白名单点就是本文件）
     const payload = { v: 3, savedAt: Date.now(), mode: m.mode, data: m.toJSON() };
     localStorage.setItem(KEY_BY_MODE[m.mode], JSON.stringify(payload));
     return true;

@@ -75,6 +75,8 @@ export class DebugConsole {
       case 'level': p.level = Math.min(9, p.level + 1); break;
       case 'hpPlus': p.hp = Math.min(PLAYER_START_HP, p.hp + 20); break;
       case 'comp': {
+        // DEV 作弊台（Ctrl+~ 仅 DEV 注册）：取非战斗随机即可 —— 用 Rng 会
+        // 消耗对局随机流，改写后续商店/掉落，反而破坏实机调试的可复现性
         const c = CHAMPIONS[Math.floor(Math.random() * CHAMPIONS.length)]; const slot = p.bench.findIndex((x) => x === null);
         if (slot >= 0) p.bench[slot] = { defId: c.id, star: 2, items: [], iid: newIid() };
         else this.scene.showToast('备战席已满', true); break;

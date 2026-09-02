@@ -331,7 +331,9 @@ const IMPL: Record<string, Impl> = {
         kind: u.range >= 4 ? 'arrow' : 'bolt',
       });
       skillDamage(a, u, curTarget, skillRaw(u, p.atk, p.sp, p.flat) * mult, type, p.forceCrit);
-      if (p.status) {
+      // 弹幕自增益只认增益白名单 —— 与 nova/aoe 同口径：新增 StatusKind 忘注册
+      // 会被拒之门外，而不是把误配的减益打到施法者自己头上
+      if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
         // u 本就是权威引用（units 不摘陠除；已亡则 addStatus 内部按 !dst.alive 空转）
         a.addStatus(u, u, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       }

@@ -73,6 +73,12 @@ export class InputController {
     return this.dragGhost !== null || this.dragItemGhost !== null;
   }
 
+  /** 全屏浮层（设置/调试/羁绊全览/侦查）是否打开 —— 键盘快捷键的统一让路口径 */
+  private overlayOpen(): boolean {
+    const s = this.scene;
+    return !!(s.settingsPanel?.isOpen || s.debug.isOpen || s.hud.traitModalOpen || s.pauseScout.scoutPanel);
+  }
+
   /** 页面隐藏：中止拖拽/点选（稳定引用，供 game.events 注册/摘除） */
   private onGameHidden = (): void => {
     this.pendingUnit = null;
@@ -247,21 +253,26 @@ export class InputController {
     });
 
     // 快捷键。E/Z 在拖拽进行中必须让路：autoArrange/undo 会整体重排
-    // board/bench 数组，endDrag 持有的 from 槽位与残影高亮随即失效
-    this.scene.input.keyboard?.on('keydown-D', () => this.scene.onReroll());
-    this.scene.input.keyboard?.on('keydown-F', () => this.scene.onBuyXp());
+    // board/bench 数组，endDrag 持有的 from 槽位与残影高亮随即失效。
+    // 浮层（设置/调试/羁绊全览/侦查）打开时同样让路 —— 键盘不经命中检测，
+    // 指针层的"不透传"拦不住按键，必须逐键手工拦截（口径与商肆热键一致）
+    this.scene.input.keyboard?.on('keydown-D', () => {
+      if (!this.overlayOpen()) this.scene.onReroll();
+    });
+    this.scene.input.keyboard?.on('keydown-F', () => {
+      if (!this.overlayOpen()) this.scene.onBuyXp();
+    });
     this.scene.input.keyboard?.on('keydown-E', () => {
-      if (this.dragging) return;
+      if (this.dragging || this.overlayOpen()) return;
       this.scene.onAutoArrange();
     });
     this.scene.input.keyboard?.on('keydown-SPACE', () => {
-      if (this.scene.phase === 'prep') this.scene.startBattlePhase();
+      if (this.scene.phase === 'prep' && !this.overlayOpen()) this.scene.startBattlePhase();
     });
     this.scene.input.keyboard?.on('keydown-Z', (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !this.dragging) this.scene.onUndo();
+      if ((e.ctrlKey || e.metaKey) && !this.dragging && !this.overlayOpen()) this.scene.onUndo();
     });
-    // 商肆快捷键：1-5 直购（含小键盘），与 ShopCard 角标对应。
-    // 浮层开着时不响应 —— 键盘不经命中检测，必须手工按层拦截
+    // 商肆快捷键：1-5 直购（含小键盘），与 ShopCard 角标对应
     const shopHotkeys: [string, number][] = [
       ['keydown-ONE', 0], ['keydown-TWO', 1], ['keydown-THREE', 2], ['keydown-FOUR', 3], ['keydown-FIVE', 4],
       ['keydown-NUMPAD_ONE', 0], ['keydown-NUMPAD_TWO', 1], ['keydown-NUMPAD_THREE', 2], ['keydown-NUMPAD_FOUR', 3], ['keydown-NUMPAD_FIVE', 4],
@@ -269,7 +280,7 @@ export class InputController {
     for (const [name, i] of shopHotkeys) {
       this.scene.input.keyboard?.on(name, () => {
         if (this.scene.phase !== 'prep' || this.scene.busy) return;
-        if (this.scene.settingsPanel?.isOpen || this.scene.debug.isOpen || this.scene.hud.traitModalOpen || this.scene.pauseScout.scoutPanel) return;
+        if (this.overlayOpen()) return;
         this.scene.onBuy(i);
       });
     }

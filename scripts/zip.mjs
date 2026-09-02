@@ -3,6 +3,7 @@
 // 用法：node scripts/zip.mjs <out.zip> <输入路径1> [输入路径2 ...]
 // 文件以 basename 入包；目录递归、保留相对结构。UTF-8 文件名（fflate 自动置标志位）。
 // 已压缩内容（png/ogg）占大头，用 level 1：速度优先，压缩率损失可忽略。
+// 全量内存打包：面向当前 <50MB 级发布产物；产物若量级上涨需改流式（fflate Zip）。
 import { zipSync } from 'fflate';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';

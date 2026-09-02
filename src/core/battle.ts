@@ -782,8 +782,11 @@ export class Battle implements BattleApi {
   revive(u: Unit, hpPct: number, src: Unit): void {
     if (u.alive) return;
     // 与 heal/dealDamage/addShield 同口径：比例入参非有限即数据污染，
-    // Math.round(NaN) 会把 NaN 静默写进 hp 并沿比例/超时裁定全链传播
+    // Math.round(NaN) 会把 NaN 静默写进 hp 并沿比例/超时裁定全链传播。
+    // 比例同时钳进 [0,1] —— revive 是 BattleApi 公开口，越界比例会造出
+    // hp > maxHp 的单位，沿血条渲染与超时裁定双向失真
     if (!Number.isFinite(hpPct)) throw new Error(`非法复活比例: ${hpPct}（uid=${u.uid}）`);
+    const pct = Math.max(0, Math.min(1, hpPct));
     // 复活位置 = 死亡点（killUnit 落笔的 deathCell）；被占时取其邻近空格。
     // Reserve a destination before changing state. A failed revive must remain
     // a complete death state rather than creating an alive, unoccupied unit.
@@ -800,7 +803,7 @@ export class Battle implements BattleApi {
 
     u.alive = true;
     u.revived = true;
-    u.hp = Math.max(1, Math.round(u.maxHp * hpPct));
+    u.hp = Math.max(1, Math.round(u.maxHp * pct));
     u.statuses = [];
     u.shield = 0;
     u.mp = u.maxMp;

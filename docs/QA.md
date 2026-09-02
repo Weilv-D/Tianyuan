@@ -20,7 +20,7 @@
 | 层级 | 入口 | 解决的问题 | 执行时机 |
 |---|---|---|---|
 | 静态正确性 | `npm run typecheck` | 类型错误、无效调用、未使用代码 | 每次改动 |
-| 架构边界 | `npm run check:boundaries` | 全部七层（core/data/game/render/ui/audio/music）的越层依赖、浏览器 API 和非确定性随机源 | 每次改动 |
+| 架构边界 | `npm run check:boundaries` | 七层（core/data/game/render/ui/audio/music）加 src 根组合文件（main/version）的越层依赖、浏览器 API 和非确定性随机源；覆盖计数断言保证新文件不脱检 | 每次改动 |
 | 核心行为 | `npm test` | 玩法、资产、存档、回放、输入是否破坏 | 每次改动 |
 | 生产可构建 | `npm run build:app` | Vite 生产打包与资源解析是否成功 | 每次改动 |
 | 默认 QA | `npm run qa` | 依次执行以上四层 | 交付前、CI |
@@ -86,9 +86,10 @@ npm ci
 | 风险 | 测试文件 | 保护内容 |
 |---|---|---|
 | 战斗可信 | `determinism`、`battle-formula`、`grid`、`skills`、`traits-big` | 收敛、重演、战斗规则、占格、技能与大羁绊 |
+| 平衡锚点 | `balance`、`shop-odds` | 定档数值回归（CRN 断面关键锚）、商店概率表结构与 rollShop 行为契约 |
 | 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为 |
-| 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销与每日成绩 |
-| 交互安全 | `input-coords`、`robustness` | K=2 输入、满盘站位、坏输入与墨兽落地 |
+| 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销（含随机流游标回滚）与每日成绩 |
+| 交互安全 | `input-coords`、`valid-placements`、`robustness` | K=2 输入、拖拽落点合法域、满盘站位、坏输入与墨兽落地 |
 
 ### 5.1 准入条件
 

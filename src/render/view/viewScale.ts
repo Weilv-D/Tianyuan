@@ -9,6 +9,9 @@ import { BOARD_SIZE, H, W } from './layout';
  * FIT 的 CSS 拉伸归零。相机 zoom = K（1 逻辑 px → K 物理 px），逻辑坐标
  * 恒为 1920×1080，布局代码零感知；文字 resolution:2 与原生分辨率棋子
  * 烘焙在采样端 1:1 落地。
+ *
+ * K 在模块加载时快照一次：运行期跨屏拖动 / 改系统缩放不重算（画布缓冲与
+ * 相机 zoom 已按旧 K 锁定，属预期取舍），刷新页面生效。
  */
 export const VIEW_K = Math.min(
   Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1),

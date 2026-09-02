@@ -10,6 +10,10 @@
  * 由配方表的多样性承担，而不是靠"合不出来"留白。
  * 全表只有两件刻意保留的**白板位**：混元珠（纯法强）与紫霄珠（纯暴击）——
  * "把一条属性堆到极致"的最朴素路线，各保留一条不被机制绑架的去处。
+ *
+ * id 命名空间与棋子表（champions.ts）相互独立：个别音译同名的 id
+ * （如 xuanwu / budong）在两表各自存在，查表经 ITEM_BY_ID / CHAMPION_BY_ID 隔离，
+ * 不会互相命中。
  */
 
 export type ItemTier = 'component' | 'combined';

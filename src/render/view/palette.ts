@@ -135,6 +135,12 @@ export const TEAM_COLOR_DEEP: Record<number, number> = {
 /** 遮罩 / 投影用纯黑 —— 色板里唯一允许的"黑" */
 export const SHADE = 0x000000;
 
+/**
+ * 技术性纯白：受击闪白（setTintFill 需要满通道路径）与 GeometryMask 占位
+ * （遮罩只取 alpha，色相无语义）。不是夜宴色板成员，别拿它当视觉色用。
+ */
+export const PURE_WHITE = 0xffffff;
+
 /** 危险按钮变体（kit Button danger）：比朱砂更深一档的暗红 */
 export const DANGER = {
   base: 0x7e3323,

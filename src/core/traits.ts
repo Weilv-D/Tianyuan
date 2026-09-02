@@ -294,7 +294,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     //      亡语 16~30 甲 → ≤0.23）近乎无感，不重演 giant@0.20 的 +65p
     //      非目标边漂移；
     //   2) 随本体普攻结算，天然吃 noReflect 通道，不会被荆棘二次反弹放大。
-    // 默认 0 = 冬眠，行为与历史逐字节一致；供 sim:ab / sim:sweep 扫档定装。
+    // 默认 6 即下行定档值（2026-08-31 起）；置 0 = 冬眠回退，供 sim:ab / sim:sweep 复扫。
     // 定档（2026-08-31，CRN n=250 双向）：gangAtk 6 / 破阵开 / 护卫 t2 卸甲 0.5
     // → 「机关→荆棘」21.0%（原 0%），其余九边 0.0p（破阵判据结构性隔离）。
     const gangAtk = t('gangAtk', 6);

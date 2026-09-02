@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 // 副作用：全局字号缩放必须先于任何场景建字挂载（见 render/view/textScale）
 import '../render/view/textScale';
-import { css, CINNABAR, DANGER, GILT, INK, PAPER, UI } from '../render/view/palette';
+import { css, CINNABAR, DANGER, GILT, INK, PAPER, PURE_WHITE, UI } from '../render/view/palette';
 import { bakedTexture } from '../render/view/bake';
 import { screenToWorld } from '../render/view/viewScale';
 import { audio } from '../audio/AudioEngine';
@@ -505,7 +505,8 @@ export function enableScroll(
     container.y = Phaser.Math.Clamp(container.y, homeY - max, homeY);
   };
   const g = scene.make.graphics({ x: 0, y: 0 }, false);
-  g.fillStyle(0xffffff, 1);
+  // 遮罩只取 alpha，填充色相无语义 —— PURE_WHITE 是技术占位，非视觉色
+  g.fillStyle(PURE_WHITE, 1);
   g.fillRect(viewX, viewY, viewW, viewH);
   container.setMask(g.createGeometryMask());
   // wheel 回调实参顺序为 (pointer, overObjects, deltaX, deltaY, deltaZ)

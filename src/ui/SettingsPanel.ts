@@ -161,11 +161,12 @@ export class SettingsPanel {
     }, { width: 150, height: 40 });
     panel.add(muteBtn);
 
-    // 自动上场
+    // 自动上场（开关类偏好与音量同口径：拖动/点按即落盘，防开战/切场景不经 close 销毁丢档）
     const autoBtn = new Button(scene, bx + 220, y + 6, prefs.autoDeploy ? '自动上场 开' : '自动上场 关', () => {
       prefs.autoDeploy = !prefs.autoDeploy;
       autoBtn.setText(prefs.autoDeploy ? '自动上场 开' : '自动上场 关');
       this.host.onAutoDeploy?.(prefs.autoDeploy);
+      savePrefs(this.host.prefs);
     }, { width: 180, height: 40 });
     panel.add(autoBtn);
     y += 60;
@@ -175,6 +176,7 @@ export class SettingsPanel {
       prefs.calm = !prefs.calm;
       motion.calm = prefs.calm;
       calmBtn.setText(prefs.calm ? '静观模式 开' : '静观模式 关');
+      savePrefs(this.host.prefs);
     }, { width: 150, height: 40 });
     panel.add(calmBtn);
     panel.add(
@@ -193,6 +195,7 @@ export class SettingsPanel {
       prefs.licensedMusic = !prefs.licensedMusic;
       audio.setLicensedMusicEnabled(prefs.licensedMusic);
       licensedBtn.setText(prefs.licensedMusic ? '典藏音乐 开' : '典藏音乐 关');
+      savePrefs(this.host.prefs);
     }, { width: 150, height: 40 });
     panel.add(licensedBtn);
     panel.add(

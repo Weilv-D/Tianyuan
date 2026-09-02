@@ -66,7 +66,8 @@ checkout，先区分文件归属。无关改动继续保留；同一文件发生
 | `src/audio`、`src/music` | 音频执行与曲目清单 | `audio` → `music`；`music` 自含；不读对局状态 |
 
 `core` 不得读取 DOM、存储、系统时间或全局随机源；`data` 不得依赖运行时场景；`game` 不得
-反向引用渲染、UI 或音频。`npm run check:boundaries` 按本表对七层全部文件执行检查
+反向引用渲染、UI 或音频。`npm run check:boundaries` 按本表对七层全部文件加 src 根组合文件
+（`main.ts` / `version.ts` 归入根组合层）执行检查
 （含 npm 包与白名单规则），名单外引用即失败。新规则优先进入 `data` / `config`，表现层只消费结果。
 
 ### 3.4 实现与反馈

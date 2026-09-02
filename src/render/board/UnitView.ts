@@ -19,7 +19,7 @@ import {
 } from './unitLayout';
 import { itemIconKey } from './itemIcons';
 import { ITEM_BY_ID } from '../../data/items';
-import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from '../view/palette';
+import { CINNABAR, GILT, INK, PAPER, PURE_WHITE, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from '../view/palette';
 import { TEX } from '../view/textures';
 
 /** 棋盘体量（内容高归一口径）：1★≈94% / 2★≈107% / 3★≈121% 格高（格 72）。
@@ -442,7 +442,7 @@ export class UnitView extends Phaser.GameObjects.Container {
   playHit(fromX: number, fromY: number): void {
     if (this.dead) return;
     this.flashT = 0.14;
-    this.sprite.setTintFill(0xffffff);
+    this.sprite.setTintFill(PURE_WHITE);
     const dx = this.x - fromX;
     const dy = this.y - fromY;
     const len = Math.hypot(dx, dy) || 1;

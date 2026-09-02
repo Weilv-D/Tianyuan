@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Match } from '../src/game/match';
 import { CardPool } from '../src/game/pool';
 import { boardIdx, createUnit } from '../src/game/state';
 import { restorePlayer, snapshotPlayer } from '../src/game/undo';
@@ -28,5 +29,28 @@ describe('准备阶段撤销', () => {
     player.board[boardIdx(3, 0)]!.items.push('duanhun');
     restorePlayer(player, pool, before);
     expect(snapshotPlayer(player, pool)).toEqual(before);
+  });
+
+  it('撤销回滚随机流游标：刷新-撤销-再刷新与被撤销那次结果一致（不可免费探店）', () => {
+    // 快照进/出栈的完整语义（快照 + rng 游标）在 GameScene.pushUndo/onUndo：
+    // 这里用 Match 在 Node 里复现同一对操作 —— 随机游标不回滚的话，
+    // 第二次刷新会落在前进过的随机流上，"刷新-撤销"循环变成零成本探店
+    const match = new Match(42);
+    const p = match.human;
+    p.gold = 50;
+
+    const entry = { snap: snapshotPlayer(p, match.pool), rngState: match.rng.state };
+    expect(match.reroll(p)).toBe(true);
+    const rolledShop = [...p.shop];
+    const goldAfterReroll = p.gold;
+    expect(rolledShop.some((id) => id !== null)).toBe(true);
+
+    restorePlayer(p, match.pool, entry.snap);
+    match.rng.state = entry.rngState;
+    expect(p.gold).toBe(50);
+
+    expect(match.reroll(p)).toBe(true);
+    expect(p.shop).toEqual(rolledShop);
+    expect(p.gold).toBe(goldAfterReroll);
   });
 });

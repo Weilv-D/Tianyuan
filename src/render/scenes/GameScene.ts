@@ -53,6 +53,12 @@ interface UndoEntry {
   /** 动作前的完整玩家快照（含等级/经验/器匣/卡池），见 src/game/undo.ts */
   snap: PlayerSnapshot;
   label: string;
+  /**
+   * 动作前的对局随机流游标（Rng.state）。随机游标是世界状态的一部分：
+   * 不随快照回滚的话，"刷新-撤销-再刷新"可零成本预览后续商店（免费探店）。
+   * 准备阶段随机流的唯一消费者是玩家动作本身，回滚到动作前即恢复一致。
+   */
+  rngState: number;
 }
 
 /**
@@ -466,8 +472,9 @@ export class GameScene extends Phaser.Scene {
       this.showToast('没有可撤销的操作', true);
       return;
     }
-    // 整份快照对称回滚：金币、等级/经验、棋子与装备、商店、器匣、卡池计数
+    // 整份快照对称回滚：金币、等级/经验、棋子与装备、商店、器匣、卡池计数、随机流游标
     restorePlayer(this.match.human, this.match.pool, e.snap);
+    this.match.rng.state = e.rngState;
     audio.play('ui');
     this.showToast(`已撤销：${e.label}`);
     this.afterAction();
@@ -477,7 +484,7 @@ export class GameScene extends Phaser.Scene {
     // 撤销快照 scope=准备阶段（见 undo.ts 文件头）：结算期间入栈的快照
     // 一旦被 Ctrl+Z 消费会把已结算的血量/连胜盖回战前值 —— 在入口拦死
     if (this.phase !== 'prep' || this.busy) return;
-    this.undoStack.push({ snap: snapshotPlayer(this.match.human, this.match.pool), label });
+    this.undoStack.push({ snap: snapshotPlayer(this.match.human, this.match.pool), label, rngState: this.match.rng.state });
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
   }
 
