@@ -534,9 +534,14 @@ export function starGlyph(star: Star): string {
 // ── 详情卡装备三格槽（icon 即视觉，名字/效果进悬停 tooltip）────────
 // 图标与器匣/头顶/提示卡同出 itemIcons 烘焙管线 —— 不是新画的装饰，
 // 是同一资产的第四个展示档（47/36/17/24px）。空槽淡框表达"还能装"。
+// 格下短名换行：三格共 w-28 的可用宽度，单槽按 SLOT_PITCH 限宽，
+// 10px 小字断行时行高≈12（clipToWidth 仅做行宽守护，行数由 wordWrap 控制）
+// —— 「鈎魂鈴」等 3 字词不会重叠到相邻槽。
 const SLOT_SIZE = 26;
 const SLOT_ICON = 24;
 const SLOT_PITCH = 32;
+const SLOT_LABEL_W = 30;
+const SLOT_LABEL_FONT = '10px';
 
 /**
  * 棋子悬停详情卡（复用式）。
@@ -580,7 +585,10 @@ export class UnitDetailCard {
       const t = scene.add.text(14, 66 + i * 19, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[300]) }).setOrigin(0, 0);
       this.statT.push(t);
     }
-    this.itemsRow = scene.add.container(14, 144);
+    // itemsRow 基线下移：槽下短名 10px 字按两行 ≈22 高，末行需与 traitT
+    // （y=196）留 8px 净距 —— 否则长名换行会压到「幽冥·丹师」行。
+    // 悬停卡总高维持 DETAIL_H=304，瓶颈是描述区而非顶区，下移 4px 无副作用。
+    this.itemsRow = scene.add.container(14, 148);
     // 槽位底框：三枚 26px 直角淡框一次画死；icon 24px 居中，悬停出提示卡
     const slotFrames = scene.add.graphics();
     for (let i = 0; i < 3; i++) {
@@ -608,15 +616,25 @@ export class UnitDetailCard {
       });
       this.slotIcons.push(img);
       this.itemsRow.add(img);
-      const nameT = scene.add.text(i * SLOT_PITCH + SLOT_SIZE / 2, SLOT_SIZE + 4, '', { fontFamily: FONT.body, fontSize: '11px', color: css(PAPER[300]) }).setOrigin(0.5, 0);
+      // 槽下短名：居中、上沿锚定，限宽换行（CHAR_LIMIT_WORD_WRAP），两格之间不挤叠
+      const nameT = scene.add
+        .text(i * SLOT_PITCH + SLOT_SIZE / 2, SLOT_SIZE + 4, '', {
+          fontFamily: FONT.body,
+          fontSize: SLOT_LABEL_FONT,
+          color: css(PAPER[300]),
+          align: 'center',
+          wordWrap: { width: SLOT_LABEL_W, useAdvancedWrap: true },
+        })
+        .setOrigin(0.5, 0);
       nameT.setVisible(false);
       this.slotNameTs.push(nameT);
       this.itemsRow.add(nameT);
     }
-    this.traitT = scene.add.text(14, 192, '', { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) }).setOrigin(0, 0);
-    this.skillT = scene.add.text(14, 212, '', { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) }).setOrigin(0, 0);
+    // 193/213/233：随 itemsRow 下移 4px 同步后移，保持「装备槽末行-8px-羁绊行」的节奏
+    this.traitT = scene.add.text(14, 196, '', { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) }).setOrigin(0, 0);
+    this.skillT = scene.add.text(14, 216, '', { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) }).setOrigin(0, 0);
     this.descT = scene.add
-      .text(14, 232, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { useAdvancedWrap: true, width: w - 28 } })
+      .text(14, 236, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { useAdvancedWrap: true, width: w - 28 } })
       .setOrigin(0, 0);
     this.sellBtn = new Button(scene, 14, 0, '', () => this.sellAction?.(), {
       width: w - 28,
@@ -664,6 +682,7 @@ export class UnitDetailCard {
     });
 
     // 装备三格槽：图标 + 格下常驻装备名（不依赖悬停）；图标仍可悬停看完整效果
+    // 名称走槽限宽换行（SLOT_LABEL_W=30，10px 中心对齐）：3 字词两行不挤叠
     const ids = u.items.slice(0, 3);
     for (let i = 0; i < 3; i++) {
       const iid = ids[i] ?? null;
@@ -674,8 +693,7 @@ export class UnitDetailCard {
         // setDisplaySize 必须跟在 setTexture 后：scale 按当前纹理帧标定，
         // 换纹理不会自动重标（32×2 的 __DEFAULT 与 96×96 烘焙图差 3 倍）
         img.setTexture(itemIconKey(iid)).setDisplaySize(SLOT_ICON, SLOT_ICON).setVisible(true);
-        const shortName = (ITEM_BY_ID[iid]?.name ?? iid).slice(0, 6);
-        nameT.setText(shortName).setVisible(true);
+        nameT.setText(ITEM_BY_ID[iid]?.name ?? iid).setVisible(true);
       } else {
         img.setVisible(false);
         nameT.setVisible(false);
@@ -685,9 +703,14 @@ export class UnitDetailCard {
     this.traitT.setText([...def.origins, ...def.classes].map((t) => TRAIT_BY_ID[t]?.name ?? t).join(' · '));
     this.skillT.setText(def.skillSpec.name);
     this.descT.setText(formatSkillDesc(def.skillSpec.desc, def.skillSpec.params));
-    // 描述过长时钳制：卖钮在 h-42，描述顶 232，留 28px 净距；超出则省略号收尾
+    // 描述过长时钳制：描述顶 236（itemsRow 已下移 4px），底缘与卡底/出售带留净距；
+    // 悬停态无出售带不得扣除 DETAIL_SELL_BAND——旧式无条件扣除使 304 高的
+    // 悬停卡可用高度归零，首屏即被截成"…"
     {
-      const maxDescH = h - DETAIL_SELL_BAND - 232 - 28;
+      const hasSell = !!(opts?.sellLabel && opts.onSell);
+      const bottomReserve = hasSell ? DETAIL_SELL_BAND : 0;
+      const gap = 16;
+      const maxDescH = Math.max(16, h - bottomReserve - 236 - gap);
       while (this.descT.height > maxDescH && this.descT.text.length > 4) {
         this.descT.setText(this.descT.text.slice(0, -2).trimEnd() + '…');
       }

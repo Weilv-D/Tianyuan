@@ -40,17 +40,17 @@ describe('对局节奏表', () => {
 });
 
 describe('首战引导轮（第 1 回合墨兽）', () => {
-  it('首回合即是墨兽轮：2 只 1★ 引导兽，攻击力 ×0.15 且生命正常', () => {
+  it('首回合即是墨兽轮：1 只 1★ 引导兽，攻击力 ×0.08 且生命正常', () => {
     const match = new Match(42);
     match.beginRound();
     expect(match.round).toBe(1);
     expect(match.isBeastRound()).toBe(true);
 
     const beasts = match.boardOfOpponent({ a: 0, b: -1, ghost: -1, swap: true, beast: true }).filter(Boolean);
-    expect(beasts).toHaveLength(2);
+    expect(beasts).toHaveLength(1);
     for (const beast of beasts) {
       expect(beast!.star).toBe(1);
-      expect(beast!.powMult).toBe(0.15);
+      expect(beast!.powMult).toBe(0.08);
       const plain = createUnit(beast!.defId, 1);
       expect(plain.powMult).toBeUndefined();
     }

@@ -774,7 +774,7 @@ export class Match implements AiWorld {
   /**
    * 败方应受的伤害 = 阶段基础伤害 + 胜方每个**存活**单位的追加伤害。
    * 只算存活单位，是因为"我用三个人换掉你五个，最后只剩一个残血"应该算是打赢了。
-   * 第 1 回合例外归零：引导轮的墨兽攻击力已削到 15%，掉血再归零 ——
+   * 第 1 回合例外归零：引导轮的墨兽仅 1 只且攻击力已削到 8%，掉血再归零 ——
    * 首战的全部意义是装备教学与节奏体验，不构成任何淘汰威胁。
    */
   damageOf(result: BattleResult, winnerTeam: 0 | 1, winnerBoard: readonly (UnitInstance | null)[]): number {

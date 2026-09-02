@@ -36,23 +36,24 @@ function poolFor(round: number): readonly string[] {
   return out.length > 0 ? out : BEAST_TIERS[0].ids;
 }
 
-/** 首回合引导墨兽的攻击力倍率：只留威胁之形，去威胁之实 —— 首战是引导轮，不掉血、不掉节奏 */
-export const BEAST_INTRO_POW_MULT = 0.15;
+/** 首回合引导墨兽的攻击力倍率：只留威胁之形，去威胁之实 —— 首战是引导轮，不掉血、不掉节奏。
+ *  1 只 ×0.08：首战的意义是装备教学与节奏体验，任何开局阵容都应无悬念可过 */
+export const BEAST_INTRO_POW_MULT = 0.08;
 
 /**
  * 生成一场墨兽战的阵容。
  *
  * 强度曲线刻意设计成"前期明显好打、后期明显难打"：
  * 早期墨兽要给玩家拿到第一批装备的成就感，后期墨兽要真的能淘汰掉弱势玩家。
- * 第 1 回合（引导轮）例外：2 只 1★ 前排、攻击力 ×0.15，输赢都不构成伤害威胁
+ * 第 1 回合（引导轮）例外：1 只 1★ 前排、攻击力 ×0.08，输赢都不构成伤害威胁
  * （Match 侧教学轮同步归零掉血），全部意义在掉落与节奏教学。
  */
 export function generateBeastBoard(round: number, rng: Rng): (UnitInstance | null)[] {
   const board: (UnitInstance | null)[] = new Array(32).fill(null);
   const pool = poolFor(round);
 
-  // 数量：早期 2 只，随回合增长到 8 只
-  const count = Math.min(8, 2 + Math.floor(round / 4));
+  // 数量：首回合 1 只（引导只留一形），此后 2~8 只逐段增长
+  const count = round === 1 ? 1 : Math.min(8, 2 + Math.floor(round / 4));
   // 星级：8 回合前全 1★；8~15 出现 2★；16 回合起出现 3★
   const twoStarChance = round < 8 ? 0 : round < 16 ? 0.45 : 0.6;
   const threeStarChance = round < 16 ? 0 : round < 24 ? 0.12 : 0.3;

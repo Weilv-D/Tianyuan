@@ -99,7 +99,8 @@ describe('损坏输入与极端阵容', () => {
   it('墨兽阵容在各阶段都按宣告数量实际落地', () => {
     for (let round = 0; round <= 30; round += 3) {
       const board = generateBeastBoard(round, new Rng(1000 + round));
-      expect(board.filter(Boolean).length).toBe(Math.min(8, 2 + Math.floor(round / 4)));
+      const expected = round === 1 ? 1 : Math.min(8, 2 + Math.floor(round / 4));
+      expect(board.filter(Boolean).length).toBe(round === 0 ? 2 : expected);
     }
   });
 });
