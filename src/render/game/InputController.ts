@@ -143,6 +143,17 @@ export class InputController {
   }
 
   bindInput(): void {
+    // Phaser 复用 Scene 实例时 create() 会重入，同一 input 上重复绑定
+    // 会让 pointerdown 双发。定向摘除本控制器曾注册的指针/键盘事件，保持
+    // 场景级的 gameobjectover/out 悬停桥接不受影响（GameScene 已另行重挂）。
+    for (const evt of ['pointerdown', 'pointermove', 'pointerup', 'pointerupoutside'] as const) {
+      try { this.scene.input.removeAllListeners(evt); } catch { /* ignore */ }
+    }
+    for (const evt of ['keydown-D', 'keydown-F', 'keydown-E', 'keydown-SPACE', 'keydown-Z', 'keydown-ONE', 'keydown-TWO', 'keydown-THREE', 'keydown-FOUR', 'keydown-FIVE', 'keydown-NUMPAD_ONE', 'keydown-NUMPAD_TWO', 'keydown-NUMPAD_THREE', 'keydown-NUMPAD_FOUR', 'keydown-NUMPAD_FIVE', 'keydown-ESC'] as const) {
+      try { this.scene.input.keyboard?.removeAllListeners(evt as unknown as string); } catch { /* ignore */ }
+    }
+    // hidden 由 game.events 全局总线派生，不在 input 上
+    try { this.scene.game.events.off('hidden', this.onGameHidden); } catch { /* ignore */ }
     this.scene.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       audio.unlock();
       if (this.scene.phase !== 'prep' || this.scene.busy) return;

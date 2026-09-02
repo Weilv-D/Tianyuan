@@ -691,6 +691,20 @@ export class GameScene extends Phaser.Scene {
       this.finishRound();
       return;
     }
+    // 空阵对手直胜：对手零上场子时不入 BattleScene（避免 1-tick 零条计分板）
+    // 判定已在本轮 settleRound 内按弃权口径完成，这里只收尾
+    if (humanPair) {
+      const oppBoard = this.match.boardOfOpponent(humanPair);
+      const oppEmpty = oppBoard.every((u) => u === null);
+      const meEmpty = this.match.human.board.every((u) => u === null);
+      if (oppEmpty || meEmpty) {
+        // 将"我方弃权/对手弃权"顶到战报首行，避免只有"胜/败"却看不到原因
+        const tag = meEmpty && oppEmpty ? '双方均未上阵 · 平局' : oppEmpty ? '对手未上阵 · 直接胜利' : '我方未上阵 · 直接败北';
+        this.lastReport = `${tag}\n${reports.join('\n')}`.trim();
+        this.finishRound();
+        return;
+      }
+    }
     this.lastReport = reports.join('\n');
     this.refreshAll();
 

@@ -615,10 +615,12 @@ export class UnitView extends Phaser.GameObjects.Container {
   }
 
   override destroy(fromScene?: boolean): void {
-    this.scene.tweens.killTweensOf(this.sprite);
-    this.scene.tweens.killTweensOf(this.base);
-    this.scene.tweens.killTweensOf(this.aura);
-    this.scene.tweens.killTweensOf(this.shadow);
+    // 补间目标分散在 bars/pips/castRing/crown/itemRow 与内部组件上；
+    // 仅清 sprite/base/aura/shadow 会让残余补间空转并在 SHUTDOWN 时触已销毁场景
+    try { this.scene.tweens.killTweensOf(this); } catch { /* ignore */ }
+    for (const obj of [this.sprite, this.base, this.aura, this.shadow, this.bars, this.pips, this.castRing, this.crown, this.itemRow]) {
+      try { this.scene.tweens.killTweensOf(obj); } catch { /* ignore */ }
+    }
     super.destroy(fromScene);
   }
 }

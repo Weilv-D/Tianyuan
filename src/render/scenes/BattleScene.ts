@@ -883,7 +883,8 @@ export class BattleScene extends Phaser.Scene {
     const theirRows = byTeam(this.viewerTeam === 0 ? 1 : 0);
     const COL_PITCH = 30;
     const COL_TOP = 208;
-    const colDepth = Math.max(mineRows.length, theirRows.length) * COL_PITCH;
+    const emptySide = mineRows.length === 0 || theirRows.length === 0;
+    const colDepth = emptySide ? COL_PITCH : Math.max(mineRows.length, theirRows.length) * COL_PITCH;
     const BTN_H = 42;
     const listBottom = COL_TOP + colDepth;
     const btnTopRel = listBottom + 14;
@@ -978,6 +979,16 @@ export class BattleScene extends Phaser.Scene {
       hair.lineBetween(x, by + 194, x + COL_W, by + 194);
       panel.add([head, totals, hair]);
 
+      if (list.length === 0) {
+        const empty = this.add
+          .text(x + COL_W / 2, by + COL_TOP + 14, '未上阵', {
+            fontFamily: FONT.body,
+            fontSize: '12px',
+            color: css(INK[300]),
+          })
+          .setOrigin(0.5, 0.5);
+        panel.add(empty);
+      }
       const maxDmg = Math.max(1, ...list.map((r) => r.dmg));
       const maxTaken = Math.max(1, ...list.map((r) => r.taken));
       let y = by + COL_TOP;

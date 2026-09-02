@@ -66,6 +66,10 @@ export class SettingsPanel {
     shade.fillStyle(SHADE, 0.7);
     shade.fillRect(0, 0, W, H);
     shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
+    shade.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const { x: wx, y: wy } = screenToWorld(p.x, p.y, scene.cameras.main.zoom);
+      if (wx < bxForShade || wx > bxForShade + bw || wy < byForShade || wy > byForShade + bhForShade) this.close();
+    });
     panel.add(shade);
 
     // 面板高度由内容行推导（行高表：标题带 76 + 三滑杆 66×3 + 三个开关行 60×3
@@ -74,6 +78,9 @@ export class SettingsPanel {
     // 各算各的坐标，行数一变就撞车。
     const bw = 440;
     const inMatch = !!this.host.inMatch;
+    const bhForShade = 76 + 66 * 3 + 60 * 5 + (inMatch ? 58 : 0) + 42 + 14 + 22 + 34;
+    const bxForShade = (W - bw) / 2;
+    const byForShade = (H - bhForShade) / 2;
     // 行高表：标题带 76 + 三滑杆 66×3 + 五个开关行 60×5（静音与自动上场同占一行）
     // + 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 34。
     // 页脚贴着内容流排布，不再用 bh 固定偏移 —— 此前「关闭」钮与快捷键/署名两行

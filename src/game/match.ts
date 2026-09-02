@@ -842,6 +842,43 @@ export class Match implements AiWorld {
       return out;
     }
 
+    // 空阵直胜：一方零上场子时 Battle 在首 tick 即判单队胜，伤害条全 0、
+    // 计分板成空态。平局已在上游返回，这里只处理有胜负的空阵局。
+    {
+      const paEmpty = pa.board.every((u) => u === null);
+      const oppEmpty = opponentBoard.every((u) => u === null);
+      if (paEmpty || oppEmpty) {
+        if (paEmpty && oppEmpty) {
+          pa.lastOutcome = 'draw';
+          pa.streak = 0;
+          pa.lastDamage = 0;
+          out.push({ idx: pa.idx, outcome: 'draw', damage: 0, hpAfter: pa.hp, eliminated: false, drops: [], gold: 0 });
+          if (pair.b >= 0) {
+            const pb = this.players[pair.b];
+            pb.lastOutcome = 'draw';
+            pb.streak = 0;
+            pb.lastDamage = 0;
+            out.push({ idx: pb.idx, outcome: 'draw', damage: 0, hpAfter: pb.hp, eliminated: false, drops: [], gold: 0 });
+          }
+          return out;
+        }
+        const emptyWinnerTeam: 0 | 1 = paEmpty ? (pair.swap ? 0 : 1) : (pair.swap ? 1 : 0);
+        const emptyWinnerBoard = paEmpty ? opponentBoard : pa.board;
+        const dmgEmpty = this.damageOf({ winner: emptyWinnerTeam, ticks: 1, survivors: {}, remainingHpRatio: {}, timeout: false } as BattleResult, emptyWinnerTeam, emptyWinnerBoard);
+        if (paEmpty) {
+          this.applyLoss(pa, dmgEmpty, out, pair.b >= 0 ? this.players[pair.b] : null, pair.beast);
+          if (pair.b >= 0) this.applyWin(this.players[pair.b], out);
+        } else {
+          this.applyWin(pa, out, pair.beast);
+          if (pair.b >= 0) {
+            const pb = this.players[pair.b];
+            this.applyLoss(pb, dmgEmpty, out, pa);
+          }
+        }
+        return out;
+      }
+    }
+
     // pair.a 在 swap 时位于 team 1，所以"a 是否获胜"要按交换后的队号判断
     const aTeam: 0 | 1 = pair.swap ? 1 : 0;
     const aWon = result.winner === aTeam;

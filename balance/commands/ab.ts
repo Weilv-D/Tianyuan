@@ -29,6 +29,7 @@ export async function run(argv: string[]): Promise<void> {
     if (a === '--set') {
       const kv = argv[++i] ?? '';
       const eq = kv.indexOf('=');
+      if (eq === -1) throw new Error("--set 需要 key=value 形式，收到：" + kv);
       overrides[kv.slice(0, eq)] = Number(kv.slice(eq + 1));
     } else if (a === '--n') n = requirePositiveInt(argv[++i], '--n', 200);
     else if (a === '--pairs') focus = argv[++i] ?? '4';

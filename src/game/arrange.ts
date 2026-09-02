@@ -133,6 +133,21 @@ export function autoArrange(p: PlayerState, pool: CardPool): number {
 
   p.board = newBoard;
   p.bench = newBench;
+  // 紧急保底：若棋盘仍为空而备战席有子，强行上最强的一张，避免“直接胜利”零对抗局
+  // 用变量承接 every 结果，避免控制流把 p.board 收窄为 null[]（此时 p.board[dest]=best 会被判为赋 UnitInstance 给 null）
+  const boardEmpty = p.board.every((u) => u === null);
+  const benchHas = p.bench.some((u) => u !== null);
+  if (boardEmpty && benchHas) {
+    const best = ([...p.bench].filter(Boolean) as UnitInstance[]).sort((a, b) => powerScore(b!) - powerScore(a!))[0];
+    if (best) {
+      const bi = p.bench.findIndex((u) => u && u.iid === best.iid);
+      const dest = p.board.findIndex((u) => u === null);
+      if (bi >= 0 && dest >= 0) {
+        p.bench[bi] = null;
+        p.board[dest] = best;
+      }
+    }
+  }
   p.gold += refund;
   return refund;
 }

@@ -174,3 +174,15 @@ export function portraitItemSlotRect(i: number, sz: number): { x: number; y: num
   const w = portraitItemSlotSize(sz);
   return { x: PORTRAIT_ITEM_PAD.x + i * (w + PORTRAIT_ITEM_GAP), y: PORTRAIT_ITEM_PAD.y, w, h: w };
 }
+
+/**
+ * 点按热区矩形（视觉之外外扩，保证 44px 误触容差）。
+ *
+ * 视觉图标 17px 时点按热区极小，移动端或快速鼠标下 4~6px 漂移即判"没点中"；
+ * 视觉保持精致，热区单独外扩 —— 两者分离是可触性与可读性兼得的唯一路径。
+ */
+export function portraitItemSlotHitRect(i: number, sz: number): { x: number; y: number; w: number; h: number } {
+  const r = portraitItemSlotRect(i, sz);
+  const pad = 6;
+  return { x: r.x - pad, y: r.y - pad, w: r.w + pad * 2, h: r.h + pad * 2 };
+}

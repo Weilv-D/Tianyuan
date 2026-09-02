@@ -115,7 +115,7 @@ async function main(): Promise<void> {
       await (await import('./commands/trend')).run(rest);
       break;
     default:
-      console.log(command ? `✗ 未知命令：${command}\n` : '' + HELP);
+      console.log((command ? `✗ 未知命令：${command}\n` : '') + HELP);
       process.exitCode = command ? 1 : 0;
   }
 }

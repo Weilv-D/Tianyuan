@@ -26,7 +26,7 @@ import {
   ITEM_ROWS,
   ITEM_SIZE,
 } from '../view/layout';
-import { portraitItemSlotRect } from '../view/hudLayout';
+import { portraitItemSlotHitRect } from '../view/hudLayout';
 
 export interface HitSlot {
   where: 'board' | 'bench';
@@ -86,7 +86,7 @@ export function hitUnitItemSlot(
   const py =
     (where.where === 'board' ? GRID_Y + (Math.floor(where.slot / 8) + HALF_ROWS) * CELL : BENCH_Y) + 3;
   for (let i = 0; i < Math.min(3, itemCount); i++) {
-    const r = portraitItemSlotRect(i, size);
+    const r = portraitItemSlotHitRect(i, size);
     if (x >= px + r.x && x <= px + r.x + r.w && y >= py + r.y && y <= py + r.y + r.h) return i;
   }
   return -1;

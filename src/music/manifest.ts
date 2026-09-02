@@ -51,16 +51,24 @@ const URLS: Record<MusicMood, string> = {
   final: finalUrl,
 };
 
-export const LICENSED_MUSIC: LicensedTrack[] = rawTracks.map((t) => ({
-  id: t.id as MusicMood,
-  file: t.file,
-  title: t.title,
-  artist: t.artist,
-  license: 'CC0-1.0',
-  sourceUrl: t.sourceUrl,
-  sha256: t.sha256,
-  url: URLS[t.id as MusicMood],
-}));
+const ALLOWED_MOODS = new Set<string>(['menu', 'prep', 'battle', 'final']);
+export const LICENSED_MUSIC: LicensedTrack[] = rawTracks.map((t) => {
+  if (!ALLOWED_MOODS.has(t.id)) throw new Error('tracks.json 非法 id：' + t.id + '（仅允许 menu/prep/battle/final）');
+  if (t.license !== 'CC0-1.0') throw new Error('tracks.json 仅允许 CC0-1.0，' + t.id + ' 为 ' + t.license);
+  const url = URLS[t.id as MusicMood];
+  if (!url) throw new Error('tracks.json id ' + t.id + ' 无对应构建产物 URL');
+  if (!/^([0-9a-f]{64})$/.test(t.sha256)) throw new Error('tracks.json ' + t.id + ' sha256 非 64 位 hex：' + t.sha256);
+  return {
+    id: t.id as MusicMood,
+    file: t.file,
+    title: t.title,
+    artist: t.artist,
+    license: 'CC0-1.0' as const,
+    sourceUrl: t.sourceUrl,
+    sha256: t.sha256,
+    url,
+  };
+});
 
 /** 按心境取曲；无对应曲目返回 null（调用方回落程序化合成） */
 export function licensedTrackOf(mood: MusicMood): LicensedTrack | null {

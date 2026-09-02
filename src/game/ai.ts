@@ -225,6 +225,7 @@ function tidyBench(w: AiWorld, p: PlayerState): void {
   let need = 3 - free;
   for (const c of cands) {
     if (need <= 0) break;
+    if (allUnits(p).length <= 1) break;
     if (w.sell(p, c.iid)) need--;
   }
 }

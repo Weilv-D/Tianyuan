@@ -6,6 +6,7 @@ import { UnitPortrait } from '../../ui/cards';
 import { audio } from '../../audio/AudioEngine';
 import { INK, CINNABAR, GILT, PAPER, SHADE, css } from '../view/palette';
 import { W, H } from '../view/layout';
+import { screenToWorld } from '../view/viewScale';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
@@ -61,17 +62,19 @@ export class PauseScoutOverlay {
     const p = this.scene.match.players[idx];
     if (!p) return;
     const panel = this.scene.add.container(0, 0).setDepth(860);
-    const shade = this.scene.add.graphics();
-    shade.fillStyle(SHADE, 0.66);
-    shade.fillRect(0, 0, W, H);
-    shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
-    shade.on('pointerdown', () => this.closeScout());
-    panel.add(shade);
-
     const bw = 780;
     const bh = 600;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
+    const shade = this.scene.add.graphics();
+    shade.fillStyle(SHADE, 0.66);
+    shade.fillRect(0, 0, W, H);
+    shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
+    shade.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const { x: wx, y: wy } = screenToWorld(p.x, p.y, this.scene.cameras.main.zoom);
+      if (wx < bx || wx > bx + bw || wy < by || wy > by + bh) this.closeScout();
+    });
+    panel.add(shade);
     const g = this.scene.add.graphics();
     g.fillStyle(INK[800], 0.98);
     g.fillRect(bx, by, bw, bh);

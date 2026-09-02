@@ -16,6 +16,8 @@ export class RoundResultOverlay {
 
   show(p: PlayerState, next: () => void): void {
     const won = p.lastOutcome === 'win';
+    const isDraw = p.lastOutcome === 'draw';
+    const isBye = p.lastOutcome === 'bye';
     const panel = this.scene.add.container(W / 2, H / 2).setDepth(600);
     const shade = this.scene.add.graphics();
     shade.fillStyle(SHADE, 0.55);
@@ -29,11 +31,11 @@ export class RoundResultOverlay {
     const g = this.scene.add.graphics();
     g.fillStyle(INK[800], 0.97);
     g.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 12);
-    g.lineStyle(2, won ? GILT.base : CINNABAR.base, 0.9);
+    g.lineStyle(2, won ? GILT.base : isBye || isDraw ? INK[500] : CINNABAR.base, 0.9);
     g.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 12);
     panel.add(g);
 
-    const accent = won ? GILT : CINNABAR;
+    const accent: { base: number; light: number } = won ? GILT : isBye || isDraw ? { base: INK[500], light: PAPER[300] } : CINNABAR;
     // 顶部一道结果色带：胜负在 200ms 内就已经传达，不必读字
     const band = this.scene.add.graphics();
     band.fillStyle(accent.base, 0.85);
@@ -41,7 +43,7 @@ export class RoundResultOverlay {
     panel.add(band);
 
     const glyph = this.scene.add
-      .text(0, -bh / 2 + 30, won ? '胜' : p.lastOutcome === 'draw' ? '和' : '败', {
+      .text(0, -bh / 2 + 30, won ? '胜' : isDraw ? '和' : isBye ? '休' : '败', {
         fontFamily: FONT.title,
         fontSize: '52px',
         color: css(accent.light),
@@ -60,8 +62,10 @@ export class RoundResultOverlay {
       hpG.clear();
       hpG.fillStyle(INK[900], 1);
       hpG.fillRoundedRect(barX, barY, barW, 10, 5);
-      hpG.fillStyle(v > 0.5 ? SPIRIT.base : v > 0.22 ? GILT.base : CINNABAR.base, 1);
-      hpG.fillRoundedRect(barX, barY, Math.max(2, barW * v), 10, 5);
+      if (v > 0.005) {
+        hpG.fillStyle(v > 0.5 ? SPIRIT.base : v > 0.22 ? GILT.base : CINNABAR.base, 1);
+        hpG.fillRoundedRect(barX, barY, Math.max(2, barW * v), 10, 5);
+      }
       hpG.lineStyle(1, INK[500], 1);
       hpG.strokeRoundedRect(barX, barY, barW, 10, 5);
     };
@@ -95,9 +99,10 @@ export class RoundResultOverlay {
         .setOrigin(1, 0)
     );
 
+    const streakPart = p.streak === 0 ? '' : `连${p.streak > 0 ? '胜' : '败'} ${Math.abs(p.streak)}　`;
     panel.add(
       this.scene.add
-        .text(0, barY + 26, `连${p.streak >= 0 ? '胜' : '败'} ${Math.abs(p.streak)}　战绩 ${p.wins}胜 ${p.losses}负`, {
+        .text(0, barY + 26, `${streakPart}战绩 ${p.wins}胜 ${p.losses}负`, {
           fontFamily: FONT.body,
           fontSize: '13px',
           color: css(PAPER[400]),

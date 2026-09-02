@@ -179,6 +179,7 @@ export class Button extends Phaser.GameObjects.Container {
     );
 
     this.on('pointerover', () => {
+      if (this.disabled) return;
       this.hovered = true;
       this.redraw();
       scene.input.setDefaultCursor('pointer');

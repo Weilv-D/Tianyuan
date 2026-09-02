@@ -59,8 +59,13 @@ export async function run(argv: string[]): Promise<void> {
   } else if (setArg) {
     const ov: Overrides = {};
     for (const kv of setArg.split(',')) {
-      const [k, v] = kv.split('=');
-      ov[k.trim()] = Number(v);
+      const eq = kv.indexOf('=');
+      if (eq === -1) throw new Error('--set 需要 k=v 形式，收到：' + kv);
+      const k = kv.slice(0, eq).trim();
+      const v = kv.slice(eq + 1).trim();
+      const num = Number(v);
+      if (!Number.isFinite(num)) throw new Error('--set 值须为有限数字，收到：' + kv);
+      ov[k] = num;
     }
     spec = { name: 'quick-ab', axes: [], note: `--set ${setArg}`, single: ov };
   } else {

@@ -179,37 +179,35 @@ export class AudioEngine {
     return this.licensedSrc !== null;
   }
 
-  /** 后台抓取并解码全部授权曲目；逐曲 try/catch，失败即静默回落程序化 */
+  /** 后台抓取并解码全部授权曲目；并行抓取、统一代际，失败即静默回落程序化 */
   private async loadLicensedMusic(): Promise<void> {
     if (!this.ctx || this.licensedLoading) return;
     this.licensedLoading = true;
     const ctx = this.ctx;
-    for (const track of LICENSED_MUSIC) {
-      const gen = ++this.licensedGen;
+    const myGen = ++this.licensedGen;
+    const jobs = LICENSED_MUSIC.map(async (track) => {
       try {
-        // 弱网单曲 5s 超时：与 boot 序章的预载超时同一纪律 —— 不让任何一首
-        // 挂起的 TCP 连接拖死整条典藏曲目链（失败按曲回落程序化）
         const ctrl = new AbortController();
         const timer = window.setTimeout(() => ctrl.abort(), 5000);
         try {
           const res = await fetch(track.url, { signal: ctrl.signal });
-          if (!res.ok) continue;
+          if (!res.ok) return;
           const buf = await res.arrayBuffer();
           const audio = await ctx.decodeAudioData(buf);
-          if (gen !== this.licensedGen && this.mood === 'none') {
-            // 解码期间用户已停曲：只登记缓冲，不接管
-            this.licensedBufs.set(track.id, audio);
-            continue;
-          }
+          if (myGen !== this.licensedGen) return;
           this.licensedBufs.set(track.id, audio);
-          this.maybeTakeoverLicensed();
+          // 仍在同代且 BGM 运行中，具备接管条件则接管
+          if (this.mood !== 'none' && this.licensedSrc === null && this.bgmTimer !== null && this.licensedEnabled) {
+            this.maybeTakeoverLicensed();
+          }
         } finally {
           window.clearTimeout(timer);
         }
       } catch {
         // 单曲失败不影响其余曲目与程序化路径
       }
-    }
+    });
+    await Promise.all(jobs);
     this.licensedLoading = false;
   }
 

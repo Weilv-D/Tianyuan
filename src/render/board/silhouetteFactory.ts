@@ -100,7 +100,8 @@ function tracking(g: Phaser.GameObjects.Graphics, b: Bounds): Phaser.GameObjects
                 }
               }
             }
-            return Reflect.apply(raw, target, args);
+            const ret = Reflect.apply(raw, target, args);
+            return ret === target ? new Proxy(target, handler) : ret;
           };
         }
         return (...args: unknown[]) => Reflect.apply(raw, target, args);
@@ -109,7 +110,9 @@ function tracking(g: Phaser.GameObjects.Graphics, b: Bounds): Phaser.GameObjects
         const nums = args.filter((x): x is number => typeof x === 'number');
         const box = geo(nums);
         if (box) merge(box[0], box[1], box[2], box[3]);
-        return Reflect.apply(raw, target, args);
+        const ret = Reflect.apply(raw, target, args);
+        // Graphics API 多为链式返回 this，返回代理保证 g.fill().stroke() 全程被记录
+        return ret === target ? new Proxy(target, handler) : ret;
       };
     },
   };

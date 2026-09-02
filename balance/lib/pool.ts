@@ -124,7 +124,7 @@ export function runPool(
           fail(new Error(`池子作业失败 (${String(msg.itemKey ?? msg.configIdx)} pair ${String(msg.i)}v${String(msg.j)})：${String(msg.message)}`));
           return;
         }
-        if (msg.type !== 'result') return;
+        if (msg.type !== 'result') { dispatch(proc); return; }
         if (msg.kind === 'item') {
           results[idx] = {
             kind: 'item', itemKey: String(msg.itemKey), i: Number(msg.i), j: Number(msg.j),
@@ -139,7 +139,7 @@ export function runPool(
           };
         }
         done += 1;
-        onProgress?.(done, jobs.length);
+        try { onProgress?.(done, jobs.length); } catch { /* progress 回调不该中断分发 */ }
         dispatch(proc);
       });
     };

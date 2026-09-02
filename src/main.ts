@@ -217,12 +217,21 @@ window.addEventListener('keydown', unlock);
 
 // 自定义光标的悬停态桥接：index.html 的金环在悬停可交互对象时放大。
 // 场景级 gameobjectover/out 汇入 body.cur-hover —— DOM 光标与画布内命中同源。
-game.events.once('ready', () => {
+// 金环悬停桥接：DOM 光标随画布悬停状态放大。InputPlugin 在 Scene SHUTDOWN
+// 时 removeAllListeners，once 挂一次的桥接会在首次切场景后丢弃。改为在每个
+// 场景 create 时重挂（由场景侧调用 wireForScene），此处仅保留首屏挂载。
+function wireCursorForScene(scene: Phaser.Scene): void {
   const doc = document.body.classList;
-  for (const scene of game.scene.scenes) {
-    scene.input.on('gameobjectover', () => doc.add('cur-hover'));
-    scene.input.on('gameobjectout', () => doc.remove('cur-hover'));
-  }
+  // 幂等：先摘旧监听再挂新，避免重复挂载叠加
+  try { scene.input.off('gameobjectover'); } catch { /* ignore */ }
+  try { scene.input.off('gameobjectout'); } catch { /* ignore */ }
+  scene.input.on('gameobjectover', () => doc.add('cur-hover'));
+  scene.input.on('gameobjectout', () => doc.remove('cur-hover'));
+  // SHUTDOWN 时清类，避免切场景后残留 cur-hover
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => doc.remove('cur-hover'));
+}
+game.events.once('ready', () => {
+  for (const scene of game.scene.scenes) wireCursorForScene(scene);
 });
 
 // 隐藏加载序章：先让「弈」字与进度条走完入场（~1.5s），再上掀退场（clip-path 1.2s）。

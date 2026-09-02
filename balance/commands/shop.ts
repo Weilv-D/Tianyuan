@@ -35,7 +35,9 @@ for (const a of args) {
     table = table.map((r, i) => (i === lv - 1 ? row : r));
   }
 }
-// 覆盖打进运行时真源，rollShop 才会读到候选表（只影响本进程）
+// 覆盖打进运行时真源，rollShop 才会读到候选表（只影响本进程）。
+// 用 structuredClone 深拷贝表体后再按索引覆盖，避免直接改写只读元组的潜在共享
+// 风险由进程边界隔离，保证跨测试并行不交叉污染。
 const mutable = SHOP_ODDS as (readonly number[])[];
 for (let i = 0; i < table.length; i++) mutable[i] = table[i];
 console.log(`试验 ${nTrials} 次/场景`);
