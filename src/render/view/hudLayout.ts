@@ -27,14 +27,15 @@ export const RAIL_VIEW_W = 76;
 export const RAIL_VIEW_H = 660;
 /**
  * 计数相对环心的横向偏移：计数放环右侧外（origin 0,0.5）。
- * 圆内只留篆字——10px mono 的真实墨迹高度带抗锯齿余量后必然蹭到 r16 底弧，
- * 实机截图证实过，环内不放任何第二元素。
+ * 圆内只留篆字——小字号 mono 的真实墨迹高度带抗锯齿余量后必然蹭到 r16 底弧，
+ * 实机截图证实过，环内不放任何第二元素。12px 是 HUD 信息字号下限
+ * （FIT 缩放到 1366×768 后仍可读），10px 在小窗下不可辨。
  */
 export const RAIL_COUNT_DX = 21;
 /** 篆字墨迹半高（14px 字面 ≈0.92em）：环内净空校验用 */
 export const RAIL_GLYPH_INK_HALF = 6.4;
-/** 最宽计数串（"0/9"，10px mono）：环右净空与悬浮笺避让校验用 */
-export const RAIL_COUNT_W = 17;
+/** 最宽计数串（"0/9"，12px mono ≈0.6em/字）：环右净空与悬浮笺避让校验用 */
+export const RAIL_COUNT_W = 22;
 
 /** 第 i 枚徽章的环心（相对 traitContainer；traitContainer 挂在 RAIL_X, RAIL_Y） */
 export function railBadgeY(i: number): number {
@@ -51,9 +52,9 @@ export function railBottomY(): number {
   return (RAIL_ITEMS - 1) * RAIL_PITCH + BADGE_R;
 }
 
-/** 命中区（相对单枚徽章容器）：罩住圆环与右侧计数 */
+/** 命中区（相对单枚徽章容器）：罩住圆环与右侧计数串全部墨迹 */
 export function railBadgeHit(): { x: number; y: number; w: number; h: number } {
-  return { x: -BADGE_SIZE / 2, y: -BADGE_SIZE / 2, w: BADGE_SIZE + RAIL_COUNT_DX, h: BADGE_SIZE };
+  return { x: -BADGE_SIZE / 2, y: -BADGE_SIZE / 2, w: BADGE_SIZE / 2 + RAIL_COUNT_DX + RAIL_COUNT_W, h: BADGE_SIZE };
 }
 
 /**
@@ -72,7 +73,17 @@ export function railOverlapsLog(): boolean {
 
 /** 渲染字号（textScale 放大后的实际值） */
 const NAME_RENDERED = renderedSize(13); // 15
-const LV_RENDERED = renderedSize(11); // 12
+const LV_RENDERED = renderedSize(12); // 13
+
+// 列位链式推导：每列从上一列的右缘 + 6px 净距推出，禁止重复写字面量 ——
+// 历史事故：lvX 公式里硬编码旧血条宽 72，血条收窄后 lvX 没跟上，行尾静默越栏。
+const NAME_BUDGET = 7 * NAME_RENDERED + 1;
+const BAR_X = 36 + NAME_BUDGET + 6;
+/** 血条 68：lv/streak 提到 12px 后行尾预算贴死 SIDE_W，血条让 4px 保住 reportRowFitsSide */
+const BAR_W = 68;
+const LV_X = BAR_X + BAR_W + 6;
+const LV_BUDGET = Math.ceil(4 * 0.55 * LV_RENDERED); // "Lv10" mono 4 字
+const STREAK_X = LV_X + LV_BUDGET + 4;
 
 export const REPORT_ROW = {
   rowH: 30,
@@ -81,15 +92,15 @@ export const REPORT_ROW = {
   nameX: 36,
   nameSize: 13,
   /** 名字列预算：最长 7 个全角名按渲染字号收进，超出由渲染层 clipToWidth 截断 */
-  nameMaxW: 7 * NAME_RENDERED + 1,
-  barX: 36 + 7 * NAME_RENDERED + 1 + 6,
-  barW: 72,
-  lvX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6,
-  lvSize: 11,
-  streakX: 36 + 7 * NAME_RENDERED + 1 + 6 + 72 + 6 + Math.ceil(4 * 0.55 * LV_RENDERED) + 4,
-  streakSize: 11,
-  /** 连胜注最宽（"胜9"两全角 × 渲染 12px） */
-  streakMaxW: 2 * renderedSize(11),
+  nameMaxW: NAME_BUDGET,
+  barX: BAR_X,
+  barW: BAR_W,
+  lvX: LV_X,
+  lvSize: 12,
+  streakX: STREAK_X,
+  streakSize: 12,
+  /** 连胜注最宽（"胜9"两全角 × 渲染 13px） */
+  streakMaxW: 2 * renderedSize(12),
 } as const;
 
 /** 行尾不出右栏（导出供测试口径复算） */

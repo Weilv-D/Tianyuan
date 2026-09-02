@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import { REROLL_COST } from '../../core/config';
 import { Bar, Button, FONT, enableScroll, makePanel } from '../../ui/kit';
 import { ItemChip, ShopCard, TraitRow } from '../../ui/cards';
-import { bakedImage } from '../view/bake';
+import { bakedImage, bakedTexture } from '../view/bake';
 import { INK, GILT, CINNABAR, SPIRIT, PAPER, VOID, SHADE, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
 import {
   ACT_BTN_H,
@@ -60,8 +60,7 @@ export class HudPanels {
   // 顶栏
   roundText!: Phaser.GameObjects.Text;
   phaseText!: Phaser.GameObjects.Text;
-  timerText!: Phaser.GameObjects.Text;
-  timerBar!: Bar;
+  // 旧 timerText/timerBar（恒满假计时条）已移除：备战无倒计时，假仪表只生误导
   streakText!: Phaser.GameObjects.Text;
   streakLabel!: Phaser.GameObjects.Text;
 
@@ -93,6 +92,7 @@ export class HudPanels {
   // 侧栏
   traitContainer!: Phaser.GameObjects.Container;
   traitScroll: ReturnType<typeof enableScroll> | null = null;
+  railFade: Phaser.GameObjects.Image | null = null;
   scoreContainer!: Phaser.GameObjects.Container;
   opponentText!: Phaser.GameObjects.Text;
   intelContainer!: Phaser.GameObjects.Container;
@@ -267,20 +267,16 @@ export class HudPanels {
       variant: 'primary',
       fontSize: 12,
     });
-
-    // 备战无倒计时：此处给常驻提示而非走秒（玩家公测后裁决 —— 手动开战）
-    this.timerText = this.scene.add
-      .text(cx + 180, PHASE_Y - 6, '准备就绪 · 随时开战', { fontFamily: FONT.mono, fontSize: '11px', color: css(INK[300]), letterSpacing: 2 })
-      .setOrigin(0, 0.5);
-    this.timerBar = new Bar(this.scene, cx + 180, PHASE_Y + 12, 120, 2, GILT.base);
-    this.timerBar.setValue(1);
+    // 备战无倒计时（玩家公测后裁决 —— 手动开战）。旧「准备就绪」文案 + 恒满计时条
+    // 读作"正在计时"，是永不走针的假仪表，已移除；阶段语义由 phaseText 与开战按钮承担。
   }
 
   // ══════════════ 商肆（样稿 .scard 窄卡 × 5） ══════════════
 
   buildShop(): void {
     // 注脚放卡下一行：卡上方紧贴备战席框底，旧「卡上标题」压进框底带是备战区视觉混乱的一处根因
-    // 行顶坐标走 SHOP_FOOT_Y（layout 单一真源）：13px@1.12 行高 ~19px，底缘收在 1080 之内
+    // 行顶坐标走 SHOP_FOOT_Y（layout 单一真源）：13px@1.12 行高 ~19px，底缘收在 1080 之内。
+    // 右注脚是常驻键位参考（非教程）：直购/撤销不在任何按钮文案上，设置页脚是全游戏唯一出处 —— 这里补上发现通道
     this.scene.add
       .text(SHOP_X, SHOP_FOOT_Y, '商 肆', {
         fontFamily: FONT.title,
@@ -290,12 +286,12 @@ export class HudPanels {
       })
       .setOrigin(0, 0);
     this.scene.add
-      .text(SHOP_X + SHOP_W, SHOP_FOOT_Y, `刷新 · ${REROLL_COST} 金`, {
+      .text(SHOP_X + SHOP_W, SHOP_FOOT_Y, `刷新 ${REROLL_COST} 金 · 直购 1-5 · 撤销 Ctrl+Z`, {
         fontFamily: FONT.body,
         fontSize: '12px',
         color: css(PAPER[400]),
       })
-      .setOrigin(0, 0);
+      .setOrigin(1, 0);
 
     for (let i = 0; i < 5; i++) {
       const card = new ShopCard(
@@ -448,6 +444,27 @@ export class HudPanels {
     this.traitContainer = this.scene.add.container(RAIL_X, RAIL_Y);
     // 视口一窗收全「徽章 40 + 右侧计数」；旧宽 48 只罩圆环，计数被遮罩裁成半截
     this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_X - 24, RAIL_Y - 20, RAIL_VIEW_W, RAIL_VIEW_H);
+    // 轨尾渐隐缘：内容超出视口时显示 —— "下面还有、滚轮可看"的常驻信号。
+    // 17 族最坏情形溢出 88px，此前没有任何可滚提示，超出的族静默不可见。
+    const FADE_H = 24;
+    bakedTexture(this.scene, `railfade_v1_${RAIL_VIEW_W}x${FADE_H}`, RAIL_VIEW_W, FADE_H, (g) => {
+      // 逐行扫描线：INK900 自下而上渐隐入夜 —— 与页面夜色底同色相，读作"沉入暗处"
+      for (let row = 0; row < FADE_H; row++) {
+        const t = row / (FADE_H - 1); // 0 顶（透明）→ 1 底（不透明）
+        g.fillStyle(INK[900], 0.92 * t);
+        g.fillRect(0, row, RAIL_VIEW_W, 1);
+      }
+    });
+    this.railFade = this.scene.add
+      .image(RAIL_X - 24, RAIL_Y - 20 + RAIL_VIEW_H - FADE_H, `railfade_v1_${RAIL_VIEW_W}x${FADE_H}`)
+      .setOrigin(0, 0)
+      .setDepth(3)
+      .setVisible(false);
+  }
+
+  /** 轨尾渐隐缘开关（SceneRefresh.refreshTraits 按内容高度驱动） */
+  setRailOverflow(overflow: boolean): void {
+    this.railFade?.setVisible(overflow);
   }
 
   // ══════════════ 敌情（右上） ══════════════

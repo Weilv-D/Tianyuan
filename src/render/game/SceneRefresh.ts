@@ -7,6 +7,7 @@ import { boardCap, boardCount } from '../../game/state';
 import { interestOf, streakGold, xpToNext } from '../../game/economy';
 import { Bar, FONT, clipToWidth, setTextIf } from '../../ui/kit';
 import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
+import { RAIL_VIEW_H } from '../view/hudLayout';
 import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, SIDE_W } from '../view/layout';
 import { traitIconKey } from '../board/traitIcons';
 import {
@@ -179,13 +180,13 @@ export class SceneRefresh {
       icon.setDisplaySize(40, 40);
       item.add(icon);
 
-      // 计数在环右侧：圆内只留篆字，字与环永不相碰
+      // 计数在环右侧：圆内只留篆字，字与环永不相碰（12px 为 HUD 信息字号下限）
       const cp = railCountPos();
       item.add(
         this.scene.add
           .text(cp.x, cp.y, `${s.t.count}/${s.nextBreak}`, {
             fontFamily: FONT.mono,
-            fontSize: '10px',
+            fontSize: '12px',
             color: css(active ? SPIRIT.base : INK[300]),
           })
           .setOrigin(0, 0.5)
@@ -203,6 +204,8 @@ export class SceneRefresh {
       i++;
     }
     this.scene.hud.traitScroll?.setHeight(i * RAIL_PITCH);
+    // 轨尾渐隐缘：内容超视口才显示（17 族最坏情形才会触发）
+    this.scene.hud.setRailOverflow(i * RAIL_PITCH > RAIL_VIEW_H);
   }
 
   /** 羁绊悬停详情：轨右侧浮出小笺（名/计数/当前档效果/描述），高度按内容行数自适应 */
@@ -225,7 +228,8 @@ export class SceneRefresh {
     g.lineStyle(1.5, color, 0.8);
     g.fillRect(0, 0, 2.5, L.h);
     c.add(g);
-    c.setPosition(106, py);
+    // x=112：轨计数串右缘（RAIL_X+RAIL_COUNT_DX+RAIL_COUNT_W=109）之外留 3px 净距
+    c.setPosition(112, py);
 
     c.add(
       this.scene.add
@@ -421,9 +425,21 @@ export class SceneRefresh {
 
       if (!p.alive) row.setAlpha(0.45);
       if (!isHuman && p.alive) {
+        // 可点信号：悬停淡金底 —— 计分板行是侦查入口，此前只有光标切换，可发现性弱
+        const hoverBg = this.scene.add.graphics();
+        hoverBg.fillStyle(GILT.base, 0.08);
+        hoverBg.fillRect(0, 0, SIDE_W, 27);
+        hoverBg.setVisible(false);
+        row.addAt(hoverBg, 0);
         row.setInteractive(new Phaser.Geom.Rectangle(0, -4, SIDE_W, 30), Phaser.Geom.Rectangle.Contains);
-        row.on('pointerover', () => this.scene.input.setDefaultCursor('pointer'));
-        row.on('pointerout', () => this.scene.input.setDefaultCursor('default'));
+        row.on('pointerover', () => {
+          hoverBg.setVisible(true);
+          this.scene.input.setDefaultCursor('pointer');
+        });
+        row.on('pointerout', () => {
+          hoverBg.setVisible(false);
+          this.scene.input.setDefaultCursor('default');
+        });
         row.on('pointerdown', () => this.scene.pauseScout.showOpponentBoard(p.idx));
       }
       this.scene.hud.scoreContainer.add(row);

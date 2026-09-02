@@ -16,6 +16,7 @@ import {
   BENCH_Y,
   CELL,
   DETAIL_H,
+  DETAIL_SELL_BAND,
   DETAIL_W,
   GRID_X,
   GRID_Y,
@@ -64,6 +65,8 @@ export class InputController {
   // 悬停详情
   private hoverKey = '';
   private detailCard: UnitDetailCard | null = null;
+  /** 指针正悬在详情卡的装备槽上：updateHover 的器匣分支不得杀掉槽位提示卡 */
+  private slotHovering = false;
   itemTip!: ItemTooltip;
 
   constructor(private scene: GameScene) {}
@@ -125,8 +128,10 @@ export class InputController {
     this.selectionTween = null;
     this.selectedSlot = null;
     this.pinnedKey = '';
+    this.slotHovering = false;
     if (this.selectionG && this.selectionG.active) this.selectionG.clear();
     this.detailCard?.container.setVisible(false);
+    this.itemTip.hide();
   }
 
   // ══════════════ 输入 ══════════════
@@ -404,23 +409,58 @@ export class InputController {
     audio.play('ui');
   }
 
-  /** 选中棋子的详情卡钉在格旁；内容未变时只挪位不重建 */
+  /** 详情卡单例工厂：槽位 tooltip 回调只在创建时接一次 */
+  private ensureDetailCard(): UnitDetailCard {
+    if (!this.detailCard) {
+      this.detailCard = new UnitDetailCard(this.scene, DETAIL_W);
+      this.detailCard.onItemHover = (iid, px, py) => {
+        this.slotHovering = !!iid;
+        if (iid) this.itemTip.show(iid, px, py);
+        else this.itemTip.hide();
+      };
+    }
+    return this.detailCard;
+  }
+
+  /** 选中棋子的详情卡钉在格旁；内容未变时只挪位不重建。
+   *  钉住态比悬停态多一条出售带（DETAIL_SELL_BAND）—— 出售入口此前只有
+   *  "拖到右下朱印"一条隐藏手势，点选语境给显式动作。 */
   private showPinnedDetail(where: 'board' | 'bench', slot: number): void {
     const u = this.unitAt({ where, slot });
     if (!u) return;
     const key = `${where}:${slot}:${u.iid}:${u.star}`;
     const ox = where === 'board' ? GRID_X + (slot % 8) * CELL : BENCH_X + slot * BENCH_CELL;
     const oy = where === 'board' ? GRID_Y + (Math.floor(slot / 8) + HALF_ROWS) * CELL : BENCH_Y;
+    const h = DETAIL_H + DETAIL_SELL_BAND;
     const x = Math.min(ox + CELL + 12, W - DETAIL_W - 20);
-    const y = Math.min(oy, H - DETAIL_H - 20);
+    const y = Math.min(oy, H - h - 20);
     if (this.pinnedKey === key) {
       if (this.detailCard) this.detailCard.container.setPosition(x, y).setVisible(true);
       return;
     }
     this.pinnedKey = key;
-    if (!this.detailCard) this.detailCard = new UnitDetailCard(this.scene, DETAIL_W);
-    this.detailCard.update(u, DETAIL_W, DETAIL_H);
-    this.detailCard.container.setPosition(x, y).setVisible(true);
+    const card = this.ensureDetailCard();
+    card.update(u, DETAIL_W, h, {
+      sellLabel: `出 售 · ${sellValue(u)} 金`,
+      onSell: () => this.sellSelected(where, slot, u),
+    });
+    card.container.setPosition(x, y).setVisible(true);
+  }
+
+  /** 点选态出售：与拖拽到朱印同一内核路径（match.sell + pushUndo），反馈同语 */
+  private sellSelected(where: 'board' | 'bench', slot: number, u: UnitInstance): void {
+    if (this.scene.phase !== 'prep' || this.scene.busy) return;
+    const arr = where === 'board' ? this.scene.match.human.board : this.scene.match.human.bench;
+    const cur = arr[slot];
+    if (!cur || cur.iid !== u.iid) return; // 选中内容已变（撤销/合成），按当前态重画，不出售
+    const gain = sellValue(cur);
+    this.scene.pushUndo('卖出');
+    if (this.scene.match.sell(this.scene.match.human, cur.iid)) {
+      audio.play('coin');
+      this.scene.showToast(`卖出 ${CHAMPION_BY_ID[cur.defId]?.name ?? ''}，返还 ${gain} 金`);
+    }
+    this.clearSelection();
+    this.scene.afterAction();
   }
 
   // ══════════════ 装备拖拽 ══════════════
@@ -583,6 +623,7 @@ export class InputController {
     // 复用式详情卡：隐藏而非销毁，下一次悬停只做 setText / 换贴图
     this.detailCard?.container.setVisible(false);
     this.hoverKey = '';
+    this.slotHovering = false;
   }
 
   private updateHover(px: number, py: number): void {
@@ -609,11 +650,19 @@ export class InputController {
       this.itemTip.hide();
       return;
     }
-    // 器匣装备：悬停出提示卡（名 + 效果 + 合成路径）
+    // 指针在详情卡上：卡是信息层，不许"穿透"它去悬停其下的棋子 ——
+    // 否则悬停装备槽的瞬间，钉住卡就会被下面的棋子偷换掉
+    const dc = this.detailCard;
+    if (dc?.container.visible) {
+      const cx = dc.container.x;
+      const cy = dc.container.y;
+      if (px >= cx && px <= cx + DETAIL_W && py >= cy && py <= cy + dc.curH) return;
+    }
+    // 器匣装备：悬停出提示卡（名 + 效果 + 合成路径）；详情卡槽位的提示由槽位事件自持
     const chipIdx = hitItemChip(px, py);
     const chipItem = chipIdx >= 0 ? this.scene.itemAt(chipIdx) : null;
     if (chipItem) this.itemTip.show(chipItem, px, py);
-    else this.itemTip.hide();
+    else if (!this.slotHovering) this.itemTip.hide();
     const hit = hitSource(px, py);
     let key = '';
     let unit: UnitInstance | null = null;
@@ -629,8 +678,8 @@ export class InputController {
       this.hoverKey = key;
       if (unit) {
         this.pinnedKey = ''; // 悬停接管详情卡，钉住态让位
-        if (!this.detailCard) this.detailCard = new UnitDetailCard(this.scene, DETAIL_W);
-        this.detailCard.update(unit, DETAIL_W, DETAIL_H);
+        const card = this.ensureDetailCard();
+        card.update(unit, DETAIL_W, DETAIL_H);
       } else if (this.selectedSlot) {
         // 指针在空处：保持选中棋子的详情卡常驻（点选落子语境）
         this.showPinnedDetail(this.selectedSlot.where, this.selectedSlot.slot);
@@ -640,10 +689,11 @@ export class InputController {
       return;
     }
     // 同一枚棋子：只跟随指针挪位（整卡复用，无重建）。
-    // 空处（hoverKey=''）时选中卡应钉在原位，不跟随指针
+    // 空处（hoverKey=''）时选中卡应钉在原位，不跟随指针；
+    // 钳位用 curH：钉住卡带出售带时比悬停卡高 44px，按常量钳会让底带越屏
     if (this.detailCard?.container.visible && (key.startsWith('board:') || key.startsWith('bench:'))) {
       const x = Math.min(px + 24, W - DETAIL_W - 20);
-      const y = Math.min(py + 16, H - DETAIL_H - 20);
+      const y = Math.min(py + 16, H - this.detailCard.curH - 20);
       this.detailCard.container.setPosition(x, y);
     }
   }

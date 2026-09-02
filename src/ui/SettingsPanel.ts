@@ -74,11 +74,13 @@ export class SettingsPanel {
     // 各算各的坐标，行数一变就撞车。
     const bw = 440;
     const inMatch = !!this.host.inMatch;
-    // 行高表：标题带 76 + 三滑杆 66×3 + 六个开关行 60×6（静音/自动/静观/典藏/
-    // 伤害数字/镜头震动）+ 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 20。
+    // 行高表：标题带 76 + 三滑杆 66×3 + 五个开关行 60×5（静音与自动上场同占一行）
+    // + 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 34。
     // 页脚贴着内容流排布，不再用 bh 固定偏移 —— 此前「关闭」钮与快捷键/署名两行
     // 重叠的根源就是两者各算各的坐标，行数一变就撞车。
-    const closeRel = 76 + 66 * 3 + 60 * 6 + (inMatch ? 58 : 0);
+    // 历史事故：此处曾按 60×6 计（静音/自动被当成两行），页脚与面板底比实际内容
+    // 低挂 60px，面板底部长出一段空档。
+    const closeRel = 76 + 66 * 3 + 60 * 5 + (inMatch ? 58 : 0);
     const hotkeyRel = closeRel + 42 + 14;
     const creditRel = hotkeyRel + 22;
     // 底衬 34：署名行（11px@1.12，行高 ~16px）+ 字形下延，与底框净距 ≥10px ——
@@ -106,27 +108,36 @@ export class SettingsPanel {
     ];
     let y = by + 76;
     for (const s of sliders) {
+      // 本行坐标快照（历史事故：闭包共享循环外的 let y，build 完成后任何一次
+      // draw() 重绘都落在 y 的最终值上 —— 拖动滑杆，轨道整条"传送"到关闭钮上）
+      const rowY = y;
       panel.add(
         scene.add
-          .text(bx + 34, y, s.label, { fontFamily: FONT.body, fontSize: '14px', color: css(PAPER[300]) })
+          .text(bx + 34, rowY, s.label, { fontFamily: FONT.body, fontSize: '14px', color: css(PAPER[300]) })
           .setOrigin(0, 0)
       );
+      // 行尾 mono 读出：5% 量化的当前值，拖动时"是否生效"一眼可辨
+      const readout = scene.add
+        .text(bx + bw - 34, rowY, '', { fontFamily: FONT.mono, fontSize: '12px', color: css(PAPER[400]) })
+        .setOrigin(1, 0);
+      panel.add(readout);
       const track = scene.add.graphics();
       const draw = () => {
         track.clear();
         const v = prefs[s.key];
         const tw = bw - 68;
         track.fillStyle(INK[900], 1);
-        track.fillRect(bx + 34, y + 28, tw, 6);
+        track.fillRect(bx + 34, rowY + 28, tw, 6);
         track.fillStyle(GILT.base, 1);
-        track.fillRect(bx + 34, y + 28, tw * v, 6);
+        track.fillRect(bx + 34, rowY + 28, tw * v, 6);
         track.fillStyle(GILT.light, 1);
-        track.fillCircle(bx + 34 + tw * v, y + 31, 8);
+        track.fillCircle(bx + 34 + tw * v, rowY + 31, 8);
+        readout.setText(`${Math.round(v * 100)}`);
       };
       draw();
       panel.add(track);
       const zone = scene.add
-        .zone(bx + 34, y + 20, bw - 68, 28)
+        .zone(bx + 34, rowY + 20, bw - 68, 28)
         .setOrigin(0, 0)
         .setInteractive(new Phaser.Geom.Rectangle(0, 0, bw - 68, 28), Phaser.Geom.Rectangle.Contains);
       const apply = (localX: number) => {
@@ -141,10 +152,32 @@ export class SettingsPanel {
       // 滑杆取值用的是世界系轨道几何，而 p.x 是画布像素（1920K 系）——先换算（A1）
       const localOf = (p: Phaser.Input.Pointer) =>
         screenToWorld(p.x, p.y, scene.cameras.main.zoom).x - (bx + 34);
-      zone.on('pointerdown', (p: Phaser.Input.Pointer) => apply(localOf(p)));
+      // 拖拽状态挂在场景输入上：指针滑出 28px 命中带也持续跟随，松手即停。
+      // 监听随 panel.destroy() 摘除（close() 复用实例，必须手动清理；
+      // 场景 SHUTDOWN 会整体清 scene.input，不会泄漏）
+      let dragging = false;
+      const onMove = (p: Phaser.Input.Pointer) => {
+        if (dragging && p.isDown) apply(localOf(p));
+      };
+      const onUp = () => {
+        dragging = false;
+      };
+      const cleanup = () => {
+        scene.input.off('pointermove', onMove);
+        scene.input.off('pointerup', onUp);
+        scene.input.off('pointerupoutside', onUp);
+      };
+      panel.once('destroy', cleanup);
+      zone.on('pointerdown', (p: Phaser.Input.Pointer) => {
+        dragging = true;
+        apply(localOf(p));
+      });
       zone.on('pointermove', (p: Phaser.Input.Pointer) => {
         if (p.isDown) apply(localOf(p));
       });
+      scene.input.on('pointermove', onMove);
+      scene.input.on('pointerup', onUp);
+      scene.input.on('pointerupoutside', onUp);
       panel.add(zone);
       y += 66;
     }

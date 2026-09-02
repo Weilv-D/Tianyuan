@@ -172,8 +172,12 @@ export const DAMAGE_COLOR = {
   shield: MOON.light,
 } as const;
 
-/** 羁绊档位色（古铜 / 暖银 / 米金 / 胭脂） */
-export const TRAIT_TIER_COLOR_HEX: readonly number[] = [0x9a7d5e, 0xb9b3a4, 0xe3cfa0, 0xcf9bae];
+/**
+ * 羁绊档位色（古铜 / 暖银 / 米金 / 胭脂）。
+ * 古铜 #9a7d5e→#b59a77：旧值在 INK700 面板底 4.28:1 低于 AA（4.5:1），
+ * 提亮后 6.2:1，与暖银 #b9b3a4 仍靠明度与色相差区分档位。
+ */
+export const TRAIT_TIER_COLOR_HEX: readonly number[] = [0xb59a77, 0xb9b3a4, 0xe3cfa0, 0xcf9bae];
 
 // ── UI 语义 ──
 export const UI = {

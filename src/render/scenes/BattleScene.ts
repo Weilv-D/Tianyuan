@@ -960,10 +960,33 @@ export class BattleScene extends Phaser.Scene {
     });
     this.resultPanel = panel;
 
-    // 对局模式：3.5 秒后自动返回，不打断心流
+    // 对局模式：6 秒自动返回（与回合结算弹层同口径）。悬停面板挂起倒计时、
+    // 移开续跑剩余时间 —— 五行战报读不完就被卷走，比多等更伤心流。
     if (isMatch) {
-      this.after(3500, () => {
-        if (this.matchCtx) this.returnToGame();
+      const AUTO_MS = 6000;
+      let remain = AUTO_MS;
+      let armAt = this.time.now;
+      let timer: Phaser.Time.TimerEvent | null = null;
+      const arm = (ms: number): void => {
+        armAt = this.time.now;
+        timer = this.time.delayedCall(ms, () => {
+          timer = null;
+          if (this.matchCtx) this.returnToGame();
+        });
+        this.pendingTimers.add(timer);
+      };
+      arm(remain);
+      card.setInteractive(new Phaser.Geom.Rectangle(bx, by, bw, bh), Phaser.Geom.Rectangle.Contains);
+      card.on('pointerover', () => {
+        if (!timer) return;
+        remain = Math.max(600, remain - (this.time.now - armAt));
+        this.pendingTimers.delete(timer);
+        this.time.removeEvent(timer);
+        timer = null;
+      });
+      card.on('pointerout', () => {
+        if (timer) return;
+        arm(remain);
       });
     }
   }

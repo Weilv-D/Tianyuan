@@ -113,3 +113,5 @@ export const LOG_H = 224;
 /** 棋子悬停卡：含已穿装备一行（F2），技能描述最多三行 */
 export const DETAIL_W = 300;
 export const DETAIL_H = 284;
+/** 钉住态（点选）详情卡的出售操作带：悬停只读态不带，调用方按此加高卡体 */
+export const DETAIL_SELL_BAND = 44;

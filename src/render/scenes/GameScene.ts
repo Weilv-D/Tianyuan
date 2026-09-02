@@ -409,6 +409,8 @@ export class GameScene extends Phaser.Scene {
       this.showToast(`花费 ${before - p.gold} 金`);
     } else {
       this.undoStack.pop();
+      // 反馈就位：失败落在被点的卡上（红边脉冲），toast 只作补充说明
+      this.hud.shopCards[slot]?.pulseDenied();
       if (r.reason === 'gold') this.showToast('金币不足', true);
       else if (r.reason === 'pool') this.showToast('卡池不足', true);
       else if (r.reason === 'bench') this.showToast('备战席已满', true);
@@ -528,7 +530,9 @@ export class GameScene extends Phaser.Scene {
       this.tweens.killTweensOf(this.toast);
       this.toast.destroy();
     }
-    const c = this.add.container(W / 2, H - 78).setDepth(500);
+    // 落位 y=176：备战期敌方半场恒空（棋盘上半），绝不遮商肆卡/阶段条/操作列。
+    // 旧 H-78 正压商肆 2-4 号卡的价格行，连买时反馈自己挡住被反馈的对象。
+    const c = this.add.container(W / 2, 186).setDepth(500);
     const t = this.add
       .text(0, 0, msg, {
         fontFamily: FONT.body,
@@ -544,7 +548,7 @@ export class GameScene extends Phaser.Scene {
     g.strokeRect(-w / 2, -20, w, 40);
     c.add([g, t]);
     c.setAlpha(0);
-    this.tweens.add({ targets: c, alpha: 1, y: H - 88, duration: 220, ease: 'Quad.easeOut' });
+    this.tweens.add({ targets: c, alpha: 1, y: 176, duration: 220, ease: 'Quad.easeOut' });
     this.tweens.add({ targets: c, alpha: 0, delay: 1700, duration: 380, onComplete: () => c.destroy() });
     this.toast = c;
   }

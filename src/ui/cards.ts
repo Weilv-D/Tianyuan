@@ -10,11 +10,12 @@ import Phaser from 'phaser';
 import { CHAMPION_BY_ID, formatSkillDesc } from '../data/champions';
 import { ITEM_BY_ID } from '../data/items';
 import { TRAIT_BY_ID } from '../data/traits';
-import { GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/view/palette';
+import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/view/palette';
+import { motion } from '../render/view/motion';
 import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/board/silhouetteFactory';
 import { traitIconKey } from '../render/board/traitIcons';
 import { itemIconKey } from '../render/board/itemIcons';
-import { FONT, RADIUS, clipToWidth } from './kit';
+import { FONT, RADIUS, Button, clipToWidth } from './kit';
 import { bakedTexture } from '../render/view/bake';
 import { portraitItemSlotRect } from '../render/view/hudLayout';
 import type { UnitInstance } from '../game/state';
@@ -240,6 +241,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
   private owned = false;
   private hovered = false;
   private ownedTween: Phaser.Tweens.Tween | null = null;
+  private deniedPulse: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number, onClick: () => void) {
     super(scene, x, y);
@@ -264,7 +266,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
     // 键盘角标：商肆 1-5 直购（与 InputController 的 keydown-ONE..FIVE 对应）。
     // 角标只给买得起且有货的卡（setDef 时切换），不显示时整卡可买性仍由底框表达
     this.keyBadge = scene.add
-      .text(5, 5, '', { fontFamily: FONT.mono, fontSize: '10px', color: css(PAPER[400]) })
+      .text(5, 5, '', { fontFamily: FONT.mono, fontSize: '12px', color: css(PAPER[400]) })
       .setOrigin(0, 0)
       .setAlpha(0.6);
     this.add(this.keyBadge);
@@ -373,7 +375,34 @@ export class ShopCard extends Phaser.GameObjects.Container {
   override destroy(fromScene?: boolean): void {
     this.ownedTween?.remove();
     this.ownedTween = null;
+    this.deniedPulse?.destroy();
+    this.deniedPulse = null;
     super.destroy(fromScene);
+  }
+
+  /**
+   * 购买失败的就地反馈：朱红边在卡框上短促脉冲两次。
+   * 反馈必须落在视线停留处（卡上），不能只靠远处的 toast；静观模式只留 toast+警示音。
+   */
+  pulseDenied(): void {
+    if (!this.scene || motion.calm) return;
+    this.deniedPulse?.destroy();
+    const g = this.scene.add.graphics();
+    g.lineStyle(2, CINNABAR.base, 1);
+    g.strokeRect(1, 1, this.cardW - 2, this.cardH - 2);
+    this.add(g);
+    this.deniedPulse = g;
+    this.scene.tweens.add({
+      targets: g,
+      alpha: { from: 1, to: 0.15 },
+      duration: 160,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => {
+        if (this.deniedPulse === g) this.deniedPulse = null;
+        g.destroy();
+      },
+    });
   }
 
   get def(): string | null {
@@ -497,6 +526,13 @@ export function starGlyph(star: Star): string {
   return star === 1 ? '★' : star === 2 ? '★★' : '★★★';
 }
 
+// ── 详情卡装备三格槽（icon 即视觉，名字/效果进悬停 tooltip）────────
+// 图标与器匣/头顶/提示卡同出 itemIcons 烘焙管线 —— 不是新画的装饰，
+// 是同一资产的第四个展示档（47/36/17/24px）。空槽淡框表达"还能装"。
+const SLOT_SIZE = 26;
+const SLOT_ICON = 24;
+const SLOT_PITCH = 32;
+
 /**
  * 棋子悬停详情卡（复用式）。
  *
@@ -515,6 +551,16 @@ export class UnitDetailCard {
   private readonly traitT: Phaser.GameObjects.Text;
   private readonly skillT: Phaser.GameObjects.Text;
   private readonly descT: Phaser.GameObjects.Text;
+  /** 出售按钮：仅钉住态（点选）传入 sellLabel 时显示；悬停只读态恒隐 */
+  private readonly sellBtn: Button;
+  private sellAction: (() => void) | null = null;
+  private sellArmed = false;
+  /** 当前卡体高（钉住态带出售带时比悬停态高）——跟随挪位的调用方按此钳位 */
+  curH = 0;
+  /** 装备槽悬停回调：iid=null 表示离开。宿主借此接 ItemTooltip（show/hide） */
+  onItemHover: ((iid: string | null, px: number, py: number) => void) | null = null;
+  private readonly slotIcons: Phaser.GameObjects.Image[] = [];
+  private slotIds: (string | null)[] = [null, null, null];
 
   constructor(scene: Phaser.Scene, w: number) {
     this.container = scene.add.container(-999, -999).setDepth(400).setVisible(false);
@@ -528,16 +574,53 @@ export class UnitDetailCard {
       const t = scene.add.text(14, 66 + i * 19, '', { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[300]) }).setOrigin(0, 0);
       this.statT.push(t);
     }
-    this.itemsRow = scene.add.container(14, 148);
+    this.itemsRow = scene.add.container(14, 144);
+    // 槽位底框：三枚 26px 直角淡框一次画死；icon 24px 居中，悬停出提示卡
+    const slotFrames = scene.add.graphics();
+    for (let i = 0; i < 3; i++) {
+      slotFrames.fillStyle(INK[800], 0.4);
+      slotFrames.fillRect(i * SLOT_PITCH, 0, SLOT_SIZE, SLOT_SIZE);
+      slotFrames.lineStyle(1, INK[500], 0.32);
+      slotFrames.strokeRect(i * SLOT_PITCH + 0.5, 0.5, SLOT_SIZE - 1, SLOT_SIZE - 1);
+    }
+    this.itemsRow.add(slotFrames);
+    for (let i = 0; i < 3; i++) {
+      const img = scene.add.image(i * SLOT_PITCH + 1, 1, '__DEFAULT').setOrigin(0, 0).setVisible(false);
+      img.setDisplaySize(SLOT_ICON, SLOT_ICON);
+      // 命中取整槽（26px 框），指针进入即弹提示卡
+      img.setInteractive(new Phaser.Geom.Rectangle(-1, -1, SLOT_SIZE, SLOT_SIZE), Phaser.Geom.Rectangle.Contains);
+      img.on('pointerover', () => {
+        const iid = this.slotIds[i];
+        if (!iid || !this.onItemHover) return;
+        this.container.scene?.input.setDefaultCursor('pointer');
+        const m = img.getWorldTransformMatrix();
+        this.onItemHover(iid, m.tx + SLOT_SIZE, m.ty);
+      });
+      img.on('pointerout', () => {
+        this.container.scene?.input.setDefaultCursor('default');
+        this.onItemHover?.(null, 0, 0);
+      });
+      this.slotIcons.push(img);
+      this.itemsRow.add(img);
+    }
     this.traitT = scene.add.text(14, 172, '', { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) }).setOrigin(0, 0);
     this.skillT = scene.add.text(14, 194, '', { fontFamily: FONT.title, fontSize: '14px', color: css(VOID.light) }).setOrigin(0, 0);
     this.descT = scene.add
       .text(14, 214, '', { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[400]), wordWrap: { useAdvancedWrap: true, width: w - 28 } })
       .setOrigin(0, 0);
-    this.container.add([this.nameT, this.subT, this.costT, ...this.statT, this.itemsRow, this.traitT, this.skillT, this.descT]);
+    this.sellBtn = new Button(scene, 14, 0, '', () => this.sellAction?.(), {
+      width: w - 28,
+      height: 32,
+      variant: 'danger',
+      fontSize: 13,
+    });
+    this.sellBtn.setVisible(false);
+    this.container.add([this.nameT, this.subT, this.costT, ...this.statT, this.itemsRow, this.traitT, this.skillT, this.descT, this.sellBtn]);
   }
 
-  update(u: UnitInstance, w: number, h: number): void {
+  /** opts.sellLabel + onSell 同时给出时，卡底新增出售带（调用方相应加高 h）；悬停只读态不传 */
+  update(u: UnitInstance, w: number, h: number, opts?: { sellLabel?: string; onSell?: () => void }): void {
+    this.curH = h;
     const def = CHAMPION_BY_ID[u.defId];
     if (!def) {
       this.container.setVisible(false);
@@ -570,28 +653,47 @@ export class UnitDetailCard {
       if (this.statT[i].text !== t) this.statT[i].setText(t);
     });
 
-    // 已穿装备行：图标 + 名
-    this.itemsRow.removeAll(true);
-    let ix = 0;
-    for (const iid of u.items.slice(0, 3)) {
-      const idef = ITEM_BY_ID[iid];
-      if (!idef) continue;
-      if (this.container.scene?.textures.exists(itemIconKey(iid))) {
-        this.itemsRow.add(
-          this.container.scene.add.image(ix, 0, itemIconKey(iid)).setDisplaySize(16, 16).setOrigin(0, 0)
-        );
-        ix += 20;
+    // 装备三格槽：图标即视觉，名字/效果走悬停 tooltip（槽位事件经 onItemHover 上抛）
+    const ids = u.items.slice(0, 3);
+    for (let i = 0; i < 3; i++) {
+      const iid = ids[i] ?? null;
+      this.slotIds[i] = iid;
+      const img = this.slotIcons[i];
+      if (iid && this.container.scene?.textures.exists(itemIconKey(iid))) {
+        // setDisplaySize 必须跟在 setTexture 后：scale 按当前纹理帧标定，
+        // 换纹理不会自动重标（32×2 的 __DEFAULT 与 96×96 烘焙图差 3 倍）
+        img.setTexture(itemIconKey(iid)).setDisplaySize(SLOT_ICON, SLOT_ICON).setVisible(true);
+      } else {
+        img.setVisible(false);
       }
-      const t = this.container.scene!.add
-        .text(ix, 2, idef.name, { fontFamily: FONT.body, fontSize: '13px', color: css(GILT.light) })
-        .setOrigin(0, 0);
-      this.itemsRow.add(t);
-      ix += t.width + 10;
     }
 
     this.traitT.setText([...def.origins, ...def.classes].map((t) => TRAIT_BY_ID[t]?.name ?? t).join(' · '));
     this.skillT.setText(def.skillSpec.name);
     this.descT.setText(formatSkillDesc(def.skillSpec.desc, def.skillSpec.params));
+
+    // 出售带：标签由调用方按 sellValue 生成（金额自含绝对数值）。
+    // 2★/3★ 是不可逆的大额操作：第一次点变确认态，再点才执行（与"放弃对局"同口径）。
+    if (opts?.sellLabel && opts.onSell) {
+      this.sellArmed = false;
+      this.sellBtn.setPosition(14, h - 42);
+      this.sellBtn.setText(opts.sellLabel);
+      this.sellBtn.setDisabled(false);
+      this.sellAction = () => {
+        if (u.star >= 2 && !this.sellArmed) {
+          this.sellArmed = true;
+          this.sellBtn.setText(`确认出售 ${u.star}★？`);
+          return;
+        }
+        const act = opts.onSell;
+        this.sellAction = null;
+        act?.();
+      };
+      this.sellBtn.setVisible(true);
+    } else {
+      this.sellAction = null;
+      this.sellBtn.setVisible(false);
+    }
     this.container.setVisible(true);
   }
 }

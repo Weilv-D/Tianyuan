@@ -159,12 +159,26 @@ export const DEFAULT_PREFS: Preferences = {
   licensedMusic: true,
 };
 
+/** 无本地偏好时的出厂默认：跟随系统"减少动态效果"设置（前庭敏感用户首次进入即得舒适档）。
+ *  用户在设置面板明确选择后以用户为准 —— 面板写入即落盘，此后不再读系统值。 */
+function systemAwareDefaults(): Preferences {
+  let calm = DEFAULT_PREFS.calm;
+  try {
+    if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      calm = true;
+    }
+  } catch {
+    /* 无 matchMedia 环境（测试/嵌入式）按标准默认 */
+  }
+  return { ...DEFAULT_PREFS, calm };
+}
+
 export function loadPrefs(): Preferences {
   try {
     const raw = localStorage.getItem(PREF_KEY);
-    if (!raw) return { ...DEFAULT_PREFS };
+    if (!raw) return systemAwareDefaults();
     const parsed = JSON.parse(raw) as Partial<Preferences>;
-    const out: Preferences = { ...DEFAULT_PREFS };
+    const out: Preferences = { ...systemAwareDefaults() };
     if (typeof parsed.volBgm === 'number' && Number.isFinite(parsed.volBgm)) out.volBgm = Math.max(0, Math.min(1, parsed.volBgm));
     if (typeof parsed.volSfx === 'number' && Number.isFinite(parsed.volSfx)) out.volSfx = Math.max(0, Math.min(1, parsed.volSfx));
     if (typeof parsed.volUi === 'number' && Number.isFinite(parsed.volUi)) out.volUi = Math.max(0, Math.min(1, parsed.volUi));
@@ -174,7 +188,7 @@ export function loadPrefs(): Preferences {
     if (typeof parsed.licensedMusic === 'boolean') out.licensedMusic = parsed.licensedMusic;
     return out;
   } catch {
-    return { ...DEFAULT_PREFS };
+    return systemAwareDefaults();
   }
 }
 

@@ -105,7 +105,17 @@ export class MenuScene extends Phaser.Scene {
 
     if (saveAvailable) {
       mk('继 续 对 局', () => fadeTo(this, 'Game', {}), { primary: true });
-      mk('新 对 局', () => fadeTo(this, 'Game', { fresh: true }));
+      // 有进行中的存档时，新对局 = 清档重开，不可逆 —— 第一次点变为确认态，
+      // 再点才执行（与设置面板"放弃对局"的二次确认同口径）
+      let freshArmed = false;
+      const freshBtn = mk('新 对 局', () => {
+        if (!freshArmed) {
+          freshArmed = true;
+          freshBtn.setText('确认覆盖存档？');
+          return;
+        }
+        fadeTo(this, 'Game', { fresh: true });
+      });
     } else {
       mk('新 对 局', () => fadeTo(this, 'Game', { fresh: true }), { primary: true });
     }

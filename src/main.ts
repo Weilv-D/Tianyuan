@@ -165,6 +165,13 @@ await preloadItemArt();
 
 const game = new Phaser.Game(config);
 
+// 画布语义垫脚石：纯 canvas 游戏无法给读屏器完整语义，但至少让主画布有
+// 可朗读的身份说明（装饰性的 #bg 已在 index.html 标 aria-hidden）。
+game.events.once('ready', () => {
+  game.canvas.setAttribute('role', 'img');
+  game.canvas.setAttribute('aria-label', '百战天元 · 夜宴对局画布：八人对弈自走棋，全部操作需用鼠标与键盘快捷键完成');
+});
+
 // E2E/截图直入备战层：?autostart=1 跳过菜单（仅 DEV）
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('autostart')) {
   game.events.once('ready', () => {
