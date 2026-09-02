@@ -102,12 +102,23 @@ export function runPool(
      *  挂住它的队列）。 */
     const busy = new Set<ChildProcess>();
     let settled = false;
+    // 全体待清定时器：settled（finish/fail）后一律清掉，不让超时/兜底句柄空转到自然触发
+    const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+    const trackTimer = (t: ReturnType<typeof setTimeout>): void => {
+      pendingTimers.add(t);
+      t.unref?.();
+    };
+    const clearAllTimers = (): void => {
+      for (const t of pendingTimers) clearTimeout(t);
+      pendingTimers.clear();
+    };
     const killAll = (): void => {
       for (const p of children) p.kill();
     };
     const finish = (): void => {
       if (settled) return;
       settled = true;
+      clearAllTimers();
       for (const p of children) p.send({ type: 'shutdown' });
       // 兜底强杀：shutdown 消息丢失时别让命令挂住（unref 不阻塞进程退出）
       const t = setTimeout(killAll, 2000);
@@ -117,6 +128,7 @@ export function runPool(
     const fail = (err: Error): void => {
       if (settled) return;
       settled = true;
+      clearAllTimers();
       killAll();
       reject(err);
     };
@@ -138,9 +150,10 @@ export function runPool(
         const kind = job.kind === 'item' ? `item ${String(job.itemKey)}` : `pair ${job.configIdx} ${job.i}v${job.j}`;
         fail(new Error(`池子作业超时（>${JOB_TIMEOUT_MS / 1000}s）：${kind}`));
       }, JOB_TIMEOUT_MS);
-      timer.unref?.();
+      trackTimer(timer);
       proc.once('message', (msg: Record<string, unknown> & { type: string }) => {
         clearTimeout(timer);
+        pendingTimers.delete(timer);
         busy.delete(proc);
         if (settled) return;
         if (msg.type === 'error') {
@@ -174,14 +187,26 @@ export function runPool(
         cwd: process.cwd(),
       });
       children.push(proc);
-      proc.on('error', fail);
+      proc.on('error', (err) => {
+        if (initTimer !== null) {
+          clearTimeout(initTimer);
+          pendingTimers.delete(initTimer);
+          initTimer = null;
+        }
+        fail(err);
+      });
       // fork → ready 阶段上钟：超时即整池失败，防止 tsx 加载/启动卡死挂住命令
       let initTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
         if (settled) return;
         fail(new Error(`池子子进程初始化超时（>${INIT_TIMEOUT_MS / 1000}s，fork 后未回 ready）`));
       }, INIT_TIMEOUT_MS);
-      initTimer.unref?.();
+      trackTimer(initTimer);
       proc.on('exit', (code) => {
+        if (initTimer !== null) {
+          clearTimeout(initTimer);
+          pendingTimers.delete(initTimer);
+          initTimer = null;
+        }
         if (settled) return;
         // 作业未回就退出 = 子进程异常死亡：code 0 的正常退出只发生在 shutdown /
         // disconnect 之后，作业中途 code 0 同样异常（如子进程自己 process.exit）。
@@ -194,6 +219,7 @@ export function runPool(
         if (msg.type !== 'ready') return;
         if (initTimer !== null) {
           clearTimeout(initTimer);
+          pendingTimers.delete(initTimer);
           initTimer = null;
         }
         dispatch(proc);

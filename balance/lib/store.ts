@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS configs (
   UNIQUE (run_id, idx)
 );
 CREATE TABLE IF NOT EXISTS pair_results (
-  run_id INTEGER NOT NULL,
-  config_id INTEGER NOT NULL,
+  run_id INTEGER NOT NULL REFERENCES runs(id),
+  config_id INTEGER NOT NULL REFERENCES configs(id),
   top_idx INTEGER NOT NULL,
   bottom_idx INTEGER NOT NULL,
   n INTEGER NOT NULL,
@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS pair_results (
   PRIMARY KEY (run_id, config_id, top_idx, bottom_idx)
 );
 CREATE TABLE IF NOT EXISTS unit_stats (
-  run_id INTEGER NOT NULL,
-  config_id INTEGER NOT NULL,
+  run_id INTEGER NOT NULL REFERENCES runs(id),
+  config_id INTEGER NOT NULL REFERENCES configs(id),
   comp_idx INTEGER NOT NULL,
   def_id TEXT NOT NULL,
   star INTEGER NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS unit_stats (
   PRIMARY KEY (run_id, config_id, comp_idx, def_id)
 );
 CREATE TABLE IF NOT EXISTS item_results (
-  run_id INTEGER NOT NULL,
+  run_id INTEGER NOT NULL REFERENCES runs(id),
   item_id TEXT NOT NULL,
   n INTEGER NOT NULL,
   baseline_rate REAL NOT NULL,
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS item_results (
   PRIMARY KEY (run_id, item_id)
 );
 CREATE TABLE IF NOT EXISTS trait_results (
-  run_id INTEGER NOT NULL,
+  run_id INTEGER NOT NULL REFERENCES runs(id),
   comp_idx INTEGER NOT NULL,
   trait_id TEXT NOT NULL,
   n INTEGER NOT NULL,
@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS trait_results (
   PRIMARY KEY (run_id, comp_idx, trait_id)
 );
 CREATE INDEX IF NOT EXISTS idx_runs_command ON runs (command, id);
+-- 注：pair/unit/item/trait 四表对 runs/configs 的外键随上面 CREATE 建全；
+-- 本地旧 balance.db 是丢弃式工件，下次跑任意写库命令重建即带 FK。
 `;
 
 export interface RunHeader {
