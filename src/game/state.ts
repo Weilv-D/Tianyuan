@@ -12,7 +12,7 @@
  *    带来的代价（少了一种堆叠玩法）远小于收益。
  */
 
-import { BENCH_SLOTS, BOARD_COLS, LEGEND_T3, ROWS_PER_SIDE } from '../core/config';
+import { BENCH_SLOTS, BOARD_COLS, LEGEND_T3, ROWS_PER_SIDE, STAR_HP_SCALE, STAR_POWER_SCALE } from '../core/config';
 import { CHAMPION_BY_ID } from '../data/champions';
 import type { Star } from '../core/types';
 import type { AdventureKind } from './adventure';
@@ -33,7 +33,7 @@ export interface UnitInstance {
   items: string[];
   /** 墨兽（PvE 单位）。渲染层据此换用墨色剪影。 */
   isBeast?: boolean;
-  /** 攻击力倍率（乘在星级倍率之后、装备加成之前）。引导轮墨兽 0.15，缺省 1。 */
+  /** 攻击力倍率（乘在星级倍率之后、装备加成之前）。引导轮墨兽 0.08，缺省 1。 */
   powMult?: number;
 }
 
@@ -214,19 +214,21 @@ export function sellRefundFor(cost: number, star: Star): number {
   return cost * 9 - 1;
 }
 
-/** 棋子"战力估值"，用于 AI 选谁上场、卖谁。粗粒度即可，不需要精确。 */
+/** 棋子"战力估值"，用于 AI 选谁上场、卖谁。粗粒度即可，不需要精确。
+ *  星级倍率与 config.STAR_*_SCALE 同源（调平衡只改 config 一处，此处不落字面量）。 */
 export function powerScore(u: UnitInstance): number {
   const def = CHAMPION_BY_ID[u.defId];
   if (!def) return 0;
   const s = u.star;
+  const si = s - 1;
   // 3★ 五费·天命：估值与 core/config.LEGEND_T3 同源——不乘的话 AI 对天命
   // 低估约三成，搜牌/追三的欲望被系统性压价（AI 不会贱卖它，但会少追它）
   const legend = def.cost === 5 && s === 3;
   const hpM = legend ? LEGEND_T3.hpMult : 1;
   const powM = legend ? LEGEND_T3.powerMult : 1;
-  const hp = def.base.hp * (s === 1 ? 1 : s === 2 ? 1.8 : 3.24) * hpM;
-  const atk = def.base.atk * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1) * powM;
-  const sp = def.base.sp * (s === 1 ? 1 : s === 2 ? 1.45 : 2.1) * powM;
+  const hp = def.base.hp * STAR_HP_SCALE[si] * hpM;
+  const atk = def.base.atk * STAR_POWER_SCALE[si] * powM;
+  const sp = def.base.sp * STAR_POWER_SCALE[si] * powM;
   // 生命按 0.35 折算成"战力"，避免纯肉棋子在估值里虚高
   return hp * 0.012 + atk * 1.0 + sp * 0.8 + (def.base.range >= 3 ? 4 : 0) + s * 6
     // 机制包（35% 开战盾 + 20% 全能吸血 + 免控 + 技能 1.25×）的粗估常量
