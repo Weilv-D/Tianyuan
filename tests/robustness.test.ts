@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createUnit as createBattleUnit } from '../src/core/unit';
 import { TRAITS } from '../src/data/traits';
 import { autoArrange } from '../src/game/arrange';
-import { boardIdx, createUnit } from '../src/game/state';
+import { boardIdx, createUnit, powerScore } from '../src/game/state';
 const createCoreUnit = createBattleUnit;
 import { makePlayer } from './helpers';
 import { Rng } from '../src/core/rng';
@@ -84,6 +84,24 @@ describe('损坏输入与极端阵容', () => {
     expect(three.sp / two.sp).toBeCloseTo((2.1 / 1.45) * 1.15, 1);
     // 无天命机制包：无免控（ccImmune 为 0）
     expect(three.ccImmune).toBe(0);
+  });
+
+  it('AI 战力估值与结算星级刻度同源：四费 3★ 含登峰 ×1.15、五费 3★ 含天命包', () => {
+    const cost4 = CHAMPIONS.find((c) => c.cost === 4)!;
+    const cost5 = CHAMPIONS.find((c) => c.cost === 5)!;
+    const p2 = powerScore(createUnit(cost4.id, 2));
+    const p3 = powerScore(createUnit(cost4.id, 3));
+    // 登峰生效参照：星级倍率 2.1/1.45 之上若不再乘 1.15，估值应约为 p3 的 1/1.15。
+    // hp 折算项与 range 加分在 3★ 同样被乘区放大，故用整体比率而非逐项复算
+    const naive = (p2 - 12) * (2.1 / 1.45) + 18; // 无登峰乘区的对照
+    expect(p3 / naive).toBeGreaterThan(1.14); // ≈1.15：登峰乘区计入估值
+    expect(p3).toBeGreaterThan(naive);
+    // 五费 3★ 天命包：星级 ×2.1 与天命 ×2.0 之上再叠机制包常量 ——
+    // 估值相对 1★ 至少 ×4（若漏天命包则只有 ×2.1）
+    const q1 = powerScore(createUnit(cost5.id, 1));
+    const q3 = powerScore(createUnit(cost5.id, 3));
+    expect(q3).toBeGreaterThan(q1 * 4.0);
+    expect(q3).toBeGreaterThan(q1 * 2.1 * 2.0 * 0.9); // 机制包 90 使总倍率更高
   });
 
   it('17 条羁绊的每个档位都可激活（unique 棋子数 ≥ 最高档）', () => {

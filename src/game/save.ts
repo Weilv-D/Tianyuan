@@ -98,7 +98,21 @@ export function loadMatch(mode: Match['mode'] = 'normal'): Match | null {
     const raw = localStorage.getItem(key);
     if (raw) {
       const data = loadData(raw, 3);
-      if (data) return Match.fromJSON(data);
+      if (data) {
+        try {
+          return Match.fromJSON(data);
+        } catch {
+          // 骨架字段通过但深层结构损坏（beastBoard/players[i].board 类型错、
+          // 幽灵快照坏元素等）：fromJSON 抛错。与"损坏即无档"同口径 ——
+          // 清掉坏键，避免"继续"入口亮着却永远点不进（坏档自愈）。
+          try {
+            localStorage.removeItem(key);
+          } catch {
+            /* 清不掉也无害：hasSave 判无存档 */
+          }
+          return null;
+        }
+      }
       // 键存在但损坏：普通档继续尝试旧键兜底，但损坏的 v3 键不能再残留 ——
       // 否则"继续"入口会被它长期误导（hasSave 判定失败后同样清理，双口径一致）。
       // 每日档无旧键可兜底：清掉坏键即自愈，下次开局从干净状态走。

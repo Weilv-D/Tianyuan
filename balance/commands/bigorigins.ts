@@ -7,7 +7,7 @@
  * 回答"高roll是否统治"。定位锚点：胜率显著高于 50%（强），但不是 100%（统治）；
  * 「仅次于三星五费」= 顶级构筑之一，而非无敌。
  *
- * 运行： npx tsx scripts/sim-bigorigins.ts [每对局数]
+ * 运行： npm run balance -- bigorigins [每对局数]
  */
 import { Battle } from '../../src/core/battle';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../../src/game/comp';

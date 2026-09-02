@@ -12,7 +12,7 @@
  *    带来的代价（少了一种堆叠玩法）远小于收益。
  */
 
-import { BENCH_SLOTS, BOARD_COLS, LEGEND_T3, ROWS_PER_SIDE, STAR_HP_SCALE, STAR_POWER_SCALE } from '../core/config';
+import { BENCH_SLOTS, BOARD_COLS, LEGEND_T3, ROWS_PER_SIDE, STAR_HP_SCALE, STAR_POWER_SCALE, T3_ELITE_COST4 } from '../core/config';
 import { CHAMPION_BY_ID } from '../data/champions';
 import type { Star } from '../core/types';
 import type { AdventureKind } from './adventure';
@@ -226,9 +226,14 @@ export function powerScore(u: UnitInstance): number {
   const legend = def.cost === 5 && s === 3;
   const hpM = legend ? LEGEND_T3.hpMult : 1;
   const powM = legend ? LEGEND_T3.powerMult : 1;
-  const hp = def.base.hp * STAR_HP_SCALE[si] * hpM;
-  const atk = def.base.atk * STAR_POWER_SCALE[si] * powM;
-  const sp = def.base.sp * STAR_POWER_SCALE[si] * powM;
+  // 3★ 四费·登峰：与结算（unit.ts 乘 T3_ELITE_COST4）同源。漏乘则估值比
+  // 结算面板矮 15%，AI 对四费追三的欲望被系统性低估 —— 追三决策失真
+  const elite = def.cost === 4 && s === 3;
+  const eliteHpM = elite ? T3_ELITE_COST4.hpMult : 1;
+  const elitePowM = elite ? T3_ELITE_COST4.powerMult : 1;
+  const hp = def.base.hp * STAR_HP_SCALE[si] * hpM * eliteHpM;
+  const atk = def.base.atk * STAR_POWER_SCALE[si] * powM * elitePowM;
+  const sp = def.base.sp * STAR_POWER_SCALE[si] * powM * elitePowM;
   // 生命按 0.35 折算成"战力"，避免纯肉棋子在估值里虚高
   return hp * 0.012 + atk * 1.0 + sp * 0.8 + (def.base.range >= 3 ? 4 : 0) + s * 6
     // 机制包（35% 开战盾 + 20% 全能吸血 + 免控 + 技能 1.25×）的粗估常量

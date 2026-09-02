@@ -36,13 +36,17 @@ export const TRAIT_TUNE_KEYS: Record<string, readonly string[]> = {
   ],
   danding: ['manaPerSec', 'regen'],
   longyuan: ['skillAmp', 'spFlat', 'spellChargeSp', 'teamAmp', 'teamSp'],
-  warrior: ['physDr', 'stackAtk'],
+  // 档位键（traits.ts 经 t(`atk${tier}`) 等模板读取，键名带档位后缀 0/1/2）：
+  // 必须登记 —— 否则补丁层白名单校验会拒绝合法覆盖，档位扫参断链
+  warrior: ['atk0', 'atk1', 'atk2', 'physDr', 'stackAtk'],
   guardian: [
-    'allyShield', 'shieldRegen', 'thornsArmorRatio', 't2ThornsHpPct', 't2ArmorCut', 't2HpGain', 'guard6Atk',
+    'hp0', 'hp1', 'hp2', 'armor0', 'armor1', 'armor2', 'allyShield', 'shieldRegen', 'thornsArmorRatio',
+    't2ThornsHpPct', 't2ArmorCut', 't2HpGain', 'guard6Atk',
   ],
   assassin: ['crit', 'critMult', 'breakerPct', 'openerPct', 'leapAspd'],
   marksman: ['critMult', 'atk'],
-  mage: ['shield', 'shield2', 'shred', 'splash', 'teamAmp', 'teamAmp2', 'teamSp', 'teamSp2'],
+  // sp0/sp1/sp2 为固定法强档位键（t(`sp${tier}`)）
+  mage: ['sp0', 'sp1', 'sp2', 'shield', 'shield2', 'shred', 'splash', 'teamAmp', 'teamAmp2', 'teamSp', 'teamSp2'],
   warlock: ['true0', 'true1', 'wound'],
   support: ['healAmp', 'shieldAmp', 'regen', 'deathAspd'],
 };

@@ -12,17 +12,11 @@
 
 import { PRESET_COMPS } from '../../src/game/comp';
 import { CHAMPION_BY_ID } from '../../src/data/champions';
+import { goldOf } from '../lib/comps';
 
-/** 一个 N 星棋子消耗的金币（1★=1 张，2★=3 张，3★=9 张） */
+/** 一个 N 星棋子消耗的金币（1★=1 张，2★=3 张，3★=9 张）—— 仅用于逐棋子展示；
+ *  造价核算本体 goldOf 在 ../lib/comps（单一真源，此处不再复制实现） */
 const COPIES: Record<number, number> = { 1: 1, 2: 3, 3: 9 };
-
-export function goldOf(units: Record<string, number>): number {
-  let g = 0;
-  for (const [id, star] of Object.entries(units)) {
-    g += (CHAMPION_BY_ID[id]?.cost ?? 1) * (COPIES[star] ?? 1);
-  }
-  return g;
-}
 
 const TARGET_MIN = 52;
 const TARGET_MAX = 58;

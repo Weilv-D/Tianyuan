@@ -18,6 +18,7 @@ import { Patcher, readCurrent, withOverrides } from '../balance/lib/patch';
 import { TRAIT_TUNING, TRAIT_TUNING_KEYS, resetTuning, tune } from '../src/data/tuning';
 import { pairSeed, DEFAULT_SEED_BASE, pairIndex } from '../balance/lib/seeds';
 import { runPair, pairedItemsDelta } from '../balance/lib/engine';
+import { runPool } from '../balance/lib/pool';
 import { runConfigs } from '../balance/lib/matrix';
 import { PRESET_COMPS } from '../src/game/comp';
 import { OUT_DIR, Store } from '../balance/lib/store';
@@ -115,6 +116,26 @@ describe('进程池（pool.ts）', () => {
     expect(a.diff).toBeLessThanOrEqual(1);
     expect(a.withRate - a.withoutRate).toBeCloseTo(a.diff, 10);
   });
+
+  it('item 作业经进程池分发与串行逐位一致（池子 item 分发看守）', async () => {
+    // 与 pair 池一致守卫互补：item 作业（带装/裸装 CRN 配对）走 runPool 的
+    // fork 分发路径，若子进程的装备装载/配对顺序与串行 diverged，门禁须拦下
+    const jobs = [
+      { kind: 'item' as const, itemKey: 'duanhun', items: ['duanhun'], i: 0, j: 1, n: 4, seedBase: 20260902 },
+      { kind: 'item' as const, itemKey: 'stack:2', items: ['duanhun', 'duanhun'], i: 0, j: 2, n: 4, seedBase: 20260902 },
+      { kind: 'item' as const, itemKey: 'mix', items: ['xueyin', 'zidian'], i: 1, j: 3, n: 4, seedBase: 20260902 },
+    ];
+    const pooled = await runPool(jobs, { comps: PRESET_COMPS, workers: 2 });
+    for (const job of jobs) {
+      const serial = pairedItemsDelta(job.i, job.j, job.items, job.n, job.seedBase, PRESET_COMPS);
+      const got = pooled.find((r) => r.kind === 'item' && r.itemKey === job.itemKey);
+      expect(got?.kind).toBe('item');
+      if (got?.kind !== 'item') continue;
+      expect(got.diff).toBeCloseTo(serial.diff, 10);
+      expect(got.withRate).toBeCloseTo(serial.withRate, 10);
+      expect(got.withoutRate).toBeCloseTo(serial.withoutRate, 10);
+    }
+  }, 30_000);
 });
 
 describe('工件库（store.ts，:memory:）', () => {

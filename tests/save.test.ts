@@ -89,6 +89,19 @@ describe('本地存档', () => {
     expect(hasSave('daily')).toBe(false);
   });
 
+  it('深层结构损坏（骨架过、fromJSON 抛）同样清理坏键，不残留死档', () => {
+    // players 骨架合法（非空数组）但元素损坏（首元素为 null）—— loadData 骨架
+    // 校验拦不住，Match.fromJSON 在遍历 players 时抛错。坏键必须一并清除：
+    // 否则"继续"入口亮着却永远点不进。
+    const d = { ...playedMatch().toJSON() } as Record<string, unknown>;
+    d.players = [null];
+    localStorage.setItem(DAILY_KEY, JSON.stringify({ v: 3, savedAt: 1, data: d }));
+    expect(hasSave('daily')).toBe(true); // 骨架字段合法 → 入口判定放行
+    expect(loadMatch('daily')).toBeNull(); // 读档 fromJSON 抛错 → 清键
+    expect(localStorage.getItem(DAILY_KEY)).toBeNull();
+    expect(hasSave('daily')).toBe(false); // 坏键已清，入口消失
+  });
+
   it('普通档坏键清理后不波及可用的 v2 旧档（读档仍可迁移）', () => {
     const data = { ...playedMatch().toJSON() } as Record<string, unknown>;
     delete data.mode;

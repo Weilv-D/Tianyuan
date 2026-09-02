@@ -82,6 +82,9 @@ function canvas(scene: Phaser.Scene, key: string, w: number, h: number): { ctx: 
  * 而纹理在 Phaser 里是全局共享的，第二次创建同名 key 只会得到 null。
  */
 export function buildTextures(scene: Phaser.Scene): void {
+  // 幂等哨兵：以最后一张（vignette）是否已建代表"本组九张纹理原子建成"。
+  // 前提：本函数内纹理键固定且任一张创建失败即 throw（canvas() 内），
+  // 不存在"建到一半静默返回"的路径 —— 若未来纹理清单可配置化，须改逐键守卫
   if (scene.textures.exists(TEX.vignette)) return;
   // ── 宣纸纤维：细腻的明暗颗粒，叠在棋盘上当底纹 ──
   {

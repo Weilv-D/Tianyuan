@@ -339,8 +339,11 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'xuanwu_q',
     skillSpec: {
       kind: 'shieldAll', name: '玄冥之护', target: 'allAllies',
-      desc: '为全体友军提供相当于自身 {value} 最大生命的护盾，持续 {dur} 秒；护盾生效期间受到伤害降低 {damageReduction}。',
-      params: { value: 0.1, dur: 8, damageReduction: 0.12 },
+      desc: '为全体友军提供相当于自身 {value} 最大生命的护盾，持续 8 秒；护盾生效期间受到伤害降低 {damageReduction}。',
+      // 护盾时长走 shieldDur（与墨家/鬼城同口径）：skills.shieldAll 只读
+      // shieldDur，读顶层 dur 的是控制时长 —— 玄武若用 dur 传 8，扫参改
+      // dur 会静默失效（skills 侧默认 shieldDur=8 巧合对齐，改键即断链）
+      params: { value: 0.1, shieldDur: 8, damageReduction: 0.12 },
     },
   },
   {
@@ -893,13 +896,16 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'shidian_q',
     skillSpec: {
       kind: 'execute', name: '十殿审判', target: 'allEnemies',
-      desc: '审判全场：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 15% 生命。',
+      desc: '审判全场：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 生命。',
       // threshold 0.24 → 0.20（M 残留专项）：处决斩杀窗收窄 4 个百分点。
       // 量化依据（scripts/ab-pair.ts，CRN n=250）：「亡语→后期」双向平均
       // 99.8% → 90.0%（-9.8p，目标门 ≤92% 达标）；其余配对全部 |Δ| ≤ 2p，
       // 仅「亡语→快攻」-1.6p、「亡语→荆棘」-1.4p —— 对被克制方（后期大招）
       // 特异、对环境中性。0.18 档（→82.8%）扰动更大，按最小扰动原则取 0.20。
-      params: { sp: 2.1, type: 'true', threshold: 0.2 },
+      // healPerExecute 显式声明（= skills.execute 默认值 15% 的口径）：
+      // 处决回血是面板数值的一部分，不能靠隐式默认巧合对齐 —— 与太卜的
+      // healPerExecute 0.1 同键同源，调数值只改这里
+      params: { sp: 2.1, type: 'true', threshold: 0.2, healPerExecute: 0.15 },
     },
   },
   {

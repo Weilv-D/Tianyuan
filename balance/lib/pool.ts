@@ -187,26 +187,31 @@ export function runPool(
         cwd: process.cwd(),
       });
       children.push(proc);
-      proc.on('error', (err) => {
+      // fork → ready 阶段上钟：超时即整池失败，防止 tsx 加载/启动卡死挂住命令。
+      // 声明必须先于 error/exit/message 监听 —— fork 同步抛错时这些监听会立刻
+      // 触发，若 initTimer 仍在 TDZ（let 声明在后）会先抛 ReferenceError，
+      // 把"子进程启动失败"的真实错误掩盖成更隐蔽的崩溃（Windows spawn 失败路径）。
+      let initTimer: ReturnType<typeof setTimeout> | null = null;
+      const startInitTimer = (): void => {
+        initTimer = setTimeout(() => {
+          if (settled) return;
+          fail(new Error(`池子子进程初始化超时（>${INIT_TIMEOUT_MS / 1000}s，fork 后未回 ready）`));
+        }, INIT_TIMEOUT_MS);
+        trackTimer(initTimer);
+      };
+      const clearInitTimer = (): void => {
         if (initTimer !== null) {
           clearTimeout(initTimer);
           pendingTimers.delete(initTimer);
           initTimer = null;
         }
+      };
+      proc.on('error', (err) => {
+        clearInitTimer();
         fail(err);
       });
-      // fork → ready 阶段上钟：超时即整池失败，防止 tsx 加载/启动卡死挂住命令
-      let initTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-        if (settled) return;
-        fail(new Error(`池子子进程初始化超时（>${INIT_TIMEOUT_MS / 1000}s，fork 后未回 ready）`));
-      }, INIT_TIMEOUT_MS);
-      trackTimer(initTimer);
       proc.on('exit', (code) => {
-        if (initTimer !== null) {
-          clearTimeout(initTimer);
-          pendingTimers.delete(initTimer);
-          initTimer = null;
-        }
+        clearInitTimer();
         if (settled) return;
         // 作业未回就退出 = 子进程异常死亡：code 0 的正常退出只发生在 shutdown /
         // disconnect 之后，作业中途 code 0 同样异常（如子进程自己 process.exit）。
@@ -217,15 +222,12 @@ export function runPool(
       });
       proc.once('message', (msg: { type: string }) => {
         if (msg.type !== 'ready') return;
-        if (initTimer !== null) {
-          clearTimeout(initTimer);
-          pendingTimers.delete(initTimer);
-          initTimer = null;
-        }
+        clearInitTimer();
         dispatch(proc);
       });
       // 每个作业自携带种子基（pair = CRN 矩阵口径，item = 装备配对口径，本就不同源）
       proc.send({ type: 'init', comps });
+      startInitTimer();
     }
   });
 }

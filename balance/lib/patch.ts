@@ -83,6 +83,10 @@ export class Patcher {
     }
     if (kind === 'trait') {
       if (rest === 'scale') {
+        // 整条羁绊等比缩放也必须落在已知羁绊上：错拼 id（如 momen 打成 momem）
+        // 会在 TRAIT_TUNING 里静默造键 —— traits.ts 的 tune() 只读真 id 的键，
+        // 扫描方以为压了整条羁绊，实际改了个寂寞，结果失真且无告警
+        if (!TRAIT_TUNE_KEYS[id]) throw new Error(`未知的羁绊 id：${id}（${path}；可缩放羁绊见 tuning.ts TRAIT_TUNE_KEYS）`);
         setNumber(TRAIT_TUNING as unknown as Record<string, unknown>, id, value, path, this.journal, true);
         return;
       }

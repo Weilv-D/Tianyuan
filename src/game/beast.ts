@@ -15,7 +15,7 @@
 
 import { Rng } from '../core/rng';
 import { CHAMPION_BY_ID } from '../data/champions';
-import { cloneBoard, createUnit, type UnitInstance } from './state';
+import { createUnit, type UnitInstance } from './state';
 import type { Star } from '../core/types';
 
 /** 墨兽的候选棋子池，按"该在第几回合开始出现"分层 */
@@ -91,8 +91,3 @@ export function generateBeastBoard(round: number, rng: Rng): (UnitInstance | nul
 
 /** 墨兽的展示名 */
 export const BEAST_NAME = '墨兽';
-
-/** 深拷贝一份墨兽阵容（每个玩家面对同一只，避免各自 roll 出不同强度） */
-export function cloneBeast(board: readonly (UnitInstance | null)[]): (UnitInstance | null)[] {
-  return cloneBoard(board);
-}
