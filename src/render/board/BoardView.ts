@@ -13,6 +13,14 @@ export { CELL };
 export const BOARD_W = BOARD_SIZE; // 640 含漆盘边
 export const BOARD_H = BOARD_W;
 
+/**
+ * 棋盘格内容的视觉下沉（板层局部 px）：单位立绘贴格时在格心之下再沉 8px，
+ * 让 3★ 大体积棋子的"脚"落在格下沿而非悬在格心 —— 战斗板层的纯视觉偏移，
+ * 与命中数学（hitTest / xyToCell 的格心换算）解耦：命中仍按格心判定，
+ * 两套坐标在此文件名常量收敛，避免散落 ±8 魔法值。
+ */
+export const CELL_CONTENT_DY = 8;
+
 const TEX_LACQUER = 'lacquerBoard_v3';
 const TEX_GRID = 'lacquerGrid_v3';
 
@@ -193,20 +201,25 @@ export class BoardView extends Phaser.GameObjects.Container {
     this.add(this.embers);
     this.add(this.overlay);
 
-    // 入场：漆盘先落，格线次第浮现（烘焙纹理之间的 stagger 淡入，零重绘成本）
+    // 入场：漆盘先落，格线次第浮现（烘焙纹理之间的 stagger 淡入，零重绘成本）。
+    // 补间句柄随场景 SHUTDOWN 取消：场景复用重入 create() 时，若旧淡入仍以
+    // 已销毁 gridImg 为目标会触发二次淡入/对已销毁对象补间。
     this.gridImg.setAlpha(0);
-    scene.tweens.add({ targets: this.gridImg, alpha: 1, delay: 140, duration: 460, ease: 'Quad.easeOut' });
+    const gridTween = scene.tweens.add({ targets: this.gridImg, alpha: 1, delay: 140, duration: 460, ease: 'Quad.easeOut' });
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (gridTween.isPlaying()) gridTween.remove();
+    });
 
     scene.add.existing(this);
   }
 
   cellToXY(c: number, r: number): { x: number; y: number } {
-    return { x: BOARD_PAD + c * CELL + CELL / 2, y: BOARD_PAD + r * CELL + CELL / 2 + 8 };
+    return { x: BOARD_PAD + c * CELL + CELL / 2, y: BOARD_PAD + r * CELL + CELL / 2 + CELL_CONTENT_DY };
   }
 
   xyToCell(x: number, y: number): { c: number; r: number } | null {
     const c = Math.floor((x - BOARD_PAD) / CELL);
-    const r = Math.floor((y - 8 - BOARD_PAD) / CELL);
+    const r = Math.floor((y - CELL_CONTENT_DY - BOARD_PAD) / CELL);
     if (c < 0 || c >= BOARD_COLS || r < 0 || r >= BOARD_ROWS) return null;
     return { c, r };
   }

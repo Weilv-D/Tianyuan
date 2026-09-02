@@ -226,7 +226,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.moveDur = Math.max(0.016, dur);
   }
 
-  blinkTo(x: number, y: number, dur: number): void {
+  blinkTo(x: number, y: number, dur: number): Phaser.GameObjects.Image {
     this.px = this.x;
     this.py = this.y;
     this.tx = x;
@@ -247,8 +247,14 @@ export class UnitView extends Phaser.GameObjects.Container {
       scaleX: this.scaleX * 1.25,
       scaleY: this.scaleY * 1.25,
       duration: 260,
-      onComplete: () => ghost.destroy(),
+      onComplete: () => {
+        if (ghost.scene) ghost.destroy();
+      },
     });
+    // 残影本体归还调用方登记（BattleScene 经 trackStray 统一清理）：
+    // 战斗早结束（clearBattle）时若只剩 onComplete 自毁，残影会悬浮到
+    // 结算面板之上 —— 落场兜底销毁必须挂在场景级清理链上，不靠补间回调
+    return ghost;
   }
 
   // ── 数值 ──

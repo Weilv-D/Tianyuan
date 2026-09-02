@@ -70,25 +70,29 @@ describe('羁绊轨几何', () => {
     }
   });
 
-  it('徽章行世界位 = 容器世界位 + 行局部位（锚 y 不依赖滚动）', () => {
+  it('徽章行世界位 = 容器实时 y + 行局部位（滚动位移计入，默认静态 = RAIL_Y）', () => {
     for (const i of [0, 7, 16]) {
       expect(railBadgeWorldY(i)).toBe(RAIL_Y + i * 44);
+      expect(railBadgeWorldY(i, RAIL_Y - 120)).toBe(RAIL_Y - 120 + i * 44);
     }
-    // 世界 y 与局部 railBadgeY 一致性的守护：局部 y=0 时锚 = RAIL_Y
+    // 世界 y 与局部 railBadgeY 一致性的守护：局部 y=0 时锚 = 传入容器 y
     expect(railBadgeWorldY(0)).toBe(RAIL_Y);
+    expect(railBadgeWorldY(3, 400)).toBe(400 + 3 * 44);
   });
 
-  it('徽章行世界命中区 = 局部命中区平移到世界位（滚动只改容器 y，不改行世界锚）', () => {
-    const hit0 = railBadgeWorldHit(0);
+  it('徽章行世界命中区 = 局部命中区平移到容器实时 y（滚动后贴行，不按静态 RAIL_Y）', () => {
     const local = railBadgeHit();
-    expect(hit0.x).toBe(RAIL_X + local.x);
-    expect(hit0.y).toBe(RAIL_Y + local.y);
-    for (const i of [1, 16]) {
-      const h = railBadgeWorldHit(i);
-      expect(h.y).toBe(hit0.y + i * 44);
-      expect(h.x).toBe(hit0.x);
-      expect(h.w).toBe(local.w);
-      expect(h.h).toBe(local.h);
+    for (const containerY of [RAIL_Y, RAIL_Y - 220]) {
+      const hit0 = railBadgeWorldHit(0, containerY);
+      expect(hit0.x).toBe(RAIL_X + local.x);
+      expect(hit0.y).toBe(containerY + local.y);
+      for (const i of [1, 16]) {
+        const h = railBadgeWorldHit(i, containerY);
+        expect(h.y).toBe(hit0.y + i * 44);
+        expect(h.x).toBe(hit0.x);
+        expect(h.w).toBe(local.w);
+        expect(h.h).toBe(local.h);
+      }
     }
   });
 });
@@ -143,7 +147,7 @@ describe('羁绊成员卡几何', () => {
     }
   });
 
-  it('卡高随行数自适应；全量最坏情形的卡都能钳位进 CAH 带内', () => {
+  it('卡高随行数自适应；全量最坏情形的卡都能钳位进 CAH 带内（滚动后锚同样收带）', () => {
     // 最坏情形：徽章行锚取整条轨上可达的最大世界 y，卡仍不越 CAH 底
     const h = traitMemberCardH(24);
     const py = traitMemberClampY(railBadgeWorldY(16), h);
@@ -151,6 +155,10 @@ describe('羁绊成员卡几何', () => {
     expect(py).toBeGreaterThanOrEqual(140);
     // 行高上限不超过允许带的收缩量（成员超 25 引滚动前的守卫）
     expect(h).toBeLessThanOrEqual(860 - 140);
+    // 滚动后徽章锚在视口高处：卡钳位仍收在带内（锚追行、不追静态 RAIL_Y）
+    const scrolled = traitMemberClampY(railBadgeWorldY(0, RAIL_Y - 300), h);
+    expect(scrolled + h).toBeLessThanOrEqual(860);
+    expect(scrolled).toBeGreaterThanOrEqual(140);
   });
 
   it('格心距 ≥ 立绘边长 + 净距（相邻格不叠压）', () => {

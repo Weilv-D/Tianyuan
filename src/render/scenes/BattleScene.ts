@@ -670,7 +670,10 @@ export class BattleScene extends Phaser.Scene {
         const v = this.views.get(e.uid);
         if (!v) break;
         const p = this.cellWorld(e.to.c, e.to.r);
-        v.blinkTo(p.x, p.y, e.dur);
+        const ghost = v.blinkTo(p.x, p.y, e.dur);
+        // 残影挂场景根、自毁只靠补间回调 —— 登记进 strays，clearBattle 时
+        // 一并清掉：战斗早结束（死亡/快进）时残影不会浮在结算面板上
+        if (ghost) this.trackStray(ghost);
         v.setDepth(30 + e.to.r * 2);
         break;
       }

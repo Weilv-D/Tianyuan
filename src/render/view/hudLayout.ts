@@ -15,11 +15,14 @@ export const BADGE_R = 16;
 export const BADGE_SIZE = 40;
 
 // ── 悬停笺 / 成员卡 y 真源 ─────────────────────────────
-// 轨内徽章在世界系的 y = traitContainer 的世界 y（RAIL_Y）+ 行局部 y。
-// traitContainer 直接落在场景根部（无嵌套容器），其世界 y = RAIL_Y，
-// 与 enableScroll 的滚动位移无关（滚动改的是 container.y，见 HudPanels
-// buildTraitRail / ui/kit enableScroll）。此前按"容器局部 y"直接进世界系
-// 钳位，等于整体上移 RAIL_Y —— 顶行徽章的笺/卡落到屏顶之外。
+// 轨内徽章在世界系的 y = traitContainer 的实时世界 y（= RAIL_Y + 滚动位移）
+// + 行局部 y。traitContainer 直接落在场景根部（无嵌套容器），enableScroll
+// 滚动时改的是 container.y（见 HudPanels buildTraitRail / ui/kit enableScroll）
+// —— 因此"徽章世界锚不依赖滚动"的旧假设在滚动生效后不成立：滚动 100px 后
+// 行 0 的真实世界 y 是 RAIL_Y−100，若仍按 RAIL_Y 钳位，悬停笺/成员卡会
+// 贴到滚动前的旧位置、与徽章错位一截（1.16 成员卡在可滚长轨上实测）。
+// 本文件的纯函数一律以"容器实时 y"入参（containerY，默认 RAIL_Y 保持测试
+// 兼容），调用方（SceneRefresh / hitTraitBadge）传入 traitContainer.y 实况。
 //
 // 三个位置真源：
 // 1. 徽章世界 y —— 悬停笺沿其对齐（railPopupClampY）的锚；传给成员卡
@@ -27,15 +30,16 @@ export const BADGE_SIZE = 40;
 // 2. 点击徽章行的完整命中矩形（世界系，含计数串）—— 输入层"点徽章不关卡"。
 // 3. 悬停笺世界位置 —— 与徽章行同锚：若滚轮把行滚出视口，笺同步消失。
 
-/** 第 i 枚徽章的行锚（世界 y；徽章局部 40×40 以行容器原点为中心） */
-export function railBadgeWorldY(i: number): number {
-  return RAIL_Y + railBadgeY(i);
+/** 第 i 枚徽章的行锚（世界 y；徽章局部 40×40 以行容器原点为中心）。
+ *  containerY = 轨容器实时 y（静态 = RAIL_Y，滚动后 = RAIL_Y − scroll）。 */
+export function railBadgeWorldY(i: number, containerY = RAIL_Y): number {
+  return containerY + railBadgeY(i);
 }
 
 /** 第 i 行徽章点击命中矩形（世界系）。入参 i = 该行在轨内的下标 */
-export function railBadgeWorldHit(i: number): { x: number; y: number; w: number; h: number } {
+export function railBadgeWorldHit(i: number, containerY = RAIL_Y): { x: number; y: number; w: number; h: number } {
   const row = railBadgeHit();
-  return { x: RAIL_X + row.x, y: RAIL_Y + railBadgeY(i) + row.y, w: row.w, h: row.h };
+  return { x: RAIL_X + row.x, y: containerY + railBadgeY(i) + row.y, w: row.w, h: row.h };
 }
 
 /** 悬停笺应放置的世界位置：笺左缘贴轨计数串右缘；py 沿徽章行 y 钳位 */

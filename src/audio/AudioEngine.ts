@@ -86,6 +86,9 @@ export class AudioEngine {
     comp.connect(this.ctx.destination);
     if (!this.visBound) {
       this.visBound = true;
+      // 页面级自动静音监听：AudioEngine 是游戏级单例、生命周期与页面同长
+      //（不存在 destroy/重建路径），此处刻意常驻不摘除 —— 若未来引入
+      // 音频引擎销毁，需与此 visBound 标志配套摘除三个监听
       document.addEventListener('visibilitychange', () => {
         this.setAutoMuted(document.hidden);
         if (!this.ctx) return;

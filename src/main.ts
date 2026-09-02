@@ -69,8 +69,11 @@ import './render/view/textScale';
     Phaser.GameObjects.GameObjectFactory.prototype,
     Phaser.GameObjects.GameObjectCreator.prototype,
   ] as unknown as Record<string, (...a: unknown[]) => unknown>[]) {
+    // HMR 幂等守卫（与下方 __descentPadded 同款）：Vite 热重载会重新执行本模块，
+    // 不加标记则每次重载都在已包裹的 proto.text 上再缠一层 ×2 resolution
+    if ((proto.text as unknown as { __resolutionPatched?: boolean }).__resolutionPatched) continue;
     const orig = proto.text;
-    proto.text = function (this: unknown, x, y, text, style, ...rest) {
+    const wrapped = function (this: unknown, x: unknown, y: unknown, text: unknown, style?: object, ...rest: unknown[]) {
       return orig.call(
         this,
         x,
@@ -79,7 +82,9 @@ import './render/view/textScale';
         { resolution: RES, ...(style as object) },
         ...rest,
       );
-    };
+    } as unknown as typeof orig & { __resolutionPatched?: boolean };
+    wrapped.__resolutionPatched = true;
+    proto.text = wrapped;
   }
 }
 

@@ -19,7 +19,14 @@ export class PauseScoutOverlay {
   /** 侦查对手的覆盖层 */
   scoutPanel: Phaser.GameObjects.Container | null = null;
 
-  constructor(private scene: GameScene) {}
+  constructor(private scene: GameScene) {
+    // 容器随场景销毁；模块字段若还指着死引用，overlayOpen 等守卫会被骗。
+    // 与 TraitMembersCard/DebugConsole 同款 SHUTDOWN 复位（create 重入前清空）
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.pauseOverlay = null;
+      this.scoutPanel = null;
+    });
+  }
 
   /** 准备阶段暂停：只冻结倒计时，操作不受限（单机对 AI，给玩家无限思考时间是纯收益） */
   togglePause(): void {

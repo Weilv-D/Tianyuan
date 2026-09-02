@@ -1,4 +1,5 @@
-/** 职责：回合结算覆盖层——胜负/生命条/战绩的展示与「继续」按钮、6 秒自动推进，纯展示不改对局数据。 */
+/** 职责：回合结算覆盖层——胜负/生命条/战绩的展示与「继续」按钮，纯展示不改对局数据。
+ *  推进完全手动（点「继续」）：战斗与回合结算的节奏都交给玩家掌握，浮层不自动关。 */
 import Phaser from 'phaser';
 import { PLAYER_START_HP } from '../../core/config';
 import { FONT, Button } from '../../ui/kit';
@@ -126,13 +127,8 @@ export class RoundResultOverlay {
     // 回合胜负是常态，不值得 full fanfare —— 高光留给连胜/三星/终局
     if (won) audio.play('uiBig');
     else if (p.lastOutcome === 'loss') audio.play('warn');
-
-    // 6 秒后自动继续，不打断心流
-    this.scene.time.delayedCall(6000, () => {
-      if (panel.active) {
-        panel.destroy();
-        next();
-      }
-    });
+    // 推进完全手动：点「继续」才进下一回合（战斗结算与回合结算都不自动关，
+    // 节奏交给玩家 —— 2026-09 统一口径）。无 6s 自动延时，也就不存在
+    // "面板已关/场景已切，定时器仍在 Clock 上空转"的句柄问题。
   }
 }

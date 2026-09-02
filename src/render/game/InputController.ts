@@ -93,6 +93,10 @@ export class InputController {
       this.dragItemGhost = null;
       this.dragItemId = null;
       this.dragItemFrom = -1;
+      // 与 endItemDrag 的收尾对称：装备拖拽中止同样要收掉提示卡与落点衬底，
+      // 否则隐藏后恢复可见时提示卡/淡金衬底残留
+      this.itemTip.hide();
+      this.scene.boardBake?.boardHover?.clear();
     }
   };
 

@@ -109,6 +109,8 @@ export class GameScene extends Phaser.Scene {
   private toast: Phaser.GameObjects.Container | null = null;
   private onBeforeUnload: (() => void) | null = null;
   private saveTimer: Phaser.Time.TimerEvent | null = null;
+  /** DEV 调试台热键（具名句柄：create 重入前须摘除旧监听，见 create 注册处） */
+  private devKeydown: ((e: KeyboardEvent) => void) | null = null;
   /** 开战前玩家的连胜/连败值（负数为连败）—— 翻盘判定必须用战前口径 */
   private streakBefore = 0;
   /** 投降/重开后置真：阻止 SHUTDOWN 与 beforeunload 把已放弃的存档写回去 */
@@ -169,6 +171,10 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('beforeunload', this.onBeforeUnload);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.onBeforeUnload) window.removeEventListener('beforeunload', this.onBeforeUnload);
+      if (this.devKeydown) {
+        this.input.keyboard?.off('keydown', this.devKeydown);
+        this.devKeydown = null;
+      }
       if (!this.match.isOver()) this.flushSave();
     });
 
@@ -236,14 +242,16 @@ export class GameScene extends Phaser.Scene {
 
     this.refreshAll();
     if (import.meta.env.DEV) {
-      this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
+      // 具名句柄 + SHUTDOWN 对称摘除：Phaser 复用 Scene 实例时 create() 会重入，
+      // 匿名 keydown 监听每次重入叠加一发（Ctrl+~ 触发次数倍增）
+      this.devKeydown = (e: KeyboardEvent) => {
         if (e.ctrlKey && (e.key === '`' || e.key === '~' || e.code === 'Backquote')) {
           e.preventDefault();
           this.debug.toggle();
         }
-      });
+      };
+      this.input.keyboard?.on('keydown', this.devKeydown);
     }
-
   }
 
   override update(_time: number, delta: number): void {
@@ -832,10 +840,9 @@ export class GameScene extends Phaser.Scene {
     while (!this.match.isOver() && guard++ < 60) {
       this.match.beginRound();
       if (this.match.isOver()) break;
-      // beginRound 已生成本回合配对 —— 直接消费，避免二次生成重复记对手历史
-      for (const pair of this.match.pairings) {
-        this.match.applyBattleResult(pair, this.match.runBattleHeadless(pair));
-      }
+      // 人类已亡不在配对内，批量结算走 settleRound —— 与正常回合同一入口，
+      // 结算后内部清空 pairings（手工逐对消费会留下同轮配对的二次消费窗口）
+      this.match.settleRound();
       this.match.endRound();
     }
     this.showFinalStandings();

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GILT, PAPER, css } from '../view/palette';
 import { BADGE_R, BADGE_SIZE } from '../view/hudLayout';
+import { TRAITS } from '../../data/traits';
 import sealFontUrl from '../../assets/fonts/seal.woff2?url';
 
 /**
@@ -82,18 +83,20 @@ const TIER_RINGS: number[][] = [[], [16], [16, 13.5], [16, 14.75, 13.5]];
 const BOX = BADGE_SIZE; // 逻辑边长（r16 外环 + 4px 呼吸）
 const SS = 2; // 超采样：徽章在屏上不超过 32 逻辑 px，2× 已留足余量
 
-/** 一次性烘出 17 羁绊 × 4 态（未激活/一圈/两圈/三圈）。键判重，场景重入零成本。 */
+/** 一次性烘出全部羁绊 × 4 态（未激活/一圈/两圈/三圈）。键判重，场景重入零成本。
+ *  遍历 TRAITS 全表而非 GLYPH：新增羁绊即使字表没收录（sealGlyph 落楷体首字），
+ *  徽章纹理也一定存在 —— 不依赖 17 字表与羁绊表手工同步。 */
 export function bakeTraitIcons(scene: Phaser.Scene): void {
-  for (const [traitId, glyph] of Object.entries(GLYPH)) {
+  for (const def of TRAITS) {
     for (let tier = 0; tier <= 3; tier++) {
-      const key = traitIconKey(traitId, tier);
+      const key = traitIconKey(def.id, tier);
       if (scene.textures.exists(key)) continue;
       const canvas = document.createElement('canvas');
       canvas.width = BOX * SS;
       canvas.height = BOX * SS;
       const ctx = canvas.getContext('2d');
       if (!ctx) continue;
-      drawBadge(ctx, glyph, tier);
+      drawBadge(ctx, sealGlyph(def.id, def.name), tier);
       scene.textures.addCanvas(key, canvas);
     }
   }

@@ -110,7 +110,18 @@ export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
     delay: motion.calm ? 700 : 1850,
     duration: 460,
     ease: 'Quad.easeIn',
-    onComplete: () => root.destroy(),
+    onComplete: () => {
+      if (root.scene) root.destroy();
+    },
+  });
+  // 场景在演出中切换（重开/快进/切图鉴）：root 与粒子必须随场景退场销毁，
+  // 否则残留在新场景时钟里（旧容器自毁回调还会对已销毁对象二次 destroy）。
+  // 归一到"场景 shutdown 清空本场演出"的既有纪律 —— 与 EffectsLayer 同款守卫。
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    if (root.scene) {
+      scene.tweens.killTweensOf([dim, shadow, halo, seal, banner]);
+      root.destroy();
+    }
   });
 }
 
@@ -135,7 +146,9 @@ function burst(
     .setDepth(1501);
   root.add(p);
   p.explode(count);
-  scene.time.delayedCall(900, () => p.destroy());
+  scene.time.delayedCall(900, () => {
+    if (p.scene) p.destroy();
+  });
 }
 
 function defName(defId: string): string {

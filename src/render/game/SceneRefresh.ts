@@ -7,7 +7,7 @@ import { boardCap, boardCount } from '../../game/state';
 import { interestOf, streakGold, xpToNext } from '../../game/economy';
 import { Bar, FONT, clipToWidth, setTextIf } from '../../ui/kit';
 import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
-import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, SIDE_W } from '../view/layout';
+import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, RAIL_Y, SIDE_W } from '../view/layout';
 import { traitIconKey } from '../board/traitIcons';
 import {
   RAIL_VIEW_H,
@@ -203,23 +203,25 @@ export class SceneRefresh {
       );
 
       // 悬停/点击热区 = 世界系行矩形：徽章局部矩形 + 容器世界位
-      // （traitContainer 无嵌套，世界 y 即 RAIL_Y + 行局部 y，见 hudLayout 头注）
+      // （traitContainer 挂在 RAIL_X,RAIL_Y；enableScroll 滚动改 container.y ——
+      //  世界锚必须取容器**实时** y，否则滚动后徽章行与悬停笺/成员卡错位一截）
       const hit = railBadgeHit();
       item.setInteractive(new Phaser.Geom.Rectangle(hit.x, hit.y, hit.w, hit.h), Phaser.Geom.Rectangle.Contains);
-      const worldY = railBadgeWorldY(i);
+      const worldY = () => railBadgeWorldY(i, this.scene.hud.traitContainer.y);
       // 悬停出效果笺；点击钉成员卡。成员卡打开时不弹效果笺（两卡叠放抢读）。
       // pointerup 带 8px 位移阈值：徽章在可滚轨内，滚动结束的落点不得被当成点选
       item.on('pointerover', () => {
         if (this.scene.traitMembers.isOpen) return;
-        this.showRailPopup(s.def.id, s.t.count, s.t.tier, color, worldY);
+        this.showRailPopup(s.def.id, s.t.count, s.t.tier, color, worldY());
       });
       item.on('pointerout', () => {
+        if (this.railPopup?.scene !== this.scene) this.railPopup = null;
         this.railPopup?.destroy();
         this.railPopup = null;
         this.scene.input.setDefaultCursor('default');
       });
       item.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
-        this.railDown = { x: ptr.x, y: ptr.y, id: s.def.id, badgeWorldY: worldY };
+        this.railDown = { x: ptr.x, y: ptr.y, id: s.def.id, badgeWorldY: worldY() };
       });
       item.on('pointerup', (ptr: Phaser.Input.Pointer) => {
         if (
@@ -231,7 +233,7 @@ export class SceneRefresh {
           // 打开（非收起同徽章）时清掉棋子详情卡的钉住态，避免成员卡与详情卡叠放
           const closing = this.scene.traitMembers.isOpen && this.scene.traitMembers.traitId === s.def.id;
           if (!closing) this.scene.inputCtl.clearSelection();
-          this.scene.traitMembers.toggle(s.def.id, worldY);
+          this.scene.traitMembers.toggle(s.def.id, worldY());
         }
         this.railDown = null;
       });
@@ -247,11 +249,12 @@ export class SceneRefresh {
   }
 
   /** 世界坐标是否命中任一徽章行。输入层"点徽章不关卡"的判断用。
-   *  徽章行局部 y 是容器位 i*RAIL_PITCH，世界位由 railBadgeWorldHit 给出
-   *  （traitContainer 无嵌套，世界 y = RAIL_Y + 行局部 y，与滚动位移无关）。 */
+   *  徽章行世界位由容器实时 y 平移（railBadgeWorldHit(i, container.y)），
+   *  与滚动后的视觉位置一致 —— 滚动把行移出视口，点旧位置不应再命中该行。 */
   hitTraitBadge(x: number, y: number): boolean {
+    const containerY = this.scene.hud.traitContainer?.y ?? RAIL_Y;
     for (let i = 0; i < this.badgeIds.length; i++) {
-      const hit = railBadgeWorldHit(i);
+      const hit = railBadgeWorldHit(i, containerY);
       if (x >= hit.x && x <= hit.x + hit.w && y >= hit.y && y <= hit.y + hit.h) return true;
     }
     return false;
@@ -263,6 +266,7 @@ export class SceneRefresh {
     this.railPopup?.destroy();
     const def = TRAIT_BY_ID[id];
     if (!def) return;
+    if (!this.scene.scene.isActive()) return; // 场景正在退场/已停：不再新建浮层
     const c = this.scene.add.container(0, 0).setDepth(520);
     const descLines = descLineCount(def.description, RAIL_POPUP_W - 28);
     const effect = tier >= 0 ? def.effectText[Math.min(tier, def.effectText.length - 1)] : null;

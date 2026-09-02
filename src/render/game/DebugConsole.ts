@@ -17,7 +17,12 @@ import type { GameScene } from '../scenes/GameScene';
 export class DebugConsole {
   private panel: Phaser.GameObjects.Container | null = null;
 
-  constructor(private scene: GameScene) {}
+  constructor(private scene: GameScene) {
+    // 场景关闭即清引用（与 reset 同语义，防御 create 之前就有 SHUTDOWN 的时序）
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.panel = null;
+    });
+  }
 
   get isOpen(): boolean {
     return this.panel !== null;
