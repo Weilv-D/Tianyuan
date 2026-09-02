@@ -1,0 +1,11 @@
+{
+  "name": "channel-tune",
+  "note": "五通道边际定档：在默认值基础上单轴探测",
+  "axes": [
+    { "path": "trait.assassin.breakerPct", "values": [0.07] },
+    { "path": "trait.bingjia.siegeAtk", "values": [0.35] },
+    { "path": "trait.jiguan.constructMr", "values": [8] },
+    { "path": "trait.youming.reviveFragilePct", "values": [50] },
+    { "path": "champ.yuansu.base.startMp", "values": [8] }
+  ]
+}

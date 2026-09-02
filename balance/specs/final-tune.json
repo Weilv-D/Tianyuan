@@ -1,0 +1,30 @@
+{
+  "name": "final-tune",
+  "note": "快攻/法爆带内抬升候选（通道定档 constructMr=10 siegeAtk=0.15 之上）",
+  "axes": [
+    {
+      "path": "champ.qingming.base.atk",
+      "values": [
+        84
+      ]
+    },
+    {
+      "path": "trait.jianzong.critMult",
+      "values": [
+        0.24
+      ]
+    },
+    {
+      "path": "champ.yinglong.skill.sp",
+      "values": [
+        5.2
+      ]
+    },
+    {
+      "path": "champ.yuansu.skill.sp",
+      "values": [
+        2.8
+      ]
+    }
+  ]
+}

@@ -3,9 +3,12 @@ node_modules/
 dist/
 release/
 
-# 模拟工件（sweep-out 是 sim:sweep / sim:ab 的输出目录，保留目录本身）
+# 平衡工具链工件（balance/out 是 SQLite 工件库与导出的输出目录，保留目录本身）
+balance/out/
+!balance/out/.gitkeep
+
+# 旧扫描工件目录已由 balance/out 取代（历史 JSON 仍可被 sweep --compare <path> 直读）
 sweep-out/
-!sweep-out/.gitkeep
 
 # 运行日志与临时产物（.qa 的证据工件 *.txt/*.ts 是文档引用的可复现证据链，保留入库）
 *.log

@@ -203,7 +203,7 @@ describe('装备钩子回归（v1.9 新件）', () => {
     expect(withItem).toBeGreaterThan(barePan.mp);
   });
 
-  it('墨龙旗：开战全体友军获得 18% 减伤', () => {
+  it('墨龙旗：开战全体友军获得 22% 减伤（2026-09-02 定档）', () => {
     const battle = mkBattle(
       [
         unitInput('pan', 0, { c: 0, r: 6 }, { items: ['molongqi'] }),
@@ -214,7 +214,7 @@ describe('装备钩子回归（v1.9 新件）', () => {
       2,
     );
     for (const defId of ['pan', 'duanyue']) {
-      expect(byDef(battle, defId).statuses.some((s) => s.kind === 'dr' && s.value === 18)).toBe(true);
+      expect(byDef(battle, defId).statuses.some((s) => s.kind === 'dr' && s.value === 22)).toBe(true);
     }
     // 敌方不吃旗
     expect(byDef(battle, 'jingyu').statuses.some((s) => s.kind === 'dr')).toBe(false);

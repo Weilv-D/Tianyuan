@@ -110,7 +110,7 @@ export interface CompSpec {
 export const PRESET_COMPS: readonly CompSpec[] = [
   {
     name: '快攻 · 4剑宗3刺客',
-    desc: '4剑宗(20%暴击/18%破甲/击杀回蓝)3刺客4武将，1秒后跳后排切方士。',
+    desc: '4剑宗(20%暴击/18%破甲/击杀回蓝)3刺客4武将，1秒后跳后排突袭切方士。',
     units: { duanyue: 3, wujiu: 2, canghao: 2, chitong: 2, yingsha: 2, ajiu: 2, qingming: 2 },
   },
   {
@@ -127,7 +127,7 @@ export const PRESET_COMPS: readonly CompSpec[] = [
     // 原版七个全是护卫/武将，一点输出都没有，纯靠荆棘反弹和流血磨 ——
     // 打不死人就是打不死人。第七格换成朱炎（方士/山海），
     // 让它有至少一个能主动制造伤害的单位。
-    desc: '6护卫(55%攻击/荆棘52%)2山海(16%流血)，站得住就赢。',
+    desc: '6护卫(15%攻击/荆棘52%/续盾1.4%)2山海(16%流血)，站得住就赢。',
     units: { pan: 2, lingxiao: 2, xuanwu: 2, budong: 2, zhenyue: 2, canglan: 1, zhuyan: 2 },
   },
   {
@@ -139,7 +139,7 @@ export const PRESET_COMPS: readonly CompSpec[] = [
   },
   {
     name: '机关 · 4机关3神射',
-    desc: '4机关(22甲/9%叠攻速)3神射(15%攻击)，数量压制。',
+    desc: '4机关(22甲/12%叠攻速)3神射(15%攻击)，数量压制。',
     units: { gongshu: 2, muji: 2, pan: 2, budong: 2, canghao: 2, jingyu: 3, qinghe: 3 },
   },
   {
@@ -152,17 +152,17 @@ export const PRESET_COMPS: readonly CompSpec[] = [
   },
   {
     name: '天庭 · 4天庭',
-    desc: '4天庭(20%护盾/破盾法爆)双五费天王2星，覆盖天庭/丹鼎/丹师（实战7人口高费）。',
+    desc: '4天庭(24%护盾/破盾法爆)双五费天王2星，覆盖天庭/丹鼎/丹师（实战7人口高费）。',
     units: { lingxiao: 2, yaoguang: 2, xinhuan: 2, zhenyue: 2, haotian: 2, gouchen: 1, qinghe: 2 },
   },
   {
     name: '墨门 · 6墨门',
-    desc: '6墨门(8%团队减伤/2%回血)墨翟2星，贴近实战7人口成型。',
+    desc: '6墨门(8%团队减伤/1.8%回血)墨翟2星，贴近实战7人口成型。',
     units: { moyan: 3, yunchu: 2, chiji: 2, guicheng: 2, xuanji: 2, baitao: 2, mozhai: 2 },
   },
   {
     name: '兵家 · 5兵家',
-    desc: '5兵家(26%攻击/20%攻速)百战滚雪球，武将/神射混搭，贴合实战中期锁血。',
+    desc: '5兵家(22%攻击/17%攻速)百战滚雪球，武将/神射混搭，贴合实战中期锁血。',
     units: { zhenfeng: 3, jinghong: 3, xijue: 2, paoche: 2, guzhen: 2, canghao: 2, jingyu: 3 },
   },
 ];

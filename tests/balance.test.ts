@@ -62,6 +62,13 @@ describe('数值平衡回归（2026-09-01 CRN 定档）', () => {
     }
   });
 
+  it('2026-09-02 终态定档（机制包 + 数值包，矩阵带外 0 / 极差 11.4% / 装备 36/36 正收益）', () => {
+    // 数值包：机关三连 + 木机连弩 + 青冥攻击 + 元素技能法强
+    expect(CHAMPION_BY_ID['muji'].skillSpec.params.atk).toBe(0.7);
+    expect(CHAMPION_BY_ID['qingming'].base.atk).toBe(84);
+    expect(CHAMPION_BY_ID['yuansu'].skillSpec.params.sp).toBe(2.7);
+  });
+
   it('9套平衡：天庭/墨门主C加强、兵家削弱', () => {
     expect(CHAMPION_BY_ID['haotian'].base.atk).toBe(190);
     expect(CHAMPION_BY_ID['gouchen'].base.sp).toBe(240);

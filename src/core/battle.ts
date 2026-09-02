@@ -2,7 +2,6 @@ import {
   ATTACK_WINDUP_RATIO,
   BOARD_COLS,
   BOARD_ROWS,
-  BATTLE_TIMEOUT_TICKS,
   CAST_WINDUP_SECONDS,
   DOT_TICKS_PER_SEC,
   DT,
@@ -11,7 +10,6 @@ import {
   MANA_LOCK_AFTER_CAST,
   MANA_PER_ATTACK,
   MANA_REGEN_PER_SEC,
-  OVERTIME_AMP_PER_SEC,
   OVERTIME_START_TICK,
   MECH,
   RESIST_BASE,
@@ -87,7 +85,7 @@ export class Battle implements BattleApi {
     this.rng = new Rng(cfg.seed);
     this.sink = sink;
     this.recordEvents = recordEvents;
-    this.maxTicks = cfg.maxTicks && cfg.maxTicks > 0 ? cfg.maxTicks : BATTLE_TIMEOUT_TICKS;
+    this.maxTicks = cfg.maxTicks && cfg.maxTicks > 0 ? cfg.maxTicks : MECH.battleTimeoutTicks;
 
     // 1) 建单位（uid 升序，保证遍历顺序确定）。
     //    输入校验与 createUnit 的「未知棋子即抛」同契约：重复 uid / 越界格 /
@@ -240,7 +238,7 @@ export class Battle implements BattleApi {
 
   overtimeAmp(): number {
     if (this.tick < OVERTIME_START_TICK) return 0;
-    return ((this.tick - OVERTIME_START_TICK) / TICK_RATE) * OVERTIME_AMP_PER_SEC;
+    return ((this.tick - OVERTIME_START_TICK) / TICK_RATE) * MECH.overtimeAmpPerSec;
   }
 
   // ───────────────── 目标选择 ─────────────────
@@ -614,6 +612,7 @@ export class Battle implements BattleApi {
     if (!Number.isFinite(amount)) throw new Error(`非法治疗值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (amount <= 0) return 0;
     let amt = amount * (1 + (src?.trait.healAmp ?? 0));
+    if (this.tick >= OVERTIME_START_TICK) amt *= MECH.overtimeSustainFactor;
     let wound = 0;
     for (const s of dst.statuses) if (s.kind === 'wound') wound += s.value;
     amt *= 1 - Math.min(0.9, wound / 100);
@@ -642,7 +641,8 @@ export class Battle implements BattleApi {
     if (!dst.alive) return;
     if (!Number.isFinite(amount)) throw new Error(`非法护盾值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (amount <= 0) return;
-    const amt = amount * (1 + (src?.trait.shieldAmp ?? 0));
+    const amt = amount * (1 + (src?.trait.shieldAmp ?? 0))
+      * (this.tick >= OVERTIME_START_TICK ? MECH.overtimeSustainFactor : 1);
     const before = dst.shield;
     dst.shield = Math.min(dst.shield + amt, dst.maxHp * SHIELD_CAP_RATIO);
     const added = dst.shield - before;
@@ -918,7 +918,8 @@ export class Battle implements BattleApi {
     if (u.manaLock > 0) u.manaLock -= DT;
     else if (!u.isMinion) u.mp = Math.min(u.maxMp, u.mp + (MANA_REGEN_PER_SEC + u.trait.manaPerSec) * DT);
     if (u.trait.hpRegenPctPerSec > 0 && u.hp < u.maxHp) {
-      u.hp = Math.min(u.maxHp, u.hp + u.maxHp * u.trait.hpRegenPctPerSec * DT);
+      const sustain = this.tick >= OVERTIME_START_TICK ? MECH.overtimeSustainFactor : 1;
+      u.hp = Math.min(u.maxHp, u.hp + u.maxHp * u.trait.hpRegenPctPerSec * DT * sustain);
     }
 
     if (u.moveCd > 0) u.moveCd -= DT;

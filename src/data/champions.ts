@@ -266,7 +266,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skillSpec: {
       kind: 'aoe', name: '五雷符', target: 'enemyDensest',
       desc: '在最密集处降下雷罚，{radius} 格内造成 {sp} 法强的法术伤害并眩晕 {dur} 秒。',
-      params: { sp: 2.4, radius: 1, type: 'magic', status: { kind: 'stun', dur: 1.2, value: 0 } },
+      params: { sp: 2.7, radius: 1, type: 'magic', status: { kind: 'stun', dur: 1.2, value: 0 } },
     },
   },
   {
@@ -290,7 +290,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skillSpec: {
       kind: 'volley', name: '连弩齐射', target: 'currentTarget',
       desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 6% 攻速（至多 8 层，持续 5 秒）。',
-      params: { atk: 0.55, type: 'physical', shots: 8, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
+      params: { atk: 0.7, type: 'physical', shots: 8, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
   {
@@ -444,7 +444,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
   {
     id: 'qingming', name: '青冥', title: '剑仙', cost: 4 as Rarity,
     origins: ['jianzong'], classes: ['assassin'], cls: 'assassin',
-    base: S(740, 78, 0, 26, 26, 0.9, 1, 0.45, 0, 80, 0.35, 1.9),
+    base: S(740, 84, 0, 26, 26, 0.9, 1, 0.45, 0, 80, 0.35, 1.9),
     silhouette: 'twinDagger', hue: 0xa7b6d4,
     skill: 'qingming_q',
     skillSpec: {

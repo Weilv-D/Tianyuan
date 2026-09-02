@@ -1,0 +1,10 @@
+{
+  "name": "edge-probe",
+  "note": "边带结构层：护卫/墨门续航侧候选杠杆的边效应映射",
+  "axes": [
+    { "path": "trait.guardian.allyShield", "values": [0.08] },
+    { "path": "trait.guardian.shieldRegen", "values": [0.011] },
+    { "path": "trait.momen.teamDr", "values": [0.06] },
+    { "path": "trait.momen.hpUp", "values": [0.13] }
+  ]
+}

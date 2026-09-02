@@ -1,0 +1,12 @@
+import { fork } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
+const here = fileURLToPath(new URL('.', import.meta.url));
+console.log('execArgv:', process.execArgv);
+const cp = fork(new URL('./child.ts', import.meta.url), [], { cwd: here });
+cp.on('message', (m) => { console.log('fork OK:', m); 
+  const w = new Worker(new URL('./child.ts', import.meta.url), { execArgv: [...process.execArgv] });
+  w.on('message', (m2) => { console.log('worker OK:', m2); process.exit(0); });
+  w.on('error', (e) => { console.log('worker FAIL:', e.message); process.exit(1); });
+});
+cp.on('error', (e) => { console.log('fork FAIL:', e.message); process.exit(1); });

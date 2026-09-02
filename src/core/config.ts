@@ -17,11 +17,12 @@ export const BENCH_SLOTS = 9;
 
 // ── 时间 ──────────────────────────────────────────────
 /** 战斗超时（ticks）。超时后进入"余烬"阶段，双方急速掉血裁定胜负。 */
+/** 兼容导出：超时上限的真源在 MECH.battleTimeoutTicks */
 export const BATTLE_TIMEOUT_TICKS = 40 * TICK_RATE;
 /** 进入"余烬"的起始 tick —— 之后全体每秒递增增伤，逼迫战斗收束 */
 export const OVERTIME_START_TICK = 30 * TICK_RATE;
 /** 余烬阶段每秒增伤系数（线性累加） */
-export const OVERTIME_AMP_PER_SEC = 0.35;
+
 /** 超时裁定：剩余生命比例差超过该值才算胜负，否则平局 */
 export const TIMEOUT_WIN_RATIO = 0.02;
 
@@ -86,6 +87,24 @@ export const RESIST_CAP = 220;
  * 恒定，对局确定性与"同 seed ⇒ 同事件流"不受影响；换档只发生在局与局之间。
  */
 export const MECH = {
+  /**
+   * 战斗超时上限（tick 数，默认 40 秒）：超时进入剩余生命比例裁定。加时增幅
+   * 在 30 秒起线性放大全体输出 —— 上限越长，加时窗越深，「互奶死锁」对局越多
+   * 在裁定前打出真实胜负（延长上限 = 用时间换决定性，工具链 cfg.battleTimeoutTicks 扫档）。
+   */
+  battleTimeoutTicks: 50 * TICK_RATE,
+  /**
+   * 加时增幅（每秒伤害增幅系数，30 秒起算）：加时窗内全体输出随时间线性放大，
+   * 是「互奶死锁对局」的裁决通道 —— 回复对拼到打不死人的两阵容（如幽冥对护卫）
+   * 靠它分出胜负而不是拖到超时裁定。工具链经 cfg.overtimeAmpPerSec 扫档。
+   */
+  overtimeAmpPerSec: 0.5,
+  /**
+   * 加时续航系数：加时窗（30 秒起）内治疗、护盾获得与回复的产出乘数，1 = 不衰减。
+   * 语义：加时是决胜时刻 —— 伤害被增幅放大的同时，回复类产出对称走弱，
+   * 「靠拖」的阵容在加时窗里逐渐失去屏障，对局走向真实分胜负而不是裁定。
+   */
+  overtimeSustainFactor: 1,
   /**
    * 真伤单跳上限（占目标最大生命的比例），0 = 不设上限。
    * 语义：type==='true' 的伤害在全部增减益结算后、护盾吸收前，

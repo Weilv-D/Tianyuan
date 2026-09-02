@@ -47,7 +47,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
   tian: ({ api, members }) => {
     const t = tuner('tian');
     const tier = members[0]?.trait.tier['tian'] ?? 0;
-    const pct = tier >= 1 ? t('shield1', 0.2) : t('shield0', 0.08);
+    const pct = tier >= 1 ? t('shield1', 0.24) : t('shield0', 0.08);
     api.hooksOf(members[0]?.team ?? 0).onBattleStart.push(() => {
       for (const u of members) api.addShield(null, u, u.maxHp * pct, 999);
     });
@@ -56,7 +56,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         if (!isMember(members, unit)) return;
         api.fx('nova', { uid: unit.uid, radius: 1, params: { hue: 0 } });
         for (const e of enemiesNear(api, unit, 1)) {
-          api.dealDamage(unit, e, effSp(unit) * t('novaSp', 1.2), 'magic', { source: 'trait' });
+          api.dealDamage(unit, e, effSp(unit) * t('novaSp', 1.6), 'magic', { source: 'trait' });
         }
       });
     }
@@ -101,6 +101,10 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         // 而不是"复活后还很能打"。
         a.revive(victim, t('reviveHp', 0.1), victim);
         a.addStatus(victim, victim, 'aspdUp', 999, t('reviveAspd', 30));
+        // 余烬：新生的躯壳短暂易伤（受伤 +reviveFragilePct%，dr 负状态实现）。
+        // 爆发流对「复活」的条件化通道：处决掉的第一波伤害在余烬窗内被
+        // 后续伤害补完，复活不再完全吞掉爆发窗口。
+        a.addStatus(victim, victim, 'dr', t('reviveFragileDur', 4), -t('reviveFragilePct', 35));
         a.fx('summon', { uid: victim.uid });
       }
     });
@@ -198,7 +202,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       for (const u of api.units) {
         if (u.team === members[0].team) u.trait.allDr = Math.min(0.9, u.trait.allDr + t('teamDr', 0.08));
       }
-      for (const u of members) u.trait.hpRegenPctPerSec += t('regen', 0.02);
+      for (const u of members) u.trait.hpRegenPctPerSec += t('regen', 0.018);
     }
     if (tier >= 2) {
       // 兼爱：友军所受伤害的 30% 转由存活墨门均摊。
@@ -228,9 +232,16 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     if (tier >= 1) {
       for (const u of api.units) {
         if (u.team !== members[0].team) continue;
-        u.permAtkPct += t('teamAtk', 0.26);
-        u.permAspdPct += t('teamAspd', 0.2);
+        u.permAtkPct += t('teamAtk', 0.22);
+        u.permAspdPct += t('teamAspd', 0.17);
       }
+      // 攻城：军阵对高护甲目标（护甲 ≥ siegeArmor）的攻击附带额外物理伤害 ——
+      // 普攻流对「护甲墙」的条件化通道（数值旋钮对兵家→护卫 0% 边全档不可达）。
+      api.hooksOf(members[0].team).onPreAttack.push((_a, src, dst, mod) => {
+        if (src.team !== members[0].team) return;
+        if (effArmor(dst) < t('siegeArmor', 55)) return;
+        mod.bonusPhysical += src.atk * t('siegeAtk', 0.15);
+      });
     }
     if (tier >= 2) {
       const team = members[0].team;
@@ -334,16 +345,19 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       });
     }
     if (tier >= 1) {
+      // 构装护体：构装体获得魔抗 —— 法术清场（AoE 一轮洗掉人海）是机关的
+      // 结构性天敌，魔抗让人海在法术雨里有活口，而非全灭于第一波循环。
+      for (const u of members) u.baseMr += t('constructMr', 10);
       api.hooksOf(team).onAttackHit.push((_a, src) => {
         if (!isMember(members, src)) return;
         const s = (src.traitStacks['jiguan'] ?? 0) + 1;
         src.traitStacks['jiguan'] = s;
-        if (s <= 8) src.permAspdPct += t('stackAspd', 0.09);
+        if (s <= 8) src.permAspdPct += t('stackAspd', 0.12);
       });
       api.hooksOf(team).onPreAttack.push((_a, src, dst, mod) => {
         if (!isMember(members, src)) return;
         if ((src.attackCount + 1) % 4 === 0) {
-          mod.bonusPhysical += src.atk * t('fourthHitAtk', 1.4);
+          mod.bonusPhysical += src.atk * t('fourthHitAtk', 1.8);
           // 第 4 击结构附加（N 残留专项「输出构成置换」，默认 0 = 冬眠）：
           // 把第 4 击从"随自身攻击力走"改成"随目标体量走"，验证机制层是否
           // 能替代已被 M 线证伪的数值/穿甲杠杆（机关甲 74~102 远低于
@@ -479,7 +493,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         if (tick === 0 || tick % (3 * TICK_RATE) !== 0) return;
         for (const u of members) {
           if (!u.alive) continue;
-          a.addShield(u, u, u.maxHp * t('shieldRegen', 0.02), 999);
+          a.addShield(u, u, u.maxHp * t('shieldRegen', 0.014), 999);
         }
       });
       // 荆棘：挨打就是输出 —— 纯坦阵容的正当伤害来源。
@@ -531,6 +545,15 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       u.critChance += t('crit', 0.2);
       if (tier >= 1) u.critMult += t('critMult', 0.35);
     }
+    const team = members[0].team;
+    if (tier >= 1) {
+      // 猎盾：对护盾值大于 0 的目标，攻击附带其最大生命一部分的额外物理伤害
+      // （伤害先入盾后入血，天然先打在盾上）—— 刺客流对「护盾墙」的条件化通道。
+      api.hooksOf(team).onPreAttack.push((_a, src, dst, mod) => {
+        if (!isMember(members, src) || dst.shield <= 0) return;
+        mod.bonusPhysical += dst.maxHp * t('breakerPct', 0.05);
+      });
+    }
     api.hooksOf(members[0].team).onBattleStart.push((a) => {
       // 关键设计：不立即跳。
       // 若开局瞬间跃入，刺客会在己方前排接战前独自面对 7 人集火，必死 ——
@@ -561,6 +584,25 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
           if (tier >= 1) api.addStatus(u, u, 'aspdUp', 5, t('leapAspd', 35));
           api.addStatus(u, u, 'invuln', ASSASSIN_SMOKE_DURATION, 0);
           api.fx('dashTrail', { uid: u.uid, cell: candidates[0] });
+          // 攻其不备：烟遁散去的一瞬，对落点最近的敌人发动一次突袭 ——
+          // 数值按目标体量计且不受伤害分摊（墨门兼爱分摊不及身法）。
+          // 这是刺客流对「回复/分摊墙」的条件化通道：不做它，快攻对这类
+          // 阵容是 0% 的结构判定（OAT 数值旋钮全档不可达，balance 工件库在案）。
+          if (tier >= 1) {
+            api.schedule(ASSASSIN_SMOKE_DURATION, (api2) => {
+              if (!u.alive) return;
+              const foes = api2.units.filter((x) => x.alive && x.team !== u.team);
+              if (foes.length === 0) return;
+              let mark = foes[0];
+              let best = Infinity;
+              for (const f of foes) {
+                const d = chebyshev(f.cell, u.cell);
+                if (d < best) { best = d; mark = f; }
+              }
+              api2.dealDamage(u, mark, mark.maxHp * t('openerPct', 0.12), 'physical', { source: 'trait', noShare: true });
+              api2.fx('dashTrail', { uid: u.uid, cell: mark.cell });
+            });
+          }
         }
       });
     });
