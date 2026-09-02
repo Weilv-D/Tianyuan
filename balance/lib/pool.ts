@@ -63,6 +63,10 @@ export interface ItemResult {
 
 export type PoolResult = PairResult | ItemResult;
 
+/** 单个作业的硬超时：任何 (配置,配对) 作业都不该跑超过 120s —— 超过即视为子进程
+ *  挂死（死循环 / 引擎异常空转），整池失败并给出定位信息，而不是永久等待。 */
+const JOB_TIMEOUT_MS = 120_000;
+
 const CHILD_URL = new URL('./poolChild.ts', import.meta.url);
 
 /** 默认并行度：留 2 个核给系统与父进程聚合。上限 32（更多进程只会抢内存） */
@@ -89,6 +93,10 @@ export function runPool(
 
   return new Promise((resolve, reject) => {
     const children: ChildProcess[] = [];
+    /** 正在执行作业的子进程（用于识别"作业中途退出"——code 0 的正常退出只发生在
+     *  shutdown 之后；作业未回就先退出说明子进程异常死亡，必须整池失败而不是
+     *  挂住它的队列）。 */
+    const busy = new Set<ChildProcess>();
     let settled = false;
     const killAll = (): void => {
       for (const p of children) p.kill();
@@ -117,8 +125,19 @@ export function runPool(
         return;
       }
       const { job, idx } = item;
+      busy.add(proc);
       proc.send({ type: 'job', ...job });
+      // 每作业超时：子进程若在作业中途挂死（异常退出被 exit 监听捕获 → fail；
+      // 死循环 / IPC 静默丢失则靠本定时器兜底），不让命令永久挂起。
+      const timer = setTimeout(() => {
+        if (settled) return;
+        const kind = job.kind === 'item' ? `item ${String(job.itemKey)}` : `pair ${job.configIdx} ${job.i}v${job.j}`;
+        fail(new Error(`池子作业超时（>${JOB_TIMEOUT_MS / 1000}s）：${kind}`));
+      }, JOB_TIMEOUT_MS);
+      timer.unref?.();
       proc.once('message', (msg: Record<string, unknown> & { type: string }) => {
+        clearTimeout(timer);
+        busy.delete(proc);
         if (settled) return;
         if (msg.type === 'error') {
           fail(new Error(`池子作业失败 (${String(msg.itemKey ?? msg.configIdx)} pair ${String(msg.i)}v${String(msg.j)})：${String(msg.message)}`));
@@ -153,7 +172,13 @@ export function runPool(
       children.push(proc);
       proc.on('error', fail);
       proc.on('exit', (code) => {
-        if (!settled && code !== 0 && code !== null) fail(new Error(`池子子进程异常退出（code ${code}）`));
+        if (settled) return;
+        // 作业未回就退出 = 子进程异常死亡：code 0 的正常退出只发生在 shutdown /
+        // disconnect 之后，作业中途 code 0 同样异常（如子进程自己 process.exit）。
+        // 此时若不失败，该 worker 队列上未完成作业会永远挂住 —— 见 dispatch 超时
+        if (busy.has(proc) || code !== 0) {
+          fail(new Error(`池子子进程异常退出（code ${String(code)}${busy.has(proc) ? '，作业中途' : ''}）`));
+        }
       });
       proc.once('message', (msg: { type: string }) => {
         if (msg.type !== 'ready') return;

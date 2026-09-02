@@ -79,7 +79,7 @@ balance trend                        # 7. 对比历史断面
 - 依赖方向单向：`balance/ → src/（只读）`；`src/` 永不引用 `balance/`（测试看守）。
 - 补丁只落在 fork 子进程的独立模块实例上，跑完即弃——扫描进程崩溃/泄漏不影响任何东西。
 - `scripts/check-boundaries.mjs` 只检 `src/`；vite 构建不触 `balance/`；`tsconfig` 仅做类型检查（不进产物）。
-- 代价声明：balance 工具需要 Node ≥ 22.5（node:sqlite）；游戏本体仍 `engines: node >= 22`。
+- 代价声明：`balance` 工具需要 Node ≥ 22.5（`node:sqlite`）；游戏本体的 `engines` 自 2026-09-02 起统一为 `>=22.5`（与 `.nvmrc`/CI 同口径，见 root README）。
 
 ### D4 · 平衡方法论：相对平衡与百花齐放，不是绝对平均（2026-09-02 定稿）
 

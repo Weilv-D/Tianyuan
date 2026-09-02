@@ -21,8 +21,11 @@ import { GAME_VERSION } from '../../src/version';
 import type { Overrides } from './patch';
 import type { UnitRow } from './matrix';
 
-/** 工件目录（balance/out，gitignored）—— 从模块位置推导，不依赖 cwd */
-export const OUT_DIR = resolve(dirname(fileURLToPath(new URL('.', import.meta.url))), '..', 'out');
+/** 工件目录（balance/out，gitignored）—— 从模块位置推导，不依赖 cwd。
+ *  注意必须经 dirname 的「父目录」再拼 balance：fileURLToPath(new URL('.', …))
+ *  自带尾部分隔符，直接 dirname 它会把 balance 目录本身当文件名剥掉，落到
+ *  `<repo>/out`（该路径未被 ignore、曾被整体提交入库 —— 见 2026-09-02 修复）。 */
+export const OUT_DIR = resolve(dirname(fileURLToPath(new URL('.', import.meta.url))), '..', 'balance', 'out');
 export const DB_PATH = resolve(OUT_DIR, 'balance.db');
 
 const DDL = `

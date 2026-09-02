@@ -12,7 +12,7 @@
 风格为「夜宴 · 幽冥水墨」（Night Feast）。
 
 ```
-npm ci           # 按锁文件安装依赖（Node 22+，.nvmrc 已钉死 22）
+npm ci           # 按锁文件安装依赖（Node ≥ 22.5，.nvmrc 已钉死 22.5）
 npm run dev      # 开发服务器 → http://localhost:5199
 npm test         # 核心行为测试（vitest）
 npm run build    # tsc 严格类型检查 + 生产构建 → dist/
@@ -32,11 +32,14 @@ npm run qa       # 交付门禁：类型 + 架构边界 + 核心行为 + 生产�
 | `百战天元-<版本>-web.zip` | 上述两者 + 使用说明 + 第三方授权清单，分发归档 |
 
 要点：单文件形态无任何外链（发布脚本内置体检，`data:` 内联之外的相对路径、
-绝对 URL、`blob:` 一律判失败）；相对路径 `base './'`，任意子目录托管可用。
-发布工具链跨平台（Node zip，Windows/macOS/Linux 一致）。存档保存在**玩家本机浏览器**
-的 localStorage：普通对局与每日挑战**分键存取**（`inkarena.save.v3` /
-`inkarena.save.v3.daily`），互不覆盖——玩每日挑战不会动普通进度，任一模式终局或
-放弃只清本模式存档；音乐在窗口失焦时自动静音，回到前台恢复。
+绝对 URL、`blob:` 一律判失败 —— 属性写法、CSS `url()`、`@import` 全覆盖）；
+相对路径 `base './'`，任意子目录托管可用。发布工具链跨平台（Node zip，
+Windows/macOS/Linux 一致）。存档保存在**玩家本机浏览器**的 localStorage：
+普通对局与每日挑战**分键存取**（`inkarena.save.v3` / `inkarena.save.v3.daily`），
+互不覆盖——玩每日挑战不会动普通进度，任一模式终局或放弃只清本模式存档；
+损坏的存档键（配额半截写入 / 手动改坏 / 旧版本残留）在「继续」入口判定与
+读档时都会被自动清理并判无存档（有 v2 旧档仍会走无损迁移），不会把入口
+误点亮成"继续"；音乐在窗口失焦时自动静音，回到前台恢复。
 
 > 开发模式下 `window.__arena` 暴露 Phaser 实例；`window.__qa` 采集 console 的
 > 报错与警告（只抄不吞，原始 console 行为不变）；`window.__tftAudio`（仅 dev）
@@ -111,12 +114,14 @@ src/
 数值不靠感觉，全部走「迭代式调参 + 统计反馈」。工具链 2026-09-02 重建为
 **`npm run balance -- <command>`**（[balance/](./balance/README.md)：fork 进程池并行
 + SQLite 工件库 + CRN 配对统计；目标函数是**相对平衡与百花齐放**——阵容带
-[44,58] + 边带 [20,80]，不是压平极差）。四维分析全覆盖：
+[44,58] + 边带 [20,80]，不是压平极差）。实验工件落在 `balance/out/balance.db`
+（gitignored；`trend` 跨版本断面、`units`/`items`/`traits` 维分析都从库读数）。
+四维分析全覆盖：
 
 | 命令 | 维度 | 回答什么问题 |
 |---|---|---|
 | `matrix` | 阵容 | 九套预设对拍矩阵（双向平均）、阵容带/边带越带读数、超时率，入库 |
-| `sweep` / `ab` | 阵容 | 参数灵敏度扫描（CRN 配对消噪）/ 克制边定向 A/B（`--set` 值校验与缺 `=` 守卫） |
+| `sweep` / `ab` | 阵容 | 参数灵敏度扫描（CRN 配对消噪）/ 克制边定向 A/B（`--set` 值校验与缺 `=` 守卫、路径预检进池前完成） |
 | `units` | 棋子 | 逐单位场均伤害/承伤/类型构成/施法/生存率榜单 |
 | `traits` | 羁绊 | 每条羁绊压制归零 vs 基线的边际胜率贡献 |
 | `items` | 装备 | 单件边际 / 合成正收益 / 同件堆叠递减 / 异件协同有界（logit 口径） |
@@ -124,7 +129,9 @@ src/
 | `match` / `shop` / `gold` / `bigorigins` / `legend` | — | 局长与 AI 极差 / 商店概率与刷店成本（覆盖进真源） / 造价带 / 大羁绊天花板 / 天命专项 |
 | `npm run check:boundaries` | — | 架构边界：越层依赖 / 浏览器 API / 非确定性随机源，名单外引用即失败 |
 
-旧 `sim:*` 命令名保留为别名，历史工作流不断层。进程池对非预期 IPC 消息重分发、进度回调异常隔离；工件库启用外键与缺口显式校验。
+旧 `sim:*` 命令名保留为别名，历史工作流不断层。进程池对单作业设有硬超时与
+「作业中途子进程退出」整池失败兜底（任何情况下命令不永久挂起）；工件库启用
+外键与缺口显式校验，`sweep` 的覆盖路径在派发前一次性预检。
 
 当前平衡断面、先手偏差、克制边和局长数据见
 **[docs/DESIGN.md](./docs/DESIGN.md)**（§十二 当前平衡数据），质量验收见 **[docs/QA.md](./docs/QA.md)**。
@@ -138,6 +145,7 @@ src/
 | Vite 5 | 秒级冷启动；应用代码与 Phaser 独立分包 |
 | Vitest | 风险驱动的核心行为防线：战斗、资产、进度与交互 |
 | 轻素材管线 | 纸纹、颗粒、图标、音效全部程序化；立绘 64 张 / 小篆子集 / CC0 音乐三源入库，`?url` 导入自动适配双形态 |
+| Node ≥ 22.5 | 平衡工具链经 `node:sqlite` 零新依赖持久化工件（`engines`/`.nvmrc`/CI 同口径） |
 | DPR 渲染底座 | 画布缓冲 = 1920×1080 × K（K=min(dpr,2)），相机 zoom=K 锚点居中 —— 高分屏 1 逻辑 px = 1 设备 px；指针坐标经 screenToWorld 咽喉换算，高分屏拖拽/命中零偏移 |
 
 ## 视觉方向
@@ -164,11 +172,10 @@ src/
 全部工程文档集中到 **[docs/](./docs/)**，导航与文档间关系见 **[docs/README.md](./docs/README.md)**：
 
 - **[DESIGN.md](./docs/DESIGN.md)** —— 设计说明书：核心循环、经济、羁绊与克制环、装备、
-  战斗内核契约、AI、平衡方法论与当前数据（墨兽/奇遇真源表与 Node 22 工件库口径同步）
+  战斗内核契约、AI、平衡方法论与当前数据（墨兽/奇遇真源表与 Node 22.5 工件库口径同步）
 - **[DEVELOPMENT.md](./docs/DEVELOPMENT.md)** —— 开发全流程：需求、边界、实现、验证、提交、同步与回退
 - **[QA.md](./docs/QA.md)** —— 质量规范：风险分层、门禁、专项验证与通过标准（CI Node 22，`balance` 需 SQLite）
 - **[ART_BIBLE.md](./docs/ART_BIBLE.md)** —— 美术圣经：色板、字体、立绘与徽章体系、特效与 UI 规范
 - **[VERSIONING.md](./docs/VERSIONING.md)** —— 版本号、CHANGELOG、正式发布与版本回退
 - **[CHANGELOG.md](./docs/CHANGELOG.md)** —— 更新日志（1.0.0 起按版本归档）
 - **[UPGRADE.md](./docs/UPGRADE.md)** —— 五阶段重构升级计划（v3，执行归档）
-

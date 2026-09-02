@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { noiseBand, runConfigs, type MatrixConfig } from '../lib/matrix';
-import { readCurrent, type Overrides } from '../lib/patch';
+import { Patcher, readCurrent, type Overrides } from '../lib/patch';
 import { defaultWorkers } from '../lib/pool';
 import { edgeStats, printDeltaReport, printSlopes, shortName } from '../lib/report';
 import { DEFAULT_SEED_BASE } from '../lib/seeds';
@@ -81,6 +81,20 @@ export async function run(argv: string[]): Promise<void> {
   }
   if (spec.single && Object.keys(spec.single).length > 0) {
     configs.push({ label: Object.entries(spec.single).map(([k, v]) => `${k}=${v}`).join(' '), overrides: spec.single });
+  }
+
+  // 覆盖路径预检：spec / --set 里的非法路径（未知棋子、不存在字段）在进池子之前
+  // 一次性暴露 —— 否则坏路径要等该配置的第一个作业在子进程里才抛，前面若干配置
+  // 的算力全部白费，报错上下文也更差。probe 的顺序 apply + reset 只验证不落补丁。
+  {
+    const probe = new Patcher();
+    try {
+      for (const c of configs) {
+        if (Object.keys(c.overrides).length > 0) probe.apply(c.overrides);
+      }
+    } finally {
+      probe.reset();
+    }
   }
 
   console.log(`═════════ 百战天元 · 数值灵敏度扫描 ═════════`);

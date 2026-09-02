@@ -15,7 +15,7 @@ import { motion } from '../render/view/motion';
 import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/board/silhouetteFactory';
 import { traitIconKey } from '../render/board/traitIcons';
 import { itemIconKey } from '../render/board/itemIcons';
-import { FONT, RADIUS, Button, clipToWidth } from './kit';
+import { FONT, RADIUS, Button, clipToWidth, ensurePlaceholderTex } from './kit';
 import { bakedTexture } from '../render/view/bake';
 import { portraitItemSlotRect } from '../render/view/hudLayout';
 import { DETAIL_SELL_BAND } from '../render/view/layout';
@@ -80,7 +80,7 @@ export class UnitPortrait extends Phaser.GameObjects.Container {
     // 底框、星级光环、实星全是"画一次就不变"的东西。
     // 原实现每个棋子卡 3 个 Graphics ≈ 310 条命令，屏上满编就是几千条，
     // 而它们只在买子 / 升星时才变。烤成纹理后每帧成本归零。
-    this.chrome = scene.add.image(-CHROME_PAD, -CHROME_PAD, '__chrome').setOrigin(0).setVisible(false);
+    this.chrome = scene.add.image(-CHROME_PAD, -CHROME_PAD, ensurePlaceholderTex(scene, '__chrome')).setOrigin(0).setVisible(false);
     this.bg = scene.add.graphics();
     this.sil = scene.add.image(size / 2, size, '').setVisible(false);
     this.starRow = scene.add.container(0, 0);
@@ -249,7 +249,7 @@ export class ShopCard extends Phaser.GameObjects.Container {
     this.cardW = w;
     this.cardH = h;
     this.baseY = y;
-    this.bg = scene.add.image(-1, -1, '__shop').setOrigin(0);
+    this.bg = scene.add.image(-1, -1, ensurePlaceholderTex(scene, '__shop')).setOrigin(0);
     this.sil = scene.add.image(w / 2, h - 70, '').setVisible(false);
     // 底部信息带只留决策三行：名 / 羁绊 / 价 —— 品阶由底框色表达，称号是冗余文字。
     // 三行统一 origin(0.5,1) 底对齐、行间净距 3px、卡底留 6px：origin(0,0) 顶锚
@@ -474,7 +474,7 @@ export class TraitRow extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number, w: number) {
     super(scene, x, y);
     this.cardW = w;
-    this.bg = scene.add.image(0, 0, '__trow').setOrigin(0);
+    this.bg = scene.add.image(0, 0, ensurePlaceholderTex(scene, '__trow')).setOrigin(0);
     this.icon = scene.add.image(23, 21, '').setVisible(false).setDisplaySize(30, 30);
     this.nameText = scene.add.text(46, 4, '', { fontFamily: FONT.title, fontSize: '14px', color: css(PAPER[100]), letterSpacing: 1 }).setOrigin(0, 0);
     this.countText = scene.add.text(w - 8, 5, '', { fontFamily: FONT.num, fontSize: '12px', color: css(GILT.base) }).setOrigin(1, 0);
@@ -574,7 +574,7 @@ export class UnitDetailCard {
 
   constructor(scene: Phaser.Scene, w: number) {
     this.container = scene.add.container(-999, -999).setDepth(400).setVisible(false);
-    this.bg = scene.add.image(0, 0, '__dcard').setOrigin(0);
+    this.bg = scene.add.image(0, 0, ensurePlaceholderTex(scene, '__dcard')).setOrigin(0);
     this.container.add(this.bg);
 
     this.nameT = scene.add.text(14, 12, '', { fontFamily: FONT.title, fontSize: '22px', color: css(PAPER[100]) }).setOrigin(0, 0);
@@ -598,7 +598,7 @@ export class UnitDetailCard {
     }
     this.itemsRow.add(slotFrames);
     for (let i = 0; i < 3; i++) {
-      const img = scene.add.image(i * SLOT_PITCH + 1, 1, '__DEFAULT').setOrigin(0, 0).setVisible(false);
+      const img = scene.add.image(i * SLOT_PITCH + 1, 1, ensurePlaceholderTex(scene, '__DEFAULT')).setOrigin(0, 0).setVisible(false);
       img.setDisplaySize(SLOT_ICON, SLOT_ICON);
       // 命中取整槽（26px 框），指针进入即弹提示卡
       img.setInteractive(new Phaser.Geom.Rectangle(-1, -1, SLOT_SIZE, SLOT_SIZE), Phaser.Geom.Rectangle.Contains);

@@ -24,6 +24,7 @@ const args = process.argv.slice(2);
 const nTrials = Number(args.find((a) => a.startsWith('--n='))?.slice(4) ?? 8000);
 if (!Number.isInteger(nTrials) || nTrials <= 0) throw new Error(`--n 必须是正整数，收到 ${nTrials}`);
 let table: readonly (readonly number[])[] = SHOP_ODDS;
+let overridden = false;
 for (const a of args) {
   const m = /^--t(\d)=(.+)$/.exec(a);
   if (m) {
@@ -33,13 +34,17 @@ for (const a of args) {
       throw new Error(`行格式错误（需要 5 个非负数且合计 100）：${a}`);
     }
     table = table.map((r, i) => (i === lv - 1 ? row : r));
+    overridden = true;
   }
 }
-// 覆盖打进运行时真源，rollShop 才会读到候选表（只影响本进程）。
-// 用 structuredClone 深拷贝表体后再按索引覆盖，避免直接改写只读元组的潜在共享
-// 风险由进程边界隔离，保证跨测试并行不交叉污染。
-const mutable = SHOP_ODDS as (readonly number[])[];
-for (let i = 0; i < table.length; i++) mutable[i] = table[i];
+// 覆盖打进运行时真源，rollShop 才会读到候选表（只影响本进程）。无 --t 覆盖时
+// 不写任何东西 —— SHOP_ODDS 元组只读，逐行自我覆盖既无意义也无必要。
+if (overridden) {
+  const mutable = SHOP_ODDS as (readonly number[])[];
+  for (let i = 0; i < table.length; i++) {
+    if (table[i] !== SHOP_ODDS[i]) mutable[i] = table[i];
+  }
+}
 console.log(`试验 ${nTrials} 次/场景`);
 console.log(`概率表：L3 ${table[2].join('/')} · L4 ${table[3].join('/')} · L7 ${table[6].join('/')} · L8 ${table[7].join('/')} · L9 ${table[8].join('/')}\n`);
 

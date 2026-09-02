@@ -75,6 +75,38 @@ describe('本地存档', () => {
     expect(loadMatch()).toBeNull();
   });
 
+  it('损坏键不点亮"继续"入口，且读档/判档都会清理坏键（自愈）', () => {
+    // 半截载荷（配额写中断）：JSON 合法但缺骨架字段
+    localStorage.setItem(DAILY_KEY, JSON.stringify({ v: 3, savedAt: 1, data: { players: [], round: 1 } }));
+    expect(hasSave('daily')).toBe(false);
+    // hasSave 判定失败即清键，坏键不残留
+    expect(localStorage.getItem(DAILY_KEY)).toBeNull();
+
+    // 语法坏档：loadMatch 清理后入口消失（每日档无 v2 兜底，必须自愈）
+    localStorage.setItem(DAILY_KEY, '{broken');
+    expect(loadMatch('daily')).toBeNull();
+    expect(localStorage.getItem(DAILY_KEY)).toBeNull();
+    expect(hasSave('daily')).toBe(false);
+  });
+
+  it('普通档坏键清理后不波及可用的 v2 旧档（读档仍可迁移）', () => {
+    const data = { ...playedMatch().toJSON() } as Record<string, unknown>;
+    delete data.mode;
+    delete data.battleSnapshots;
+    localStorage.setItem(LEGACY_KEY, JSON.stringify({ v: 2, savedAt: 1, data }));
+    localStorage.setItem(SAVE_KEY, '{broken');
+
+    // hasSave 清理坏 v3 键，但 v2 旧档仍在 → "继续"仍亮
+    expect(hasSave()).toBe(true);
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+    // loadMatch 走 v2 迁移路径，正常恢复
+    const loaded = loadMatch();
+    expect(loaded?.mode).toBe('normal');
+    expect(loaded?.round).toBe(data.round);
+    expect(localStorage.getItem(SAVE_KEY)).not.toBeNull();
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+  });
+
   it('清除存档后继续入口消失', () => {
     saveMatch(playedMatch());
     expect(hasSave('daily')).toBe(true);

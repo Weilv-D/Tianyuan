@@ -100,17 +100,20 @@ run(process.execPath, [
 ]);
 
 // 产物体检：单文件不得残留任何外链资源（src=/href= 指向文件的引用，
-// 单双引号都查；再扫 CSS url() 与 srcset —— 漏一种写法就漏一类资源）。
-// 白名单只保留 data: 内联 —— https:/http:/blob:/相对路径全算外链；
+// 单双引号与无引号属性都查；再扫 CSS url() 与 @import —— 漏一种写法就漏一类
+// 资源）。白名单只保留 data: 内联 —— https:/http:/blob:/相对路径全算外链；
 // 此前 https: 被列入豁免，残留 CDN 引用也能过检，门禁形同虚设。
 // （已对现行产物验证零误报：data: 之外零命中。）
+const urlAttr = (attr) => `${attr}\\s*=\\s*(?:"(?!data:)[^"]*"|'(?!data:)[^']*'|(?!data:)[^\\s"'<>]+)`;
 const external = [
-  html.match(/<(script|link|img|audio|source|video|track)[^>]+(src|href|srcset)\s*=\s*"(?!data:)[^"]+"/gi) ?? [],
-  html.match(/<(script|link|img|audio|source|video|track)[^>]+(src|href|srcset)\s*=\s*'(?!data:)[^']+'/gi) ?? [],
+  html.match(new RegExp(`<(script|link|img|audio|source|video|track|iframe|input|use|image)[^>]*?(?:${urlAttr('src')}|${urlAttr('href')}|${urlAttr('poster')}|${urlAttr('srcset')})`, 'gi')) ?? [],
   // url() 只认小写（打包器产出的 CSS 恒为小写）、内容含路径特征（. 或 /），
   // 且排除 JS 拼接特征（+ $ {）—— 宽松版会被压缩 JS 的 URL(i)/URL(Q) 与
   // url("+this.src+') 之类动态串误杀（实测分别 27 处与 1 处）
   html.match(/url\(\s*['"]?(?!data:)[^)'"+${}]*[./][^)'"+${}]*['"]?\s*\)/g) ?? [],
+  // CSS @import：外链样式表的另一种入口（打包器产出内联 <style> 后 Vite 不会
+  // 生成 @import，但门禁该查的一律查）
+  html.match(/@import\s+(?!url\(data:)[^;]+/gi) ?? [],
 ].flat();
 if (external.length) {
   console.error('✗ 单文件仍引用外部资源：', external);

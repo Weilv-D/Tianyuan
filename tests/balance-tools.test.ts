@@ -20,7 +20,7 @@ import { pairSeed, DEFAULT_SEED_BASE, pairIndex } from '../balance/lib/seeds';
 import { runPair, pairedItemsDelta } from '../balance/lib/engine';
 import { runConfigs } from '../balance/lib/matrix';
 import { PRESET_COMPS } from '../src/game/comp';
-import { Store } from '../balance/lib/store';
+import { OUT_DIR, Store } from '../balance/lib/store';
 
 describe('补丁层（patch.ts）', () => {
   it('apply → 读数可见 → reset 逆序还原（面板/技能/羁绊/机制四类路径）', () => {
@@ -118,6 +118,21 @@ describe('进程池（pool.ts）', () => {
 });
 
 describe('工件库（store.ts，:memory:）', () => {
+  it('工件目录钉在 gitignored 的 balance/out/（曾落到库内 out/ 被整体提交）', async () => {
+    // OUT_DIR 推导若经错 dirname 会落到 <repo>/out —— 该路径不被 ignore、
+    // 曾被整体入库（2026-09-02 修复）。金锁用可移植的 URL 语义：相对
+    // balance/lib 模块位置再拼 out/，跨平台不依赖 cwd。
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, resolve } = await import('node:path');
+    const storeUrl = new URL('../balance/lib/', import.meta.url);
+    const expected = resolve(dirname(fileURLToPath(storeUrl)), 'out');
+    expect(OUT_DIR).toBe(expected);
+    // balance/ 目录在 <repo> 根层下有同名兄弟 out/ —— 断言落点真的在
+    // balance 子目录之下，而不是根层的 out/（曾被入库的那个）
+    const parts = OUT_DIR.split(/[\\/]/);
+    expect(parts).toContain('balance');
+  });
+
   it('run/config/pair/unit/item/trait 全链写读一致', () => {
     const store = new Store(':memory:');
     try {

@@ -38,6 +38,25 @@ export const RADIUS = 0; // 直角体系：圆角在 main.ts 的 Graphics 接管
 export const GRID = 4;
 
 /**
+ * 惰性烘焙占位纹理：控件构造期 add.image 需要引用一个已注册的键，真实纹理
+ * 在同一帧的 redraw / setTexture 里换入（换入前不可见）。占位键若不先烘焙，
+ * Phaser 会对每个缺失键刷一条 Missing texture 警告 —— 面板实例一多就是几十条
+ * 启动噪音。1×1 透明即可，键在场景纹理管理器上只会烘焙一次。返回 key 便于
+ * 直接内联进 add.image。
+ */
+export function ensurePlaceholderTex(scene: Phaser.Scene, key: string): string {
+  const tm = scene.textures;
+  if (!tm.exists(key)) {
+    const g = scene.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0x000000, 0);
+    g.fillRect(0, 0, 1, 1);
+    g.generateTexture(key, 1, 1);
+    g.destroy();
+  }
+  return key;
+}
+
+/**
  * 界格角饰 —— 本体系的"圆角替代品"。
  * 四角短线像漆盘木胎的界格钉，直角由此获得装饰性而不显生硬。
  */
@@ -158,8 +177,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.variant = opts.variant ?? 'ghost';
     this.disabled = opts.disabled ?? false;
 
-    this.bg = scene.add.image(-1, -1, '__btn').setOrigin(0);
-    this.label = scene.add
+    this.bg = scene.add.image(-1, -1, ensurePlaceholderTex(scene, '__btn')).setOrigin(0);    this.label = scene.add
       .text(this.btnW / 2, this.btnH / 2, text, {
         fontFamily: FONT.title,
         fontSize: `${opts.fontSize ?? 14}px`,

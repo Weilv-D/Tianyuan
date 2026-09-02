@@ -52,7 +52,20 @@ function loadData(raw: string, expectV: number): ReturnType<Match['toJSON']> | n
 
 export function hasSave(mode: Match['mode'] = 'normal'): boolean {
   try {
-    if (localStorage.getItem(KEY_BY_MODE[mode]) !== null) return true;
+    if (localStorage.getItem(KEY_BY_MODE[mode]) !== null) {
+      // 键存在不等于有可用存档：配额半截写入 / 手动改坏 / 旧版本残留的损坏载荷
+      // 会让"继续"常亮，点进去却被 loadMatch 判空 —— 入口必须与读档同口径
+      //（loadData 校验）。损坏键在此一并清除，避免每次都走"判定失败"路径。
+      const raw = localStorage.getItem(KEY_BY_MODE[mode]) ?? '';
+      if (loadData(raw, 3)) return true;
+      try {
+        localStorage.removeItem(KEY_BY_MODE[mode]);
+      } catch {
+        /* 清不掉也照常判无存档 */
+      }
+      // v3 键损坏但普通档仍有 v2 旧档可迁移 → "继续"仍亮（与 loadMatch 兜底同口径）
+      return mode === 'normal' && localStorage.getItem(LEGACY_KEY) !== null;
+    }
     // 只有 v2 旧档也算普通档有存档：读档时会被迁移，"继续"按钮必须亮
     return mode === 'normal' && localStorage.getItem(LEGACY_KEY) !== null;
   } catch {
@@ -86,7 +99,14 @@ export function loadMatch(mode: Match['mode'] = 'normal'): Match | null {
     if (raw) {
       const data = loadData(raw, 3);
       if (data) return Match.fromJSON(data);
-      // 键存在但损坏：不急着判负，继续尝试旧键兜底（仅普通档有旧键）
+      // 键存在但损坏：普通档继续尝试旧键兜底，但损坏的 v3 键不能再残留 ——
+      // 否则"继续"入口会被它长期误导（hasSave 判定失败后同样清理，双口径一致）。
+      // 每日档无旧键可兜底：清掉坏键即自愈，下次开局从干净状态走。
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* 清不掉也无害：hasSave 会与读档同口径判无存档 */
+      }
     }
     if (mode !== 'normal') return null;
     // ── 普通档缺失（或损坏）→ 读 v2 旧档做迁移 ──

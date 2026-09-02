@@ -2,6 +2,7 @@
 import Phaser from 'phaser';
 import { CHAMPIONS } from '../../data/champions';
 import { PLAYER_START_HP } from '../../core/config';
+import { MAX_ITEMS_PER_UNIT } from '../../game/inventory';
 import { newIid, resolveMerges } from '../../game/state';
 import type { Star } from '../../core/types';
 import { FONT, Button } from '../../ui/kit';
@@ -98,7 +99,22 @@ export class DebugConsole {
         } else this.scene.showToast('合成异常', true);
         break;
       }
-      case 'items': if (p.bench.some((x) => x)) { for (const slot of p.bench) if (slot) slot.items = ['xuanjia', 'moren', 'lingzhu', 'yunlv', 'xueyu', 'fafu']; } else p.items.push(...['xuanjia', 'moren', 'lingzhu']); break;
+      case 'items': {
+        // 满袋调试：整袋 6 件在备战席与器匣间按装备上限分发 —— 此前无视
+        // MAX_ITEMS_PER_UNIT 一次塞 6 件/人，超出部分在装备三格槽外不可见，
+        // 卖出时 stripItems 会把超出部分全量拆回器匣、静默撑爆 10 格上限。
+        const bag = ['xuanjia', 'moren', 'lingzhu', 'yunlv', 'xueyu', 'fafu'];
+        let given = 0;
+        for (const slot of p.bench) {
+          if (!slot) continue;
+          const n = Math.min(MAX_ITEMS_PER_UNIT, bag.length - given);
+          if (n <= 0) break;
+          slot.items.push(...bag.slice(given, given + n));
+          given += n;
+        }
+        p.items.push(...bag.slice(given));
+        break;
+      }
       case 'skip': void this.scene.fastForward(); break;
       case 'reset': p.board.fill(null); p.bench.fill(null); p.items.length = 0; break;
       default: break;
