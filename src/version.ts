@@ -8,7 +8,7 @@
  */
 
 /** 游戏语义版本（与 package.json 的 version 字段保持一致） */
-export const GAME_VERSION = '1.14.1';
+export const GAME_VERSION = '1.14.2';
 
 /** 构建日期戳（对齐 M2 锁版日，随手改版本号一起更新） */
 export const GAME_BUILD = '2026-09-02';
