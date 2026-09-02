@@ -1,20 +1,17 @@
 /**
  * 数值补丁层 —— 扫描框架的写入面（原 scripts/lib/patch.ts 原样迁入）。
  *
- * 路径语法（五类，全部指向"已存在的数字字段"，禁止凭空造字段）：
+ * 路径语法（六类，全部指向"已存在的数字字段"，禁止凭空造字段）：
  *   cfg.<字段>                    机制软化常量（core/config.ts 的 MECH / MATCH_TUNING 字段）
  *   legend.<字段>                 天命包数值（core/config.ts 的 LEGEND_T3 数字字段）
  *   champ.<defId>.base.<field>    基础面板：hp/atk/sp/armor/mr/aspd/range/moveTime/startMp/maxMp/critChance/critMult
  *   champ.<defId>.skill.<param>   技能参数：skillSpec.params 里的数字键（如 atk、value、radius）
  *   trait.<id>.scale              整条羁绊等比缩放
- *   trait.<id>.<key>              羁绊单点覆盖（key 对应 core/traits.ts 里 tune() 的键名）
- *
- * 每次写入都记进撤销日志，reset() 逆序恢复 —— 同一进程里可以安全地
- * 「打补丁 → 跑一组战斗 → 还原 → 打下一组」。进程池模式下每个子进程
- * 各持独立模块实例，补丁互不可见（隔离比共享进程更彻底）。
+ *   trait.<id>.<key>              羁绊单点覆盖（key 必须是 tuning.ts TRAIT_TUNE_KEYS 登记键，
+ *                                 与 core/traits.ts 里 tune() 的读取键同源 —— 拼错当场报错）
  */
 import { CHAMPION_BY_ID } from '../../src/data/champions';
-import { resetTuning, TRAIT_TUNING, TRAIT_TUNING_KEYS } from '../../src/data/tuning';
+import { resetTuning, TRAIT_TUNING, TRAIT_TUNING_KEYS, TRAIT_TUNE_KEYS } from '../../src/data/tuning';
 import { LEGEND_T3, MATCH_TUNING, MECH } from '../../src/core/config';
 
 export type Overrides = Record<string, number>;
@@ -87,14 +84,21 @@ export class Patcher {
     if (kind === 'trait') {
       if (rest === 'scale') {
         setNumber(TRAIT_TUNING as unknown as Record<string, unknown>, id, value, path, this.journal, true);
+        return;
+      }
+      // 单点覆盖只允许 traits.ts 里实际存在、经 tune() 读取的键 ——
+      // 拼写错误（trait.momen.amor）必须当场抛错，而不是静默造键让扫描结果失真
+      const known = TRAIT_TUNE_KEYS[id];
+      if (!known) throw new Error(`未知的羁绊 id：${id}（${path}；可调羁绊见 tuning.ts TRAIT_TUNE_KEYS）`);
+      if (!known.includes(rest)) {
+        throw new Error(`羁绊 ${id} 没有可调键 ${rest}（${path}；可选键：${known.join(' / ')}）`);
+      }
+      const bucket = (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] as Record<string, number> | undefined;
+      if (!bucket) {
+        (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] = { [rest]: value };
+        this.journal.push({ obj: TRAIT_TUNING_KEYS as unknown as Record<string, unknown>, key: id, had: false, prev: undefined });
       } else {
-        const bucket = (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] as Record<string, number> | undefined;
-        if (!bucket) {
-          (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] = { [rest]: value };
-          this.journal.push({ obj: TRAIT_TUNING_KEYS as unknown as Record<string, unknown>, key: id, had: false, prev: undefined });
-        } else {
-          setNumber(bucket as unknown as Record<string, unknown>, rest, value, path, this.journal, true);
-        }
+        setNumber(bucket as unknown as Record<string, unknown>, rest, value, path, this.journal);
       }
       return;
     }

@@ -124,6 +124,15 @@ const external = [
   // 的第三种外链形态 —— Vite 不会内联动态 import 的远程目标，漏检会让单文件
   // 在离线时静默失效（modulepreload 补丁已在上面剔除）
   scanSource.match(/\b(?:import|fetch)\s*\(\s*["'`]https?:/gi) ?? [],
+  // 运行期生成 blob 资源的调用（URL.createObjectURL / revokeObjectURL）：
+  // 属"未来代码形态"的外链，但 Phaser 引擎内联实现必然含这些调用（视频/纹理的
+  // MediaStream/FileReader blob 是本地生成资源，非网络外链，离线单文件照常工作）。
+  // 此处只拦业务代码里的 createObjectURL 调用 —— 引擎内联的四字面量 createObjectURL(
+  // 属合法 blob 资源生成，豁免；1.15.2 产物实测 4 处全部落在引擎内联形态。
+  scanSource.match(/(?<!URL\.)createObjectURL\s*\(/gi) ?? [], // 非引擎前缀的调用
+  // 纯字面量 blob: / javascript: 协议引用：Phaser 引擎的判断形态（url.indexOf("blob:")、
+  // 正则 ^(?:blob:|data:) 等）是协议识别而非外链，豁免；其余字面量才拦
+  scanSource.match(/["'`](?:blob|javascript):(?![\w-]+\/)[^"'`]*["'`]/gi) ?? [],
 ].flat();
 if (external.length) {
   console.error('✗ 单文件仍引用外部资源：', external);

@@ -60,10 +60,15 @@ export async function preloadSealFont(): Promise<void> {
   sealLoaded = true;
   try {
     const face = new FontFace(SEAL_FONT, `url(${sealFontUrl})`);
+    // 回落定时器持句柄：字体先胜即清掉，不让 3s 空转（与 aiBake/itemIcons 同款成对清理）
+    let timer = 0;
     const ok = await Promise.race([
       face.load().then(() => true),
-      new Promise<false>((resolve) => setTimeout(() => resolve(false), 3000)),
+      new Promise<false>((resolve) => {
+        timer = window.setTimeout(() => resolve(false), 3000);
+      }),
     ]);
+    window.clearTimeout(timer);
     if (ok) document.fonts.add(face);
     else console.warn('[百战天元] 篆体字库载入超时，羁绊徽章回退楷体');
   } catch {

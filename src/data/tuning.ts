@@ -15,6 +15,38 @@ export const TRAIT_TUNING: Record<string, number> = {};
 /** 单点覆盖：羁绊 id → 数字键 → 绝对值 */
 export const TRAIT_TUNING_KEYS: Record<string, Record<string, number>> = {};
 
+/**
+ * 可调键权威表：羁绊 id → 该羁绊全部可调键名。
+ *
+ * 来源 = `core/traits.ts` 各 `tuner(id)` 段里的全部 `t('key', …)` 字面量，
+ * 与实现严格同源（补丁层按此白名单拒绝拼写错误；运行时只用于校验，不参与取值）。
+ * 新增一个可调量时，`traits.ts` 里加 `t('key', …)` 后必须同步登记在这里。
+ */
+export const TRAIT_TUNE_KEYS: Record<string, readonly string[]> = {
+  tian: ['shield0', 'shield1', 'novaSp'],
+  youming: ['reviveHp', 'reviveFragilePct', 'reviveFragileDur', 'reviveAspd', 'deathHeal'],
+  shanhai: ['bleed0', 'bleed1', 'wound'],
+  jianzong: ['crit', 'critMult', 'armorPen', 'penBase', 'penStep', 'penCap', 'killMana'],
+  yaozu: ['transformHeal', 'transformDr', 'transformAtk', 'transformAspd', 'transformAt', 'vamp0', 'vamp1'],
+  momen: ['drLow', 'drHigh', 'hpUp', 'teamDr', 'regen', 'sharePct'],
+  bingjia: ['teamAtk', 'teamAspd', 'growAtk', 'growAspd', 'atkUp', 'siegeAtk', 'siegeArmor'],
+  jiguan: [
+    'armor', 'pen', 'stackAspd', 'tickAspd', 'fourthHitAtk', 'fourthHitCrush', 'fourthHitGiant',
+    'gangAtk', 'gangWindow', 'gangTargetT2', 'gangMinArmor', 'constructMr', 'thornResist',
+  ],
+  danding: ['manaPerSec', 'regen'],
+  longyuan: ['skillAmp', 'spFlat', 'spellChargeSp', 'teamAmp', 'teamSp'],
+  warrior: ['physDr', 'stackAtk'],
+  guardian: [
+    'allyShield', 'shieldRegen', 'thornsArmorRatio', 't2ThornsHpPct', 't2ArmorCut', 't2HpGain', 'guard6Atk',
+  ],
+  assassin: ['crit', 'critMult', 'breakerPct', 'openerPct', 'leapAspd'],
+  marksman: ['critMult', 'atk'],
+  mage: ['shield', 'shield2', 'shred', 'splash', 'teamAmp', 'teamAmp2', 'teamSp', 'teamSp2'],
+  warlock: ['true0', 'true1', 'wound'],
+  support: ['healAmp', 'shieldAmp', 'regen', 'deathAspd'],
+};
+
 /** 查一个羁绊数字。key 不在表里时用默认值（可再乘整条缩放）。 */
 export function tune(id: string, key: string, def: number): number {
   const keys = TRAIT_TUNING_KEYS[id];
