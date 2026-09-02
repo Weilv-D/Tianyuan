@@ -474,9 +474,14 @@ export class GameScene extends Phaser.Scene {
       this.showToast('没有可撤销的操作', true);
       return;
     }
-    // 整份快照对称回滚：金币、等级/经验、棋子与装备、商店、器匣、卡池计数、随机流游标
+    // 整份快照对称回滚：金币、等级/经验、棋子与装备、商店、器匣、卡池计数、随机流游标，
+    // 以及本回合尚未领取/已领取后待还原的奇遇恩赐
     restorePlayer(this.match.human, this.match.pool, e.snap);
+    this.match.adventureOffer = e.snap.adventureOffer;
     this.match.rng.state = e.rngState;
+    // 恩赐面板的"本回合已择"记忆随撤销失效：撤销到领赐前快照后 offer 已还原，
+    // 面板必须重开，否则还原的恩赐没有领取入口（resolvedRound 守卫会拦掉重开）
+    this.adventure.resetResolved();
     audio.play('ui');
     this.showToast(`已撤销：${e.label}`);
     this.afterAction();
@@ -486,7 +491,14 @@ export class GameScene extends Phaser.Scene {
     // 撤销快照 scope=准备阶段（见 undo.ts 文件头）：结算期间入栈的快照
     // 一旦被 Ctrl+Z 消费会把已结算的血量/连胜盖回战前值 —— 在入口拦死
     if (this.phase !== 'prep' || this.busy) return;
-    this.undoStack.push({ snap: snapshotPlayer(this.match.human, this.match.pool), label, rngState: this.match.rng.state });
+    // 奇遇恩赐与玩家状态一并入快照：领取发生在准备阶段，撤销到领赐前快照
+    // 时必须把 offer 还原（否则恩赐永久蒸发），否则同一回合「领完再撤销」后
+    // 面板不会重开 —— 见 undo.ts 的 PlayerSnapshot.adventureOffer 注释
+    this.undoStack.push({
+      snap: snapshotPlayer(this.match.human, this.match.pool, this.match.adventureOffer),
+      label,
+      rngState: this.match.rng.state,
+    });
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
   }
 

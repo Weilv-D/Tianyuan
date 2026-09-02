@@ -38,6 +38,7 @@
  */
 import type { Rng } from '../core/rng';
 import { ITEMS } from '../data/items';
+import { sellRefundFor } from './state';
 
 export type AdventureKind = 'item' | 'gold' | 'xp' | 'components' | 'level' | 'reinforce';
 
@@ -93,9 +94,9 @@ export function adventureComponents(round: number): number {
 /** 成品装备池（item 恩赐从合成装备里随机，与墨兽轮组件掉落区分开） */
 export const COMBINED_ITEM_IDS: readonly string[] = ITEMS.filter((i) => i.tier === 'combined').map((i) => i.id);
 
-/** 2★ 援军入不了账（备战席满 / 卡池余量不足）时的折金返还额 = 2★ 卖出价 */
+/** 2★ 援军入不了账（备战席满 / 卡池余量不足）时的折金返还额 = 2★ 卖出价（state 单一口径） */
 export function reinforceRefund(round: number): number {
-  return adventureReinforceCost(round) * 3 - 1;
+  return sellRefundFor(adventureReinforceCost(round), 2);
 }
 
 // ── 选项文案 ────────────────────────────────────────────

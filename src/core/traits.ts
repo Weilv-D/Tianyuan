@@ -1,9 +1,9 @@
 import type { BattleApi } from './api';
 import { ASSASSIN_LEAP_DELAY, ASSASSIN_SMOKE_DURATION, MECH, TICK_RATE } from './config';
 import { chebyshev } from './grid';
-import { effArmor, effSp, isStunned, isSilenced, isDisarmed, hasStatus, type Unit } from './unit';
+import { effArmor, effSp, type Unit } from './unit';
 import { tune } from '../data/tuning';
-import type { ActiveTrait, StatusKind } from './types';
+import type { ActiveTrait } from './types';
 
 /** 羁绊数字统一经调参表读取（src/data/tuning.ts）—— 无头扫描器可在线替换，
  *  游戏进程读到的一律是下面的默认字面量。 */
@@ -756,18 +756,4 @@ export function applyTraits(api: BattleApi, team: number, active: ActiveTrait[],
     if (!impl) continue;
     impl({ api, team, tier: at.tier, members, teamUnits });
   }
-}
-
-/** 供单位状态检查复用的守卫（避免各处重复判空） */
-export function unitCanAct(u: Unit): boolean {
-  return u.alive && !isStunned(u);
-}
-export function unitCanCast(u: Unit): boolean {
-  return u.alive && !isStunned(u) && !isSilenced(u);
-}
-export function unitCanAttack(u: Unit): boolean {
-  return u.alive && !isStunned(u) && !isDisarmed(u);
-}
-export function unitHasStatus(u: Unit, kind: StatusKind): boolean {
-  return hasStatus(u, kind);
 }

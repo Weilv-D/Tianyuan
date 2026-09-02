@@ -4,7 +4,6 @@ import { CardPool } from '../src/game/pool';
 import { boardIdx, createUnit } from '../src/game/state';
 import { restorePlayer, snapshotPlayer } from '../src/game/undo';
 import { makePlayer } from './helpers';
-
 describe('准备阶段撤销', () => {
   it('一次撤销完整恢复玩家资产和共享卡池，快照可安全复用', () => {
     const player = makePlayer({ gold: 42, level: 6, xp: 3 });
@@ -52,5 +51,34 @@ describe('准备阶段撤销', () => {
     expect(match.reroll(p)).toBe(true);
     expect(p.shop).toEqual(rolledShop);
     expect(p.gold).toBe(goldAfterReroll);
+  });
+
+  it('快照携带奇遇恩赐：撤销到领赐前快照可重选同一份选项', () => {
+    // 快照 scope = 准备阶段可触碰的一切（含本回合未领取的恩赐）。奇遇轮
+    // rollAdventureOffer 的 rng 消费发生在 beginRound 内，撤销回滚只回玩家动作：
+    // offer 随快照出入栈，领赐后撤销应把 offer 还原回原对象，重选路径不被切断。
+    const match = new Match(7);
+    match.beginRound();
+    expect(match.round).toBe(1);
+    // 人为把人类置于奇遇轮语境：round 4 的 offer 是全体共享的同一份
+    while (match.round < 4 && !match.isOver()) match.beginRound();
+    const offerBefore = match.adventureOffer;
+    if (!offerBefore) {
+      // round 4 必然生成（human alive）—— 但用完整对局推进到 4 后 human 可能
+      // 已挨打掉血，仍活着即可；构造不出就跳过（防御）
+      expect(match.round).toBeGreaterThanOrEqual(4);
+      return;
+    }
+    const entry = { snap: snapshotPlayer(match.human, match.pool, match.adventureOffer), rngState: match.rng.state };
+
+    // 领取恩赐（走与 UI 相同的 resolveAdventure 入口）
+    match.resolveAdventure(0);
+    expect(match.adventureOffer).toBeNull();
+
+    // 撤销：offer 还原，玩家可重选
+    restorePlayer(match.human, match.pool, entry.snap);
+    match.adventureOffer = entry.snap.adventureOffer;
+    expect(match.adventureOffer).not.toBeNull();
+    expect(match.adventureOffer!.options).toEqual(offerBefore.options);
   });
 });

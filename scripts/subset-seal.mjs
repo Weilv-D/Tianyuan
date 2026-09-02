@@ -7,7 +7,7 @@
  * 先逐字探测字体覆盖（篆体字库未必收简繁全部码位），再按实际存在的字出子集。
  * 运行：node scripts/subset-seal.mjs
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import subsetFont from 'subset-font';
 
 const SRC = 'design/fonts/YiShanBeiZhuanTi.ttf';
@@ -32,5 +32,9 @@ console.log('可用字形：', present.join(' '));
 
 mkdirSync('src/assets/fonts', { recursive: true });
 const woff2 = await subsetFont(ttf, present.join(''), { targetFormat: 'woff2' });
-writeFileSync(OUT, woff2);
+// 原子写：先落 .tmp 再 rename —— 中断（Ctrl+C / 进程被杀）时不留下半截 woff2
+// 被 vite 内联成坏字体（与 slice-sheet 同一套 atomicWrite 纪律）
+const tmpOut = `${OUT}.tmp`;
+writeFileSync(tmpOut, woff2);
+renameSync(tmpOut, OUT);
 console.log(`写出 ${OUT}：${(woff2.length / 1024).toFixed(1)} KB，${present.length} 字`);

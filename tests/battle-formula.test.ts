@@ -71,6 +71,31 @@ describe('玩家可感知的战斗规则', () => {
     expect(status.value).toBe(Math.round(target.shield));
   });
 
+  it('部分吸收后 shield 状态 value 同步为剩余总量', () => {
+    const battle = mkBattle(cornerPair());
+    const target = battle.units[1];
+    battle.addShield(null, target, target.maxHp * SHIELD_CAP_RATIO, 30);
+    // 打掉大半盾（不清零）：unit.shield 扣减，shield 状态 value 必须同步扣减
+    const dealt = battle.dealDamage(null, target, target.shield * 0.6, 'true');
+    expect(dealt).toBeGreaterThan(0);
+    const st = target.statuses.find((s) => s.kind === 'shield');
+    expect(st?.value).toBeCloseTo(target.shield, 6);
+    // 残余状态 value 仍 = 当前总量：此后继续吸收也不漂移
+    const dealt2 = battle.dealDamage(null, target, 1, 'true');
+    const st2 = target.statuses.find((s) => s.kind === 'shield');
+    expect(dealt2).toBe(1);
+    expect(st2?.value).toBeCloseTo(target.shield, 6);
+  });
+
+  it('护盾被完全打破时 shield 状态一并移除', () => {
+    const battle = mkBattle(cornerPair());
+    const target = battle.units[1];
+    battle.addShield(null, target, target.maxHp * 0.3, 30);
+    battle.dealDamage(null, target, target.shield + 5, 'true');
+    expect(target.shield).toBe(0);
+    expect(target.statuses.some((s) => s.kind === 'shield')).toBe(false);
+  });
+
   it('超时按双方存活生命判定，势均力敌时平局', () => {
     const even = mkBattle(cornerPair(), 7, TICK_RATE / 2).run();
     expect(even.timeout).toBe(true);

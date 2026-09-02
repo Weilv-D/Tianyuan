@@ -9,7 +9,7 @@
  *   --pairs 聚焦下标（逗号分隔，默认 4）；--serial 走本进程串行。
  */
 import { DEFAULT_SEED_BASE } from '../lib/seeds';
-import { readCurrent, withOverrides, type Overrides } from '../lib/patch';
+import { Patcher, readCurrent, withOverrides, type Overrides } from '../lib/patch';
 import { runPair, type PairRun } from '../lib/engine';
 import { runPool, defaultWorkers, type PoolJob, type PoolResult } from '../lib/pool';
 import { loadComps } from '../lib/comps';
@@ -30,7 +30,11 @@ export async function run(argv: string[]): Promise<void> {
       const kv = argv[++i] ?? '';
       const eq = kv.indexOf('=');
       if (eq === -1) throw new Error("--set 需要 key=value 形式，收到：" + kv);
-      overrides[kv.slice(0, eq)] = Number(kv.slice(eq + 1));
+      const k = kv.slice(0, eq).trim();
+      if (!k) throw new Error('--set 键不能为空，收到：' + kv);
+      const v = Number(kv.slice(eq + 1).trim());
+      if (!Number.isFinite(v)) throw new Error('--set 值须为有限数字，收到：' + kv);
+      overrides[k] = v;
     } else if (a === '--n') n = requirePositiveInt(argv[++i], '--n', 200);
     else if (a === '--pairs') focus = argv[++i] ?? '4';
     else if (a === '--seed') seedBase = requirePositiveInt(argv[++i], '--seed', DEFAULT_SEED_BASE);
@@ -39,6 +43,16 @@ export async function run(argv: string[]): Promise<void> {
   }
   if (Object.keys(overrides).length === 0) {
     throw new Error('用法：balance ab --set path=value [--n 200] [--pairs 4] [--seed S] [--serial]');
+  }
+  // 覆盖路径预检：非法路径（未知棋子/字段/非有限值）在 fork 子进程前一次性暴露，
+  // 与 sweep 同口径 —— 否则坏路径要等子进程作业里才抛，白费算力且报错上下文更差
+  {
+    const probe = new Patcher();
+    try {
+      probe.apply(overrides);
+    } finally {
+      probe.reset();
+    }
   }
   const { comps } = loadComps();
   const focusSet = new Set(focus.split(',').map(Number).filter((x) => Number.isInteger(x) && x >= 0 && x < comps.length));

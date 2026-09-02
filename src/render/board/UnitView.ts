@@ -19,7 +19,7 @@ import {
 } from './unitLayout';
 import { itemIconKey } from './itemIcons';
 import { ITEM_BY_ID } from '../../data/items';
-import { CINNABAR, GILT, INK, PAPER, PURE_WHITE, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, TEAM_COLOR_DEEP, VOID } from '../view/palette';
+import { CINNABAR, GILT, INK, PAPER, PURE_WHITE, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, VOID } from '../view/palette';
 import { TEX } from '../view/textures';
 
 /** 棋盘体量（内容高归一口径）：1★≈94% / 2★≈107% / 3★≈121% 格高（格 72）。
@@ -624,6 +624,3 @@ export class UnitView extends Phaser.GameObjects.Container {
     super.destroy(fromScene);
   }
 }
-
-/** 队伍色（供外部复用） */
-export const TEAM_DEEP = TEAM_COLOR_DEEP;

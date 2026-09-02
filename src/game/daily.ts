@@ -32,13 +32,15 @@ export interface DailyBest {
 
 const DAILY_KEY = 'inkarena.daily.v1';
 
-/** 读取当日前的本地最佳名次；无记录 / 数据损坏（隐私模式清空、JSON 坏档）返回 null，绝不抛出 */
+/** 读取当日前的本地最佳名次；无记录 / 数据损坏（隐私模式清空、JSON 坏档、名次越界）返回 null，绝不抛出 */
 export function loadDailyBest(): DailyBest | null {
   try {
     const raw = localStorage.getItem(DAILY_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<DailyBest> | null;
     if (!parsed || typeof parsed.date !== 'string' || typeof parsed.rank !== 'number') return null;
+    // 域校验：名次是 1~8 的整数，越界记录视作损坏 —— 防坏档把「每日最佳」钉在荒谬值上
+    if (!Number.isInteger(parsed.rank) || parsed.rank < 1 || parsed.rank > 8) return null;
     return { date: parsed.date, rank: parsed.rank };
   } catch {
     return null;
@@ -57,7 +59,7 @@ export function loadDailyBest(): DailyBest | null {
  * 绝不让持久化失败炸掉结算流程。
  */
 export function recordDailyResult(d: Date, rank: number): boolean {
-  if (!Number.isFinite(rank)) return false;
+  if (!Number.isInteger(rank) || rank < 1 || rank > 8) return false;
   const date = todayKey(d);
   try {
     const prev = loadDailyBest();

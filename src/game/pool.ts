@@ -102,10 +102,18 @@ export class CardPool {
  *
  * 逐格独立抽取：先按等级概率表掷出费用档位，再在该档位**池中仍有货**的棋子里按剩余库存加权取一个。
  * 若该档位全部被抓空，退化为"按剩余库存加权"从所有档位里取，避免高等级玩家开出一排空格。
+ *
+ * @param table 等级概率表（9 行 × 5 档）。缺省读全局 SHOP_ODDS —— 对局路径恒走
+ *  全局（确定性契约）；平衡工具链 shop 命令可注入本地覆盖表，绝不原地改写真源。
  */
-export function rollShop(pool: CardPool, rng: Rng, level: number): (string | null)[] {
-  const li = Math.max(0, Math.min(SHOP_ODDS.length - 1, level - 1));
-  const odds = SHOP_ODDS[li];
+export function rollShop(
+  pool: CardPool,
+  rng: Rng,
+  level: number,
+  table: readonly (readonly number[])[] = SHOP_ODDS,
+): (string | null)[] {
+  const li = Math.max(0, Math.min(table.length - 1, level - 1));
+  const odds = table[li];
   const out: (string | null)[] = [];
 
   for (let s = 0; s < SHOP_SLOTS; s++) {

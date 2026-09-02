@@ -20,6 +20,11 @@ export class AdventurePanel {
   /** 本回合人类已择过（即使内核尚未清空 offer 也不再重开面板） */
   private resolvedRound = -1;
 
+  /** 撤销回滚到"本回合已择"之前时调用：清掉已择记忆，让 refresh() 能重开面板 */
+  resetResolved(): void {
+    this.resolvedRound = -1;
+  }
+
   constructor(private scene: GameScene) {}
 
   /** 面板命中区判定（原 this.adventureRect?.contains 的模块化转发；无面板时恒 false） */

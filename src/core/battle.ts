@@ -536,6 +536,14 @@ export class Battle implements BattleApi {
       dst.shield -= absorbed;
       amount -= absorbed;
       this.emit({ t: 'shield', tick: this.tick, uid: dst.uid, amount: -absorbed, total: dst.shield });
+      // 部分吸收后必须同步 shield 状态的 value（口径：value 存总量，见 addShield）。
+      // 不同步的话，下一次 addShield 之前的状态 value 停留在吸收前的旧总量 ——
+      // 与 shield 事件 total、unit.shield 双口径脱节（吸收事件的 total 已扣减，
+      // 状态却还报旧值），到期事件与再上盾的 existing.value 重写都会基于脏值。
+      if (absorbed > 0 && dst.shield > 0.001) {
+        const st = dst.statuses.find((s) => s.kind === 'shield');
+        if (st) st.value = dst.shield;
+      }
       if (dst.shield <= 0.001) {
         dst.shield = 0;
         // 护盾数值归零，对应的 shield 状态必须同生共死地移除。

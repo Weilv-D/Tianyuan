@@ -20,7 +20,13 @@ export const MAX_ITEMS_PER_UNIT = 3;
 
 /** 把一件装备放进装备栏 */
 export function addItem(p: PlayerState, itemId: string): void {
-  if (!ITEM_BY_ID[itemId]) return;
+  // 未知 id 静默丢弃会让"掉落发生但器匣没收到"无从察觉（坏档残留 / 配置表改名的
+  // 老存档条目都走这里）——落盘层应在读档边界就滤掉，这里补一条显式告警兜底。
+  if (!ITEM_BY_ID[itemId]) {
+    // 开发 / 冒烟环境可见即可：无控制台环境不抛，绝不因单件脏数据炸掉结算流程
+    if (typeof console !== 'undefined') console.warn(`[inventory] 忽略未知装备 id：${itemId}`);
+    return;
+  }
   p.items.push(itemId);
 }
 

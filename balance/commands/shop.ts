@@ -24,7 +24,6 @@ const args = process.argv.slice(2);
 const nTrials = Number(args.find((a) => a.startsWith('--n='))?.slice(4) ?? 8000);
 if (!Number.isInteger(nTrials) || nTrials <= 0) throw new Error(`--n 必须是正整数，收到 ${nTrials}`);
 let table: readonly (readonly number[])[] = SHOP_ODDS;
-let overridden = false;
 for (const a of args) {
   const m = /^--t(\d)=(.+)$/.exec(a);
   if (m) {
@@ -34,17 +33,10 @@ for (const a of args) {
       throw new Error(`行格式错误（需要 5 个非负数且合计 100）：${a}`);
     }
     table = table.map((r, i) => (i === lv - 1 ? row : r));
-    overridden = true;
   }
 }
-// 覆盖打进运行时真源，rollShop 才会读到候选表（只影响本进程）。无 --t 覆盖时
-// 不写任何东西 —— SHOP_ODDS 元组只读，逐行自我覆盖既无意义也无必要。
-if (overridden) {
-  const mutable = SHOP_ODDS as (readonly number[])[];
-  for (let i = 0; i < table.length; i++) {
-    if (table[i] !== SHOP_ODDS[i]) mutable[i] = table[i];
-  }
-}
+// 覆盖只落在本地 table（SHOP_ODDS 元组只读，绝不原地改写 —— 同一进程里后跑的
+// 整局配对臂 / 其他命令还要读真源表，原地覆盖会让共享配置漂移且无法还原）。
 console.log(`试验 ${nTrials} 次/场景`);
 console.log(`概率表：L3 ${table[2].join('/')} · L4 ${table[3].join('/')} · L7 ${table[6].join('/')} · L8 ${table[7].join('/')} · L9 ${table[8].join('/')}\n`);
 
@@ -89,7 +81,7 @@ function shopsToGoal(cost: number, star: number, level: number, seed: number, ma
   const target = candidates[Math.floor(rng.next() * candidates.length)];
   let have = 0;
   for (let s = 1; s <= maxShops; s++) {
-    for (const id of rollShop(pool, rng, level)) {
+    for (const id of rollShop(pool, rng, level, table)) {
       if (id === target && have < need) {
         pool.take(id);
         have++;
@@ -153,6 +145,9 @@ if (args.some((a) => a.startsWith('--match'))) {
   const star3ByCost = [0, 0, 0, 0, 0, 0]; // [费用1..5] 终局 3★ 件数
   for (let i = 0; i < N; i++) {
     const m = new Match((i * 2654435761) >>> 0);
+    // 整局臂也吃 --t 覆盖：Match.shopTable 让本局全部 rollShop 走覆盖表。
+    // 覆盖只作用在新建的 Match 实例上，真源 SHOP_ODDS 不被触碰。
+    if (table !== SHOP_ODDS) m.shopTable = table;
     const humanArch = archs[i % archs.length];
     m.human.ai = makeProfile(humanArch);
     m.human.name = `[模拟]${humanArch}`;

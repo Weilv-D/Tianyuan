@@ -202,6 +202,12 @@ export class Match implements AiWorld {
   private ghosts = new Map<number, (UnitInstance | null)[]>();
   /** 本回合的墨兽阵容（全体玩家面对同一只） */
   private beastBoard: (UnitInstance | null)[] | null = null;
+  /**
+   * 商店概率表覆盖（平衡工具链 A/B 用）。缺省 null = 读全局 SHOP_ODDS 真源；
+   * 设置后本局全部 rollShop 走该表 —— 与真源行数/列数一致的调用方责任。
+   * 对局主路径（UI / 存档 / 回放）永不设置，确定性契约不受影响。
+   */
+  shopTable: readonly (readonly number[])[] | null = null;
   /** 事件日志，结算面板与调试用 */
   log: string[] = [];
   settings: MatchSettings = { autoDeploy: true };
@@ -305,9 +311,9 @@ export class Match implements AiWorld {
 
   /**
    * 墨兽轮（PvE）：1 / 7 / 13 / 19 / 25，全场恰五次。
-   * 第 1 回合是引导轮 —— 人人只有一两个棋子也能打过（攻击力削到 15%），
-   * 装备来源从第一轮就建立；此后每 6 回合一次，第 25 轮是最后一只，
-   * 其后的纯 PvP 终局不再插入 PvE。
+   * 第 1 回合是引导轮 —— 人人只有一两个棋子也能打过（攻击力 ×BEAST_INTRO_POW_MULT
+   * = 0.08，见 beast.ts，且本回合败北掉血归零），装备来源从第一轮就建立；
+   * 此后每 6 回合一次，第 25 轮是最后一只，其后的纯 PvP 终局不再插入 PvE。
    */
   isBeastRound(round = this.round): boolean {
     return BEAST_ROUND_SCHEDULE.includes(round);
@@ -488,7 +494,7 @@ export class Match implements AiWorld {
       if (p.shopLocked) {
         p.shopLocked = false;
       } else {
-        p.shop = rollShop(this.pool, this.rng, p.level);
+        p.shop = rollShop(this.pool, this.rng, p.level, this.shopTable ?? undefined);
       }
     }
 
@@ -607,7 +613,7 @@ export class Match implements AiWorld {
   reroll(p: PlayerState): boolean {
     if (p.gold < REROLL_COST) return false;
     p.gold -= REROLL_COST;
-    p.shop = rollShop(this.pool, this.rng, p.level);
+    p.shop = rollShop(this.pool, this.rng, p.level, this.shopTable ?? undefined);
     return true;
   }
 

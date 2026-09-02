@@ -204,9 +204,13 @@ export function boardCap(p: PlayerState): number {
 export function sellValue(u: UnitInstance): number {
   const def = CHAMPION_BY_ID[u.defId];
   if (!def) return 0;
-  const cost = def.cost;
-  if (u.star === 1) return cost;
-  if (u.star === 2) return cost * 3 - 1;
+  return sellRefundFor(def.cost, u.star);
+}
+
+/** 按费用与星级算卖出返还 —— 卖出 / 援军折金（adventure.reinforceRefund）共用同一口径 */
+export function sellRefundFor(cost: number, star: Star): number {
+  if (star === 1) return cost;
+  if (star === 2) return cost * 3 - 1;
   return cost * 9 - 1;
 }
 

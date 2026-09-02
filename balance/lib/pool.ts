@@ -66,6 +66,10 @@ export type PoolResult = PairResult | ItemResult;
 /** 单个作业的硬超时：任何 (配置,配对) 作业都不该跑超过 120s —— 超过即视为子进程
  *  挂死（死循环 / 引擎异常空转），整池失败并给出定位信息，而不是永久等待。 */
 const JOB_TIMEOUT_MS = 120_000;
+/** 子进程初始化硬超时：fork 到 ready 之间只有 tsx 加载 + 阵容装载，正常 ≤ 数秒。
+ *  loader 失败 / 导入抛错 / Windows 下 fork 启动异常都可能让子进程既不回 ready
+ *  也不退出 —— 不给这一阶段上钟，父进程会永远等 dispatch，命令挂死。 */
+const INIT_TIMEOUT_MS = 30_000;
 
 const CHILD_URL = new URL('./poolChild.ts', import.meta.url);
 
@@ -171,6 +175,12 @@ export function runPool(
       });
       children.push(proc);
       proc.on('error', fail);
+      // fork → ready 阶段上钟：超时即整池失败，防止 tsx 加载/启动卡死挂住命令
+      let initTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        if (settled) return;
+        fail(new Error(`池子子进程初始化超时（>${INIT_TIMEOUT_MS / 1000}s，fork 后未回 ready）`));
+      }, INIT_TIMEOUT_MS);
+      initTimer.unref?.();
       proc.on('exit', (code) => {
         if (settled) return;
         // 作业未回就退出 = 子进程异常死亡：code 0 的正常退出只发生在 shutdown /
@@ -182,6 +192,10 @@ export function runPool(
       });
       proc.once('message', (msg: { type: string }) => {
         if (msg.type !== 'ready') return;
+        if (initTimer !== null) {
+          clearTimeout(initTimer);
+          initTimer = null;
+        }
         dispatch(proc);
       });
       // 每个作业自携带种子基（pair = CRN 矩阵口径，item = 装备配对口径，本就不同源）

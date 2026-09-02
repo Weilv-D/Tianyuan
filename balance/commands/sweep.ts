@@ -62,6 +62,7 @@ export async function run(argv: string[]): Promise<void> {
       const eq = kv.indexOf('=');
       if (eq === -1) throw new Error('--set 需要 k=v 形式，收到：' + kv);
       const k = kv.slice(0, eq).trim();
+      if (!k) throw new Error('--set 键不能为空，收到：' + kv);
       const v = kv.slice(eq + 1).trim();
       const num = Number(v);
       if (!Number.isFinite(num)) throw new Error('--set 值须为有限数字，收到：' + kv);

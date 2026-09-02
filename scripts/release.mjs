@@ -105,15 +105,25 @@ run(process.execPath, [
 // 此前 https: 被列入豁免，残留 CDN 引用也能过检，门禁形同虚设。
 // （已对现行产物验证零误报：data: 之外零命中。）
 const urlAttr = (attr) => `${attr}\\s*=\\s*(?:"(?!data:)[^"]*"|'(?!data:)[^']*'|(?!data:)[^\\s"'<>]+)`;
+// Vite 单文件产物自带 modulepreload 补丁（h(O){…fetch(O.href,…)}：只在 <link
+// rel="modulepreload"> 存在时取 href，单文件形态下不可能有此类标签）。它是一段
+// 每次构建都原样复制的固定文本 —— 扫描前先把该片段替换掉，避免把「无外链门禁」
+// 误报在补丁本身，也让下方新增的 JS 网络调用扫描不产生假阳性。
+const modulepreloadPolyfill = /function\s*h\(O\)\{if\(O\.ep\)return;O\.ep=!0;const\s*Z=o\(O\);fetch\(O\.href,Z\)\}/g;
+const scanSource = html.replace(modulepreloadPolyfill, '');
 const external = [
-  html.match(new RegExp(`<(script|link|img|audio|source|video|track|iframe|input|use|image)[^>]*?(?:${urlAttr('src')}|${urlAttr('href')}|${urlAttr('poster')}|${urlAttr('srcset')})`, 'gi')) ?? [],
+  scanSource.match(new RegExp(`<(script|link|img|audio|source|video|track|iframe|input|use|image)[^>]*?(?:${urlAttr('src')}|${urlAttr('href')}|${urlAttr('poster')}|${urlAttr('srcset')})`, 'gi')) ?? [],
   // url() 只认小写（打包器产出的 CSS 恒为小写）、内容含路径特征（. 或 /），
   // 且排除 JS 拼接特征（+ $ {）—— 宽松版会被压缩 JS 的 URL(i)/URL(Q) 与
   // url("+this.src+') 之类动态串误杀（实测分别 27 处与 1 处）
-  html.match(/url\(\s*['"]?(?!data:)[^)'"+${}]*[./][^)'"+${}]*['"]?\s*\)/g) ?? [],
+  scanSource.match(/url\(\s*['"]?(?!data:)[^)'"+${}]*[./][^)'"+${}]*['"]?\s*\)/g) ?? [],
   // CSS @import：外链样式表的另一种入口（打包器产出内联 <style> 后 Vite 不会
   // 生成 @import，但门禁该查的一律查）
-  html.match(/@import\s+(?!url\(data:)[^;]+/gi) ?? [],
+  scanSource.match(/@import\s+(?!url\(data:)[^;]+/gi) ?? [],
+  // JS 网络调用：动态 import 与 fetch 指向 http(s) 的字符串。属性与 url() 之外
+  // 的第三种外链形态 —— Vite 不会内联动态 import 的远程目标，漏检会让单文件
+  // 在离线时静默失效（modulepreload 补丁已在上面剔除）
+  scanSource.match(/\b(?:import|fetch)\s*\(\s*["'`]https?:/gi) ?? [],
 ].flat();
 if (external.length) {
   console.error('✗ 单文件仍引用外部资源：', external);

@@ -7,22 +7,12 @@ export function inBounds(c: number, r: number): boolean {
   return c >= 0 && c < BOARD_COLS && r >= 0 && r < BOARD_ROWS;
 }
 
-export function sameCell(a: Cell, b: Cell): boolean {
-  return a.c === b.c && a.r === b.r;
-}
-
 /**
  * 切比雪夫距离 —— 与"攻击距离 1 = 周围 8 格"的直觉一致。
  * 相比曼哈顿距离，斜向移动不再被惩罚，棋盘感更自然。
  */
 export function chebyshev(a: Cell, b: Cell): number {
   return Math.max(Math.abs(a.c - b.c), Math.abs(a.r - b.r));
-}
-
-export function euclid(a: Cell, b: Cell): number {
-  const dc = a.c - b.c;
-  const dr = a.r - b.r;
-  return Math.sqrt(dc * dc + dr * dr);
 }
 
 const NEIGHBORS_8: readonly (readonly [number, number])[] = [
@@ -130,23 +120,4 @@ export function stepTowardAttackPosition(
   );
   if (!res || res.path.length === 0) return null;
   return res.path[0];
-}
-
-/** 在指定格子集合中挑选一个离 origin 最近且空着的格子（用于刺客跳后排） */
-export function nearestFreeCell(
-  origin: Cell,
-  candidates: Cell[],
-  blocked: (c: number, r: number) => boolean,
-): Cell | null {
-  let best: Cell | null = null;
-  let bestD = Infinity;
-  for (const cand of candidates) {
-    if (blocked(cand.c, cand.r)) continue;
-    const d = euclid(origin, cand);
-    if (d < bestD) {
-      bestD = d;
-      best = cand;
-    }
-  }
-  return best;
 }

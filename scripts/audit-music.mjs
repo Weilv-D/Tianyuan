@@ -52,10 +52,22 @@ for (const [location, metadata] of Object.entries(lock.packages ?? {})) {
     fail(`${pkg.name ?? location}: 缺少许可证元数据或正文`);
     continue;
   }
+  // SPDX 表达式可能是字符串、{type} 对象或旧式 licenses 数组 —— 统一规整成字符串
+  const normalizeLicense = (raw) => {
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') {
+      if (typeof raw.type === 'string') return raw.type;
+      if (Array.isArray(raw) && raw.length > 0) {
+        const first = raw[0];
+        return typeof first === 'string' ? first : first?.type ?? 'UNKNOWN';
+      }
+    }
+    return 'UNKNOWN';
+  };
   runtimePackages.push({
     name: pkg.name,
     version: pkg.version,
-    license: pkg.license,
+    license: normalizeLicense(pkg.license),
     text: readFileSync(join(packageDir, licenseFile), 'utf8').trim(),
   });
 }

@@ -118,8 +118,11 @@ export function createUnit(input: BattleUnitInput): Unit {
   const hpScale = STAR_HP_SCALE[si];
   const powScale = STAR_POWER_SCALE[si];
   const eff = itemEffects(input.items ?? []);
-  // 装备加成与外部传入的 bonus 合并：装备写在前面，外部覆盖写在后面
-  const bonus = { ...eff.bonus, ...(input.bonus ?? {}) } as NonNullable<BattleUnitInput['bonus']>;
+  // 装备加成与外部传入的 bonus 合并：同键必须**求和**（与 itemEffects 的按件求和
+  // 同一口径）。此前用展开覆盖 —— 同名键（hp/atk/armor…）会把装备的贡献整个
+  // 丢掉，扫参实验/外部增强传 bonus.hp 时面板数值与装备实际不符，静默漂移。
+  const bonus: Record<string, number> = { ...eff.bonus };
+  for (const [k, v] of Object.entries(input.bonus ?? {})) bonus[k] = (bonus[k] ?? 0) + (v as number);
 
   // 五费三星·天命（LEGEND_T3）：数值在天命层再乘，附免疫控制/开战护盾/全能吸血。
   // 三星五费是终局单位，常规三星倍率不足以表达"无敌"的玩家预期。
