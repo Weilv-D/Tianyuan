@@ -563,6 +563,11 @@ export class Battle implements BattleApi {
 
     dst.takenDamage += final;
     if (src) src.dealtDamage += final;
+    // 分类型与盾吸单列：结算面板条形图按 物理/法术/真伤 三段呈现，
+    // 护盾吸收额从"承伤"里拆出来单看（否则玩家分不清掉血与被盾挡下）
+    dst.takenByType[type] += final;
+    if (src) src.dealtByType[type] += final;
+    dst.absorbedDamage += absorbed;
 
     // 受击回蓝（manaFromDamageMult：装备的承伤转蓝增幅，护盾吸收额计入 final）
     const manaGain = Math.min(

@@ -155,20 +155,23 @@ export class ItemTooltip {
 
     const icon = (id: string, size: number): Phaser.GameObjects.Image =>
       this.scene.add.image(0, 0, itemIconKey(id)).setDisplaySize(size, size).setOrigin(0, 0);
+    // 三图标共用一条视觉中线（MID）：散件 30px 与成装 36px 同心排布，符号与墨迹对齐
+    const MID = y + 30;
     const aIcon = icon(a, 30);
-    aIcon.setPosition(14, y + 15);
+    aIcon.setPosition(14, MID - 15);
     c.add(aIcon);
+    // 文本框因 descent 补底比字形略高，中心再让 1px 才与图标墨迹对齐
     c.add(
-      this.scene.add.text(50, y + 10, '+', { fontFamily: FONT.body, fontSize: '14px', color: css(INK[300]) }).setOrigin(0.5)
+      this.scene.add.text(50, MID + 1, '+', { fontFamily: FONT.body, fontSize: '14px', color: css(INK[300]) }).setOrigin(0.5)
     );
     const bIcon = icon(b, 30);
-    bIcon.setPosition(66, y + 15);
+    bIcon.setPosition(66, MID - 15);
     c.add(bIcon);
     c.add(
-      this.scene.add.text(102, y + 10, '→', { fontFamily: FONT.body, fontSize: '14px', color: css(INK[300]) }).setOrigin(0.5)
+      this.scene.add.text(102, MID + 1, '→', { fontFamily: FONT.body, fontSize: '14px', color: css(INK[300]) }).setOrigin(0.5)
     );
     const cIcon = icon(out, 36);
-    cIcon.setPosition(122, y + 18);
+    cIcon.setPosition(122, MID - 18);
     c.add(cIcon);
     y += 50;
 

@@ -2,7 +2,7 @@ import { GLOBAL_HP_SCALE, LEGEND_T3, RESIST_CAP, STAR_HP_SCALE, STAR_POWER_SCALE
 import { itemEffects } from './items';
 import { createTraitState, type BattleApi, type TraitState } from './api';
 import { CHAMPION_BY_ID, type ChampionEntry } from '../data/champions';
-import type { BattleUnitInput, Cell, Star, StatusEffect, StatusKind, TeamId } from './types';
+import type { BattleUnitInput, Cell, DamageType, Star, StatusEffect, StatusKind, TeamId } from './types';
 
 /** 战斗中的单位运行时状态。纯数据 + 少量查询方法，不含渲染。 */
 export interface Unit {
@@ -89,6 +89,11 @@ export interface Unit {
   // ── 统计 ──
   dealtDamage: number;
   takenDamage: number;
+  /** 分类型伤害统计（结算面板条形图消费）；数值含护盾吸收额 */
+  dealtByType: Record<DamageType, number>;
+  takenByType: Record<DamageType, number>;
+  /** 承伤中被护盾吸收的部分（与掉血分开呈现） */
+  absorbedDamage: number;
   healed: number;
   kills: number;
 }
@@ -203,6 +208,9 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     dealtDamage: 0,
     takenDamage: 0,
+    dealtByType: { physical: 0, magic: 0, true: 0 },
+    takenByType: { physical: 0, magic: 0, true: 0 },
+    absorbedDamage: 0,
     healed: 0,
     kills: 0,
   };

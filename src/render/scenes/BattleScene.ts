@@ -18,12 +18,12 @@ import { motion } from '../view/motion';
 import { fadeIn, fadeTo } from '../view/transition';
 import { shakeFactor } from '../view/fxPrefs';
 import { audio } from '../../audio/AudioEngine';
-import { Button, enableScroll, FONT, makeChip, makePanel, resetCursorOnShutdown, type ScrollHandle } from '../../ui/kit';
+import { Button, clipToWidth, enableScroll, FONT, makeChip, makePanel, resetCursorOnShutdown, type ScrollHandle } from '../../ui/kit';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../../game/comp';
 import type { Match, Pairing } from '../../game/match';
 import { saveMatch } from '../../game/save';
 import type { Unit } from '../../core/unit';
-import type { ActiveTrait, BattleConfig } from '../../core/types';
+import type { ActiveTrait, BattleConfig, DamageType } from '../../core/types';
 
 const W = 1920;
 const H = 1080;
@@ -870,17 +870,26 @@ export class BattleScene extends Phaser.Scene {
     shade.fillRect(0, 0, W, H);
     panel.add(shade);
 
-    // 战报：伤害 / 承伤 / 治疗 排行。行数先取 —— 面板高、按钮位都从它推导，
-    // 纵向只有一条依赖链（战报带 → 按钮顶 → 面板高）。定高 340 的旧制里
-    // 按钮顶 by+278 压住末行文字底 by+280，五级战报必与「返回」相撞。
-    const shown = this.buildScoreboard().slice(0, 5);
-    const ROW_PITCH = 24;
+    // 战报：敌我各一列（每边最多 9 子，8v8 全员可见）——每单位「伤害 / 承伤」
+    // 双细条，物理/法术/真伤三段堆叠（与飘字 DAMAGE_COLOR 同色源），盾吸并进
+    // 承伤总数字。阵亡单位压暗。列内按伤害降序；面板高由列深推导。
+    const rows = this.buildScoreboard();
+    const byTeam = (team: number): typeof rows =>
+      rows
+        .filter((r) => r.team === team)
+        .sort((a, b) => b.dmg - a.dmg)
+        .slice(0, 9);
+    const mineRows = byTeam(this.viewerTeam);
+    const theirRows = byTeam(this.viewerTeam === 0 ? 1 : 0);
+    const COL_PITCH = 30;
+    const COL_TOP = 208;
+    const colDepth = Math.max(mineRows.length, theirRows.length) * COL_PITCH;
     const BTN_H = 42;
-    const listBottom = 166 + shown.length * ROW_PITCH; // 战报带底（ry 终值，已含一行空距）
-    const btnTopRel = listBottom + 10; // 末行行箱残余下延 ~6px + 净距
-    const bh = btnTopRel + BTN_H + 24; // 按钮底到面板底衬 24
+    const listBottom = COL_TOP + colDepth;
+    const btnTopRel = listBottom + 14;
+    const bh = btnTopRel + BTN_H + 24;
 
-    const bw = 620;
+    const bw = 720;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
     const card = this.add.graphics();
@@ -919,24 +928,113 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     panel.add(sub);
 
-    // 战报行（行距 24，最多 5 行）
-    let ry = by + 166;
-    for (const r of shown) {
-      const t = this.add
-        .text(bx + 60, ry, `${r.name}`, { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[200]) })
-        .setOrigin(0, 0);
-      const d = this.add
-        .text(bx + 250, ry, `${Math.round(r.dmg)}`, { fontFamily: FONT.body, fontSize: '13px', color: css(CINNABAR.light) })
-        .setOrigin(1, 0);
-      const k = this.add
-        .text(bx + 340, ry, `承 ${Math.round(r.taken)}`, { fontFamily: FONT.body, fontSize: '13px', color: css(PAPER[400]) })
-        .setOrigin(1, 0);
-      const h = this.add
-        .text(bx + 450, ry, `治 ${Math.round(r.heal)}`, { fontFamily: FONT.body, fontSize: '13px', color: css(SPIRIT.light) })
-        .setOrigin(1, 0);
-      panel.add([t, d, k, h]);
-      ry += ROW_PITCH;
+    // 图例（颜色与飘字 DAMAGE_COLOR 同源）：物 / 法 / 真 / 盾吸
+    const legend: [string, number][] = [
+      ['物', PAPER[100]],
+      ['法', VOID.light],
+      ['真', GILT.light],
+      ['盾吸', MOON.base],
+    ];
+    let lx = bx + 44;
+    for (const [label, col] of legend) {
+      const sw = this.add.graphics();
+      sw.fillStyle(col, 0.95);
+      sw.fillRect(lx, by + 146, 9, 9);
+      const tag = this.add
+        .text(lx + 14, by + 150, label, { fontFamily: FONT.body, fontSize: '11px', color: css(PAPER[300]) })
+        .setOrigin(0, 0.5);
+      panel.add([sw, tag]);
+      lx += 14 + tag.width + 20;
     }
+
+    const fmtNum = (n: number): string => (n >= 10000 ? `${(n / 10000).toFixed(1)}万` : `${Math.round(n)}`);
+    const TYPE_ORDER: { key: DamageType; col: number }[] = [
+      { key: 'physical', col: PAPER[100] },
+      { key: 'magic', col: VOID.light },
+      { key: 'true', col: GILT.light },
+    ];
+
+    // 敌我两列：列头（队名 + 队伍汇总）+ 每单位「伤（类型堆叠 8px）/ 承（类型堆叠 5px）」
+    // 双细条 + mono 总数（承伤附盾吸）。阵亡单位整行压暗。列内按伤害降序。
+    const COL_W = 310;
+    const colDef: [number, string, number, typeof rows][] = [
+      [bx + 40, '我 方', GILT.base, mineRows],
+      [bx + 380, '敌 方', CINNABAR.base, theirRows],
+    ];
+    for (const [x, title, titleCol, list] of colDef) {
+      const head = this.add
+        .text(x, by + 180, title, { fontFamily: FONT.title, fontSize: '14px', color: css(titleCol), letterSpacing: 4 })
+        .setOrigin(0, 0.5);
+      const totals = this.add
+        .text(
+          x + COL_W,
+          by + 180,
+          `伤 ${fmtNum(list.reduce((s, r) => s + r.dmg, 0))} · 承 ${fmtNum(list.reduce((s, r) => s + r.taken, 0))}`,
+          { fontFamily: FONT.mono, fontSize: '10px', color: css(PAPER[400]) }
+        )
+        .setOrigin(1, 0.5);
+      const hair = this.add.graphics();
+      hair.lineStyle(1, titleCol, 0.5);
+      hair.lineBetween(x, by + 194, x + COL_W, by + 194);
+      panel.add([head, totals, hair]);
+
+      const maxDmg = Math.max(1, ...list.map((r) => r.dmg));
+      const maxTaken = Math.max(1, ...list.map((r) => r.taken));
+      let y = by + COL_TOP;
+      for (const r of list) {
+        const g = this.add.graphics();
+        g.lineStyle(1, INK[600], 0.18);
+        g.lineBetween(x, y + 28, x + COL_W, y + 28);
+        const seg = (barY: number, h: number, byType: Record<DamageType, number>, max: number, alpha: number): void => {
+          g.fillStyle(INK[950], 0.9);
+          g.fillRect(x + 80, barY, 128, h);
+          let cxSeg = x + 80;
+          for (const { key, col: c } of TYPE_ORDER) {
+            const segW = Math.min((byType[key] / max) * 128, x + 208 - cxSeg);
+            if (segW < 1) continue;
+            g.fillStyle(c, alpha);
+            g.fillRect(cxSeg, barY, segW, h);
+            cxSeg += segW;
+          }
+        };
+        seg(y + 4, 8, r.dmgBy, maxDmg, 0.95);
+        seg(y + 16, 5, r.takenBy, maxTaken, 0.8);
+        const name = this.add
+          .text(x, y + 13, r.name, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[200]) })
+          .setOrigin(0, 0.5);
+        clipToWidth(name, r.name, 72);
+        const t1 = this.add
+          .text(x + 214, y + 9, fmtNum(r.dmg), { fontFamily: FONT.mono, fontSize: '10px', color: css(PAPER[200]) })
+          .setOrigin(0, 0.5);
+        const t2 = this.add
+          .text(
+            x + 214,
+            y + 20,
+            `${fmtNum(r.taken)}${r.absorbed >= 50 ? `·盾${fmtNum(r.absorbed)}` : ''}`,
+            { fontFamily: FONT.mono, fontSize: '10px', color: css(MOON.base) }
+          )
+          .setOrigin(0, 0.5);
+        panel.add([g, name, t1, t2]);
+        if (r.heal >= 50) {
+          panel.add(
+            this.add
+              .text(x + COL_W, y + 9, `治${fmtNum(r.heal)}`, {
+                fontFamily: FONT.mono,
+                fontSize: '10px',
+                color: css(SPIRIT.light),
+              })
+              .setOrigin(1, 0.5)
+          );
+        }
+        if (!r.alive) for (const o of [g, name, t1, t2]) o.setAlpha(0.45);
+        y += COL_PITCH;
+      }
+    }
+    // 列间发丝分隔
+    const sep = this.add.graphics();
+    sep.lineStyle(1, INK[600], 0.3);
+    sep.lineBetween(bx + 365, by + 172, bx + 365, by + COL_TOP + colDepth);
+    panel.add(sep);
 
     const isMatch = !!this.matchCtx;
     const btnLabel = isMatch ? '返 回' : '再 来 一 局';
@@ -960,35 +1058,8 @@ export class BattleScene extends Phaser.Scene {
     });
     this.resultPanel = panel;
 
-    // 对局模式：6 秒自动返回（与回合结算弹层同口径）。悬停面板挂起倒计时、
-    // 移开续跑剩余时间 —— 五行战报读不完就被卷走，比多等更伤心流。
-    if (isMatch) {
-      const AUTO_MS = 6000;
-      let remain = AUTO_MS;
-      let armAt = this.time.now;
-      let timer: Phaser.Time.TimerEvent | null = null;
-      const arm = (ms: number): void => {
-        armAt = this.time.now;
-        timer = this.time.delayedCall(ms, () => {
-          timer = null;
-          if (this.matchCtx) this.returnToGame();
-        });
-        this.pendingTimers.add(timer);
-      };
-      arm(remain);
-      card.setInteractive(new Phaser.Geom.Rectangle(bx, by, bw, bh), Phaser.Geom.Rectangle.Contains);
-      card.on('pointerover', () => {
-        if (!timer) return;
-        remain = Math.max(600, remain - (this.time.now - armAt));
-        this.pendingTimers.delete(timer);
-        this.time.removeEvent(timer);
-        timer = null;
-      });
-      card.on('pointerout', () => {
-        if (timer) return;
-        arm(remain);
-      });
-    }
+    // 结算面板不自动关闭（v1.12 用户裁决）：读图表需要时间，返回由「返回」键显式触发。
+    // 此前 3.5s / 6s 自动返回 + 悬停挂起的两代实现一并移除。
   }
 
   /**
@@ -1010,17 +1081,31 @@ export class BattleScene extends Phaser.Scene {
     fadeTo(this, 'Game', { match, resultPending: true });
   }
 
-  private buildScoreboard(): { name: string; dmg: number; taken: number; heal: number }[] {
+  private buildScoreboard(): {
+    name: string;
+    team: number;
+    alive: boolean;
+    dmg: number;
+    taken: number;
+    heal: number;
+    absorbed: number;
+    dmgBy: Record<DamageType, number>;
+    takenBy: Record<DamageType, number>;
+  }[] {
     if (!this.battle) return [];
     return [...this.battle.units]
       .filter((u) => !u.isMinion)
       .map((u) => ({
-        name: `${u.team === this.viewerTeam ? '我' : '敌'} ${u.entry.name}${'★'.repeat(u.star)}`,
+        name: `${u.entry.name}${'★'.repeat(u.star)}`,
+        team: u.team,
+        alive: u.alive,
         dmg: u.dealtDamage,
         taken: u.takenDamage,
         heal: u.healed,
-      }))
-      .sort((a, b) => b.dmg - a.dmg);
+        absorbed: u.absorbedDamage,
+        dmgBy: { ...u.dealtByType },
+        takenBy: { ...u.takenByType },
+      }));
   }
 
   // ══════════════ 悬停详情 ══════════════

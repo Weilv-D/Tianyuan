@@ -471,8 +471,11 @@ const IMPL: Record<string, Impl> = {
       if (!e.alive || e.team === u.team) continue;
       if (e.hp / e.maxHp < threshold) {
         // 斩杀一跳豁免真伤单跳上限：处决的语义是"裁定死亡"而非输出伤害，
-        // 若被 MECH.trueHitCapRatio 钳制则处决机制整体失效
-        api.dealDamage(u, e, e.hp + e.shield + 9999, 'true', { source: 'skill', ignoreTrueCap: true });
+        // 若被 MECH.trueHitCapRatio 钳制则处决机制整体失效。
+        // 量取恰好 hp+shield（+1 浮点余量）保证必死；此前 +9999 的填充值会全额
+        // 流入 final——处决者的伤害/承伤统计虚高一万，全能吸血按 1 万结算≈回满，
+        // onDamageTaken 反弹钩子也按 1 万放大（真实 bug，v1.11.1 修复）。
+        api.dealDamage(u, e, e.hp + e.shield + 1, 'true', { source: 'skill', ignoreTrueCap: true });
         executed++;
       } else {
         skillDamage(api, u, e, raw, 'true');

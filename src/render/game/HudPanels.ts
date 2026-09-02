@@ -249,7 +249,9 @@ export class HudPanels {
     const cx = W / 2;
     const line = this.scene.add.graphics();
     line.lineStyle(1, GILT.base, 0.25);
-    line.lineBetween(cx - 380, PHASE_Y, cx - 250, PHASE_Y);
+    // 左线右端收到 650：签条「备 战 席」左缘 666，此前 710 的末端正压签条上方，
+    // 视觉上与签条撞成一团（右线无此问题，场上文无底框）
+    line.lineBetween(cx - 380, PHASE_Y, cx - 310, PHASE_Y);
     line.lineBetween(cx + 290, PHASE_Y, cx + 420, PHASE_Y);
 
     this.phaseText = this.scene.add
