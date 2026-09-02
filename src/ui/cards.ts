@@ -534,9 +534,8 @@ export function starGlyph(star: Star): string {
 // ── 详情卡装备三格槽（icon 即视觉，名字/效果进悬停 tooltip）────────
 // 图标与器匣/头顶/提示卡同出 itemIcons 烘焙管线 —— 不是新画的装饰，
 // 是同一资产的第四个展示档（47/36/17/24px）。空槽淡框表达"还能装"。
-// 格下短名换行：三格共 w-28 的可用宽度，单槽按 SLOT_PITCH 限宽，
-// 10px 小字断行时行高≈12（clipToWidth 仅做行宽守护，行数由 wordWrap 控制）
-// —— 「鈎魂鈴」等 3 字词不会重叠到相邻槽。
+// 格下短名单行截断：槽宽仅 SLOT_PITCH=32，换行会把行高压进下方羁绊行
+// （144+26+4+行高 > traitT），故恒为单行、以 clipToWidth 在槽宽内截断加省略号。
 const SLOT_SIZE = 26;
 const SLOT_ICON = 24;
 const SLOT_PITCH = 32;
@@ -616,14 +615,12 @@ export class UnitDetailCard {
       });
       this.slotIcons.push(img);
       this.itemsRow.add(img);
-      // 槽下短名：居中、上沿锚定，限宽换行（CHAR_LIMIT_WORD_WRAP），两格之间不挤叠
+      // 槽下短名：居中、上沿锚定，单行截断（不换行，避免压到羁绊行）
       const nameT = scene.add
         .text(i * SLOT_PITCH + SLOT_SIZE / 2, SLOT_SIZE + 4, '', {
           fontFamily: FONT.body,
           fontSize: SLOT_LABEL_FONT,
           color: css(PAPER[300]),
-          align: 'center',
-          wordWrap: { width: SLOT_LABEL_W, useAdvancedWrap: true },
         })
         .setOrigin(0.5, 0);
       nameT.setVisible(false);
@@ -682,7 +679,7 @@ export class UnitDetailCard {
     });
 
     // 装备三格槽：图标 + 格下常驻装备名（不依赖悬停）；图标仍可悬停看完整效果
-    // 名称走槽限宽换行（SLOT_LABEL_W=30，10px 中心对齐）：3 字词两行不挤叠
+    // 名称单行截断在槽宽内：不换行，避免第二行压到羁绊行
     const ids = u.items.slice(0, 3);
     for (let i = 0; i < 3; i++) {
       const iid = ids[i] ?? null;
@@ -693,7 +690,8 @@ export class UnitDetailCard {
         // setDisplaySize 必须跟在 setTexture 后：scale 按当前纹理帧标定，
         // 换纹理不会自动重标（32×2 的 __DEFAULT 与 96×96 烘焙图差 3 倍）
         img.setTexture(itemIconKey(iid)).setDisplaySize(SLOT_ICON, SLOT_ICON).setVisible(true);
-        nameT.setText(ITEM_BY_ID[iid]?.name ?? iid).setVisible(true);
+        const raw = ITEM_BY_ID[iid]?.name ?? iid;
+        nameT.setText(clipToWidth(nameT, raw, SLOT_LABEL_W)).setVisible(true);
       } else {
         img.setVisible(false);
         nameT.setVisible(false);
