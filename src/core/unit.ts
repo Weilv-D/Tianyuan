@@ -126,9 +126,10 @@ export function createUnit(input: BattleUnitInput): Unit {
 
   // 五费三星·天命（LEGEND_T3）：数值在天命层再乘，附免疫控制/开战护盾/全能吸血。
   // 三星五费是终局单位，常规三星倍率不足以表达"无敌"的玩家预期。
-  // monster（墨兽轮）排除：beast 后期池含五费且 16 轮后有 3★ 概率，
-  // 不排除的话 PvE 会静默拿到天命包，难度尖峰绕过平衡前提。
-  const legend = entry.cost === 5 && input.star === 3 && !input.monster;
+  // monster（墨兽轮）与召唤物（isMinion）排除：beast 后期池含五费且 16 轮后有 3★
+  // 概率，不排除的话 PvE 会静默拿到天命包，难度尖峰绕过平衡前提 —— 与
+  // skills.skillRaw 的技能天命乘区同一判定（!isMinion && !isMonster）。
+  const legend = entry.cost === 5 && input.star === 3 && !input.isMinion && !input.monster;
   const legendHp = legend ? LEGEND_T3.hpMult : 1;
   const legendPow = legend ? LEGEND_T3.powerMult : 1;
   // 三星四费「登峰」（T3_ELITE_COST4）：数值乘区，无机制包（见 config 注释）。

@@ -177,6 +177,8 @@ export interface BattleUnitInput {
   }>;
   /** 墨兽（PvE 单位）。渲染层据此换用墨色剪影，与玩家棋子区分。 */
   monster?: boolean;
+  /** 召唤物标记（createMinion 内部派生用）。天命判定与技能乘区据此排除召唤物。 */
+  isMinion?: boolean;
   /** 攻击力倍率（乘在星级倍率之后、装备加成之前）。引导轮墨兽 0.15，缺省 1。 */
   powMult?: number;
 }

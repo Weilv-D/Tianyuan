@@ -164,8 +164,11 @@ export class GameScene extends Phaser.Scene {
     motion.calm = this.prefs.calm;
     this.inputCtl.resetForCreate();
     // DEV 控制台随场景实例存活：panel 若在上一场关闭时还开着，现在指向
-    // 已销毁的容器（isOpen 恒真）—— create 时统一复位（C5）
+    // 已销毁的容器（isOpen 恒真）—— create 时统一复位（C5）。
+    // attach 必须在 create（scene.events 已由 Systems boot 挂载）调用：
+    // DebugConsole 是字段初始化期构造的模块，构造器里读 scene.events 为 undefined
     this.debug.reset();
+    this.debug.attach();
     this.saveTimer?.remove();
     this.saveTimer = null;
 

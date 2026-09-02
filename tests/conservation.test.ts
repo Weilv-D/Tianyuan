@@ -202,6 +202,38 @@ describe('玩家资产守恒', () => {
     expect(player.bench.every((u) => u === null || u.defId !== 'pan')).toBe(true);
   });
 
+  it('满席买入即合后升级件留备战席（自动上场关闭/人口满）：席位仍收敛 9 格', () => {
+    // autoDeploy=false（或同名已在场 / 人口已满）时，合成出的 2★ 不搬上场而留席。
+    // 此前只有"溢出位恰好是合成被吃对象（尾部变空）"才裁尾，其余任何幸存者
+    // 滞留第 10 格的路径都会让 p.bench.length 永久停在 10（第 10 格恒 null，
+    // 视觉多一格、遍历多一空位）。修复后成功路径无条件把长度收敛回 BENCH_SLOTS。
+    const match = new Match(20260906, '测试', 'normal');
+    match.settings.autoDeploy = false; // 关闭自动上场 → 升级件留备战席
+    const player = match.human;
+    player.gold = 50;
+    player.level = 1; // 人口 1 已满（场上 1 张）→ 即便开自动上场也无处放
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    // 用互不相同的杂牌占位（同名会触发级联合成，污染席位断言）
+    const fillers = ['lingxiao', 'moyu', 'kutong', 'yuansu', 'wujiu', 'pan', 'guicheng'].filter((id) => id !== 'pan');
+    player.bench[0] = createUnit('pan');
+    player.bench[1] = createUnit('pan');
+    for (let i = 2; i < BENCH_SLOTS; i++) player.bench[i] = createUnit(fillers[i - 2]!);
+    player.board[boardIdx(0, 0)] = createUnit('ajiu');
+    player.shop[0] = 'pan';
+
+    expect(match.buy(player, 0).ok).toBe(true);
+
+    // 三张 pan 1★ 合出 2★，幸存者留在备战席；长度收敛回 9
+    expect(player.bench).toHaveLength(BENCH_SLOTS);
+    const pans = player.bench.filter((u) => u?.defId === 'pan');
+    expect(pans).toHaveLength(1);
+    expect(pans[0]?.star).toBe(2);
+    // 合成净腾一格：9 席 = 7 杂牌 + 1 pan2★ + 1 空
+    expect(player.bench.filter((u) => u !== null)).toHaveLength(BENCH_SLOTS - 1);
+    expect(player.board.some((u) => u?.defId === 'pan')).toBe(false);
+  });
+
   it('单件卸装严守器匣容量：放不下时整体拒绝（与批量卸载同口径）', () => {
     const match = new Match(20260905, '测试', 'normal');
     const player = match.human;

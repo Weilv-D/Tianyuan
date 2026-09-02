@@ -178,7 +178,8 @@ export interface BeastDropTier {
 /**
  * 墨兽掉落真源表。下限口径（验收线）：**五轮全败**也有组件 19（= 9.5 件成装当量，
  * 1 成品 = 2 组件）+ 金币 70，高于 9 件 / 60 金的验收线；五轮全胜 27 组件 + 2 成品
- * （= 15.5 件成装当量）+ 96 金。保底对所有玩家无条件发放，胜场追加只多不少。
+ * （= 15.5 件成装当量）+ 98 金（保底 70 + 胜场追加 28）。保底对所有玩家无条件发放，
+ * 胜场追加只多不少。DESIGN §二与 round-flow 测试同按此口径。
  */
 export const BEAST_DROP_SCHEDULE: readonly BeastDropTier[] = [
   { round: 1, comp: 2, gold: 8, winComp: 0, winGold: 0, winCompleted: 0 },
@@ -478,8 +479,11 @@ export class Match implements AiWorld {
 
     // 奇遇轮（M3）：全员共享同一份恩赐选项。掷点位置固定在墨兽阵容生成之后、
     // 收入结算之前 —— 同一种子的 rng 流 ⇒ 完全相同的 offer（对局层确定性契约）。
-    // 非奇遇轮显式置空，清掉任何残留；人类已淘汰时不再生成（快进路径无人可选）。
-    this.adventureOffer = this.isAdventureRound() && this.human.alive ? rollAdventureOffer(this.round, this.rng) : null;
+    // 非奇遇轮显式置空，清掉任何残留。offer 的生成不依赖人类存活：人类淘汰后的
+    // 快进回合（fastForward）仍由 AI 继续对战分出名次，若此刻停发奇遇，AI 会
+    // 系统性错失剩余奇遇轮（4/10/16 在 16 轮后无漏，但人类若在 4/10 前淘汰，
+    // AI 在 10/16 轮的恩赐会整轮蒸发，2~4 名排序被扭曲）。
+    this.adventureOffer = this.isAdventureRound() ? rollAdventureOffer(this.round, this.rng) : null;
 
     for (const p of this.alivePlayers()) {
       // 1) 结算上一回合的收入（第一回合没有上一回合）
@@ -548,10 +552,13 @@ export class Match implements AiWorld {
       if (!hasBenchVictim) return { ok: false, reason: 'bench' };
     }
     // 快照必须先于取卡：从这里起任何失败都整体回滚（金币/卡池/商店格/棋盘/备战席/器匣）
-    // 快照 scope 与撤销层对齐（棋盘/席/金币/等级/商店/器匣/池/奇遇）——buy 虽不直接
-    // 改动奇遇与随机流，但回滚与 undo.ts restorePlayer 走同一完整口径，避免未来在
-    // buy 内引入 rng/奇遇消费时出现"只回滚了下半场"的错位
+    // 快照 scope 与撤销层对齐（棋盘/席/金币/等级/商店/器匣/池/奇遇）+ 随机流游标。
+    // 撤销层（GameScene.UndoEntry）随 pushUndo/onUndo 另存 rngState；buy 的原子回滚
+    // 若不连游标一起定格，未来在 buy 内引入任何 rng 消费（掉落/随机特效），失败回滚
+    // 会把已前进的游标留在玩家手里 —— 重试即"撤销白嫖"半回滚。当前 buy 零 rng 消费，
+    // 游标定格是前瞻守卫，与 undo.ts 同一完整口径。
     const snap = snapshotPlayer(p, this.pool, this.adventureOffer);
+    const rngBackup = this.rng.state;
     // 卡池不足：保留商店格（缺货卡仍显示，点击提示「卡池不足」），不吞卡
     if (!this.pool.take(id)) return { ok: false, reason: 'pool' };
     p.gold -= def.cost;
@@ -559,16 +566,19 @@ export class Match implements AiWorld {
     const u = createUnit(id, 1);
 
     if (benchFull) {
-      // 溢出落位：0~8 已满，新子临时占第 10 格；三张在册时合成吃掉它后裁回 9 格
+      // 溢出落位：0~8 已满，新子临时占第 10 格（push 出的临时槽，BENCH_SLOTS=9 之外）
       p.bench.push(u);
       const merges = resolveMerges(p);
+      // 成功判定：合成消费两张旧同名 1★ 后，第 10 格必须空出（被吃或后续搬走）。
+      // 尾部仍非空 = 有资产（升级 2★ / 第 4 张同名 1★）滞留在溢出槽 —— 席满
+      // 无处安放，整体回滚到买入前（白嫖 2★ / 越席 10 格的单边漂移都禁止）
       while (p.bench.length > BENCH_SLOTS && p.bench[p.bench.length - 1] === null) p.bench.pop();
       if (merges.length === 0 || p.bench.length > BENCH_SLOTS) {
-        // 4 张同名在册时溢出位可能是合成幸存者（席位破坏）——整体回滚到买入前
         restorePlayer(p, this.pool, snap);
-        // 奇遇恩赐与随机流不在 buy 的改动范围内，但回滚与撤销层同取完整快照口径：
-        // adventureOffer 一并还原，未来 buy 内新增 rng 消费时不会出现只回滚了半场
+        // 奇遇恩赐与随机流游标一并还原（与撤销层同一完整快照口径）：
+        // 未来 buy 内新增 rng/奇遇消费时不会出现只回滚了半场
         this.adventureOffer = snap.adventureOffer;
+        this.rng.state = rngBackup;
         return { ok: false, reason: 'bench' };
       }
       this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★（满席即合）`);
@@ -577,10 +587,10 @@ export class Match implements AiWorld {
         const upgraded = p.bench.find((b) => b !== null && b.defId === id && b.star > 1);
         if (upgraded) this.tryAutoDeploy(p, upgraded.iid);
       }
-      // 自动上场把溢出位（第 10 格）的合成幸存者搬走后，席位可能又空出尾截：
-      // 必须再裁一次，否则 p.bench.length 停在 10，违反 BENCH_SLOTS=9 不变式，
-      // 备战席长度从此 10 格（第 10 格恒 null，视觉多一格、遍历多一空位）
-      while (p.bench.length > BENCH_SLOTS && p.bench[p.bench.length - 1] === null) p.bench.pop();
+      // 自动上场把第 10 格的合成幸存者搬走后尾部必空；即便没搬（autoDeploy=false
+      // 且尾部已空），此处也无条件把长度收敛回 BENCH_SLOTS=9 —— 尾部空位是
+      // 合成净腾一格的常态，不留幽灵槽（length 不变式见 conservation 测试）
+      p.bench.length = BENCH_SLOTS;
       return { ok: true };
     }
 
@@ -588,6 +598,7 @@ export class Match implements AiWorld {
     if (addToBench(p, u) < 0) {
       restorePlayer(p, this.pool, snap);
       this.adventureOffer = snap.adventureOffer;
+      this.rng.state = rngBackup;
       return { ok: false, reason: 'bench' };
     }
     const merges = resolveMerges(p);
@@ -601,6 +612,9 @@ export class Match implements AiWorld {
         : u;
       if (upgraded) this.tryAutoDeploy(p, upgraded.iid);
     }
+    // 常量格买入可能合成 3 张并出 2★（新子 + 席上 2 张同名）—— 合成后席位少一
+    // 不会溢出，这里只是防御性确保 bench 长度恒 ≤ BENCH_SLOTS
+    if (p.bench.length > BENCH_SLOTS) p.bench.length = BENCH_SLOTS;
     return { ok: true };
   }
 

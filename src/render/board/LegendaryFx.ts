@@ -111,7 +111,10 @@ export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
     duration: 460,
     ease: 'Quad.easeIn',
     onComplete: () => {
-      if (root.scene) root.destroy();
+      if (root.scene) {
+        root.removeAll(true); // Container.destroy 不递归销毁子对象（exclusive=false）
+        root.destroy();
+      }
     },
   });
   // 场景在演出中切换（重开/快进/切图鉴）：root 与粒子必须随场景退场销毁，
@@ -120,6 +123,9 @@ export function playLegendaryStarFx(scene: Phaser.Scene, defId: string): void {
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
     if (root.scene) {
       scene.tweens.killTweensOf([dim, shadow, halo, seal, banner]);
+      // root 直接 destroy 不会递归销毁子对象（Container 需显式 exclusive），
+      // 演出中途切场景时子对象会游离到场景显示列表 —— 先 removeAll(true) 再销毁
+      root.removeAll(true);
       root.destroy();
     }
   });

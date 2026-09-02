@@ -193,14 +193,30 @@ describe('装备钩子回归（v1.9 新件）', () => {
     expect(stuns.length).toBeGreaterThan(0);
   });
 
-  it('紫金炉：普攻命中额外回蓝', () => {
-    const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }, { items: ['zijin'] }), unitInput('jingyu', 1, { c: 7, r: 1 })], 777, 400);
-    const a = byDef(battle, 'pan');
-    const withItem = a.mp;
-    // 对照：不带紫金炉的同种子同站位，回蓝应更低（每命中 +3）
-    const bare = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }), unitInput('jingyu', 1, { c: 7, r: 1 })], 777, 400);
-    const barePan = byDef(bare, 'pan');
-    expect(withItem).toBeGreaterThan(barePan.mp);
+  it('紫金炉：普攻命中额外回蓝，且法力变化发 mana 事件（蓝条/回放与内核同源）', () => {
+    const run = (withZijin: boolean) => {
+      const battle = mkBattle(
+        withZijin
+          ? [unitInput('pan', 0, { c: 0, r: 6 }, { items: ['zijin'] }), unitInput('jingyu', 1, { c: 7, r: 1 })]
+          : [unitInput('pan', 0, { c: 0, r: 6 }), unitInput('jingyu', 1, { c: 7, r: 1 })],
+        777,
+        400,
+      );
+      for (let i = 0; i < 400 && !battle.finished; i++) battle.step();
+      return battle;
+    };
+    const armed = run(true);
+    const bare = run(false);
+    const manaOf = (battle: Battle, defId: string) => {
+      const u = byDef(battle, defId);
+      return battle.events.filter((e) => e.t === 'mana' && e.uid === u.uid).length;
+    };
+    // 紫金炉每次命中在普攻回蓝之外额外 +3 并补发 mana 事件（此前缺发时渲染层
+    // 蓝条滞后）—— 武装方的 mana 事件数应多于裸装方（同样普攻次数，多出紫金炉
+    // 自己的回蓝事件）。不用结算时点 mp 比较：施法会清空 mp，终值不稳定。
+    const armedEvents = manaOf(armed, 'pan');
+    expect(armedEvents).toBeGreaterThan(0);
+    expect(armedEvents).toBeGreaterThan(manaOf(bare, 'pan'));
   });
 
   it('墨龙旗：开战全体友军获得 22% 减伤（2026-09-02 定档）', () => {

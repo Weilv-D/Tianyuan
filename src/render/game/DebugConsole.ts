@@ -17,8 +17,15 @@ import type { GameScene } from '../scenes/GameScene';
 export class DebugConsole {
   private panel: Phaser.GameObjects.Container | null = null;
 
-  constructor(private scene: GameScene) {
-    // 场景关闭即清引用（与 reset 同语义，防御 create 之前就有 SHUTDOWN 的时序）
+  constructor(private scene: GameScene) {}
+
+  /**
+   * 场景关闭即清引用。必须在 scene 完成 boot 后调用（GameScene.create 内）：
+   * DebugConsole 是场景实例**字段初始化期**构造的唯一模块，而 `scene.events`
+   * 由 Phaser Systems 在 boot 时挂载 —— 构造器里直接订阅会读到 undefined
+   * （2026-09-03 实机复现：GameScene 创建即抛 TypeError，对局进不去）。
+   */
+  attach(): void {
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.panel = null;
     });

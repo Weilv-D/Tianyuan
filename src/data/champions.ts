@@ -61,6 +61,8 @@ export interface SkillParams {
   shots?: number;
   /** 弹幕间隔（秒） */
   interval?: number;
+  /** 弹幕自增益的同时生效层数上限（volley 兑现"至多 N 层"的文案承诺） */
+  maxStacks?: number;
   /** 连锁跳数与每跳衰减 */
   jumps?: number;
   falloff?: number;
@@ -187,7 +189,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'qinghe_q',
     skillSpec: {
       kind: 'healBurst', name: '春风化雨', target: 'allyLowestHp',
-      desc: '为生命最低的 2 名友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 5 秒 20% 攻速。',
+      desc: '为生命最低的 2 名友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 {statusDur} 秒 {statusValue} 攻速。',
       params: { value: 0.18, sp: 0.6, shots: 2, status: { kind: 'aspdUp', dur: 5, value: 20 } },
     },
   },
@@ -223,7 +225,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'kutong_q',
     skillSpec: {
       kind: 'nova', name: '毒瘴', target: 'self',
-      desc: '向周围 {radius} 格释放毒瘴，造成 {sp} 法强的法术伤害，并使其中敌人受到的治疗降低 50%，持续 {dur} 秒。',
+      desc: '向周围 {radius} 格释放毒瘴，造成 {sp} 法强的法术伤害，并使其中敌人受到的治疗降低 {statusValue}，持续 {statusDur} 秒。',
       params: { sp: 1.1, radius: 1, type: 'magic', status: { kind: 'wound', dur: 4, value: 50 } },
     },
   },
@@ -249,7 +251,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'canghao_q',
     skillSpec: {
       kind: 'selfBuff', name: '狂血', target: 'self',
-      desc: '进入狂血状态 {dur} 秒：攻速 +50%、攻击力 +45%；期间每次击杀，狂血时长刷新至满。',
+      desc: '进入狂血状态 {dur} 秒：攻速 +{statusValue}、攻击力 +{extraStatusValue}；期间每次击杀，狂血时长刷新至满。',
       params: {
         dur: 8,
         status: { kind: 'aspdUp', dur: 8, value: 50 },
@@ -290,8 +292,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'muji_q',
     skillSpec: {
       kind: 'volley', name: '连弩齐射', target: 'currentTarget',
-      desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 6% 攻速（至多 8 层，持续 5 秒）。',
-      params: { atk: 0.7, type: 'physical', shots: 8, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
+      desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 {statusValue} 攻速（至多 {maxStacks} 层，持续 {statusDur} 秒）。',
+      params: { atk: 0.7, type: 'physical', shots: 8, interval: 0.4, maxStacks: 8, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
   {
@@ -302,7 +304,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'moyu_q',
     skillSpec: {
       kind: 'field', name: '墨狱', target: 'enemyDensest',
-      desc: '在敌人最密集处泼洒墨池，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害，并降低其中敌人 30% 攻速。',
+      desc: '在敌人最密集处泼洒墨池，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害，并降低其中敌人 {statusValue} 攻速。',
       params: { dur: 5, dpsSp: 0.62, radius: 1, type: 'magic', status: { kind: 'slow', dur: 5, value: 30 } },
     },
   },
@@ -314,7 +316,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'bainiang_q',
     skillSpec: {
       kind: 'healBurst', name: '蛇涎回春', target: 'allAllies',
-      desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命；同时对 {shots} 名随机敌人施加 {dur} 秒重伤（受治疗降低 40%）。',
+      desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命；同时对 {shots} 名随机敌人施加 {statusDur} 秒重伤（受治疗降低 {statusValue}）。',
       params: { value: 0.12, sp: 0.5, shots: 3, dur: 3, status: { kind: 'wound', dur: 3, value: 40 } },
     },
   },
@@ -340,7 +342,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'xuanwu_q',
     skillSpec: {
       kind: 'shieldAll', name: '玄冥之护', target: 'allAllies',
-      desc: '为全体友军提供相当于自身 {value} 最大生命的护盾，持续 8 秒；护盾生效期间受到伤害降低 {damageReduction}。',
+      desc: '为全体友军提供相当于自身 {value} 最大生命的护盾，持续 {shieldDur} 秒；护盾生效期间受到伤害降低 {damageReduction}。',
       // 护盾时长走 shieldDur（与墨家/鬼城同口径）：skills.shieldAll 只读
       // shieldDur，读顶层 dur 的是控制时长 —— 玄武若用 dur 传 8，扫参改
       // dur 会静默失效（skills 侧默认 shieldDur=8 巧合对齐，改键即断链）
@@ -355,7 +357,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'chitong_q',
     skillSpec: {
       kind: 'nova', name: '血怒', target: 'self',
-      desc: '横扫周围 {radius} 格，造成 {atk} 攻击力的物理伤害；每命中一名敌人回复 {healOnHit} 最大生命，并获得 6 秒 25% 攻击力。',
+      desc: '横扫周围 {radius} 格，造成 {atk} 攻击力的物理伤害；每命中一名敌人回复 {healOnHit} 最大生命，并获得 {statusDur} 秒 {statusValue} 攻击力。',
       params: { atk: 2.1, radius: 1, type: 'physical', healOnHit: 0.08, status: { kind: 'atkUp', dur: 6, value: 25 } },
     },
   },
@@ -379,7 +381,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'aoyin_q',
     skillSpec: {
       kind: 'chain', name: '潮生链', target: 'enemyNearest',
-      desc: '水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 15%），并降低 25% 攻速 3 秒。',
+      desc: '水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 15%），并降低 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 1.75, jumps: 4, falloff: 0.15, type: 'magic', status: { kind: 'slow', dur: 3, value: 25 } },
     },
   },
@@ -489,7 +491,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'canglan_q',
     skillSpec: {
       kind: 'field', name: '沧海潮汐', target: 'enemyHalfBoard',
-      desc: '在敌方半场涌起潮汐，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害并降低 25% 移速与攻速；自身获得 25% 减伤。',
+      desc: '在敌方半场涌起潮汐，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害并降低 {statusValue} 移速与攻速；自身获得 {statusValue} 减伤。',
       params: { dur: 6, dpsSp: 0.92, radius: 2, type: 'magic', status: { kind: 'slow', dur: 6, value: 25 }, damageReduction: 0.25 },
     },
   },
@@ -515,7 +517,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yunchu_q',
     skillSpec: {
       kind: 'chain', name: '飞杼', target: 'enemyNearest',
-      desc: '掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 15%）并降低 20% 攻速 2 秒。',
+      desc: '掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 15%）并降低 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 1.5, jumps: 3, falloff: 0.15, type: 'magic', status: { kind: 'slow', dur: 2, value: 20 } },
     },
   },
@@ -551,7 +553,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jiuyuan_q',
     skillSpec: {
       kind: 'strike', name: '酹祭', target: 'enemyHighestAtk',
-      desc: '酹酒祭地：对攻击最高的敌人造成 {sp} 法强的法术伤害，并降低其 25% 攻速 3 秒。',
+      desc: '酹酒祭地：对攻击最高的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 1.5, type: 'magic', status: { kind: 'slow', dur: 3, value: 25 } },
     },
   },
@@ -563,7 +565,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'lingque_q',
     skillSpec: {
       kind: 'volley', name: '雀鸣', target: 'currentTarget',
-      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；每箭命中提升自身 5% 攻速（持续 5 秒）。',
+      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；每箭命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
       params: { atk: 0.5, type: 'physical', shots: 5, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 5 } },
     },
   },
@@ -575,7 +577,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'hanxing_q',
     skillSpec: {
       kind: 'strike', name: '坠星', target: 'enemyLowestHp',
-      desc: '引寒星坠落：对生命最低的敌人造成 {sp} 法强的法术伤害，并降低其 20% 攻速 2 秒。',
+      desc: '引寒星坠落：对生命最低的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 1.9, type: 'magic', status: { kind: 'slow', dur: 2, value: 20 } },
     },
   },
@@ -601,7 +603,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'guicheng_q',
     skillSpec: {
       kind: 'shieldAll', name: '城垣', target: 'allAllies',
-      desc: '筑起城垣：全体友军获得 {value} 最大生命的护盾与 10% 减伤，持续 6 秒。',
+      desc: '筑起城垣：全体友军获得 {value} 最大生命的护盾与 {damageReduction} 减伤，持续 {shieldDur} 秒。',
       params: { value: 0.09, damageReduction: 0.1, shieldDur: 6 },
     },
   },
@@ -625,7 +627,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'paoche_q',
     skillSpec: {
       kind: 'volley', name: '石弩', target: 'currentTarget',
-      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；命中后自身获得 8% 攻速 3 秒。',
+      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
       params: { atk: 0.62, type: 'physical', shots: 4, interval: 0.55, status: { kind: 'aspdUp', dur: 3, value: 8 } },
     },
   },
@@ -637,7 +639,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yaoguang_q',
     skillSpec: {
       kind: 'aoe', name: '星坠', target: 'enemyDensest',
-      desc: '瑶光坠地：{radius} 格内造成 {sp} 法强的法术伤害并降低 25% 攻速 2 秒。',
+      desc: '瑶光坠地：{radius} 格内造成 {sp} 法强的法术伤害并降低 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 2.1, radius: 1, type: 'magic', status: { kind: 'slow', dur: 2, value: 25 } },
     },
   },
@@ -649,7 +651,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jiaohan_q',
     skillSpec: {
       kind: 'nova', name: '翻江', target: 'self',
-      desc: '横扫周围 {radius} 格造成 {atk} 攻击力的物理伤害，并获得 6 秒 20% 攻速。',
+      desc: '横扫周围 {radius} 格造成 {atk} 攻击力的物理伤害，并获得 {statusDur} 秒 {statusValue} 攻速。',
       params: { atk: 1.9, radius: 1, type: 'physical', status: { kind: 'aspdUp', dur: 6, value: 20 } },
     },
   },
@@ -661,7 +663,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'chaoji_q',
     skillSpec: {
       kind: 'volley', name: '潮弩', target: 'currentTarget',
-      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 6% 攻速（持续 5 秒）。',
+      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
       params: { atk: 0.5, type: 'physical', shots: 6, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
@@ -747,7 +749,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'taozhu_q',
     skillSpec: {
       kind: 'nova', name: '散金', target: 'self',
-      desc: '散金惑敌：周围 {radius} 格内造成 {sp} 法强的法术伤害，并使其受到的治疗降低 40%，持续 3 秒。',
+      desc: '散金惑敌：周围 {radius} 格内造成 {sp} 法强的法术伤害，并使其受到的治疗降低 {statusValue}，持续 {statusDur} 秒。',
       params: { sp: 1.3, radius: 1, type: 'magic', status: { kind: 'wound', dur: 3, value: 40 } },
     },
   },
@@ -773,7 +775,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'moliu_q',
     skillSpec: {
       kind: 'nova', name: '踏阵', target: 'self',
-      desc: '踏破敌阵：横扫周围 {radius} 格造成 {atk} 攻击力的物理伤害；每命中一名敌人回复 {healOnHit} 最大生命，并获得 6 秒 20% 攻击力。',
+      desc: '踏破敌阵：横扫周围 {radius} 格造成 {atk} 攻击力的物理伤害；每命中一名敌人回复 {healOnHit} 最大生命，并获得 {statusDur} 秒 {statusValue} 攻击力。',
       params: { atk: 2.3, radius: 1, type: 'physical', healOnHit: 0.07, status: { kind: 'atkUp', dur: 6, value: 20 } },
     },
   },
@@ -797,7 +799,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jingbo_q',
     skillSpec: {
       kind: 'field', name: '鲸落', target: 'enemyDensest',
-      desc: '鲸落成渊：持续 {dur} 秒，{radius} 格内每秒受到 {dpsSp} 法强的法术伤害并降低 30% 攻速。',
+      desc: '鲸落成渊：持续 {dur} 秒，{radius} 格内每秒受到 {dpsSp} 法强的法术伤害并降低 {statusValue} 攻速。',
       params: { dur: 5, dpsSp: 0.55, radius: 2, type: 'magic', status: { kind: 'slow', dur: 5, value: 30 } },
     },
   },
@@ -809,7 +811,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'shihu_q',
     skillSpec: {
       kind: 'volley', name: '虎啸', target: 'currentTarget',
-      desc: '啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；命中后自身获得 10% 攻速 5 秒。',
+      desc: '啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
       params: { atk: 0.75, type: 'physical', shots: 4, interval: 0.5, status: { kind: 'aspdUp', dur: 5, value: 10 } },
     },
   },
@@ -823,7 +825,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'mozhai_q',
     skillSpec: {
       kind: 'shieldAll', name: '兼爱', target: 'allAllies',
-      desc: '举兼爱之旗：全体友军获得 {value} 最大生命的护盾（持续 8 秒）与 {damageReduction} 减伤。',
+      desc: '举兼爱之旗：全体友军获得 {value} 最大生命的护盾（持续 {shieldDur} 秒）与 {damageReduction} 减伤。',
       params: { value: 0.14, damageReduction: 0.18, shieldDur: 8 },
     },
   },
@@ -847,7 +849,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'gouchen_q',
     skillSpec: {
       kind: 'beam', name: '勾陈垣', target: 'enemyLongestLine',
-      desc: '勾陈六星贯穿 {length} 格，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -30%（持续 6 秒）。',
+      desc: '勾陈六星贯穿 {length} 格，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusValue}（持续 {statusDur} 秒）。',
       params: { sp: 4.2, length: 6, type: 'magic', status: { kind: 'mrShred', dur: 6, value: 30 } },
     },
   },
@@ -917,7 +919,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yinglong_q',
     skillSpec: {
       kind: 'beam', name: '祖龙吐息', target: 'enemyLongestLine',
-      desc: '蓄力后喷吐贯穿 {length} 格的祖龙之息，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -35%（持续 6 秒）。',
+      desc: '蓄力后喷吐贯穿 {length} 格的祖龙之息，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusValue}（持续 {statusDur} 秒）。',
       params: { sp: 4.7, length: 8, type: 'magic', status: { kind: 'mrShred', dur: 6, value: 35 }, invulnWhileCasting: true },
     },
   },
@@ -941,8 +943,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'qingqiu_q',
     skillSpec: {
       kind: 'shieldAll', name: '九尾庇佑', target: 'allAllies',
-      desc: '全体友军获得 {value} 最大生命的护盾与 8 秒 40% 攻速；同时魅惑全体敌人 {dur} 秒（无法行动，且受伤加深 20%）。',
-      params: { value: 0.35, dur: 2.5, status: { kind: 'aspdUp', dur: 8, value: 40 }, vulnerability: 0.2 },
+      desc: '全体友军获得 {value} 最大生命的护盾与 {statusDur} 秒 {statusValue} 攻速；同时魅惑全体敌人 {dur} 秒（无法行动，且受伤加深 {vulnerability}）。',
+      params: { value: 0.35, shieldDur: 8, dur: 2.5, status: { kind: 'aspdUp', dur: 8, value: 40 }, vulnerability: 0.2 },
     },
   },
 ];
@@ -980,6 +982,15 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   statusValue: (p) => pctv((p.status?.value ?? 0) / 100),
   // status.value 为平值（灼烧每秒伤害等），不走百分比
   statusFlat: (p) => String(p.status?.value ?? 0),
+  // 单条状态的时长：status.dur 优先，缺省回退顶层 dur —— status 与顶层 dur 并存
+  // 时两者语义不同（status=自身增益时长 / dur=敌方控制时长），模板各自占位互不干扰
+  statusDur: (p) => String(p.status?.dur ?? p.dur ?? 0),
+  // 第二段自身状态（狂血 +45% 攻击等）的百分比值（extraStatus.value 为百分点）
+  extraStatusValue: (p) => pctv((p.extraStatus?.value ?? 0) / 100),
+  // 群体护盾时长（shieldAll 专用；敌方控制时长走 dur —— 二者语义不同）
+  shieldDur: (p) => String(p.shieldDur ?? 0),
+  // 魅惑附带的受伤加深（比例值；battle 以百分点计，此处换算成玩家可读百分比）
+  vulnerability: (p) => pctv(p.vulnerability ?? 0),
   radius: (p) => String(p.radius ?? 1),
   // 控制类技能的时长只存在于 status.dur（stun/silence/wound/burn），顶层 dur 优先
   dur: (p) => String(p.dur ?? p.status?.dur ?? 0),
@@ -990,6 +1001,7 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   knockback: (p) => String(p.knockback ?? 0),
   count: (p) => String(p.summon?.count ?? 0),
   stackAtkOnHit: (p) => pctv(p.stackAtkOnHit),
+  maxStacks: (p) => String(p.maxStacks ?? 0),
   maxRepeats: (p) => String(p.maxRepeats ?? 0),
   healPerExecute: (p) => pctv(p.healPerExecute),
 };

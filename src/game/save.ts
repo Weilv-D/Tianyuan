@@ -127,7 +127,17 @@ export function loadMatch(mode: Match['mode'] = 'normal'): Match | null {
     const legacyRaw = localStorage.getItem(LEGACY_KEY);
     if (!legacyRaw) return null;
     const data = loadData(legacyRaw, 2);
-    if (!data) return null;
+    if (!data) {
+      // v2 旧档损坏（配额半截写入/手动改坏/版本残留）：与 v3 坏键同一自愈口径。
+      // 不清理的话 hasSave 只看键存在性仍会亮「继续」，loadMatch 却永远读不出
+      // 存档 —— 入口常亮却点不进的坏档幽灵（v3 坏键已清，v2 坏键此前漏了）
+      try {
+        localStorage.removeItem(LEGACY_KEY);
+      } catch {
+        /* 清不掉也无害：hasSave 判 v3 无档且 v2 仍在时会二次走这里 */
+      }
+      return null;
+    }
     // v2 数据没有 mode / battleSnapshots 字段，fromJSON 归 'normal' / []
     const m = Match.fromJSON(data);
     // 读档成功即写回 v3（saveMatch 自吞写失败）。

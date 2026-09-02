@@ -223,3 +223,38 @@ describe('AI 开局阵容下限（2026-09-02 空阵修复回归）', () => {
     }
   });
 });
+
+describe('奇遇轮与人类淘汰（快进路径）', () => {
+  it('人类淘汰后 AI 在剩余奇遇轮仍领恩赐（offer 生成不依赖人类存活）', () => {
+    // 回归背景：beginRound 的 offer 生成曾带 && human.alive —— 人类一旦被淘汰，
+    // 快进回合（GameScene.fastForward）不再生成奇遇 offer，而 offer 恰是 AI
+    // 吃赐的前提（beginRound 行动段 `if (p.ai && this.adventureOffer)`）——
+    // AI 系统性错失剩余奇遇轮，2~4 名排序被扭曲。此处把人类也设成 AI 原型、
+    // 整局快进，等价于"人类淘汰后的 AI 们继续对战"。
+    const match = new Match(20260910, '已淘汰的你', 'normal');
+    match.human.ai = makeProfile('balanced');
+    match.human.alive = false; // 人类已被淘汰，只留 AI 对局
+    let guard = 0;
+    while (!match.isOver() && guard++ < 40) {
+      match.beginRound();
+      if (match.isOver()) break;
+      match.settleRound();
+      match.endRound();
+    }
+
+    // 人类存活与否不应影响 AI 在奇遇轮的吃赐：全体 AI 的金币/等级/器匣增长
+    // 无法直接对拍（AI 也会自己买卖），改用日志断言 —— 奇遇发放必经 grantAdventure
+    // 并写 log。对每个 AI 数清其吃到的奇遇次数：每轮 offer 只有一次，
+    // 奇遇轮 4/10/16 都发生在 40 轮内 ⇒ 若 offer 生成被 human.alive 掐断，
+    // 快进全程 AI 一次都吃不到。
+    const perAi = new Map<string, number>();
+    for (const line of match.log) {
+      const m = /^(.+?) 奇遇 ·/.exec(line);
+      if (m) perAi.set(m[1], (perAi.get(m[1]) ?? 0) + 1);
+    }
+    expect(perAi.size).toBeGreaterThanOrEqual(7); // 7 名 AI 全都吃过（不只个别）
+    for (const [name, n] of perAi) {
+      expect(n, `${name} 的奇遇次数`).toBeGreaterThanOrEqual(3); // 3 个奇遇轮都吃到
+    }
+  });
+});

@@ -60,6 +60,44 @@ describe('补丁层（patch.ts）', () => {
     p.reset();
     expect(readCurrent('champ.pan.base.atk')).toBeTypeOf('number');
   });
+
+  it('嵌套补丁：内层 reset 只回退自己的写入，外层补丁仍生效（键级回退）', () => {
+    // 历史实现 reset() 无条件 resetTuning() 清空整张调参表 —— 内层 withOverrides
+    // 收尾时会把外层已打、仍该生效的补丁一并清掉，而外层 journal 却仍以为有效，
+    // 造成"嵌套执行期外层补丁短暂失效"。修复后 reset 只回退本实例写过的键。
+    withOverrides({ 'champ.pan.base.atk': 200, 'trait.jianzong.scale': 0.7 }, () => {
+      expect(readCurrent('champ.pan.base.atk')).toBe(200);
+      withOverrides({ 'trait.jianzong.crit': 0.55, 'cfg.trueHitCapRatio': 0.2 }, () => {
+        expect(readCurrent('trait.jianzong.crit')).toBe(0.55);
+        expect(readCurrent('trait.jianzong.scale')).toBe(0.7); // 外层缩放仍可见
+        expect(readCurrent('cfg.trueHitCapRatio')).toBe(0.2);
+      });
+      // 内层还原后：外层补丁完整保留
+      expect(readCurrent('trait.jianzong.crit')).toBeUndefined();
+      expect(readCurrent('champ.pan.base.atk')).toBe(200);
+      expect(readCurrent('trait.jianzong.scale')).toBe(0.7);
+    });
+    // 外层还原后：全部回到代码默认
+    expect(readCurrent('champ.pan.base.atk')).toBeTypeOf('number');
+    expect(readCurrent('trait.jianzong.scale')).toBe(1);
+    expect(tune('jianzong', 'crit', 0.18)).toBe(0.18);
+  });
+
+  it('嵌套建桶：内层给无桶羁绊建档后还原，不残留空桶也不误删外层', () => {
+    // trait.<id>.<key> 在 TRAIT_TUNING_KEYS[id] 不存在时会现场建桶 —— 键级回退
+    // 必须只删本键，不能整桶 delete（否则嵌套时误删外层在同一羁绊上的补丁）
+    withOverrides({ 'trait.shanhai.bleed0': 0.1 }, () => {
+      expect(tune('shanhai', 'bleed0', 0.25)).toBe(0.1);
+      withOverrides({ 'trait.shanhai.wound': 0.6 }, () => {
+        expect(tune('shanhai', 'wound', 0.5)).toBe(0.6);
+      });
+      // 内层只还原 wound；bleed0 与桶都保留
+      expect(tune('shanhai', 'wound', 0.5)).toBe(0.5);
+      expect(tune('shanhai', 'bleed0', 0.25)).toBe(0.1);
+    });
+    expect(tune('shanhai', 'bleed0', 0.25)).toBe(0.25); // 全部还原
+    expect(TRAIT_TUNING_KEYS.shanhai).toBeUndefined();
+  });
 });
 
 describe('羁绊调参表（tuning.ts）', () => {

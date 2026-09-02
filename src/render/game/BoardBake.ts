@@ -44,9 +44,14 @@ export class BoardBake {
     // 盘体与格线：与战斗同一张图 —— 两处永不走样
     this.scene.add.image(BOARD_X, BOARD_Y, 'lacquerBoard_v3').setOrigin(0);
     const gridImg = this.scene.add.image(GRID_X, GRID_Y, 'lacquerGrid_v3').setOrigin(0);
-    // 入场：格线次第浮现（与 BoardView 同款 stagger 淡入）
+    // 入场：格线次第浮现（与 BoardView 同款 stagger 淡入）。
+    // 补间句柄随场景 SHUTDOWN 取消（同 BoardView 纪律）：场景复用重入 create() 时，
+    // 若旧淡入仍以已销毁 gridImg 为目标会触发对尸体的二次补间
     gridImg.setAlpha(0);
-    this.scene.tweens.add({ targets: gridImg, alpha: 1, delay: 120, duration: 460, ease: 'Quad.easeOut' });
+    const gridTween = this.scene.tweens.add({ targets: gridImg, alpha: 1, delay: 120, duration: 460, ease: 'Quad.easeOut' });
+    this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (gridTween.isPlaying()) gridTween.remove();
+    });
 
     // 敌营纱幕：上半 4 行压暗 —— "敌营"与"我方阵地"的层级一眼可读，
     // 放置规则（canPlace）照旧在数据层兜底，纱幕只是那层视觉的"位"通道

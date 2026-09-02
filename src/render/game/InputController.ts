@@ -89,22 +89,34 @@ export class InputController {
       s.traitMembers.isOpen
     );
   }
-  /** 页面隐藏：中止拖拽/点选（稳定引用，供 game.events 注册/摘除） */
+  /** 页面隐藏：中止拖拽/点选（稳定引用，供 game.events 注册/摘除）。
+   *  页面隐藏只发生一次（重复 hidden 事件不改状态），而 clearSelection/
+   *  endDrag 内部有 setVisible(false)/destroy 收尾 —— 幂等可安全重入。 */
   private onGameHidden = (): void => {
     this.pendingUnit = null;
-    this.clearSelection();
-    this.clearValid();
-    if (this.dragGhost) this.endDrag(0, 0);
+    if (this.dragGhost) {
+      // endDrag 会走完整收尾（ghost 销毁 / 落点衬底清除 / 原格透明度复位），
+      // 但画布外坐标既无落点也无 hover 目标，结束时避免走 afterAction 副作用
+      this.dragGhost.destroy();
+      this.dragGhost = null;
+      this.dragUnit = null;
+      this.dragFrom = null;
+      this.scene.boardBake?.boardHover?.clear();
+      this.clearValid();
+    }
     if (this.dragItemGhost) {
+      // 与 endItemDrag 的收尾对称：装备拖拽中止同样要收掉提示卡与落点衬底，
+      // 否则隐藏后恢复可见时提示卡/淡金衬底残留
       this.dragItemGhost.destroy();
       this.dragItemGhost = null;
       this.dragItemId = null;
       this.dragItemFrom = -1;
-      // 与 endItemDrag 的收尾对称：装备拖拽中止同样要收掉提示卡与落点衬底，
-      // 否则隐藏后恢复可见时提示卡/淡金衬底残留
       this.itemTip.hide();
       this.scene.boardBake?.boardHover?.clear();
     }
+    this.clearSelection();
+    this.clearValid();
+    this.scene.boardBake?.boardHover?.clear();
   };
 
   /** create() 时与原场景字段复位一一对应（itemTip 重建、detailCard/拖拽状态/悬停键清空） */

@@ -67,21 +67,26 @@ function pairedWinRate(compIdx: number, starA: 2 | 3, starB: 2 | 3, legendOff = 
   }
 
   let wins = 0;
-  for (let i = 0; i < N; i++) {
-    const seed = 900000 + compIdx * 1009 + i * 7919;
-    // 正向：A = team 0 / 低 uid
-    const a1 = buildTeam({ ...spec, units: unitsOf(starA) }, 0, 1);
-    const b1 = buildTeam({ ...spec, units: unitsOf(starB) }, 1, 200);
-    const r1 = new Battle({ seed, units: [...a1.inputs, ...b1.inputs], traits: { 0: a1.traits, 1: b1.traits } }, null, false).run();
-    wins += r1.winner === 0 ? 1 : r1.winner === null ? 0.5 : 0;
-    // 镜像：队号与 uid 同时翻转（A = team 1 / 高 uid）
-    const s2 = seed + 104729;
-    const a2 = buildTeam({ ...spec, units: unitsOf(starA) }, 1, 200);
-    const b2 = buildTeam({ ...spec, units: unitsOf(starB) }, 0, 1);
-    const r2 = new Battle({ seed: s2, units: [...a2.inputs, ...b2.inputs], traits: { 0: b2.traits, 1: a2.traits } }, null, false).run();
-    wins += r2.winner === 1 ? 1 : r2.winner === null ? 0.5 : 0;
+  try {
+    for (let i = 0; i < N; i++) {
+      const seed = 900000 + compIdx * 1009 + i * 7919;
+      // 正向：A = team 0 / 低 uid
+      const a1 = buildTeam({ ...spec, units: unitsOf(starA) }, 0, 1);
+      const b1 = buildTeam({ ...spec, units: unitsOf(starB) }, 1, 200);
+      const r1 = new Battle({ seed, units: [...a1.inputs, ...b1.inputs], traits: { 0: a1.traits, 1: b1.traits } }, null, false).run();
+      wins += r1.winner === 0 ? 1 : r1.winner === null ? 0.5 : 0;
+      // 镜像：队号与 uid 同时翻转（A = team 1 / 高 uid）
+      const s2 = seed + 104729;
+      const a2 = buildTeam({ ...spec, units: unitsOf(starA) }, 1, 200);
+      const b2 = buildTeam({ ...spec, units: unitsOf(starB) }, 0, 1);
+      const r2 = new Battle({ seed: s2, units: [...a2.inputs, ...b2.inputs], traits: { 0: b2.traits, 1: a2.traits } }, null, false).run();
+      wins += r2.winner === 1 ? 1 : r2.winner === null ? 0.5 : 0;
+    }
+  } finally {
+    // 任何异常（含循环内 Battle 抛错）都必须还原天命包补丁：
+    // 不还原则全局 LEGEND_T3 保持归零，污染后续口径 1/2 的测量
+    patch.reset();
   }
-  if (legendOff) patch.reset();
   return wins / (N * 2);
 }
 
@@ -122,8 +127,13 @@ for (let i = 0; i < PRESET_COMPS.length; i++) {
     'legend.omnivamp': 0,
     'legend.startShieldPct': 0,
   });
-  const off = pairedWinRate(i, 3, 2);
-  patch.reset();
+  let off: number;
+  try {
+    off = pairedWinRate(i, 3, 2);
+  } finally {
+    // 与 pairedWinRate 内层 finally 同一纪律：测量异常也必须还原补丁
+    patch.reset();
+  }
   const on = pairedWinRate(i, 3, 2);
   pkgRows.push(on - off);
   console.log(`  ${PRESET_COMPS[i].name.padEnd(14)} 包贡献 ${(100 * (on - off)).toFixed(1)}p（${pct(on)} − ${pct(off)}）`);

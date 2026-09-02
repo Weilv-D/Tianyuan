@@ -454,6 +454,11 @@ export class UnitView extends Phaser.GameObjects.Container {
     const len = Math.hypot(dx, dy) || 1;
     const kx = (dx / len) * 3.5;
     const ky = (dy / len) * 3.5;
+    // 同时清掉 sprite 上的位移/抬手补间：攻击蓄力（playAttack 前摇后摆）或
+    // 施法浮空若与受击抖动叠加，x/y 会在两个补间间互相拉扯出"乱颤"。
+    // base 只被受击位移使用（sprite 挂在 base 上，两者同源位移）——
+    // 清 sprite 即可打断攻击/施法的位置动画，base 位置由本次受击接管。
+    this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.killTweensOf(this.base);
     this.scene.tweens.add({
       targets: [this.base, this.sprite],

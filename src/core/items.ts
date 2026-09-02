@@ -362,10 +362,14 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
 
   // 紫金炉：普攻命中额外回蓝（与内核每次普攻 +10 并行，吃法力锁与上限）
   if (units.some((u) => has(u, 'critMana'))) {
-    h.onAttackHit.push((_a, src) => {
+    h.onAttackHit.push((a, src) => {
       if (!has(src, 'critMana') || !src.alive || src.isMinion) return;
       if (src.manaLock > 0) return;
+      const before = src.mp;
       src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'mpPerHit'));
+      // 法力变化必须走事件管线：渲染层的蓝条 / 回放校验只认事件流，
+      // 直接改 mp 不发事件会让"蓝已涨、条不动"直到下一次满蓝清空才矫正
+      if (src.mp !== before) a.emit({ t: 'mana', tick: a.tick, uid: src.uid, mp: src.mp, maxMp: src.maxMp });
     });
   }
 

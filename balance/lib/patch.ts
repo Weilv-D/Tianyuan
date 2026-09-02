@@ -17,7 +17,7 @@
  * LEGEND_T3 单独走 legend.* 前缀（口径 2 把天命包归零时用）。
  */
 import { CHAMPION_BY_ID } from '../../src/data/champions';
-import { resetTuning, TRAIT_TUNING, TRAIT_TUNING_KEYS, TRAIT_TUNE_KEYS } from '../../src/data/tuning';
+import { TRAIT_TUNING, TRAIT_TUNING_KEYS, TRAIT_TUNE_KEYS } from '../../src/data/tuning';
 import { LEGEND_T3, MATCH_TUNING, MECH } from '../../src/core/config';
 
 export type Overrides = Record<string, number>;
@@ -27,6 +27,8 @@ interface JournalEntry {
   key: string;
   had: boolean;
   prev: unknown;
+  /** 建桶标记：reset 逆序时桶键删空后整桶移除（仅当桶仍由本实例持有） */
+  createdBucket?: boolean;
 }
 
 const CHAMP_BASE_FIELDS = new Set([
@@ -105,28 +107,52 @@ export class Patcher {
       }
       const bucket = (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] as Record<string, number> | undefined;
       if (!bucket) {
-        (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] = { [rest]: value };
-        this.journal.push({ obj: TRAIT_TUNING_KEYS as unknown as Record<string, unknown>, key: id, had: false, prev: undefined });
+        // 建桶：reset 时若本实例建的桶已无任何键就整桶移除，不残留空桶 —— 空桶
+        // 会让后续写侧走"键不存在"报错。桶一旦被外层复用（外层先建桶、内层往里
+        // 加键），内层 reset 不能删桶 —— 用"键级回退 + 空桶清理"两层处理。
+        const fresh = { [rest]: value };
+        (TRAIT_TUNING_KEYS as unknown as Record<string, unknown>)[id] = fresh;
+        this.journal.push({ obj: fresh, key: rest, had: false, prev: undefined });
+        this.journal.push({ obj: TRAIT_TUNING_KEYS as unknown as Record<string, unknown>, key: id, had: false, prev: undefined, createdBucket: true });
       } else {
-        setNumber(bucket as unknown as Record<string, unknown>, rest, value, path, this.journal);
+        // 桶已存在：单点覆盖允许把"尚未覆盖过的键"从默认值覆盖为新值 ——
+        // 白名单（known.includes）已保证键合法，不能用 setNumber 的"键必须
+        // 已存在"检查（那只适用于 champ.base/cfg 这类字段固定存在的面）
+        const hadKey = rest in bucket;
+        this.journal.push({ obj: bucket, key: rest, had: hadKey, prev: bucket[rest] });
+        bucket[rest] = value;
       }
       return;
     }
     throw new Error(`未知的 patch 类别：${kind}`);
   }
 
-  /** 逆序还原全部写入（含羁绊调参表） */
+  /**
+   * 逆序还原本补丁的全部写入（含羁绊调参表）。
+   *
+   * 嵌套口径：本实例只回退自己的 journal —— 内层 withOverrides 还原时绝不动
+   * 外层已打、仍在该生效的补丁（历史实现里 reset 无条件 resetTuning() 清空
+   * 整张调参表，嵌套时会把外层补丁一并清掉，外层 journal 却仍以为有效；
+   * 现按"本实例写过的键"逐键回退，天然支持嵌套）。trait 单点覆盖的
+   * TRAIT_TUNING_KEYS[id] 桶由本实例建档时同样还原（delete 空桶或回旧值）。
+   */
   reset(): void {
-    // 只在真正 apply 过（journal 非空）才还原 + 全局 resetTuning：
-    // 嵌套 withOverrides 时内层的无条件 reset 会把外层已打的补丁一并清掉
-    if (this.journal.length === 0) return;
+    // 键级回退（逆序）+ 建桶清理：建桶记录必须在所有键删除**之后**才判定
+    // 空桶（键删除走逆序，桶清理放第二遍 —— 否则逆序先碰到桶记录时桶还没删键）
     for (let i = this.journal.length - 1; i >= 0; i--) {
       const e = this.journal[i];
+      if (e.createdBucket) continue;
       if (e.had) e.obj[e.key] = e.prev;
       else delete e.obj[e.key];
     }
+    for (const e of this.journal) {
+      if (!e.createdBucket) continue;
+      // 桶由本实例新建：键已全部还原，桶若空则整桶移除（不残留空桶误导后续写侧）；
+      // 若外层在同一 id 上复用本桶加了别的键，键未空则不删 —— 嵌套语义安全
+      const b = e.obj[e.key] as Record<string, number> | undefined;
+      if (b && Object.keys(b).length === 0) delete e.obj[e.key];
+    }
     this.journal.length = 0;
-    resetTuning();
   }
 }
 
