@@ -598,6 +598,8 @@ export class HudPanels {
       this.traitModalScroll = null;
       return;
     }
+    // 成员卡与全览同为羁绊信息浮层，不同时开（全览是遮罩模态，盖在成员卡上会叠）
+    this.scene.traitMembers.close();
     const shade = this.scene.add.rectangle(0, 0, W, H, SHADE, 0.55).setOrigin(0).setDepth(560).setInteractive();
     const panelW = 640;
     const panelH = 720;

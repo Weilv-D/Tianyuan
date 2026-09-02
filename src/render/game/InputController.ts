@@ -164,6 +164,12 @@ export class InputController {
       if (this.scene.adventure.contains(x, y)) return;
       // 羁绊浮层开着：不透传棋盘交互（遮罩只挡对象事件，挡不住场景级 pointerdown）
       if (this.scene.hud.traitModalOpen) return;
+      // 羁绊成员卡开着：点卡内不透传（卡是信息层）；点卡外且非徽章 → 收卡再走正常
+      // 交互（一次点击完成"收起 + 点选"，不必两击）；点徽章由徽章 pointerup 自行 toggle
+      if (this.scene.traitMembers.isOpen) {
+        if (this.scene.traitMembers.containsPoint(x, y)) return;
+        if (!this.scene.refresher.hitTraitBadge(x, y)) this.scene.traitMembers.close();
+      }
 
       // 0) 卸载模式：点击棋子 → 全身装备回器匣；点空处退出
       if (this.scene.unloadMode) {
@@ -312,6 +318,10 @@ export class InputController {
       }
       if (this.scene.hud.traitModalOpen) {
         this.scene.hud.closeTraitModal();
+        return;
+      }
+      if (this.scene.traitMembers.isOpen) {
+        this.scene.traitMembers.close();
         return;
       }
       if (this.scene.pauseScout.scoutPanel) {
@@ -638,7 +648,12 @@ export class InputController {
   }
 
   private updateHover(px: number, py: number): void {
-    if (this.scene.pauseScout.scoutPanel || this.scene.settingsPanel?.isOpen || this.scene.hud.traitModalOpen) {
+    if (
+      this.scene.pauseScout.scoutPanel ||
+      this.scene.settingsPanel?.isOpen ||
+      this.scene.hud.traitModalOpen ||
+      this.scene.traitMembers.isOpen
+    ) {
       this.clearHover();
       this.itemTip.hide();
       return;

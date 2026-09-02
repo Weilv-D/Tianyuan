@@ -6,13 +6,42 @@
  * 纯算术、零 Phaser 依赖，可在 node 测试里直接运行。
  */
 
-import { LOG_Y, RAIL_PITCH, RAIL_Y, SIDE_W } from './layout';
+import { LOG_Y, RAIL_PITCH, RAIL_X, RAIL_Y, SIDE_W } from './layout';
 import { renderedSize } from './textScaleBase';
 
 /** 徽章外环半径（逻辑 px）。traitIcons 的烘焙与各应用位共用此口径。 */
 export const BADGE_R = 16;
 /** 徽章图标显示边长（烘焙逻辑盒 40×40） */
 export const BADGE_SIZE = 40;
+
+// ── 悬停笺 / 成员卡 y 真源 ─────────────────────────────
+// 轨内徽章在世界系的 y = traitContainer 的世界 y（RAIL_Y）+ 行局部 y。
+// traitContainer 直接落在场景根部（无嵌套容器），其世界 y = RAIL_Y，
+// 与 enableScroll 的滚动位移无关（滚动改的是 container.y，见 HudPanels
+// buildTraitRail / ui/kit enableScroll）。此前按"容器局部 y"直接进世界系
+// 钳位，等于整体上移 RAIL_Y —— 顶行徽章的笺/卡落到屏顶之外。
+//
+// 三个位置真源：
+// 1. 徽章世界 y —— 悬停笺沿其对齐（railPopupClampY）的锚；传给成员卡
+//    open 作卡的贴附锚，滚动后仍贴所点徽章。
+// 2. 点击徽章行的完整命中矩形（世界系，含计数串）—— 输入层"点徽章不关卡"。
+// 3. 悬停笺世界位置 —— 与徽章行同锚：若滚轮把行滚出视口，笺同步消失。
+
+/** 第 i 枚徽章的行锚（世界 y；徽章局部 40×40 以行容器原点为中心） */
+export function railBadgeWorldY(i: number): number {
+  return RAIL_Y + railBadgeY(i);
+}
+
+/** 第 i 行徽章点击命中矩形（世界系）。入参 i = 该行在轨内的下标 */
+export function railBadgeWorldHit(i: number): { x: number; y: number; w: number; h: number } {
+  const row = railBadgeHit();
+  return { x: RAIL_X + row.x, y: RAIL_Y + railBadgeY(i) + row.y, w: row.w, h: row.h };
+}
+
+/** 悬停笺应放置的世界位置：笺左缘贴轨计数串右缘；py 沿徽章行 y 钳位 */
+export function railPopupPos(railBadgeWorldYPos: number, h: number): { x: number; y: number } {
+  return { x: 112, y: railPopupClampY(railBadgeWorldYPos, h) };
+}
 
 // ── 羁绊轨 ─────────────────────────────────────────────
 
@@ -125,6 +154,11 @@ export function reportRowRects(nameLen: number): {
 
 // ── 羁绊悬停笺 ─────────────────────────────────────────
 
+/** 悬停笺/成员卡允许占据的垂直带（世界 y；与底部 HUD 顶缘之间）—— 成员卡高上限随此域 */
+export const CAH_Y_MIN = 140;
+export const CAH_Y_MAX = 860;
+export const CAH_MAX_H = CAH_Y_MAX - CAH_Y_MIN;
+
 export const RAIL_POPUP_W = 250;
 
 /**
@@ -147,7 +181,61 @@ export function railPopupLayout(effectLines: number, descLines: number): {
 
 /** 笺体不越出屏底（给定的 py 已由调用方钳制） */
 export function railPopupClampY(railY: number, h: number): number {
-  return Math.min(Math.max(140, railY - 10), 860 - h);
+  return Math.min(Math.max(CAH_Y_MIN, railY - 10), CAH_Y_MAX - h);
+}
+
+// ── 羁绊成员卡（点击徽章钉住的名单卡，对局左轨） ──────
+// 沿悬停笺的墨底金线语言，宽度扩到 5 列立绘格：地域族 5~9 人收进 1~2 行，
+// 职业族（最多 24 人）5 行收下。卡高随行数自适应，全量最坏情形
+// （24 人 × 5 行 ≈ 532 高）经 traitMemberClampY 后仍收在 140..860 内，
+// 无需内部滚动 —— 若未来成员数超过 25（5×5）再引入滚动视口。
+
+/** 成员格列数 */
+export const TRAIT_MEMBER_COLS = 5;
+/** 格心距：立绘 84 见方 + 8 净距；名字 12px 最长 4 全角（48px）收在 84 内不折行 */
+export const TRAIT_MEMBER_PITCH = 92;
+export const TRAIT_MEMBER_SIZE = 84;
+/** 卡左缘：轨滚动视口右缘（RAIL_X-24+RAIL_VIEW_W=118）之外 6px 净距 ——
+ *  轨内滚轮视口与卡横向错开，双滚轮冲突不可能发生 */
+export const TRAIT_MEMBER_X = RAIL_X - 24 + RAIL_VIEW_W + 6;
+/** 卡内左右边距（头部与网格共用） */
+export const TRAIT_MEMBER_PAD = 16;
+/** 头部带高（徽章 + 族名 + 已上阵计数） */
+export const TRAIT_MEMBER_HEAD_H = 56;
+/** 头部带底缘到成员格区顶的净距 */
+export const TRAIT_MEMBER_HEAD_GAP = 10;
+
+/** 成员网格起点（卡局部坐标；网格容器落在这里，格子在网格内排布） */
+export const TRAIT_MEMBER_GRID_X = TRAIT_MEMBER_PAD;
+export const TRAIT_MEMBER_GRID_Y = TRAIT_MEMBER_HEAD_H + TRAIT_MEMBER_HEAD_GAP;
+
+/** 第 i 名成员的格子原点（网格局部坐标；立绘左上角） */
+export function traitMemberCell(i: number): { x: number; y: number } {
+  return {
+    x: (i % TRAIT_MEMBER_COLS) * TRAIT_MEMBER_PITCH,
+    y: Math.floor(i / TRAIT_MEMBER_COLS) * TRAIT_MEMBER_PITCH,
+  };
+}
+
+/** 卡宽：左右边距 + (cols-1)×PITCH + 立绘边长 */
+export function traitMemberCardW(): number {
+  return TRAIT_MEMBER_PAD * 2 + (TRAIT_MEMBER_COLS - 1) * TRAIT_MEMBER_PITCH + TRAIT_MEMBER_SIZE;
+}
+
+/** 网格总高：(rows-1)×PITCH + 立绘边长（rows = ceil(count/cols)） */
+export function traitMemberGridH(memberCount: number): number {
+  const rows = Math.max(1, Math.ceil(memberCount / TRAIT_MEMBER_COLS));
+  return (rows - 1) * TRAIT_MEMBER_PITCH + TRAIT_MEMBER_SIZE;
+}
+
+/** 卡高：头部带 + 净距 + 网格 + 底缘留白 */
+export function traitMemberCardH(memberCount: number): number {
+  return TRAIT_MEMBER_HEAD_H + TRAIT_MEMBER_HEAD_GAP + traitMemberGridH(memberCount) + 14;
+}
+
+/** 卡 y 钳位：靠近所点徽章，且整卡收在 CAH 域内（与悬停笺同款钳位域） */
+export function traitMemberClampY(badgeWorldYPos: number, cardH: number): number {
+  return Math.min(Math.max(CAH_Y_MIN, badgeWorldYPos - 12), CAH_Y_MAX - cardH);
 }
 
 /** 计分板行右缘不出栏（不变量） */

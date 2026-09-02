@@ -7,19 +7,24 @@ import { boardCap, boardCount } from '../../game/state';
 import { interestOf, streakGold, xpToNext } from '../../game/economy';
 import { Bar, FONT, clipToWidth, setTextIf } from '../../ui/kit';
 import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
-import { RAIL_VIEW_H } from '../view/hudLayout';
 import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, SIDE_W } from '../view/layout';
 import { traitIconKey } from '../board/traitIcons';
 import {
+  RAIL_VIEW_H,
   REPORT_ROW,
   railBadgeHit,
+  railBadgeWorldHit,
+  railBadgeWorldY,
   railBadgeY,
   railCountPos,
-  railPopupClampY,
+  railPopupPos,
   railPopupLayout,
   RAIL_POPUP_W,
 } from '../view/hudLayout';
 import type { GameScene } from '../scenes/GameScene';
+
+/** 轻点 vs 滚动落点的位移阈值（画布 px）：低于此位移的 pointerup 才算点选徽章 */
+const CLICK_DRAG = 8;
 
 /**
  * 全量刷新家族。签名守卫状态随本模块按局重建；羁绊轨与敌情/诸侯为整表重建
@@ -36,6 +41,10 @@ export class SceneRefresh {
   private lastReportSig = '\u0000';
   /** 羁绊悬停详情浮层（单例，随悬停重建） */
   private railPopup: Phaser.GameObjects.Container | null = null;
+  /** 每枚徽章行携带的羁绊 id（与 traitContainer.list 下标一一对应，外部命中遍历用） */
+  private badgeIds: string[] = [];
+  /** 徽章按下点（pointerup 位移阈值判点选用；badgeWorldY 是行锚的世界 y） */
+  private railDown: { x: number; y: number; id: string; badgeWorldY: number } | null = null;
 
   constructor(private scene: GameScene) {}
 
@@ -153,6 +162,7 @@ export class SceneRefresh {
     this.scene.hud.traitContainer.removeAll(true);
     this.railPopup?.destroy();
     this.railPopup = null;
+    this.badgeIds = [];
 
     // 激活的排前面，其次按"离下一档还差几个人"排序
     const scored = traits.map((t) => {
@@ -192,24 +202,64 @@ export class SceneRefresh {
           .setOrigin(0, 0.5)
       );
 
+      // 悬停/点击热区 = 世界系行矩形：徽章局部矩形 + 容器世界位
+      // （traitContainer 无嵌套，世界 y 即 RAIL_Y + 行局部 y，见 hudLayout 头注）
       const hit = railBadgeHit();
       item.setInteractive(new Phaser.Geom.Rectangle(hit.x, hit.y, hit.w, hit.h), Phaser.Geom.Rectangle.Contains);
-      item.on('pointerover', () => this.showRailPopup(s.def.id, s.t.count, s.t.tier, color, badgeY));
+      const worldY = railBadgeWorldY(i);
+      // 悬停出效果笺；点击钉成员卡。成员卡打开时不弹效果笺（两卡叠放抢读）。
+      // pointerup 带 8px 位移阈值：徽章在可滚轨内，滚动结束的落点不得被当成点选
+      item.on('pointerover', () => {
+        if (this.scene.traitMembers.isOpen) return;
+        this.showRailPopup(s.def.id, s.t.count, s.t.tier, color, worldY);
+      });
       item.on('pointerout', () => {
         this.railPopup?.destroy();
         this.railPopup = null;
         this.scene.input.setDefaultCursor('default');
       });
+      item.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
+        this.railDown = { x: ptr.x, y: ptr.y, id: s.def.id, badgeWorldY: worldY };
+      });
+      item.on('pointerup', (ptr: Phaser.Input.Pointer) => {
+        if (
+          this.railDown &&
+          this.railDown.id === s.def.id &&
+          Math.abs(ptr.x - this.railDown.x) < CLICK_DRAG &&
+          Math.abs(ptr.y - this.railDown.y) < CLICK_DRAG
+        ) {
+          // 打开（非收起同徽章）时清掉棋子详情卡的钉住态，避免成员卡与详情卡叠放
+          const closing = this.scene.traitMembers.isOpen && this.scene.traitMembers.traitId === s.def.id;
+          if (!closing) this.scene.inputCtl.clearSelection();
+          this.scene.traitMembers.toggle(s.def.id, worldY);
+        }
+        this.railDown = null;
+      });
       this.scene.hud.traitContainer.add(item);
+      this.badgeIds.push(s.def.id);
       i++;
     }
     this.scene.hud.traitScroll?.setHeight(i * RAIL_PITCH);
     // 轨尾渐隐缘：内容超视口才显示（17 族最坏情形才会触发）
     this.scene.hud.setRailOverflow(i * RAIL_PITCH > RAIL_VIEW_H);
+    // 成员卡开着时按轨重建同步（买/卖/撤销后上阵数变了；该族不上轨则自动收卡）
+    this.scene.traitMembers.syncFromMatch();
   }
 
-  /** 羁绊悬停详情：轨右侧浮出小笺（名/计数/当前档效果/描述），高度按内容行数自适应 */
-  private showRailPopup(id: string, count: number, tier: number, color: number, railY: number): void {
+  /** 世界坐标是否命中任一徽章行。输入层"点徽章不关卡"的判断用。
+   *  徽章行局部 y 是容器位 i*RAIL_PITCH，世界位由 railBadgeWorldHit 给出
+   *  （traitContainer 无嵌套，世界 y = RAIL_Y + 行局部 y，与滚动位移无关）。 */
+  hitTraitBadge(x: number, y: number): boolean {
+    for (let i = 0; i < this.badgeIds.length; i++) {
+      const hit = railBadgeWorldHit(i);
+      if (x >= hit.x && x <= hit.x + hit.w && y >= hit.y && y <= hit.y + hit.h) return true;
+    }
+    return false;
+  }
+
+  /** 羁绊悬停详情：轨右侧浮出小笺（名/计数/当前档效果/描述），高度按内容行数自适应。
+   *  位置按徽章行世界 y 贴附（railPopupPos 返回世界位）。 */
+  private showRailPopup(id: string, count: number, tier: number, color: number, badgeWorldY: number): void {
     this.railPopup?.destroy();
     const def = TRAIT_BY_ID[id];
     if (!def) return;
@@ -218,7 +268,7 @@ export class SceneRefresh {
     const effect = tier >= 0 ? def.effectText[Math.min(tier, def.effectText.length - 1)] : null;
     const effectLines = effect ? descLineCount(effect, RAIL_POPUP_W - 28) : 0;
     const L = railPopupLayout(effectLines, descLines);
-    const py = railPopupClampY(railY, L.h);
+    const pos = railPopupPos(badgeWorldY, L.h);
 
     const g = this.scene.add.graphics();
     g.fillStyle(INK[900], 0.97);
@@ -229,7 +279,7 @@ export class SceneRefresh {
     g.fillRect(0, 0, 2.5, L.h);
     c.add(g);
     // x=112：轨计数串右缘（RAIL_X+RAIL_COUNT_DX+RAIL_COUNT_W=109）之外留 3px 净距
-    c.setPosition(112, py);
+    c.setPosition(pos.x, pos.y);
 
     c.add(
       this.scene.add

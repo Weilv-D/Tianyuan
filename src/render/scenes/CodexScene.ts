@@ -30,6 +30,10 @@ const BODY_Y = 96;
 const BODY_W = W - 80;
 const BODY_H = H - BODY_Y - 40;
 
+/** 羁绊册行高与行距（buildTraits/展开带重排共用同一常量） */
+const TRAIT_ROW_H = 106;
+const TRAIT_PITCH = 118;
+
 export class CodexScene extends Phaser.Scene {
   private contents: Record<CodexTab, Phaser.GameObjects.Container | null> = {
     champs: null,
@@ -47,6 +51,17 @@ export class CodexScene extends Phaser.Scene {
   private backData: Record<string, unknown> = {};
   private itemTip!: ItemTooltip;
   private detailCard: UnitDetailCard | null = null;
+
+  /** 羁绊册每行的展开态（点击行展开成员网格；同时只展开一行） */
+  private traitState: {
+    id: string;
+    count: number;
+    row: Phaser.GameObjects.Container;
+    band: Phaser.GameObjects.Container | null;
+    bandH: number;
+    hint: Phaser.GameObjects.Text;
+  }[] = [];
+  private expandedTraitId: string | null = null;
 
   constructor() {
     super({ key: 'Codex' });
@@ -114,6 +129,7 @@ export class CodexScene extends Phaser.Scene {
   private switchTab(tab: CodexTab): void {
     this.itemTip.hide();
     this.detailCard?.container.setVisible(false);
+    this.collapseTraitBand(false); // 离开羁绊册时收起展开带，返回时保持整洁
     for (const k of ['champs', 'traits', 'items'] as CodexTab[]) {
       this.contents[k]?.setVisible(k === tab);
     }
@@ -186,14 +202,15 @@ export class CodexScene extends Phaser.Scene {
   private buildTraits(): void {
     const c = this.add.container(BODY_X + 8, BODY_Y + 6);
     this.contents.traits = c;
-    let y = 0;
-    for (const t of TRAITS) {
-      const row = this.add.container(0, y);
+    this.traitState = [];
+    this.expandedTraitId = null;
+    TRAITS.forEach((t, i) => {
+      const row = this.add.container(0, i * TRAIT_PITCH);
       const g = this.add.graphics();
       g.fillStyle(INK[800], 0.6);
-      g.fillRect(0, 0, BODY_W - 16, 106);
+      g.fillRect(0, 0, BODY_W - 16, TRAIT_ROW_H);
       g.lineStyle(1, INK[500], 0.7);
-      g.strokeRect(0, 0, BODY_W - 16, 106);
+      g.strokeRect(0, 0, BODY_W - 16, TRAIT_ROW_H);
       row.add(g);
       // 小篆徽章（未激活态）：羁绊册的视觉锚点，与对局内羁绊轨同语汇
       const icon = this.add.image(34, 30, traitIconKey(t.id, 0));
@@ -239,11 +256,131 @@ export class CodexScene extends Phaser.Scene {
           })
           .setOrigin(1, 0)
       );
+      // 展开入口提示：右下角「成员 N · 点击展开」—— 行本身就是整行点击热区
+      const memberCount = CHAMPIONS.filter((d) => d.origins.includes(t.id) || d.classes.includes(t.id)).length;
+      const hint = this.add
+        .text(BODY_W - 30, 82, `成员 ${memberCount} · 点击展开`, {
+          fontFamily: FONT.body,
+          fontSize: '12px',
+          color: css(PAPER[400]),
+        })
+        .setOrigin(1, 0);
+      row.add(hint);
+      // 悬停可点信号：整行淡金底 + 光标（与对局内计分板行侦查入口同语汇）
+      const hoverBg = this.add.graphics();
+      hoverBg.fillStyle(GILT.base, 0.06);
+      hoverBg.fillRect(0, 0, BODY_W - 16, TRAIT_ROW_H);
+      hoverBg.setVisible(false);
+      row.addAt(hoverBg, 0);
+      row.setInteractive(new Phaser.Geom.Rectangle(0, 0, BODY_W - 16, TRAIT_ROW_H), Phaser.Geom.Rectangle.Contains);
+      row.on('pointerover', () => {
+        hoverBg.setVisible(true);
+        this.input.setDefaultCursor('pointer');
+      });
+      row.on('pointerout', () => {
+        hoverBg.setVisible(false);
+        this.input.setDefaultCursor('default');
+      });
+      row.on('pointerup', () => this.toggleTraitBand(t.id));
       c.add(row);
-      y += 118;
-    }
+      this.traitState.push({ id: t.id, count: memberCount, row, band: null, bandH: 0, hint });
+    });
     this.scrolls.traits = enableScroll(this, c, BODY_X, BODY_Y, BODY_W, BODY_H);
-    this.scrolls.traits.setHeight(y);
+    this.scrolls.traits.setHeight(TRAITS.length * TRAIT_PITCH - 12);
+  }
+
+  /** 点羁绊行展开/收起成员网格（同一时间只展开一行） */
+  private toggleTraitBand(id: string): void {
+    if (this.expandedTraitId === id) {
+      this.collapseTraitBand();
+      return;
+    }
+    if (this.expandedTraitId) this.collapseTraitBand(false);
+    const state = this.traitState.find((s) => s.id === id);
+    const def = TRAITS.find((t) => t.id === id);
+    if (!state || !def || !this.contents.traits) return;
+    const c = this.contents.traits;
+    const idx = this.traitState.indexOf(state);
+    const members = CHAMPIONS.filter((d) => d.origins.includes(id) || d.classes.includes(id)).sort(
+      (a, b) => a.cost - b.cost || a.id.localeCompare(b.id)
+    );
+    // 网格：立绘 66 见方、格距 78，横向排满整行宽；职业族（最多 24 人）约两行
+    const pitch = 78;
+    const cols = Math.max(1, Math.floor((BODY_W - 16 - 20) / pitch));
+    const gridRows = Math.max(1, Math.ceil(members.length / cols));
+    const titleH = 26;
+    const bandH = titleH + gridRows * pitch + 6;
+
+    const band = this.add.container(8, (idx + 1) * TRAIT_PITCH);
+    const bg = this.add.graphics();
+    bg.fillStyle(INK[850], 0.72);
+    bg.fillRect(0, 0, BODY_W - 32, bandH);
+    bg.lineStyle(1, GILT.base, 0.22);
+    bg.strokeRect(0, 0, BODY_W - 32, bandH);
+    band.add(bg);
+    band.add(
+      this.add
+        .text(10, 4, `成 员 · ${def.name}（${members.length}）`, {
+          fontFamily: FONT.title,
+          fontSize: '14px',
+          color: css(PAPER[300]),
+          letterSpacing: 2,
+        })
+        .setOrigin(0, 0)
+    );
+    members.forEach((d, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const p = new UnitPortrait(this, 10 + col * pitch, titleH + row * pitch, 66);
+      p.setUnit({ defId: d.id, star: 1, items: [], iid: -1 });
+      // 成员悬停沿用棋子册详情卡；点击卡内空白不触发行收起（band 是行的兄弟节点）
+      p.setInteractive(new Phaser.Geom.Rectangle(0, 0, 66, 66), Phaser.Geom.Rectangle.Contains);
+      p.on('pointerover', (pointer: Phaser.Input.Pointer) => {
+        const { x, y } = screenToWorld(pointer.x, pointer.y, this.cameras.main.zoom);
+        this.showChampDetail(d.id, x, y);
+        this.input.setDefaultCursor('pointer');
+      });
+      p.on('pointerout', () => {
+        this.detailCard?.container.setVisible(false);
+        this.input.setDefaultCursor('default');
+      });
+      band.add(p);
+    });
+    c.add(band);
+    state.band = band;
+    state.bandH = bandH;
+    this.expandedTraitId = id;
+    state.hint.setText('收起成员 ▴');
+    state.hint.setColor(css(GILT.light));
+    this.reflowTraits(idx, bandH);
+    audio.play('ui');
+  }
+
+  /** 收起当前展开行（切 tab 静默收起；点自身行/点另一行带音效由调用方决定） */
+  private collapseTraitBand(playSound = true): void {
+    const id = this.expandedTraitId;
+    const state = id ? this.traitState.find((s) => s.id === id) : undefined;
+    if (!id || !state) return;
+    const idx = this.traitState.indexOf(state);
+    state.band?.destroy();
+    state.band = null;
+    state.bandH = 0;
+    state.hint.setText(`成员 ${state.count} · 点击展开`);
+    state.hint.setColor(css(PAPER[400]));
+    this.expandedTraitId = null;
+    this.reflowTraits(idx, 0);
+    if (playSound) audio.play('ui');
+  }
+
+  /** 展开/收起后重排行位置并刷新整册滚动高度：展开行之后的每行让出 bandH */
+  private reflowTraits(bandIdx: number, bandH: number): void {
+    if (!this.contents.traits) return;
+    this.traitState.forEach((s, i) => {
+      const dy = bandH > 0 && i > bandIdx ? bandH : 0;
+      s.row.y = i * TRAIT_PITCH + dy;
+    });
+    const totalH = this.traitState.length * TRAIT_PITCH - 12 + bandH;
+    this.scrolls.traits?.setHeight(totalH);
   }
 
   // ══════════════ 装备册 ══════════════

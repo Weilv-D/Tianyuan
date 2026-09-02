@@ -29,6 +29,7 @@ import { BoardBake } from '../game/BoardBake';
 import { SceneRefresh } from '../game/SceneRefresh';
 import { AdventurePanel } from '../game/AdventurePanel';
 import { PauseScoutOverlay } from '../game/PauseScoutOverlay';
+import { TraitMembersCard } from '../game/TraitMembersCard';
 import { RoundResultOverlay } from '../game/RoundResultOverlay';
 import { EliminatedOverlay } from '../game/EliminatedOverlay';
 import { DebugConsole } from '../game/DebugConsole';
@@ -84,6 +85,8 @@ export class GameScene extends Phaser.Scene {
   refresher!: SceneRefresh;
   adventure!: AdventurePanel;
   pauseScout!: PauseScoutOverlay;
+  /** 点击左轨徽章钉住的羁绊成员卡（悬停效果笺之外的第二交互层） */
+  traitMembers!: TraitMembersCard;
   roundResult!: RoundResultOverlay;
   eliminated!: EliminatedOverlay;
 
@@ -148,6 +151,7 @@ export class GameScene extends Phaser.Scene {
     this.refresher = new SceneRefresh(this);
     this.adventure = new AdventurePanel(this);
     this.pauseScout = new PauseScoutOverlay(this);
+    this.traitMembers = new TraitMembersCard(this);
     this.roundResult = new RoundResultOverlay(this);
     this.eliminated = new EliminatedOverlay(this);
 
@@ -662,6 +666,7 @@ export class GameScene extends Phaser.Scene {
     this.exitUnloadMode();
     this.pauseScout.setPaused(false);
     this.pauseScout.closeScout();
+    this.traitMembers.close(); // 成员卡/悬停笺在战斗演出页无意义，随开战收起
     this.inputCtl.clearSelection(); // 阵容锁定：选中态随开战清空
     this.busy = true;
     this.phase = 'battle';
