@@ -534,12 +534,12 @@ export function starGlyph(star: Star): string {
 // ── 详情卡装备三格槽（icon 即视觉，名字/效果进悬停 tooltip）────────
 // 图标与器匣/头顶/提示卡同出 itemIcons 烘焙管线 —— 不是新画的装饰，
 // 是同一资产的第四个展示档（47/36/17/24px）。空槽淡框表达"还能装"。
-// 格下短名单行截断：槽宽仅 SLOT_PITCH=32，换行会把行高压进下方羁绊行
-// （144+26+4+行高 > traitT），故恒为单行、以 clipToWidth 在槽宽内截断加省略号。
-const SLOT_SIZE = 26;
-const SLOT_ICON = 24;
-const SLOT_PITCH = 32;
-const SLOT_LABEL_W = 30;
+// 格下短名单行全显：卡内可用宽 272px，三格共占 0..132，以 clipToWidth
+// 在槽宽内截断加省略号；间距放宽至 52，使 4 字名「不动明王/玄铁重甲」
+const SLOT_SIZE = 28;
+const SLOT_ICON = 26;
+const SLOT_PITCH = 52;
+const SLOT_LABEL_W = 48;
 const SLOT_LABEL_FONT = '10px';
 
 /**
