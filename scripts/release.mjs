@@ -22,6 +22,7 @@ const run = (command, args) => {
   const needShell = command.endsWith('.cmd');
   return execFileSync(command, args, { cwd: root, stdio: 'inherit', shell: needShell });
 };
+async function main() {
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 // 版本一致性门禁：version.ts（界面落款）与 package.json 必须同值，
@@ -102,9 +103,11 @@ run(process.execPath, [
 // 产物体检：单文件不得残留任何外链资源（src=/href= 指向文件的引用，
 // 单双引号与无引号属性都查；再扫 CSS url() 与 @import —— 漏一种写法就漏一类
 // 资源）。白名单只保留 data: 内联 —— https:/http:/blob:/相对路径全算外链；
+// blob: 与 createObjectURL 同属浏览器对内存的本地引用（无网络请求），静态
+// 属性形态同样豁免（JS 动态 blob 生成已在下方按字面量说明；属性/url() 若含
+// 静态 blob: 引用也应放行 —— 口径与 1.15.2 的 JS 段一致，只拦真网络外链）。
 // 此前 https: 被列入豁免，残留 CDN 引用也能过检，门禁形同虚设。
-// （已对现行产物验证零误报：data: 之外零命中。）
-const urlAttr = (attr) => `${attr}\\s*=\\s*(?:"(?!data:)[^"]*"|'(?!data:)[^']*'|(?!data:)[^\\s"'<>]+)`;
+const urlAttr = (attr) => `${attr}\\s*=\\s*(?:"(?!data:|blob:)[^"]*"|'(?!data:|blob:)[^']*'|(?!data:|blob:)[^\\s"'<>]+)`;
 // Vite 单文件产物自带 modulepreload 补丁（h(O){…fetch(O.href,…)}：只在 <link
 // rel="modulepreload"> 存在时取 href，单文件形态下不可能有此类标签）。它是一段
 // 每次构建都原样复制的固定文本 —— 扫描前先把该片段替换掉，避免把「无外链门禁」
@@ -116,7 +119,7 @@ const external = [
   // url() 只认小写（打包器产出的 CSS 恒为小写）、内容含路径特征（. 或 /），
   // 且排除 JS 拼接特征（+ $ {）—— 宽松版会被压缩 JS 的 URL(i)/URL(Q) 与
   // url("+this.src+') 之类动态串误杀（实测分别 27 处与 1 处）
-  scanSource.match(/url\(\s*['"]?(?!data:)[^)'"+${}]*[./][^)'"+${}]*['"]?\s*\)/g) ?? [],
+  scanSource.match(/url\(\s*['"]?(?!data:|blob:)[^)'"+${}]*[./][^)'"+${}]*['"]?\s*\)/g) ?? [],
   // CSS @import：外链样式表的另一种入口（打包器产出内联 <style> 后 Vite 不会
   // 生成 @import，但门禁该查的一律查）
   scanSource.match(/@import\s+(?!url\(data:)[^;]+/gi) ?? [],
@@ -141,7 +144,8 @@ console.log(`\n[5/5] 原子替换 dist/ 与 release/`);
 // 全部构建成功才走到这里：旧产物此刻才被替换，中途任何失败都不损上一版。
 // 替换走「旧→.bak → 新落位 → 删 .bak」三步：rm+rename 两步版若 rename 被
 // 占用/跨盘打断，旧产物已删新产物未落位，发布损坏且不可回滚。
-function safeMove(src, dst, label) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function safeMove(src, dst, label) {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       renameSync(src, dst);
@@ -152,8 +156,8 @@ function safeMove(src, dst, label) {
       if (retryable && attempt < 2) {
         const delay = 300 * (attempt + 1);
         console.warn(`  rename ${label} 被占用，重试 ${attempt + 1}/2 (${delay}ms)…`);
-        const until = Date.now() + delay;
-        while (Date.now() < until) {}
+        // 异步等待而非忙循环：空转会把事件循环钉死，重试期间无法响应信号/计时器
+        await sleep(delay);
         continue;
       }
       if (retryable) {
@@ -173,16 +177,16 @@ for (const [tmp, dest] of [[distTmp, DIST], [relTmp, RELEASE]]) {
   if (hadOld) {
     if (existsSync(bak)) rmSync(bak, { recursive: true, force: true });
     try {
-      safeMove(dest, bak, `${dest} -> ${bak}`);
+      await safeMove(dest, bak, `${dest} -> ${bak}`);
     } catch (err) {
       console.error(`✗ 无法备份旧产物 ${dest}: ${err.message}`);
       throw err;
     }
   }
   try {
-    safeMove(tmp, dest, `${tmp} -> ${dest}`);
+    await safeMove(tmp, dest, `${tmp} -> ${dest}`);
   } catch (err) {
-    if (hadOld) { try { safeMove(bak, dest, `${bak} -> ${dest} (回滚)`); } catch {} }
+    if (hadOld) { try { await safeMove(bak, dest, `${bak} -> ${dest} (回滚)`); } catch {} }
     throw err;
   }
   if (hadOld && existsSync(bak)) rmSync(bak, { recursive: true, force: true });
@@ -195,3 +199,9 @@ console.log(`
   THIRD_PARTY_LICENSES.txt  音乐出处
   ${zip}     分发归档（含使用说明）
 `);
+}
+
+main().catch((err) => {
+  console.error('发布失败：', err);
+  process.exit(1);
+});
