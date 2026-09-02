@@ -17,8 +17,6 @@ export const BENCH_SLOTS = 9;
 
 // ── 时间 ──────────────────────────────────────────────
 /** 战斗超时（ticks）。超时后进入"余烬"阶段，双方急速掉血裁定胜负。 */
-/** 兼容导出：超时上限的真源在 MECH.battleTimeoutTicks */
-export const BATTLE_TIMEOUT_TICKS = 40 * TICK_RATE;
 /** 进入"余烬"的起始 tick —— 之后全体每秒递增增伤，逼迫战斗收束 */
 export const OVERTIME_START_TICK = 30 * TICK_RATE;
 /** 余烬阶段每秒增伤系数（线性累加） */

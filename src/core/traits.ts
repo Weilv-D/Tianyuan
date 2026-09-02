@@ -248,8 +248,8 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       api.hooksOf(team).onKill.push((a, killer) => {
         if (killer.team !== team) return;
         const mult = isMember(members, killer) ? 2 : 1;
-        const atk = t('growAtk', 0.12) * mult;
-        const aspd = t('growAspd', 0.09) * mult;
+        const atk = t('growAtk', 0.26) * mult;
+        const aspd = t('growAspd', 0.18) * mult;
         for (const u of a.units) {
           if (!u.alive || u.team !== team) continue;
           u.permAtkPct += atk;
