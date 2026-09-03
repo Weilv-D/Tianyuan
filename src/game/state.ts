@@ -374,7 +374,13 @@ export function recallUnit(p: PlayerState, iid: number): boolean {
   const slot = p.board.findIndex((x) => x !== null && x.iid === iid);
   if (slot < 0) return false;
   const u = p.board[slot]!;
-  const benchSlot = p.bench.findIndex((x) => x === null);
+  let benchSlot = -1;
+  for (let i = 0; i < BENCH_SLOTS; i++) {
+    if (p.bench[i] === null) {
+      benchSlot = i;
+      break;
+    }
+  }
   if (benchSlot < 0) return false;
   p.board[slot] = null;
   p.bench[benchSlot] = u;
@@ -383,6 +389,9 @@ export function recallUnit(p: PlayerState, iid: number): boolean {
 
 /** 在场上内部移动（拖拽换站位） */
 export function moveOnBoard(p: PlayerState, iid: number, slot: number): boolean {
+  // 与 canPlace / moveToSlot 同口径的槽位守卫：越界 slot 会把 board 数组撑长
+  //（稀疏扩容）或挂上 "-1" 属性，32 格不变式即告腐坏，此处直接拒绝。
+  if (!Number.isInteger(slot) || slot < 0 || slot >= p.board.length) return false;
   const from = p.board.findIndex((x) => x !== null && x.iid === iid);
   if (from < 0) return false;
   if (from === slot) return false;
@@ -394,6 +403,8 @@ export function moveOnBoard(p: PlayerState, iid: number, slot: number): boolean 
 
 /** 备战席内部移动 */
 export function moveOnBench(p: PlayerState, iid: number, slot: number): boolean {
+  // 同 moveOnBoard：越界直接拒绝，不撑长 bench 数组（9 格不变式）。
+  if (!Number.isInteger(slot) || slot < 0 || slot >= p.bench.length) return false;
   const from = p.bench.findIndex((x) => x !== null && x.iid === iid);
   if (from < 0) return false;
   if (from === slot) return false;
@@ -433,6 +444,10 @@ export interface PlaceCheck {
 
 /** 这次拖拽是否允许。UI 层在松手前就要知道，用于给落点染色。 */
 export function canPlace(p: PlayerState, iid: number, where: 'board' | 'bench', slot: number): PlaceCheck {
+  const maxSlots = where === 'board' ? p.board.length : p.bench.length;
+  if (!Number.isInteger(slot) || slot < 0 || slot >= maxSlots) {
+    return { ok: false, reason: '无效的位置' };
+  }
   const srcBoard = p.board.findIndex((u) => u !== null && u.iid === iid);
   const onBoardNow = srcBoard >= 0;
   const u = onBoardNow ? p.board[srcBoard] : p.bench[p.bench.findIndex((x) => x !== null && x.iid === iid)];

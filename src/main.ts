@@ -124,7 +124,7 @@ import './render/view/textScale';
  * 设计分辨率固定 1920×1080，用 Scale.FIT 等比适配任意 16:9 窗口 ——
  * 缩放不错位、不裁切，逻辑坐标永远是 1920×1080。物理缓冲再乘 VIEW_K
  * （见 render/view/viewScale）：HiDPI 与系统缩放屏上 1 逻辑 px = 1 设备 px，
- * 整屏不再被 CSS 拉大发糊；相机 zoom = 1/K 由各场景 baseZoom 钉住。
+ * 整屏不再被 CSS 拉大发糊；相机 zoom = VIEW_K 由各场景 baseZoom 钉住。
  */
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -237,7 +237,7 @@ game.events.once('ready', () => {
   for (const scene of game.scene.scenes) wireCursorForScene(scene);
 });
 
-// 隐藏加载序章：先让「弈」字与进度条走完入场（~1.5s），再上掀退场（clip-path 1.2s）。
+// 隐藏加载序章：先让「天」字与进度条走完入场（~1.5s），再上掀退场（clip-path 1.2s）。
 // 刻意不用 requestAnimationFrame 包裹：后台标签页会节流 RAF，首帧回调不来
 // boot 就永久滞留，把整屏点击都挡在序章上（实测事故，2026-08-30）。
 const boot = document.getElementById('boot');

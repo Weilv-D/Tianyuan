@@ -117,16 +117,26 @@ export function rollShop(
   const out: (string | null)[] = [];
 
   for (let s = 0; s < SHOP_SLOTS; s++) {
-    // 1) 掷费用档位
+    // 1) 掷费用档位（与 weightedPick 同口径：严格小于 + 跳过零概率档，
+    // 否则 roll 恰为 0 时会命中首个 0% 档， shop-odds 分布尾端漂移）
     let total = 0;
-    for (let i = 0; i < odds.length; i++) total += odds[i];
+    for (let i = 0; i < odds.length; i++) total += Math.max(0, odds[i]);
     let roll = rng.next() * total;
     let costTier = odds.length - 1;
     for (let i = 0; i < odds.length; i++) {
+      if (odds[i] <= 0) continue;
       roll -= odds[i];
-      if (roll <= 0) {
+      if (roll < 0) {
         costTier = i;
         break;
+      }
+    }
+    if (odds[costTier] <= 0) {
+      for (let i = odds.length - 1; i >= 0; i--) {
+        if (odds[i] > 0) {
+          costTier = i;
+          break;
+        }
       }
     }
 
@@ -152,13 +162,20 @@ export function rollShop(
 }
 
 function weightedPick(items: readonly string[], weights: readonly number[], rng: Rng): string {
+  // 与 core/rng.sampleWeighted 同口径：严格小于判定 + 跳过零权重。
+  // 此前用 <=0 且不跳零权重：roll 恰为 0 时会命中首个零权重项（理论概率 2^-32，
+  // CRN 逐位一致的尾端漂移源），此处闭合。
   let total = 0;
-  for (const w of weights) total += w;
+  for (const w of weights) total += Math.max(0, w);
   if (total <= 0) return items[0];
   let roll = rng.next() * total;
   for (let i = 0; i < items.length; i++) {
+    if (weights[i] <= 0) continue;
     roll -= weights[i];
-    if (roll <= 0) return items[i];
+    if (roll < 0) return items[i];
+  }
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (weights[i] > 0) return items[i];
   }
   return items[items.length - 1];
 }

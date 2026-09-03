@@ -306,20 +306,23 @@ export class InputController {
     // 浮层（设置/调试/羁绊全览/侦查）打开时同样让路 —— 键盘不经命中检测，
     // 指针层的"不透传"拦不住按键，必须逐键手工拦截（口径与商肆热键一致）
     this.scene.input.keyboard?.on('keydown-D', () => {
-      if (!this.overlayOpen()) this.scene.onReroll();
+      if (this.dragging || this.overlayOpen()) return;
+      this.scene.onReroll();
     });
     this.scene.input.keyboard?.on('keydown-F', () => {
-      if (!this.overlayOpen()) this.scene.onBuyXp();
+      if (this.dragging || this.overlayOpen()) return;
+      this.scene.onBuyXp();
     });
     this.scene.input.keyboard?.on('keydown-E', () => {
       if (this.dragging || this.overlayOpen()) return;
       this.scene.onAutoArrange();
     });
     this.scene.input.keyboard?.on('keydown-SPACE', () => {
-      if (this.scene.phase === 'prep' && !this.overlayOpen()) this.scene.startBattlePhase();
+      if (this.dragging || this.overlayOpen()) return;
+      if (this.scene.phase === 'prep') this.scene.startBattlePhase();
     });
-    this.scene.input.keyboard?.on('keydown-Z', (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !this.dragging && !this.overlayOpen()) this.scene.onUndo();
+    this.scene.input.keyboard?.on('keydown-Z', () => {
+      if (!this.dragging && !this.overlayOpen()) this.scene.onUndo();
     });
     // 商肆快捷键：1-5 直购（含小键盘），与 ShopCard 角标对应
     const shopHotkeys: [string, number][] = [
@@ -329,11 +332,11 @@ export class InputController {
     for (const [name, i] of shopHotkeys) {
       this.scene.input.keyboard?.on(name, () => {
         if (this.scene.phase !== 'prep' || this.scene.busy) return;
-        if (this.overlayOpen()) return;
+        if (this.dragging || this.overlayOpen()) return;
         this.scene.onBuy(i);
       });
     }
-    // ESC 统一分发：设置 → 调试 → 羁绊 → 侦查 → 暂停，一次只关一层
+    // ESC 统一分发：设置 → 调试 → 羁绊全览 → 成员卡 → 侦查 → 选中/卸载模式 → 暂停，一次只关一层
     this.scene.input.keyboard?.on('keydown-ESC', () => {
       if (this.scene.settingsPanel?.isOpen) {
         this.scene.settingsPanel.close();
@@ -353,6 +356,13 @@ export class InputController {
       }
       if (this.scene.pauseScout.scoutPanel) {
         this.scene.pauseScout.closeScout();
+        return;
+      }
+      if (this.selectedSlot || this.scene.selectedItem || this.scene.unloadMode) {
+        this.clearSelection();
+        this.scene.selectedItem = null;
+        this.scene.exitUnloadMode();
+        this.scene.refreshAll();
         return;
       }
       if (this.scene.phase === 'prep' && !this.scene.busy) this.scene.pauseScout.togglePause();

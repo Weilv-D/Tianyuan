@@ -9,7 +9,7 @@
  * 5. 被拖的棋子必须已在场上/备战席（validPlacements 用 iid 定位来源）。
  */
 import { describe, expect, it } from 'vitest';
-import { emptyBench, emptyBoard, validPlacements } from '../src/game/state';
+import { canPlace, emptyBench, emptyBoard, validPlacements } from '../src/game/state';
 import { makePlayer } from './helpers';
 import type { UnitInstance } from '../src/game/state';
 import type { Star } from '../src/core/types';
@@ -65,5 +65,17 @@ describe('validPlacements', () => {
       expect(t.where === 'board' || t.where === 'bench').toBe(true);
     }
     expect(v.length).toBe(32 + 9);
+  });
+
+  it('canPlace 严格防御越界和非整数槽位', () => {
+    const p = makePlayer({ level: 5, board: emptyBoard(), bench: emptyBench() });
+    placeUnit(p, 1, 'bench', 0);
+    expect(canPlace(p, 1, 'board', -1).ok).toBe(false);
+    expect(canPlace(p, 1, 'board', 32).ok).toBe(false);
+    expect(canPlace(p, 1, 'board', Number.NaN).ok).toBe(false);
+    expect(canPlace(p, 1, 'bench', -1).ok).toBe(false);
+    expect(canPlace(p, 1, 'bench', 9).ok).toBe(false);
+    expect(canPlace(p, 1, 'bench', 0).ok).toBe(true);
+    expect(canPlace(p, 1, 'board', 0).ok).toBe(true);
   });
 });

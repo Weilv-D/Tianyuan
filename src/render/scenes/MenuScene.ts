@@ -141,9 +141,9 @@ export class MenuScene extends Phaser.Scene {
     const dailyBtnY = by;
     mk('每 日 挑 战', () => fadeTo(this, 'Game', { daily: true, fresh: true, seed: dailySeed }));
     if (bestText) {
-      // 成绩小字贴在按钮右侧：按钮纵向栈间距只够下一颗按钮，横排不与版本行/落款相犯
+      // 成绩小字贴在按钮右侧：与按钮垂直居中对齐（按钮高 56，中心在 dailyBtnY + 28）
       this.add
-        .text(bx + 148, dailyBtnY, bestText, {
+        .text(bx + 148, dailyBtnY + 28, bestText, {
           fontFamily: FONT.body,
           fontSize: '13px',
           color: css(PAPER[400]),

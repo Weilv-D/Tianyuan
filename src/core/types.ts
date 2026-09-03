@@ -179,7 +179,7 @@ export interface BattleUnitInput {
   monster?: boolean;
   /** 召唤物标记（createMinion 内部派生用）。天命判定与技能乘区据此排除召唤物。 */
   isMinion?: boolean;
-  /** 攻击力倍率（乘在星级倍率之后、装备加成之前）。引导轮墨兽 0.15，缺省 1。 */
+  /** 攻击力倍率（乘在星级倍率之后、装备加成之前）。引导轮墨兽 0.08，缺省 1。 */
   powMult?: number;
 }
 

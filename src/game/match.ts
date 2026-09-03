@@ -581,7 +581,9 @@ export class Match implements AiWorld {
         this.rng.state = rngBackup;
         return { ok: false, reason: 'bench' };
       }
-      this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★（满席即合）`);
+      for (const m of merges) {
+        this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[m.defId]?.name ?? m.defId} ${m.star}★（满席即合）`);
+      }
       // 合成出的新 2★ 仍在席上则走自动上场（人口有空位且场上无同名时）
       if (this.settings.autoDeploy) {
         const upgraded = p.bench.find((b) => b !== null && b.defId === id && b.star > 1);
@@ -602,8 +604,8 @@ export class Match implements AiWorld {
       return { ok: false, reason: 'bench' };
     }
     const merges = resolveMerges(p);
-    if (merges.length > 0) {
-      this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[merges[0].defId]?.name ?? merges[0].defId} ${merges[0].star}★`);
+    for (const m of merges) {
+      this.log.push(`${p.name} 合成 ${CHAMPION_BY_ID[m.defId]?.name ?? m.defId} ${m.star}★`);
     }
     // 新手友好：人口有空位就自动上场
     if (this.settings.autoDeploy) {
@@ -662,6 +664,7 @@ export class Match implements AiWorld {
     // 合成料留在备战席照样参与 resolveMerges。
     if (p.board.some((x) => x !== null && x.defId === u.defId)) return false;
     const target = this.suggestSlot(p, u.defId);
+    if (target < 0) return false;
     p.bench[slot] = null;
     p.board[target] = u;
     return true;
@@ -680,7 +683,7 @@ export class Match implements AiWorld {
       }
     }
     for (let i = 0; i < p.board.length; i++) if (!p.board[i]) return i;
-    return 0;
+    return -1;
   }
 
   // ── 配对与战斗 ────────────────────────────────────────
@@ -1137,6 +1140,22 @@ export class Match implements AiWorld {
     m.round = data.round;
     m.phase = data.phase;
     m.pool.restore(data.pool);
+    // 坏档/版本漂移守卫：board/bench 长度恒为 32/9（state.emptyBoard/emptyBench 口径）。
+    // 长度漂移会让 moveOnBoard/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛。
+    for (const pl of data.players ?? []) {
+      if (!Array.isArray((pl as any).board) || (pl as any).board.length !== 32) {
+        const nb: (typeof pl.board) = new Array(32).fill(null);
+        const src: unknown[] = Array.isArray((pl as any).board) ? (pl as any).board : [];
+        for (let i = 0; i < Math.min(32, src.length); i++) nb[i] = src[i] as never;
+        (pl as any).board = nb;
+      }
+      if (!Array.isArray((pl as any).bench) || (pl as any).bench.length !== 9) {
+        const nb: (typeof pl.bench) = new Array(9).fill(null);
+        const src: unknown[] = Array.isArray((pl as any).bench) ? (pl as any).bench : [];
+        for (let i = 0; i < Math.min(9, src.length); i++) nb[i] = src[i] as never;
+        (pl as any).bench = nb;
+      }
+    }
     m.players = data.players;
     m.ghosts = new Map(data.ghosts);
     m.beastBoard = data.beastBoard ? cloneBoard(data.beastBoard) : null;

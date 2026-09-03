@@ -451,7 +451,7 @@ export class CodexScene extends Phaser.Scene {
         }
         row.add(
           this.add
-            .text(x + 28, 12, ITEM_BY_ID[id]?.name ?? id, {
+            .text(x + 36, 12, ITEM_BY_ID[id]?.name ?? id, {
               fontFamily: FONT.body,
               fontSize: '13px',
               color: css(PAPER[200]),

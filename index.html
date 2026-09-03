@@ -220,7 +220,6 @@ body.cur-hover #cur-ring{width:46px;height:46px;border-color:var(--gold)}
     }
   }
 
-  var last=performance.now();
   function loop(t){draw(t);requestAnimationFrame(loop)}
   bakeGrain();sizeBG();seedAmbient();
   addEventListener('resize',function(){sizeBG()});

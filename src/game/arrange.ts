@@ -83,23 +83,41 @@ export function autoArrange(p: PlayerState, pool: CardPool): number {
   const newBoard: (UnitInstance | null)[] = new Array(BOARD_COLS * ROWS).fill(null);
   const rowUsed: boolean[][] = Array.from({ length: ROWS }, () => new Array(BOARD_COLS).fill(false));
   for (const u of chosen) {
-    let row = Math.min(ROWS - 1, Math.floor(depthOf(u.defId) * ROWS));
-    let guard = 0;
-    while (rowUsed[row].every(Boolean) && guard++ < ROWS) row = Math.min(ROWS - 1, row + 1);
-    let placed = false;
-    for (const c of COL_ORDER) {
-      if (!rowUsed[row][c]) {
-        rowUsed[row][c] = true;
-        newBoard[row * BOARD_COLS + c] = u;
-        placed = true;
+    const preferred = Math.min(ROWS - 1, Math.floor(depthOf(u.defId) * ROWS));
+    let row = -1;
+    for (let r = preferred; r < ROWS; r++) {
+      if (!rowUsed[r].every(Boolean)) {
+        row = r;
         break;
       }
     }
+    if (row < 0) {
+      for (let r = 0; r < preferred; r++) {
+        if (!rowUsed[r].every(Boolean)) {
+          row = r;
+          break;
+        }
+      }
+    }
+    let placed = false;
+    if (row >= 0) {
+      for (const c of COL_ORDER) {
+        if (!rowUsed[row][c]) {
+          rowUsed[row][c] = true;
+          newBoard[row * BOARD_COLS + c] = u;
+          placed = true;
+          break;
+        }
+      }
+    }
     if (!placed) {
-      // 兜底：扫第一个空格
+      // 兜底：扫第一个空格并同步占用标记，防后续单位覆写
       for (let i = 0; i < newBoard.length; i++) {
         if (!newBoard[i]) {
           newBoard[i] = u;
+          const fbR = Math.floor(i / BOARD_COLS);
+          const fbC = i % BOARD_COLS;
+          rowUsed[fbR][fbC] = true;
           break;
         }
       }

@@ -351,7 +351,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** 退出卸载模式：状态与按钮态必须同进同退，否则按钮文字卡在「卸载中…」 */
-  private exitUnloadMode(): void {
+  exitUnloadMode(): void {
     this.unloadMode = false;
     this.hud.setUnloadMode(false);
   }

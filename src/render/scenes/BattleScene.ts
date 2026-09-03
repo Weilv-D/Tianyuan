@@ -144,12 +144,23 @@ export class BattleScene extends Phaser.Scene {
     // 侧栏滚动句柄与战斗残留随 SHUTDOWN 统一清理：scroll 的遮罩 Graphics
     // 不在显示列表，场景关闭不回收（C4）。战斗中关页/切场景的语义：
     // 开战前 flushSave 落的是结算前快照，回来后整回合确定性重放，无数据损坏。
+    const battleKeys = [
+      'keydown-SPACE',
+      'keydown-ESC',
+      'keydown-ONE',
+      'keydown-TWO',
+      'keydown-FOUR',
+      'keydown-F',
+    ] as const;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.clearBattle();
       this.scrollA?.destroy();
       this.scrollB?.destroy();
       this.scrollA = null;
       this.scrollB = null;
+      for (const k of battleKeys) {
+        try { this.input.keyboard?.removeAllListeners(k); } catch { /* ignore */ }
+      }
     });
 
     // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底
@@ -175,6 +186,30 @@ export class BattleScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', () => audio.unlock());
+
+    // 快捷键：空格/ESC 切换暂停或确认结算；1/2/4 切换倍速；F 快进到底
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      if (this.resultPanel) {
+        if (this.matchCtx) this.returnToGame();
+        else { this.resultPanel.destroy(); this.restart(); }
+      } else {
+        this.togglePause();
+      }
+    });
+    this.input.keyboard?.on('keydown-ESC', () => {
+      if (this.resultPanel) {
+        if (this.matchCtx) this.returnToGame();
+        else { this.resultPanel.destroy(); this.restart(); }
+      } else {
+        this.togglePause();
+      }
+    });
+    this.input.keyboard?.on('keydown-ONE', () => this.setSpeed(1));
+    this.input.keyboard?.on('keydown-TWO', () => this.setSpeed(2));
+    this.input.keyboard?.on('keydown-FOUR', () => this.setSpeed(4));
+    this.input.keyboard?.on('keydown-F', () => {
+      if (this.matchCtx && !this.resultPanel) this.fastForward();
+    });
 
     this.startBattle();
   }

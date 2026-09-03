@@ -590,12 +590,7 @@ export class HudPanels {
 
   openTraitModal(): void {
     if (this.traitModal) {
-      this.traitModal.destroy();
-      this.traitModal = null;
-      // 先销毁滚轮句柄再置空：scroll 的遮罩 Graphics 不在显示列表，
-      // 不 destroy 会随每次开关累积一枚（C2）
-      this.traitModalScroll?.destroy();
-      this.traitModalScroll = null;
+      this.closeTraitModal();
       return;
     }
     // 成员卡与全览同为羁绊信息浮层，不同时开（全览是遮罩模态，盖在成员卡上会叠）

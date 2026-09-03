@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createUnit as createBattleUnit } from '../src/core/unit';
 import { TRAITS } from '../src/data/traits';
 import { autoArrange } from '../src/game/arrange';
-import { boardIdx, createUnit, powerScore } from '../src/game/state';
+import { boardIdx, createUnit, powerScore, recallUnit } from '../src/game/state';
 const createCoreUnit = createBattleUnit;
 import { makePlayer } from './helpers';
 import { Rng } from '../src/core/rng';
@@ -120,5 +120,30 @@ describe('损坏输入与极端阵容', () => {
       const expected = round === 1 ? 1 : Math.min(8, 2 + Math.floor(round / 4));
       expect(board.filter(Boolean).length).toBe(round === 0 ? 2 : expected);
     }
+  });
+
+  it('自动布阵在同纵深拥挤溢出时不会覆写已落子单位，棋子不丢失', () => {
+    const player = makePlayer({ level: 9 });
+    // 9 名后排单位（全都是丹师或方士，其 preferred 均为 row 3），单行容量 8
+    const backrowDef = CHAMPIONS.find((c) => c.cls === 'support')!.id;
+    for (let i = 0; i < 9; i++) {
+      player.board[i] = createUnit(backrowDef);
+    }
+    const pool = new CardPool();
+    autoArrange(player, pool);
+    const onBoard = player.board.filter(Boolean);
+    expect(onBoard.length).toBe(9);
+    // 所有 9 名棋子都在棋盘上，没有因为同一行满而互相覆盖丢失
+    const total = [...player.board, ...player.bench].filter(Boolean).length;
+    expect(total).toBe(9);
+  });
+
+  it('recallUnit 严格限制在备战席有效槽位内', () => {
+    const player = makePlayer();
+    player.board[0] = createUnit('pan');
+    // 备战席全满
+    for (let i = 0; i < 9; i++) player.bench[i] = createUnit('ajiu');
+    expect(recallUnit(player, player.board[0]!.iid)).toBe(false);
+    expect(player.board[0]).not.toBeNull();
   });
 });

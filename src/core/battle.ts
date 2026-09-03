@@ -276,6 +276,30 @@ export class Battle implements BattleApi {
         return enemies;
       case 'deadAlly':
         return this.units.filter((x) => !x.alive && x.team === u.team && !x.isMinion);
+      case 'enemyDensest': {
+        const cell = this.densestEnemyCell(u, 1);
+        return this.sliceBy(enemies, (a, b) => chebyshev(a.cell, cell) - chebyshev(b.cell, cell), count);
+      }
+      case 'enemyHalfBoard': {
+        const cell = this.enemyHalfBoardCell(u);
+        return this.sliceBy(enemies, (a, b) => chebyshev(a.cell, cell) - chebyshev(b.cell, cell), count);
+      }
+      case 'enemyLongestLine': {
+        const cell = this.longestLineEndpoint(u);
+        const dirC = Math.sign(cell.c - u.cell.c);
+        const dirR = Math.sign(cell.r - u.cell.r);
+        const along = (c: Cell): number => {
+          const dc = c.c - u.cell.c;
+          const dr = c.r - u.cell.r;
+          let onLine = 1;
+          if (dirC === 0 && dirR === 0) onLine = 0;
+          else if (dirC !== 0 && dirR !== 0) onLine = dc * dirC === dr * dirR && dc * dirC > 0 ? 0 : 1;
+          else if (dirC !== 0) onLine = dr === 0 && dc * dirC > 0 ? 0 : 1;
+          else onLine = dc === 0 && dr * dirR > 0 ? 0 : 1;
+          return onLine * 100 + chebyshev(c, u.cell);
+        };
+        return this.sliceBy(enemies, (a, b) => along(a.cell) - along(b.cell), count);
+      }
       default:
         return [];
     }

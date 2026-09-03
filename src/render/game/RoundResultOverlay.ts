@@ -111,10 +111,22 @@ export class RoundResultOverlay {
         .setOrigin(0.5, 0)
     );
 
-    const btn = new Button(this.scene, -90, bh / 2 - 62, '继续', () => {
+    let closed = false;
+    const proceed = () => {
+      if (closed) return;
+      closed = true;
       panel.destroy();
       next();
-    }, { width: 180, height: 44, variant: 'primary' });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'Enter') proceed();
+    };
+    this.scene.input.keyboard?.on('keydown', onKey);
+    panel.once('destroy', () => {
+      this.scene.input.keyboard?.off('keydown', onKey);
+    });
+
+    const btn = new Button(this.scene, -90, bh / 2 - 62, '继续', proceed, { width: 180, height: 44, variant: 'primary' });
     panel.add(btn);
 
     // 入场：遮罩淡入 + 面板弹入 + 结果字顿一下

@@ -86,7 +86,7 @@ export interface HeadStackLayout {
  * 世界塔高跨星级恒定（≈30.5px），邻格净空不随星级/天命恶化。
  *
  * 链（世界 px，自下而上，全部出自净距常量）：
- *   剪影顶 →7→ 装备行(12) →3→ 法力(3.5) →1.5→ 血条(4.5) →2→ 星标(±3.6)
+ *   剪影顶 →7→ 装备行(16) →3→ 法力(3.5) →1.5→ 血条(4.5) →2→ 星标(±3.6)
  *   冠弧圆心 = 星标中心 + 4，弧顶 = 圆心 - 16
  */
 export function headStackLayout(contentH: number, scale: number): HeadStackLayout {
