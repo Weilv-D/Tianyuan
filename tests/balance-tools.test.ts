@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Patcher, readCurrent, withOverrides } from '../balance/lib/patch';
-import { TRAIT_TUNING, TRAIT_TUNING_KEYS, resetTuning, tune } from '../src/data/tuning';
+import { TRAIT_TUNING, TRAIT_TUNING_KEYS, TRAIT_TUNE_KEYS, resetTuning, tune } from '../src/data/tuning';
 import { pairSeed, DEFAULT_SEED_BASE, pairIndex } from '../balance/lib/seeds';
 import { runPair, pairedItemsDelta } from '../balance/lib/engine';
 import { runPool } from '../balance/lib/pool';
@@ -239,5 +239,44 @@ describe('分离保证（工具链与游戏主体）', () => {
     };
     walk(join(process.cwd(), 'src'));
     expect(offenders).toEqual([]);
+  });
+
+  it('羁绊调参键白名单（TRAIT_TUNE_KEYS）与 traits.ts 的 t() 读取严格同源', () => {
+    // 白名单是手写常量，traits.ts 新增一个 t('newFx') 或 t(`atk${tier}`) 档位键而
+    // 漏登记，会让补丁层误拦合法覆盖（--set trait.x.newFx=… 当场抛错）或让扫描
+    // 静默失真 —— 白名单漏键/多键都是病。这里直接扫 traits.ts 的全部 t('…') 直键
+    // 与 t(`…${tier}`) 模板键，与 TRAIT_TUNE_KEYS 双向比对，失配即红。
+    const traitSrc = readFileSync(join(process.cwd(), 'src/core/traits.ts'), 'utf8');
+    const used = new Map<string, Set<string>>();
+    const addKey = (traitId: string, key: string): void => {
+      if (!used.has(traitId)) used.set(traitId, new Set());
+      used.get(traitId)!.add(key);
+    };
+    let cur = '';
+    for (const line of traitSrc.split('\n')) {
+      const tunerId = line.match(/tuner\('([^']+)'\)/);
+      if (tunerId) cur = tunerId[1];
+      // 模板键：t(`atk${tier}`) —— 展开成 0/1/2 三档与白名单比对
+      const templated = /t\(`?([A-Za-z0-9]+)\$\{tier\}`?/g;
+      let tm: RegExpExecArray | null;
+      while ((tm = templated.exec(line)) !== null) addKey(cur, `${tm[1]}0`), addKey(cur, `${tm[1]}1`), addKey(cur, `${tm[1]}2`);
+      // 直键：t('key')（跳过 t(`…`) 与函数名里的 t，前缀要求非字母）
+      const direct = /[^A-Za-z]t\('([^']+)'/g;
+      let dm: RegExpExecArray | null;
+      while ((dm = direct.exec(line)) !== null) addKey(cur, dm[1]);
+    }
+    for (const [idv, ks] of used) {
+      const wl = TRAIT_TUNE_KEYS[idv] ?? [];
+      for (const k of ks) {
+        expect(wl, `traits.ts 读取 t('${k}')（羁绊 ${idv}）但白名单未登记`).toContain(k);
+      }
+    }
+    for (const [idv, ks] of Object.entries(TRAIT_TUNE_KEYS)) {
+      const actual = used.get(idv);
+      for (const k of ks) {
+        expect(actual, `白名单含 ${idv}.${k} 但 traits.ts 没有对应 t() 读取（死键）`).toBeDefined();
+        expect(actual!.has(k)).toBe(true);
+      }
+    }
   });
 });

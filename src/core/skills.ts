@@ -368,7 +368,12 @@ const IMPL: Record<string, Impl> = {
       if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
         api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       }
-      if (p.damageReduction) api.addStatus(u, al, 'dr', 6, p.damageReduction * 100);
+      if (p.damageReduction) {
+        // 减伤时长与护甲/增益的时长同源：数据侧显式声明（p.dur 或 status.dur），
+        // 缺省 6 只是兜底 —— 此前写死 6 与抱朴/白陶 desc 的"6 秒"靠巧合对齐，
+        // 调 dur 会留下"文案 6 秒、实现已改"的静默脱节
+        api.addStatus(u, al, 'dr', p.dur ?? p.status?.dur ?? 6, p.damageReduction * 100);
+      }
       api.fx('healWave', { cell: al.cell });
     }
     // 白娘：对随机敌人施加重伤（治疗降低）

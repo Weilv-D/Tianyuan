@@ -420,6 +420,10 @@ export class BattleScene extends Phaser.Scene {
   private clearBattle(): void {
     for (const ev of this.pendingTimers) ev.remove(false);
     this.pendingTimers.clear();
+    // 盘面暴击脉冲（90ms 短补间）直接挂在 boardLayer 上、不在 views/strays 集合里：
+    // 场景复用重入（clearBattle 由 SHUTDOWN/重开两条路径触发）时若不先杀，
+    // 残留脉冲会继续对已换内容的棋盘层补间
+    this.tweens.killTweensOf(this.boardLayer);
     // 先杀挂在每个视图上的补间再销毁：hopTo/playAttack/playHit 的补间回调
     // 会碰视图子对象，拖着补间销毁等于对尸体发后事
     for (const v of this.views.values()) {

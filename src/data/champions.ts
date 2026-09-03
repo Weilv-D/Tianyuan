@@ -165,7 +165,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'pan_q',
     skillSpec: {
       kind: 'selfBuff', name: '岩心', target: 'self',
-      desc: '获得 {value} 最大生命的护盾与 40 点护甲，持续 {dur} 秒；期间每次受击，反弹所受伤害的 {reflect}。',
+      desc: '获得 {value} 最大生命的护盾与 {statusFlat} 点护甲，持续 {statusDur} 秒；期间每次受击，反弹所受伤害的 {reflect}。',
       params: { value: 0.18, dur: 6, reflect: 0.25, status: { kind: 'armorUp', dur: 6, value: 40 } },
     },
   },
@@ -467,7 +467,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'baopu_q',
     skillSpec: {
       kind: 'healBurst', name: '金丹济世', target: 'allAllies',
-      desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 6 秒 {damageReduction} 减伤与 30 点护甲。',
+      desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 {statusDur} 秒 {damageReduction} 减伤与 {statusFlat} 点护甲。',
       params: { value: 0.25, sp: 0.9, damageReduction: 0.3, status: { kind: 'armorUp', dur: 6, value: 30 } },
     },
   },
@@ -491,7 +491,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'canglan_q',
     skillSpec: {
       kind: 'field', name: '沧海潮汐', target: 'enemyHalfBoard',
-      desc: '在敌方半场涌起潮汐，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害并降低 {statusValue} 移速与攻速；自身获得 {statusValue} 减伤。',
+      desc: '在敌方半场涌起潮汐，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害并降低 {statusValue} 移速与攻速；自身获得 {damageReduction} 减伤。',
       params: { dur: 6, dpsSp: 0.92, radius: 2, type: 'magic', status: { kind: 'slow', dur: 6, value: 25 }, damageReduction: 0.25 },
     },
   },
@@ -505,7 +505,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'moyan_q',
     skillSpec: {
       kind: 'selfBuff', name: '墨壁', target: 'self',
-      desc: '凿墨为壁：获得 {value} 最大生命的护盾与 36 点护甲，持续 {dur} 秒，期间反弹所受伤害的 {reflect}。',
+      desc: '凿墨为壁：获得 {value} 最大生命的护盾与 {statusFlat} 点护甲，持续 {statusDur} 秒，期间反弹所受伤害的 {reflect}。',
       params: { value: 0.16, dur: 6, reflect: 0.2, status: { kind: 'armorUp', dur: 6, value: 36 } },
     },
   },
@@ -689,8 +689,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'baitao_q',
     skillSpec: {
       kind: 'healBurst', name: '陶钧', target: 'allAllies',
-      desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命，并获得 6 秒 {damageReduction} 减伤。',
-      params: { value: 0.1, sp: 0.45, damageReduction: 0.15 },
+      desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命，并获得 {dur} 秒 {damageReduction} 减伤。',
+      params: { value: 0.1, sp: 0.45, dur: 6, damageReduction: 0.15 },
     },
   },
   {
@@ -931,7 +931,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'haotian_q',
     skillSpec: {
       kind: 'nova', name: '天子剑', target: 'self',
-      desc: '召来剑雨：{shots} 波、每波对周围 {radius} 格造成 {atk} 攻击力 + {sp} 法强的物理伤害；期间自身无敌且攻速 +50%。',
+      desc: '召来剑雨：{shots} 波、每波对周围 {radius} 格造成 {atk} 攻击力 + {sp} 法强的物理伤害；期间自身无敌且攻速 +{statusValue}。',
       params: { atk: 1.1, sp: 0.5, radius: 2, shots: 5, interval: 0.4, type: 'physical', invulnWhileCasting: true, status: { kind: 'aspdUp', dur: 3, value: 50 } },
     },
   },

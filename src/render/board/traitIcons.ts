@@ -59,22 +59,25 @@ let sealLoaded = false;
 export async function preloadSealFont(): Promise<void> {
   if (sealLoaded) return;
   sealLoaded = true;
+  const face = new FontFace(SEAL_FONT, `url(${sealFontUrl})`);
+  // 回落定时器持句柄：字体先胜即清掉，不让 3s 空转。face.load() 拒识（404/
+  // CORS）必须归一成 false 一起进 race —— 裸拒识会走外层 catch 而漏掉
+  // clearTimeout，3s 后定时器仍触发一次无人消费的 resolve。itemIcons/
+  // aiBake 的同款加载器都是"成败都 settle + 成对清理"，此处同口径。
+  let timer = 0;
+  let ok = false;
   try {
-    const face = new FontFace(SEAL_FONT, `url(${sealFontUrl})`);
-    // 回落定时器持句柄：字体先胜即清掉，不让 3s 空转（与 aiBake/itemIcons 同款成对清理）
-    let timer = 0;
-    const ok = await Promise.race([
-      face.load().then(() => true),
+    ok = await Promise.race([
+      face.load().then(() => true).catch(() => false),
       new Promise<false>((resolve) => {
         timer = window.setTimeout(() => resolve(false), 3000);
       }),
     ]);
-    window.clearTimeout(timer);
-    if (ok) document.fonts.add(face);
-    else console.warn('[百战天元] 篆体字库载入超时，羁绊徽章回退楷体');
-  } catch {
-    console.warn('[百战天元] 篆体字库不可用，羁绊徽章回退楷体');
+  } finally {
+    if (timer) window.clearTimeout(timer);
   }
+  if (ok) document.fonts.add(face);
+  else console.warn('[百战天元] 篆体字库载入超时或不可用，羁绊徽章回退楷体');
 }
 
 /** 激活金线：档位 → 同心环半径组。环组收在 r16~13.5，字区（中心 ±8）不受侵。 */

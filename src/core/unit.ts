@@ -141,7 +141,10 @@ export function createUnit(input: BattleUnitInput): Unit {
   // 下界 1：负向 bonus（扫参实验/误配装备）把 maxHp 打到 ≤0 时，
   // 下游 hp 比例、超时裁定会除零/NaN，整场战斗的确定性随之报废
   const maxHp = Math.max(1, Math.round(b.hp * hpScale * GLOBAL_HP_SCALE * legendHp * eliteHp + (bonus.hp ?? 0)));
-  const startMp = Math.min(b.startMp + (bonus.startMp ?? 0), b.maxMp);
+  // 下界 0：startMp 只上钳 maxMp 的旧口径允许负向 bonus 把初始法力打负 ——
+  // 法力为负与"0 蓝开局"在回蓝总量上不同（负值要多回一截才能施法），
+  // 与 atk/maxHp 的钳制同口径：负向实验数据在边界终止，不沿战斗链路传播
+  const startMp = Math.max(0, Math.min(b.startMp + (bonus.startMp ?? 0), b.maxMp));
 
   return {
     uid: input.uid,
@@ -154,7 +157,7 @@ export function createUnit(input: BattleUnitInput): Unit {
     maxHp,
     hp: maxHp,
     atk: Math.max(1, Math.round(b.atk * powScale * legendPow * elitePow * (input.powMult ?? 1) + (bonus.atk ?? 0))),
-    sp: Math.round(b.sp * powScale * legendPow * elitePow + (bonus.sp ?? 0)),
+    sp: Math.max(0, Math.round(b.sp * powScale * legendPow * elitePow + (bonus.sp ?? 0))),
     baseArmor: b.armor + (bonus.armor ?? 0),
     baseMr: b.mr + (bonus.mr ?? 0),
     baseAspd: b.aspd * (1 + (bonus.aspd ?? 0)),

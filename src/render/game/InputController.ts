@@ -76,10 +76,11 @@ export class InputController {
     return this.dragGhost !== null || this.dragItemGhost !== null;
   }
 
-  /** 全屏浮层（设置/调试/羁绊全览/成员卡/侦查）是否打开 —— 键盘快捷键的统一让路口径。
-   *  注意：成员卡（traitMembers）是钉住型浮层，同样要让路 D/F/E/空格/Z/1-5 ——
-   *  只挡 pointerdown 而不挡键盘，会出现"卡钉着按 D 仍刷新商店"的穿透。 */
-  private overlayOpen(): boolean {
+  /** 全屏浮层（设置/调试/羁绊全览/成员卡/侦查）是否打开 —— 键盘/指针/悬停的**统一**让路口径。
+   *  三个入口必须共用本函数，集合漏一员就会出现"设置面板开着、按 D 让路了但点棋盘
+   *  仍能拖棋"这类半穿透：键盘只挡了按键，指针与悬停仍在给拖拽/详情卡喂坐标。
+   *  浮层自身的关闭都走各自遮罩的 GameObject 事件，场景级监听与本函数不冲突。 */
+  overlayOpen(): boolean {
     const s = this.scene;
     return !!(
       s.settingsPanel?.isOpen ||
@@ -183,16 +184,19 @@ export class InputController {
       const { x, y } = this.worldOf(p);
       // 已有拖拽进行中（多点触控的第二指）：不透传，避免覆盖状态泄漏旧 ghost
       if (this.dragGhost || this.dragItemGhost) return;
+      // 浮层开着：不透传棋盘/装备栏的拖拽与点选（遮罩只挡 GameObject 事件，
+      // 挡不住场景级 pointerdown，必须在此统一让路）。
+      // 唯一例外是成员卡：点卡外且非徽章 → 收卡再走正常交互（一次点击完成
+      // "收起 + 点选"，不必两击）；点徽章由徽章 pointerup 自行 toggle。
+      if (this.overlayOpen()) {
+        if (this.scene.traitMembers.isOpen) {
+          if (this.scene.traitMembers.containsPoint(x, y)) return;
+          if (!this.scene.refresher.hitTraitBadge(x, y)) this.scene.traitMembers.close();
+        }
+        return;
+      }
       // 点在奇遇面板上：卡片自己响应，不透传成棋盘/备战席的拖拽
       if (this.scene.adventure.contains(x, y)) return;
-      // 羁绊浮层开着：不透传棋盘交互（遮罩只挡对象事件，挡不住场景级 pointerdown）
-      if (this.scene.hud.traitModalOpen) return;
-      // 羁绊成员卡开着：点卡内不透传（卡是信息层）；点卡外且非徽章 → 收卡再走正常
-      // 交互（一次点击完成"收起 + 点选"，不必两击）；点徽章由徽章 pointerup 自行 toggle
-      if (this.scene.traitMembers.isOpen) {
-        if (this.scene.traitMembers.containsPoint(x, y)) return;
-        if (!this.scene.refresher.hitTraitBadge(x, y)) this.scene.traitMembers.close();
-      }
 
       // 0) 卸载模式：点击棋子 → 全身装备回器匣；点空处退出
       if (this.scene.unloadMode) {
@@ -671,12 +675,7 @@ export class InputController {
   }
 
   private updateHover(px: number, py: number): void {
-    if (
-      this.scene.pauseScout.scoutPanel ||
-      this.scene.settingsPanel?.isOpen ||
-      this.scene.hud.traitModalOpen ||
-      this.scene.traitMembers.isOpen
-    ) {
+    if (this.overlayOpen()) {
       this.clearHover();
       this.itemTip.hide();
       return;

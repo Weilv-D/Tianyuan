@@ -11,6 +11,11 @@ import type { TraitDef } from '../core/types';
  *   [经济]  改变资源节奏（剑宗击杀回蓝、术士击杀刷新）
  *   [生存]  改变死亡规则（幽冥复活、天庭无敌）
  *   [节奏]  改变时间曲线（机关攻速成长、山海流血叠层）
+ *
+ * effectText 是**默认档位的玩家文案**：game 进程永远读默认值（core/traits.ts
+ * 各 t('key', 默认值) 在表空时落代码字面量），因此 effectText 与 game 实际
+ * 表现恒等；平衡工具链的在线调参只发生在 fork 出的无头进程里，不构成文案
+ * 与实现的脱节窗口。effectText 不随 tune() 动态回填是既定口径，不是缺陷。
  */
 export const TRAITS: readonly TraitDef[] = [
   // ─────────────── 地域羁绊 (origin) ───────────────

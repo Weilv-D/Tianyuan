@@ -11,7 +11,7 @@
  *    一条不可逆的操作会逼玩家在每次拖拽前犹豫，这比允许拆装的代价大得多。
  */
 
-import { ITEM_BAR_SLOTS } from '../core/config';
+import { ITEM_BAR_SLOTS, STAR_HP_SCALE, STAR_POWER_SCALE } from '../core/config';
 import { ITEM_BY_ID, combine } from '../data/items';
 import { CHAMPION_BY_ID } from '../data/champions';
 import { findUnit, powerScore, type PlayerState, type UnitInstance } from './state';
@@ -180,11 +180,16 @@ export function recipeHint(u: UnitInstance): string[] {
 export function unitAxes(defId: string, star: number): [number, number, number] {
   const champ = CHAMPION_BY_ID[defId];
   if (!champ) return [0, 0, 0];
-  const s = star >= 3 ? 2.1 : star === 2 ? 1.45 : 1;
+  // 星级成长必须与内核同一真源：state.powerScore 已读 STAR_* 与 LEGEND_T3 /
+  // T3_ELITE_COST4，配装投影若落字面量，调平衡改 config 后 AI/模拟器的装备
+  // 权重会与面板实值脱节 —— 三星的 atk/tank 投影系统性失真 5~15%
+  const si = Math.min(2, Math.max(0, star - 1));
+  const s = STAR_POWER_SCALE[si];
+  const hpS = STAR_HP_SCALE[si];
   const b = champ.base;
   const atk = b.atk * s * b.aspd * (1 + b.critChance * (b.critMult - 1));
   const sp = b.sp * s * (100 / 60) * 2.5;
-  const tank = b.hp * (star >= 3 ? 3.24 : star === 2 ? 1.8 : 1) * 0.02 + b.armor * 0.6 + b.mr * 0.6;
+  const tank = b.hp * hpS * 0.02 + b.armor * 0.6 + b.mr * 0.6;
   return [atk, sp, tank];
 }
 
@@ -192,7 +197,8 @@ export function itemAxes(itemId: string, defId: string, star: number): [number, 
   const def = ITEM_BY_ID[itemId];
   const champ = CHAMPION_BY_ID[defId];
   if (!def || !champ) return [0, 0, 0];
-  const s = star >= 3 ? 2.1 : star === 2 ? 1.45 : 1;
+  const si = Math.min(2, Math.max(0, star - 1));
+  const s = STAR_POWER_SCALE[si];
   const b = champ.base;
   const ib = def.bonus;
   const im = def.mods ?? {};
