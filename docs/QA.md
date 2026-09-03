@@ -87,6 +87,7 @@ npm ci
 |---|---|---|
 | 战斗可信 | `determinism`、`battle-formula`、`grid`、`skills`、`traits-big` | 收敛、重演、战斗规则、占格、技能与大羁绊 |
 | 平衡锚点 | `balance`、`shop-odds` | 定档数值回归（CRN 断面关键锚）、商店概率表结构与 rollShop 行为契约 |
+| 工具链可信 | `balance-tools` | 平衡工具链自身：补丁四类路径往返与嵌套键级回退、CRN 配对公式金锁、进程池与串行逐位一致、SQLite 往返、**调参键白名单与 traits.ts 读取双向同源**、src 不引用工具链 |
 | 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为 |
 | 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销（含随机流游标回滚）与每日成绩 |
 | 交互安全 | `input-coords`、`valid-placements`、`robustness` | K=2 输入、拖拽落点合法域、满盘站位、坏输入与墨兽落地 |
