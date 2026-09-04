@@ -20,8 +20,14 @@ const overrides: Overrides = {};
 const rest: string[] = [];
 for (let i = 2; i < process.argv.length; i++) {
   if (process.argv[i] === '--set') {
-    const [k, v] = (process.argv[++i] ?? '').split('=');
-    overrides[k] = Number(v);
+    const kv = process.argv[++i] ?? '';
+    const eq = kv.indexOf('=');
+    if (eq === -1) throw new Error('--set 需要 key=value 形式，收到：' + kv);
+    const k = kv.slice(0, eq).trim();
+    if (!k) throw new Error('--set 键不能为空，收到：' + kv);
+    const v = Number(kv.slice(eq + 1).trim());
+    if (!Number.isFinite(v)) throw new Error('--set 值须为有限数字，收到：' + kv);
+    overrides[k] = v;
   } else {
     rest.push(process.argv[i]);
   }

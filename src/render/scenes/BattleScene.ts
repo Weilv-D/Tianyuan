@@ -776,9 +776,11 @@ export class BattleScene extends Phaser.Scene {
         if (e.crit && e.source === 'attack') tier = 'crit';
         if (e.kill && e.amount > 0) tier = 'execute';
 
-        if (e.amount > 0) {
+        if (e.amount > 0 && !this.ff) {
+          // 快进排水期不生成飘字/音效：数千事件压缩在数帧内，瞬态演出只会
+          // 积压到结算面板之下制造 jank（与弹道同口径；战斗结果与结算不变）
           this.dmgText.spawn(t.x, t.y, e.amount, tier, e.crit ? '' : '');
-          if (!this.ff) audio.play(e.crit && e.source === 'attack' ? 'crit' : 'hit');
+          audio.play(e.crit && e.source === 'attack' ? 'crit' : 'hit');
         }
         break;
       }
@@ -786,8 +788,10 @@ export class BattleScene extends Phaser.Scene {
       case 'heal': {
         const t = this.unitAnchor(e.dstUid);
         if (!t) break;
-        this.dmgText.spawn(t.x, t.y, e.amount, 'heal', '+');
-        if (!this.ff) audio.play('heal');
+        if (!this.ff) {
+          this.dmgText.spawn(t.x, t.y, e.amount, 'heal', '+');
+          audio.play('heal');
+        }
         break;
       }
 
@@ -795,8 +799,10 @@ export class BattleScene extends Phaser.Scene {
         if (e.amount <= 0) break;
         const t = this.unitAnchor(e.uid);
         if (!t) break;
-        this.dmgText.spawn(t.x, t.y, e.amount, 'shield', '+');
-        if (!this.ff) audio.play('shield');
+        if (!this.ff) {
+          this.dmgText.spawn(t.x, t.y, e.amount, 'shield', '+');
+          audio.play('shield');
+        }
         break;
       }
 
@@ -805,7 +811,7 @@ export class BattleScene extends Phaser.Scene {
         if (!v) break;
         v.playCast(e.windup);
         const a = this.unitAnchor(e.uid);
-        if (a) this.fx.play({ kind: 'castRing', x: a.x, y: a.y + 34 });
+        if (a && !this.ff) this.fx.play({ kind: 'castRing', x: a.x, y: a.y + 34 });
         if (!this.ff) audio.play('cast');
         break;
       }
@@ -815,8 +821,10 @@ export class BattleScene extends Phaser.Scene {
         v?.endCast();
         const u = this.battle?.unitByUid(e.uid);
         if (u && u.entry.cost >= 5) {
-          if (!this.ff) audio.play('skillBig');
-          this.fx.fullscreenFlash(VOID.base, 0.6);
+          if (!this.ff) {
+            audio.play('skillBig');
+            this.fx.fullscreenFlash(VOID.base, 0.6);
+          }
         } else {
           if (!this.ff) audio.play('cast');
         }
@@ -827,9 +835,11 @@ export class BattleScene extends Phaser.Scene {
         const v = this.views.get(e.uid);
         if (!v) break;
         const p = { x: v.x, y: v.y - 30 };
-        this.fx.play({ kind: 'burst', x: p.x, y: p.y, radius: 0.6, tint: INK[300] });
-        this.burstInk(p.x, p.y);
-        if (!this.ff) audio.play('death');
+        if (!this.ff) {
+          this.fx.play({ kind: 'burst', x: p.x, y: p.y, radius: 0.6, tint: INK[300] });
+          this.burstInk(p.x, p.y);
+          audio.play('death');
+        }
         v.playDeath(() => {
           if (v.scene) v.destroy();
           this.views.delete(e.uid);
@@ -838,6 +848,8 @@ export class BattleScene extends Phaser.Scene {
       }
 
       case 'fx': {
+        // 快进期间瞬态特效整体跳过（与弹道同口径）；播放计算一并省去
+        if (this.ff) break;
         let x = 0;
         let y = 0;
         let tx: number | undefined;

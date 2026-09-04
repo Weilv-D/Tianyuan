@@ -752,7 +752,11 @@ export function applyTraits(api: BattleApi, team: number, active: ActiveTrait[],
     // 2026-08-29 修正并全局重平衡。
     for (const m of members) m.trait.tier[at.id] = at.tier;
     const impl = TRAIT_IMPL[at.id];
-    if (!impl) continue;
+    if (!impl) {
+      // 数据表完整性不变量：traits 数据与 TRAIT_IMPL 必须闭环。静默 no-op 会让
+      // 拼写错误的羁绊表现为"整条羁绊消失"，平衡矩阵读到的是强度噪声
+      throw new Error(`未知羁绊实现: ${at.id} —— traits 数据与 TRAIT_IMPL 脱节`);
+    }
     impl({ api, team, tier: at.tier, members, teamUnits });
   }
 }

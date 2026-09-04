@@ -112,6 +112,13 @@ cleanup() {
 }
 
 start() {
+  # Node 能力门：node:sqlite（balance 工具链）要求 ≥22.5，旧 Node 会在
+  # 平衡/审计步骤以难懂的原生模块错误倒下 —— 入口先探明并给出指引
+  if ! node -e "require('node:sqlite')" 2>/dev/null; then
+    echo "当前 Node $(node -v 2>/dev/null || echo '未安装') 缺少 node:sqlite，本项目要求 Node ≥ 22.5。"
+    echo "请用 nvm 安装：nvm install 22.5 && nvm use（仓库 .nvmrc 已就绪）。"
+    exit 1
+  fi
   if [ -n "$(port_pid)" ]; then
     echo "端口 $PORT 已有服务器（PID $(port_pid)），先停止旧进程..."
     stop

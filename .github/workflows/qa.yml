@@ -33,3 +33,11 @@ jobs:
 
       - name: Run quality gate
         run: npm run qa
+
+      # 发布门禁里最便宜的两道前置到 PR 阶段：许可证/哈希漂移与高危依赖
+      # 在合并前暴露，而不是积压到 npm run release 才爆炸
+      - name: Audit dependencies
+        run: npm run audit:deps
+
+      - name: Audit music licensing
+        run: npm run audit:music

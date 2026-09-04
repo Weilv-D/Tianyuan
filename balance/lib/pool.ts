@@ -252,8 +252,15 @@ export function runPool(
         clearInitTimer();
         dispatch(proc);
       });
-      // 每个作业自携带种子基（pair = CRN 矩阵口径，item = 装备配对口径，本就不同源）
-      proc.send({ type: 'init', comps });
+      // 每个作业自携带种子基（pair = CRN 矩阵口径，item = 装备配对口径，本就不同源）。
+      // init 的 send 与 dispatch 同款 IPC 竞态包裹：子进程恰在 fork 与 send 之间
+      // 死亡时，ERR_IPC_CHANNEL_CLOSED 必须转整池受控失败，不能变成未捕获异常
+      try {
+        proc.send({ type: 'init', comps });
+      } catch (e) {
+        fail(new Error(`池子初始化派发失败（子进程已退出）：${e instanceof Error ? e.message : String(e)}`));
+        return;
+      }
       startInitTimer();
     }
   });

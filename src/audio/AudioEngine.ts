@@ -420,6 +420,9 @@ export class AudioEngine {
   ): void {
     const ctx = this.ctx!;
     const t = this.now() + when;
+    if (!Number.isFinite(dur) || !Number.isFinite(t) || dur <= 0 || !Number.isFinite(filterHz) || filterHz <= 0) {
+      return; // 无效参数静默早退，与 tone 的守卫同一动机（非法参数不成声、不抛错）
+    }
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuffer(dur);
     const f = ctx.createBiquadFilter();
@@ -449,6 +452,9 @@ export class AudioEngine {
   ): void {
     const ctx = this.ctx!;
     const t = this.now() + when;
+    if (!Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(dur) || from <= 0 || dur <= 0) {
+      return;
+    }
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type;
@@ -760,6 +766,9 @@ export class AudioEngine {
   private drum(when: number, gain: number, pitchMul = 1, pan = 0): void {
     const ctx = this.ctx!;
     const t = this.now() + when;
+    if (!Number.isFinite(gain) || !Number.isFinite(pitchMul) || pitchMul <= 0) {
+      return;
+    }
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = 'sine';

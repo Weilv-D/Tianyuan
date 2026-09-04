@@ -129,4 +129,12 @@ describe('大羁绊玩法', () => {
       expect(u.statuses.some((s) => s.kind === 'aspdUp')).toBe(false);
     }
   });
+
+  it('全部羁绊 id 与 TRAIT_IMPL 闭环（数据多一条实现少一条即当场红）', async () => {
+    const { TRAITS } = await import('../src/data/traits');
+    const { TRAIT_IMPL } = await import('../src/core/traits');
+    for (const t of TRAITS) {
+      expect(TRAIT_IMPL[t.id], `羁绊 ${t.id}（${t.name}）没有实现`).toBeTruthy();
+    }
+  });
 });

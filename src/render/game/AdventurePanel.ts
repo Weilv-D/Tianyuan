@@ -214,10 +214,15 @@ export class AdventurePanel {
   /** 点选恩赐：resolveAdventure 是并行线契约，桩会 throw —— 必须防御性调用 */
   private pick(index: number, title: string): void {
     if (this.scene.phase !== 'prep' || this.scene.busy) return;
+    // 领取与其他玩家动作同栈：先快照再发放，失败弹栈。
+    // 没有这一步，本回合第一个动作就是领赐时撤销栈为空（误触无法挽回），
+    // 或领赐搭着上一个动作一起回滚（标签与实际粒度不符）
+    this.scene.pushUndo('奇遇');
     try {
       this.scene.match.resolveAdventure(index);
     } catch {
-      return; // 内核未落地/本回合已择：选择无效，面板保留
+      this.scene.undoStack.pop(); // 内核未落地/本回合已择：选择无效，面板保留
+      return;
     }
     this.resolvedRound = this.scene.match.round;
     audio.play('uiBig');

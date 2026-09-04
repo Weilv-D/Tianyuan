@@ -236,11 +236,13 @@ function sliceSheet(png, sheet) {
 
 mkdirSync(OUT, { recursive: true });
 for (const sheet of SHEETS) {
-  if (!existsSync(sheet.src)) {
-    console.error(`✗ 源图不存在: ${sheet.src}`);
+  // 输入锚定仓库根：SHEETS 表存相对串，任意 cwd 运行都读同一份源图
+  const src = join(root, sheet.src);
+  if (!existsSync(src)) {
+    console.error(`✗ 源图不存在: ${src}`);
     process.exit(1);
   }
-  const png = PNG.sync.read(readFileSync(sheet.src));
+  const png = PNG.sync.read(readFileSync(src));
   const { itemOf } = sliceSheet(png, sheet);
   const W = png.width, H = png.height;
   const boxes = sheet.ids.map(() => ({ minX: W, minY: H, maxX: -1, maxY: -1 }));

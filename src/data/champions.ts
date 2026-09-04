@@ -68,8 +68,14 @@ export interface SkillParams {
   falloff?: number;
   /** 处决阈值（目标生命百分比） */
   threshold?: number;
+  /** 阈值命中的总倍率（1.0 = 100% 伤害）；缺省 2。文案 {thresholdMult} 与实现同源 */
+  thresholdMult?: number;
+  /** 弹幕末发倍率（1.0 = 100% 伤害）；缺省 2。文案 {finalMult} 与实现同源 */
+  finalMult?: number;
   /** 直线长度 */
   length?: number;
+  /** 控制附带易伤的持续秒数；缺省 dur + 2。文案 {vulnDur} 与实现同源 */
+  vulnDur?: number;
   /** 附加：必定暴击 */
   forceCrit?: boolean;
   /** 附加：击杀后刷新法力比例 */
@@ -153,8 +159,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'duanyue_q',
     skillSpec: {
       kind: 'strike', name: '断岳式', target: 'currentTarget',
-      desc: '斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 {threshold}，此击造成 200% 伤害。',
-      params: { atk: 2.8, sp: 0.4, type: 'physical', threshold: 0.35, flat: 0 },
+      desc: '斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 {threshold}，此击造成 {thresholdMult} 伤害。',
+      params: { atk: 2.8, sp: 0.4, type: 'physical', threshold: 0.35, thresholdMult: 2, flat: 0 },
     },
   },
   {
@@ -201,8 +207,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jingyu_q',
     skillSpec: {
       kind: 'volley', name: '连珠箭', target: 'currentTarget',
-      desc: '3 秒内连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，最后一箭造成双倍伤害。',
-      params: { atk: 0.7, type: 'physical', shots: 5, interval: 0.6 },
+      desc: '3 秒内连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，最后一箭造成 {finalMult} 伤害。',
+      params: { finalMult: 2, atk: 0.7, type: 'physical', shots: 5, interval: 0.6 },
     },
   },
   {
@@ -292,8 +298,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'muji_q',
     skillSpec: {
       kind: 'volley', name: '连弩齐射', target: 'currentTarget',
-      desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 {statusValue} 攻速（至多 {maxStacks} 层，持续 {statusDur} 秒）。',
-      params: { atk: 0.7, type: 'physical', shots: 8, interval: 0.4, maxStacks: 8, status: { kind: 'aspdUp', dur: 5, value: 6 } },
+      desc: '倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（至多 {maxStacks} 层，持续 {statusDur} 秒）。',
+      params: { finalMult: 2, atk: 0.7, type: 'physical', shots: 8, interval: 0.4, maxStacks: 8, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
   {
@@ -529,8 +535,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'zhenfeng_q',
     skillSpec: {
       kind: 'strike', name: '开锋', target: 'currentTarget',
-      desc: '新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 200% 伤害。',
-      params: { atk: 2.5, type: 'physical', threshold: 0.3 },
+      desc: '新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 {thresholdMult} 伤害。',
+      params: { atk: 2.5, type: 'physical', threshold: 0.3, thresholdMult: 2 },
     },
   },
   {
@@ -541,8 +547,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jinghong_q',
     skillSpec: {
       kind: 'volley', name: '逐羽', target: 'currentTarget',
-      desc: '连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭双倍。',
-      params: { atk: 0.65, type: 'physical', shots: 4, interval: 0.5 },
+      desc: '连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害。',
+      params: { finalMult: 2, atk: 0.65, type: 'physical', shots: 4, interval: 0.5 },
     },
   },
   {
@@ -565,8 +571,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'lingque_q',
     skillSpec: {
       kind: 'volley', name: '雀鸣', target: 'currentTarget',
-      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；每箭命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
-      params: { atk: 0.5, type: 'physical', shots: 5, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 5 } },
+      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；每箭命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
+      params: { finalMult: 2, atk: 0.5, type: 'physical', shots: 5, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 5 } },
     },
   },
   {
@@ -627,8 +633,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'paoche_q',
     skillSpec: {
       kind: 'volley', name: '石弩', target: 'currentTarget',
-      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
-      params: { atk: 0.62, type: 'physical', shots: 4, interval: 0.55, status: { kind: 'aspdUp', dur: 3, value: 8 } },
+      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
+      params: { finalMult: 2, atk: 0.62, type: 'physical', shots: 4, interval: 0.55, status: { kind: 'aspdUp', dur: 3, value: 8 } },
     },
   },
   {
@@ -663,8 +669,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'chaoji_q',
     skillSpec: {
       kind: 'volley', name: '潮弩', target: 'currentTarget',
-      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发双倍；每发命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
-      params: { atk: 0.5, type: 'physical', shots: 6, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
+      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
+      params: { finalMult: 2, atk: 0.5, type: 'physical', shots: 6, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
 
@@ -814,8 +820,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'shihu_q',
     skillSpec: {
       kind: 'volley', name: '虎啸', target: 'currentTarget',
-      desc: '啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭双倍；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
-      params: { atk: 0.75, type: 'physical', shots: 4, interval: 0.5, status: { kind: 'aspdUp', dur: 5, value: 10 } },
+      desc: '啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
+      params: { finalMult: 2, atk: 0.75, type: 'physical', shots: 4, interval: 0.5, status: { kind: 'aspdUp', dur: 5, value: 10 } },
     },
   },
 
@@ -888,8 +894,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'muyuan_q',
     skillSpec: {
       kind: 'strike', name: '鸢喙', target: 'currentTarget',
-      desc: '木鸢俯击：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 200% 伤害。',
-      params: { atk: 3.1, type: 'physical', threshold: 0.28 },
+      desc: '木鸢俯击：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 {thresholdMult} 伤害。',
+      params: { atk: 3.1, type: 'physical', threshold: 0.28, thresholdMult: 2 },
     },
   },
 
@@ -946,8 +952,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'qingqiu_q',
     skillSpec: {
       kind: 'shieldAll', name: '九尾庇佑', target: 'allAllies',
-      desc: '全体友军获得 {value} 最大生命的护盾与 {statusDur} 秒 {statusValue} 攻速；同时魅惑全体敌人 {dur} 秒（无法行动，且受伤加深 {vulnerability}）。',
-      params: { value: 0.35, shieldDur: 8, dur: 2.5, status: { kind: 'aspdUp', dur: 8, value: 40 }, vulnerability: 0.2 },
+      desc: '全体友军获得 {value} 最大生命的护盾与 {statusDur} 秒 {statusValue} 攻速；同时魅惑全体敌人 {dur} 秒（无法行动），并使其受伤加深 {vulnerability}，持续 {vulnDur} 秒。',
+      params: { value: 0.35, shieldDur: 8, dur: 2.5, vulnDur: 4.5, status: { kind: 'aspdUp', dur: 8, value: 40 }, vulnerability: 0.2 },
     },
   },
 ];
@@ -1005,6 +1011,11 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   knockback: (p) => String(p.knockback ?? 0),
   count: (p) => String(p.summon?.count ?? 0),
   stackAtkOnHit: (p) => pctv(p.stackAtkOnHit),
+  // 阈值命中总倍率 / 弹幕末发倍率（1.0 = 100% 伤害），实现侧 p.thresholdMult / p.finalMult
+  thresholdMult: (p) => pctv(p.thresholdMult ?? 2),
+  finalMult: (p) => pctv(p.finalMult ?? 2),
+  // 控制附带易伤的驻留时长（秒）；实现侧缺省 dur + 2
+  vulnDur: (p) => String(p.vulnDur ?? 0),
   maxStacks: (p) => String(p.maxStacks ?? 0),
   maxRepeats: (p) => String(p.maxRepeats ?? 0),
   healPerExecute: (p) => pctv(p.healPerExecute),

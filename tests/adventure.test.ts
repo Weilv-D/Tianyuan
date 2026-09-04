@@ -39,8 +39,18 @@ describe('奇遇回合', () => {
     expect(gained).toBe(true);
     // 二次代选不可重复领取
     expect(first.resolveHumanAdventure()).toBe(false);
-    // 代选走纯函数选型：同种子同局面必同选择（对局层确定性契约）
+    // 代选走纯函数选型：同种子同局面必同选择（对局层确定性契约）。
+    // 只断"成功"不够 —— 若选型漂到不同 index，两边各自成功而恩赐不同，
+    // 这半段契约就静默失守；六路增量逐位对齐才把"选了同一个"钉死
+    const rp = replay.human;
     expect(replay.resolveHumanAdventure()).toBe(true);
+    expect(replay.adventureOffer).toBeNull();
+    expect(rp.gold - goldBefore).toBe(first.human.gold - goldBefore);
+    expect(rp.xp - xpBefore).toBe(first.human.xp - xpBefore);
+    expect(rp.level).toBe(first.human.level);
+    expect(rp.items.length - itemsBefore).toBe(first.human.items.length - itemsBefore);
+    expect(rp.bench.filter(Boolean).length - benchBefore).toBe(first.human.bench.filter(Boolean).length - benchBefore);
+    expect(rp.board.filter(Boolean).length - boardBefore).toBe(first.human.board.filter(Boolean).length - boardBefore);
   });
 
   it('金币和援军恩赐通过现有经济与卡池发放', () => {

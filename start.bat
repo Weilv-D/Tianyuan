@@ -68,6 +68,14 @@ exit /b 0
 call :kill_port
 
 :do_start
+rem Node capability gate: node:sqlite (balance tooling) requires >= 22.5.
+rem Old Node fails later with cryptic native-module errors - probe it up front.
+node -e "require('node:sqlite')" >nul 2>&1
+if errorlevel 1 (
+  echo Node is missing node:sqlite - this project requires Node ^>= 22.5.
+  echo Install with nvm: "nvm install 22.5" then "nvm use" ^(see .nvmrc^).
+  exit /b 1
+)
 rem idempotent: clear any orphan on the port first
 call :getpid
 if defined PID (

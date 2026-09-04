@@ -51,9 +51,14 @@ npm ci
    ├─ Architecture boundaries
    ├─ Vitest core behavior
    └─ Vite production build
+└─ npm run audit:deps     # 高危依赖在 PR 阶段暴露
+└─ npm run audit:music    # 音乐清单/哈希/授权在 PR 阶段暴露
 ```
 
-同一分支的新提交会取消旧任务，门禁超时为 10 分钟。CI 失败时主分支和发布流程均不应继续。
+CI 追加两道发布门禁中最便宜的审计，让许可证、哈希漂移与高危依赖在合并前失败，
+而不是积压到 `npm run release` 才爆炸。单文件形态构建、外链扫描与产物体检仍由发布
+命令完整覆盖。同一分支的新提交会取消旧任务，门禁超时为 10 分钟。CI 失败时主分支和
+发布流程均不应继续。
 
 ### 3.3 发布
 

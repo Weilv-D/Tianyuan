@@ -67,6 +67,9 @@ export interface StatusEffect {
   srcUid: number;
   /** DoT 的结算伤害类型（burn=法术、bleed=真实）；非 DoT 状态不使用 */
   dtype?: DamageType;
+  /** 叠层来源标识：多来源共用同一 StatusKind（如多件装备/技能都挂 aspdUp）时，
+   *  各自声明的层数上限（maxStacks）只数本源条目，互不挤占 */
+  src?: string;
 }
 
 /** 棋子静态定义（配置表驱动） */

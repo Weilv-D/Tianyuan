@@ -81,6 +81,12 @@ function sourceFiles(directory) {
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) out.push(...sourceFiles(path));
     else if (entry.isFile() && extname(entry.name) === '.ts') out.push(path);
+    // 覆盖计数断言只认本脚本收集的文件：出现其他源码扩展名即失败，
+    // 而不是让 .tsx/.js 新文件静默逃过七层边界与确定性扫描
+    else if (entry.isFile() && /^\.(mjs|js|tsx|jsx|mts|cts)$/.test(extname(entry.name))) {
+      console.error(`✗ src 下出现边界检查未覆盖的源码文件（${extname(entry.name)}）：${path}`);
+      process.exit(1);
+    }
   }
   return out;
 }
@@ -91,10 +97,42 @@ function withoutComments(source) {
     .replace(/\/\/[^\n]*/g, (comment) => ' '.repeat(comment.length));
 }
 
+function blankExceptNewlines(text) {
+  return text.replace(/[^\n]/g, ' ');
+}
+
+// 模板字面量的 ${…} 插值是活代码而不是文本：整体抹空会让
+// `x${Math.random()}` 这类写法逃过确定性/浏览器 API 扫描（假阴性）。
+// 先按配对花括号抽出插值表达式原样保留，再抹掉其余字符。
+function keepTemplateInterpolations(literal) {
+  let out = '';
+  for (let i = 0; i < literal.length; i++) {
+    if (literal[i] === '$' && literal[i + 1] === '{') {
+      out += ' ';
+      let depth = 1;
+      i += 2;
+      while (i < literal.length && depth > 0) {
+        const ch = literal[i];
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) break;
+        }
+        out += ch;
+        i++;
+      }
+      out += ' ';
+    } else if (literal[i] === '\n') {
+      out += '\n';
+    }
+  }
+  return out;
+}
+
 function withoutStrings(source) {
   return source.replace(
     /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g,
-    (literal) => literal.replace(/[^\n]/g, ' '),
+    (literal) => (literal.startsWith('`') ? keepTemplateInterpolations(literal) : blankExceptNewlines(literal)),
   );
 }
 

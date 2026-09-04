@@ -520,6 +520,8 @@ export class InputController {
     if (this.scene.match.sell(this.scene.match.human, cur.iid)) {
       audio.play('coin');
       this.scene.showToast(`卖出 ${CHAMPION_BY_ID[cur.defId]?.name ?? ''}，返还 ${gain} 金`);
+    } else {
+      this.scene.undoStack.pop(); // 未成交不留空快照（与买入/升级失败路径同口径）
     }
     this.clearSelection();
     this.scene.afterAction();
@@ -674,6 +676,8 @@ export class InputController {
       if (this.scene.match.sell(this.scene.match.human, unit.iid)) {
         audio.play('coin');
         this.scene.showToast(`卖出 ${CHAMPION_BY_ID[unit.defId]?.name ?? ''}，返还 ${gain} 金`);
+      } else {
+        this.scene.undoStack.pop(); // 未成交不留空快照（与买入/升级失败路径同口径）
       }
     } else {
       const check = canPlace(this.scene.match.human, unit.iid, target.where, target.slot);

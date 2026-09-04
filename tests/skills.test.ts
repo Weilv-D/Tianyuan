@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { Battle } from '../src/core/battle';
+import { IMPL } from '../src/core/skills';
 import { CHAMPIONS, formatSkillDesc } from '../src/data/champions';
 
 describe('技能系统', () => {
+  it('全部棋子的技能 kind 与 skills.IMPL 闭环（数据多一条实现少一条即当场红）', () => {
+    for (const champion of CHAMPIONS) {
+      expect(IMPL[champion.skillSpec.kind], `${champion.id} 的技能类型 ${champion.skillSpec.kind} 没有实现`).toBeTruthy();
+    }
+  });
+
   it('每类真实技能都能在完整战斗中施放并收敛', () => {
     const representatives = new Map<string, string>();
     for (const champion of CHAMPIONS) {

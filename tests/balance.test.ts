@@ -52,14 +52,19 @@ describe('数值平衡回归（2026-09-01 CRN 定档）', () => {
     }, null, true);
     const shieldEvents = battle.events.filter((e) => e.t === 'shield');
     expect(shieldEvents.length).toBeGreaterThan(0);
+    // 方士盾是全队开战一次性发放：断言对象是己方（team 0）事件，
+    // 必须有至少一条真正进入比值校验 —— 敌方盾/坏 uid 静默 continue 会让
+    // 整个断言空转通过（16% 锚点被跳过仍全绿）
+    let checked = 0;
     for (const e of shieldEvents) {
       if (e.t !== 'shield') continue;
       const unit = battle.unitByUid(e.uid);
-      if (!unit) continue;
-      if (unit.team !== 0) continue;
+      if (!unit || unit.team !== 0) continue;
       const ratio = e.amount / unit.maxHp;
       expect(ratio).toBeCloseTo(0.16, 2);
+      checked++;
     }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it('2026-09-02 终态定档（机制包 + 数值包，矩阵带外 0 / 极差 11.4% / 装备 36/36 正收益）', () => {

@@ -7,7 +7,7 @@
 //   4. 授权恒为 CC0-1.0（ADR D1：禁 CC-BY / 自定义授权）
 // 同时从 package-lock 收集生产依赖许可证，生成完整的 THIRD_PARTY_LICENSES.txt。
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -132,7 +132,11 @@ if (!failed) {
     '',
   ];
   mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, lines.join('\r\n'), 'utf8');
+  // 原子落盘：中断不留半截清单 —— 半截文件会被同一发布链的 zip 原样打进分发包
+  //（与 zip.mjs / subset-seal.mjs 的 .tmp → rename 纪律同口径）
+  const tmpPath = `${outPath}.tmp`;
+  writeFileSync(tmpPath, lines.join('\r\n'), 'utf8');
+  renameSync(tmpPath, outPath);
   console.log(`✓ 授权清单已生成 → ${process.argv[2] ?? 'release/THIRD_PARTY_LICENSES.txt'}`);
 }
 

@@ -176,6 +176,13 @@ export function readCurrent(path: string): number | undefined {
       (MATCH_TUNING as unknown as Record<string, unknown>)[cfgM[1]];
     return typeof v === 'number' ? v : undefined;
   }
+  // legend.<字段>：读天命包单点（与 set 侧的 legend 分支同源 —— 只加写侧会让
+  // sweep/ab 的报告里基准值显示 ?，补丁往返可读性破口）
+  const legendM = /^legend\.([A-Za-z0-9_]+)$/.exec(path);
+  if (legendM) {
+    const v = (LEGEND_T3 as unknown as Record<string, unknown>)[legendM[1]];
+    return typeof v === 'number' ? v : undefined;
+  }
   const m = /^([a-z]+)\.([A-Za-z0-9_]+)\.(.+)$/.exec(path);
   if (!m) return undefined;
   const [, kind, id, rest] = m;

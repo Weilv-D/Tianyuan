@@ -228,13 +228,14 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     });
   }
 
-  // 流星弩：击杀后攻速爆发（aspdUp 可叠，按层数上限封顶）
+  // 流星弩：击杀后攻速爆发（aspdUp 可叠，按层数上限封顶；只数本源条目 ——
+  // 垂天翼/羁绊/技能的外来 aspdUp 不挤占本件的层数上限，src 标识同源判定）
   if (units.some((u) => has(u, 'killFrenzy'))) {
     h.onKill.push((a, killer) => {
       if (!has(killer, 'killFrenzy') || !killer.alive) return;
-      const stacks = killer.statuses.filter((s) => s.kind === 'aspdUp').length;
+      const stacks = killer.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'killFrenzy').length;
       if (stacks >= paramOf(killer, 'maxStacks')) return;
-      a.addStatus(killer, killer, 'aspdUp', paramOf(killer, 'dur'), paramOf(killer, 'aspdPct'));
+      a.addStatus(killer, killer, 'aspdUp', paramOf(killer, 'dur'), paramOf(killer, 'aspdPct'), 'killFrenzy');
       a.fx('buffAura', { uid: killer.uid, params: { hue: 0 } });
     });
   }
@@ -283,7 +284,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
         if (tick % Math.max(1, Math.round(paramOf(u, 'everyTicks'))) !== 0) continue;
         for (const kind of PURGE_ORDER) {
           if (!u.statuses.some((s) => s.kind === kind)) continue;
-          a.removeStatus(u, kind);
+          a.removeOneStatus(u, kind);
           a.fx('buffAura', { uid: u.uid });
           break;
         }
@@ -291,13 +292,13 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     });
   }
 
-  // 紫电镰：施法后攻速爆发
+  // 紫电镰：施法后攻速爆发（层数上限只数本源，与流星弩同口径）
   if (units.some((u) => has(u, 'castAspd'))) {
     h.onCast.push((a, u) => {
       if (!has(u, 'castAspd') || !u.alive) return;
-      const stacks = u.statuses.filter((s) => s.kind === 'aspdUp').length;
+      const stacks = u.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'castAspd').length;
       if (stacks >= paramOf(u, 'maxStacks')) return;
-      a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'));
+      a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'), 'castAspd');
       a.fx('buffAura', { uid: u.uid, params: { hue: 2 } });
     });
   }

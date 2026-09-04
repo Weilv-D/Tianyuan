@@ -679,6 +679,7 @@ export class Battle implements BattleApi {
   addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void {
     if (!dst.alive) return;
     if (!Number.isFinite(amount)) throw new Error(`非法护盾值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
+    if (!Number.isFinite(dur)) throw new Error(`非法护盾时长: ${dur}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (amount <= 0) return;
     const amt = amount * (1 + (src?.trait.shieldAmp ?? 0))
       * (this.tick >= OVERTIME_START_TICK ? MECH.overtimeSustainFactor : 1);
@@ -697,8 +698,9 @@ export class Battle implements BattleApi {
     this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind: 'shield', dur, value: Math.round(dst.shield), added: true });
   }
 
-  addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number): void {
+  addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number, srcTag?: string): void {
     if (!dst.alive) return;
+    if (!Number.isFinite(dur)) throw new Error(`非法状态时长: ${dur}（kind=${kind} src=${src.uid} dst=${dst.uid}）`);
     if (CONTROL_KINDS.has(kind) && (dst.ccImmune > 0 || dst.statuses.some((s) => s.kind === 'ccImmune'))) return;
     const ticks = Math.max(1, Math.round(dur * TICK_RATE));
     if (!STACKABLE_KINDS.has(kind)) {
@@ -707,11 +709,12 @@ export class Battle implements BattleApi {
         existing.ticks = Math.max(existing.ticks, ticks);
         existing.value = Math.max(existing.value, value);
         existing.srcUid = src.uid;
+        if (srcTag) existing.src = srcTag;
         this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind, dur, value, added: true });
         return;
       }
     }
-    dst.statuses.push({ kind, ticks, value, srcUid: src.uid });
+    dst.statuses.push({ kind, ticks, value, srcUid: src.uid, src: srcTag });
     this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind, dur, value, added: true });
   }
 
@@ -720,9 +723,19 @@ export class Battle implements BattleApi {
     this.emit({ t: 'status', tick: this.tick, uid: u.uid, kind, dur: 0, value: 0, added: false });
   }
 
+  /** 只摘除该 kind 的一条（最旧叠层）：burn/bleed 可多条共存，「净化一个减益」
+   *  若按 kind 整类全清，多段流血会被一次抹平 —— 与 removeStatus（全清）并存各表其义。 */
+  removeOneStatus(u: Unit, kind: StatusKind): void {
+    const idx = u.statuses.findIndex((s) => s.kind === kind);
+    if (idx < 0) return;
+    u.statuses.splice(idx, 1);
+    this.emit({ t: 'status', tick: this.tick, uid: u.uid, kind, dur: 0, value: 0, added: false });
+  }
+
   addDot(src: Unit, dst: Unit, kind: 'burn' | 'bleed', dps: number, dur: number, type: DamageType): void {
     if (!dst.alive) return;
     if (!Number.isFinite(dps)) throw new Error(`非法持续伤害值: ${dps}（src=${src.uid} dst=${dst.uid}）`);
+    if (!Number.isFinite(dur)) throw new Error(`非法持续伤害时长: ${dur}（kind=${kind} src=${src.uid} dst=${dst.uid}）`);
     if (dps <= 0) return;
     // 结算类型随状态走（burn=法术、bleed 由调用方定，山海传 'true'），
     // 不能在 tickDots 里按 kind 硬编码 —— 否则"流血走真实伤害"的设计失效
@@ -868,10 +881,12 @@ export class Battle implements BattleApi {
   }
 
   addZone(o: ZoneOptions): void {
+    if (!Number.isFinite(o.dur)) throw new Error(`非法领域时长: ${o.dur}`);
     this.zones.push({ ...o, id: this.zoneId++, endsAtTick: this.tick + Math.round(o.dur * TICK_RATE) });
   }
 
   schedule(delaySeconds: number, fn: (api: BattleApi) => void): void {
+    if (!Number.isFinite(delaySeconds)) throw new Error(`非法延迟: ${delaySeconds}`);
     this.scheduled.push({ atTick: this.tick + Math.max(1, Math.round(delaySeconds * TICK_RATE)), seq: this.seq++, fn });
   }
 
@@ -1164,7 +1179,9 @@ export class Battle implements BattleApi {
         if (!u.alive) break;
         if (s.kind !== 'burn' && s.kind !== 'bleed') continue;
         const src = this.unitByUid(s.srcUid);
-        const type: DamageType = s.dtype ?? (s.kind === 'burn' ? 'magic' : 'physical');
+        // 兜底口径与 types.ts 契约一致：burn=法术、bleed=真实 —— 显式传 dtype
+        // 的调用方（addDot 唯一入口）不受此回退影响
+        const type: DamageType = s.dtype ?? (s.kind === 'burn' ? 'magic' : 'true');
         this.emit({ t: 'fx', tick: this.tick, kind: s.kind === 'burn' ? 'burnTick' : 'bleedTick', uid: u.uid });
         this.dealDamage(src, u, s.value * dt, type, { source: 'dot' });
       }

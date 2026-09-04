@@ -63,14 +63,28 @@ export function hasSave(mode: Match['mode'] = 'normal'): boolean {
       } catch {
         /* 清不掉也照常判无存档 */
       }
-      // v3 键损坏但普通档仍有 v2 旧档可迁移 → "继续"仍亮（与 loadMatch 兜底同口径）
-      return mode === 'normal' && localStorage.getItem(LEGACY_KEY) !== null;
+      // v3 键损坏但普通档仍有 v2 旧档可迁移 → "继续"仍亮（与 loadMatch 兜底同口径）：
+      // 旧键同样验内容 —— 损坏的 v2 载荷不算有存档，且顺手清掉（loadMatch 同款自愈）
+      return mode === 'normal' && hasLegacySave();
     }
     // 只有 v2 旧档也算普通档有存档：读档时会被迁移，"继续"按钮必须亮
-    return mode === 'normal' && localStorage.getItem(LEGACY_KEY) !== null;
+    return mode === 'normal' && hasLegacySave();
   } catch {
     return false;
   }
+}
+
+/** v2 遗留键的"有存档"判定：验型失败即清除（与 loadMatch 的自愈路径同口径） */
+function hasLegacySave(): boolean {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (raw === null) return false;
+    if (loadData(raw, 2)) return true;
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* 读不出/清不掉都按无旧档处理 */
+  }
+  return false;
 }
 
 export function saveMatch(m: Match): boolean {

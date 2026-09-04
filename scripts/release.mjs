@@ -22,8 +22,18 @@ const run = (command, args) => {
   const needShell = command.endsWith('.cmd');
   return execFileSync(command, args, { cwd: root, stdio: 'inherit', shell: needShell });
 };
+const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 async function main() {
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
+
+// 锁版门禁第一守卫：干净树发布。脏树打出的 zip 与任何 commit 都对不上，
+// 无法复现与追责 —— 未提交的改动先走正常提交流程
+const dirty = git('status', '--porcelain');
+if (dirty) {
+  console.error('✗ 工作区不干净，拒绝发布（zip 必须能对应到唯一 commit）：');
+  console.error(dirty.split('\n').map((l) => `    ${l}`).join('\n'));
+  process.exit(1);
+}
 
 // 版本一致性门禁：version.ts（界面落款）与 package.json 必须同值，
 // 否则会出现"zip 是 1.4.0、界面显示 1.4.1"的错版分发
@@ -31,6 +41,14 @@ const verTs = readFileSync(path.join(root, 'src/version.ts'), 'utf8');
 const gameVersion = /GAME_VERSION = '([^']+)'/.exec(verTs)?.[1];
 if (gameVersion !== version) {
   console.error(`✗ 版本不一致：package.json=${version}，src/version.ts=${gameVersion}。发版前请同步两处。`);
+  process.exit(1);
+}
+
+// 锁版门禁第三处：CHANGELOG 顶部条目必须记录同一版本（VERSIONING §2 三处齐备才是锁版状态）
+const changelog = readFileSync(path.join(root, 'docs/CHANGELOG.md'), 'utf8');
+const clVersion = /^## \[([^\]]+)\]/m.exec(changelog)?.[1];
+if (clVersion !== version) {
+  console.error(`✗ CHANGELOG 顶部条目是 ${clVersion ?? '（无）'}，与 package.json=${version} 不一致。发版前先补条目。`);
   process.exit(1);
 }
 

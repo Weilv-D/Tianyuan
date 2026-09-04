@@ -72,9 +72,10 @@ export async function run(argv: string[]): Promise<void> {
 
   rows.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   // Δ 是同阵容两次胜率之差，方差两倍于单读数：带 = 2.64 × √(0.5/有效样本)，
-  // 有效样本 = 2×(阵容数-1)×n（与 matrix 的 noiseBand 同族、按差值口径放大 √2）
-  const minLen = Math.min(...ctx.comps.map((c) => Object.keys(c.units).length));
-  const deltaBand = 2.64 * Math.sqrt(0.5 / Math.max(1, 2 * (minLen - 1) * ctx.n));
+  // 有效样本 = 2×(阵容数-1)×n（每个基线/压制读数聚合 C-1 个对手 × 双向 × n 种子；
+  // 与 matrix 的 noiseBand 同族、按差值口径放大 √2）
+  const compCount = ctx.comps.length;
+  const deltaBand = 2.64 * Math.sqrt(0.5 / Math.max(1, 2 * (compCount - 1) * ctx.n));
   console.log('【明细】Δ = 压制后该阵容胜率 - 基线（负得多 = 羁绊贡献大；≈ = 带内，不构成结论）');
   console.log(`  （±2.64σ 噪声带约 ±${(deltaBand * 100).toFixed(1)}p）`);
   console.log('  ' + '羁绊'.padEnd(6) + '档  阵容'.padEnd(8) + '基线    压制    Δ');

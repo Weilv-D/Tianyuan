@@ -43,7 +43,9 @@ export class EliminatedOverlay {
       ink.fillEllipse(0, 0, r * 1.9, r * 1.1);
     };
     drawInk(0);
-    this.scene.tweens.addCounter({
+    // 持句柄：面板关闭时 stop 掉墨迹计数器，孤儿补间不再对已销毁的 ink 每帧重画
+    //（与 RoundResultOverlay 血条计数器同款纪律）
+    const inkCounter = this.scene.tweens.addCounter({
       from: 0, to: 100, duration: 760, ease: 'Cubic.easeOut',
       onUpdate: (tw) => drawInk((tw.getValue() ?? 0) / 100),
     });
@@ -89,6 +91,7 @@ export class EliminatedOverlay {
 
     const dismiss = (then: () => void) => {
       this.open = false;
+      inkCounter.stop();
       panel.destroy();
       then();
     };

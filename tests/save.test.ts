@@ -121,14 +121,14 @@ describe('本地存档', () => {
   });
 
   it('损坏的 v2 旧档被清理，不残留"继续"常亮却读不出的坏档幽灵', () => {
-    // v2 键存在但载荷损坏（半截 JSON）：hasSave 只看键存在性会误亮"继续"，
-    // loadMatch 此前直接 return null 且不清键 —— 入口常亮却永远进不去。
-    // 与 v3 坏键自愈同口径：loadMatch 判定 v2 坏载荷即清除该键。
+    // v2 键存在但载荷损坏（半截 JSON）：hasSave 与 loadMatch 同口径验内容，
+    // 入口判定无存档并顺手清键 —— "继续"不再常亮却永远进不去。
+    // （此前 hasSave 只看键存在性，坏档幽灵要等玩家点过一次才自愈。）
     localStorage.setItem(LEGACY_KEY, '{broken');
-    expect(hasSave()).toBe(true); // 键存在 → 入口亮（清理前的现状）
-    expect(loadMatch()).toBeNull(); // 读档判定 v2 坏载荷 → 清键自愈
-    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
-    expect(hasSave()).toBe(false); // 坏键已清，入口消失
+    expect(hasSave()).toBe(false); // 入口验型：坏旧档不算有存档
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull(); // 入口即清，不留给读档路径
+    expect(loadMatch()).toBeNull();
+    expect(hasSave()).toBe(false);
   });
 
   it('骨架损坏的 v2 旧档同样被清理', () => {

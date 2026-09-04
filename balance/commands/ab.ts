@@ -11,7 +11,7 @@
 import { DEFAULT_SEED_BASE } from '../lib/seeds';
 import { Patcher, readCurrent, withOverrides, type Overrides } from '../lib/patch';
 import { runPair, type PairRun } from '../lib/engine';
-import { runPool, defaultWorkers, type PoolJob, type PoolResult } from '../lib/pool';
+import { runPool, defaultWorkers, WORKERS_CAP, type PoolJob, type PoolResult } from '../lib/pool';
 import { loadComps } from '../lib/comps';
 import { shortName } from '../lib/report';
 import { requirePositiveInt } from '../lib/args';
@@ -38,7 +38,7 @@ export async function run(argv: string[]): Promise<void> {
     } else if (a === '--n') n = requirePositiveInt(argv[++i], '--n', 200);
     else if (a === '--pairs') focus = argv[++i] ?? '4';
     else if (a === '--seed') seedBase = requirePositiveInt(argv[++i], '--seed', DEFAULT_SEED_BASE);
-    else if (a === '--workers') workers = requirePositiveInt(argv[++i], '--workers', defaultWorkers());
+    else if (a === '--workers') workers = Math.min(requirePositiveInt(argv[++i], '--workers', defaultWorkers()), WORKERS_CAP);
     else if (a === '--serial') workers = 0;
   }
   if (Object.keys(overrides).length === 0) {

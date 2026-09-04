@@ -79,7 +79,9 @@ export class RoundResultOverlay {
     };
     drawHp(0);
     panel.add(hpG);
-    this.scene.tweens.addCounter({
+    // 持句柄：提前关闭时 stop 掉血条计数器，孤儿补间不会再对已销毁的
+    // hpG 每帧 clear/fill（EffectsLayer.counter 的同款纪律）
+    const hpCounter = this.scene.tweens.addCounter({
       from: 0,
       to: hpRatio * 100,
       duration: 520,
@@ -123,6 +125,7 @@ export class RoundResultOverlay {
       if (closed) return;
       closed = true;
       this.open = false;
+      hpCounter.stop();
       panel.destroy();
       next();
     };
@@ -140,6 +143,7 @@ export class RoundResultOverlay {
     panel.once('destroy', () => {
       closed = true;
       this.open = false;
+      hpCounter.stop();
       this.scene.input.keyboard?.off('keydown', onKey);
     });
 

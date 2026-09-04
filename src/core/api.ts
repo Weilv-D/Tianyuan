@@ -198,8 +198,10 @@ export interface BattleApi {
   dealDamage(src: Unit | null, dst: Unit, raw: number, type: DamageType, opts?: DamageOptions): number;
   heal(src: Unit | null, dst: Unit, amount: number, source: 'skill' | 'trait' | 'item'): number;
   addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void;
-  addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number): void;
+  addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number, srcTag?: string): void;
   removeStatus(u: Unit, kind: StatusKind): void;
+  /** 只摘除该 kind 的一条（最旧叠层）：多段 DoT 的「净化一个减益」语义 */
+  removeOneStatus(u: Unit, kind: StatusKind): void;
   addDot(src: Unit, dst: Unit, kind: 'burn' | 'bleed', dps: number, dur: number, type: DamageType): void;
 
   teleport(u: Unit, cell: Cell, dur: number): void;

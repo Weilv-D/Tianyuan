@@ -1,18 +1,11 @@
 /** 对阵分布探针：看一个 matchup 的胜负分布与时长分布，判断是"数值差"还是"机制崩"。 */
 import { Battle } from '../../src/core/battle';
 import { PRESET_COMPS, buildTeam } from '../../src/game/comp';
+import { requireIntArg } from '../lib/args';
 
-const intArg = (v: string | undefined, name: string, min: number, fallback: number, max?: number): number => {
-  const x = Number(v ?? fallback);
-  if (!Number.isInteger(x) || x < min || (max !== undefined && x >= max)) {
-    console.error(`✗ ${name} 必须为 ≥${min} 的整数${max !== undefined ? ` 且小于 ${max}` : ''}`);
-    process.exit(1);
-  }
-  return x;
-};
-const ai = intArg(process.argv[2], '阵容下标 A', 0, 0, PRESET_COMPS.length);
-const bi = intArg(process.argv[3], '阵容下标 B', 0, 1, PRESET_COMPS.length);
-const N = intArg(process.argv[4], '对局数', 1, 60, 5000);
+const ai = requireIntArg(process.argv[2], '阵容下标 A', 0, 0, PRESET_COMPS.length);
+const bi = requireIntArg(process.argv[3], '阵容下标 B', 0, 1, PRESET_COMPS.length);
+const N = requireIntArg(process.argv[4], '对局数', 1, 60, 5000);
 
 let w = 0;
 let l = 0;

@@ -104,7 +104,7 @@ function lineCells(from: Cell, to: Cell, length: number): Cell[] {
 
 type Impl = (api: BattleApi, u: Unit, spec: SkillSpec, target: Unit | null, cell: Cell) => void;
 
-const IMPL: Record<string, Impl> = {
+export const IMPL: Record<string, Impl> = {
   // ─────────── 单体爆发 ───────────
   strike: (api, u, spec, target, cell) => {
     const p = spec.params;
@@ -116,7 +116,7 @@ const IMPL: Record<string, Impl> = {
       api.fx('burst', { uid: u.uid, cell: center, radius, params: { hue: type === 'physical' ? 0 : 2 } });
       for (const e of foesIn(api, u, center, radius)) {
         let raw = skillRaw(u, p.atk, p.sp, p.flat);
-        if (p.threshold && e.hp / e.maxHp < p.threshold) raw *= 2;
+        if (p.threshold && e.hp / e.maxHp < p.threshold) raw *= p.thresholdMult ?? 2;
         skillDamage(api, u, e, raw, type, p.forceCrit);
         applyStatus(api, u, e, p);
         hits++;
@@ -124,7 +124,7 @@ const IMPL: Record<string, Impl> = {
     } else if (target) {
       api.fx('slash', { uid: u.uid, targetUid: target.uid });
       let raw = skillRaw(u, p.atk, p.sp, p.flat);
-      if (p.threshold && target.hp / target.maxHp < p.threshold) raw *= 2;
+      if (p.threshold && target.hp / target.maxHp < p.threshold) raw *= p.thresholdMult ?? 2;
       skillDamage(api, u, target, raw, type, p.forceCrit);
       applyStatus(api, u, target, p);
       hits = 1;
@@ -318,7 +318,7 @@ const IMPL: Record<string, Impl> = {
         if (!curTarget) return;
       }
       const isLast = fired === shots - 1;
-      const mult = isLast ? 2 : 1;
+      const mult = isLast ? p.finalMult ?? 2 : 1;
       a.fx('pierce', { uid: u.uid, targetUid: curTarget.uid });
       a.emit({
         t: 'projectile',
@@ -335,12 +335,15 @@ const IMPL: Record<string, Impl> = {
       // 会被拒之门外，而不是把误配的减益打到施法者自己头上
       if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
         // 叠层型增益（aspdUp 等在 STACKABLE_KINDS 内按条叠加）若声明了层数上限
-        //（params.maxStacks，木机"至多 8 层"），按当前生效层数封顶 ——
+        //（params.maxStacks，木机"至多 8 层"），按当前生效层数封顶，且只数本技能
+        // 施加的条目（src 标识）—— 装备/羁绊的外来同 kind 层不挤占本技能的上限 ——
         // 文案承诺的数值上限必须由实现兑现，不能只写在描述里
-        const live = u.statuses.filter((s) => s.kind === (p.status as { kind: StatusKind }).kind).length;
+        const live = u.statuses.filter(
+          (s) => s.kind === (p.status as { kind: StatusKind }).kind && s.src === spec.kind,
+        ).length;
         if (!p.maxStacks || live < p.maxStacks) {
           // u 本就是权威引用（units 不摘除；已亡则 addStatus 内部按 !dst.alive 空转）
-          a.addStatus(u, u, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
+          a.addStatus(u, u, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0, spec.kind);
         }
       }
       fired++;
@@ -403,12 +406,12 @@ const IMPL: Record<string, Impl> = {
       if (p.damageReduction) api.addStatus(u, al, 'dr', shieldDur, p.damageReduction * 100);
       api.fx('shieldWall', { cell: al.cell });
     }
-    // 青丘：全体敌人魅惑（眩晕 + 易伤）
+    // 青丘：全体敌人魅惑（眩晕 + 易伤；易伤比魅惑多驻留 vulnDur 缺省 +2 秒）
     if (p.dur && p.vulnerability) {
       for (const e of api.units) {
         if (!e.alive || e.team === u.team) continue;
         api.addStatus(u, e, 'stun', p.dur, 0);
-        api.addStatus(u, e, 'vulnerability', p.dur + 2, p.vulnerability * 100);
+        api.addStatus(u, e, 'vulnerability', p.vulnDur ?? p.dur + 2, p.vulnerability * 100);
         api.fx('debuffMark', { targetUid: e.uid });
       }
     }
@@ -616,7 +619,11 @@ export function executeSkill(api: BattleApi, u: Unit): void {
   const spec = u.entry.skillSpec;
   if (!spec) return;
   const impl = IMPL[spec.kind];
-  if (!impl) return;
+  if (!impl) {
+    // 数据表完整性不变量：champions.skillSpec.kind 与 IMPL 必须闭环。静默 no-op
+    // 会让拼写错误的技能表现为"这个棋子永远不施法"，平衡矩阵读到的是强度噪声
+    throw new Error(`未知技能类型: ${spec.kind}（${u.entry.id}）—— champions 与 skills.IMPL 脱节`);
+  }
   const target = api.resolveTargets(u, spec.target, 1)[0] ?? null;
   const cell = api.resolveTargetCell(u, spec.target);
   impl(api, u, spec, target, cell);

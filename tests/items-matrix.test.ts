@@ -107,6 +107,29 @@ describe('装备钩子回归（v1.9 新件）', () => {
     expect(a.statuses.some((s) => s.kind === 'aspdUp')).toBe(true);
   });
 
+  it('流星弩层数上限只数本源：外来 aspdUp 不挤占「至多 2 层」', () => {
+    // 垂天翼/羁绊/技能都会往同单位挂 aspdUp。此前计数不分来源，一件外来
+    // 攻速就让 killFrenzy 永远到不了自己的 2 层 —— 装备间歇性哑火
+    const battle = mkBattle(
+      [
+        unitInput('pan', 0, { c: 0, r: 6 }, { items: ['liuxing'] }),
+        unitInput('jingyu', 1, { c: 7, r: 1 }),
+        unitInput('jingyu', 1, { c: 7, r: 2 }),
+      ],
+    );
+    const a = byDef(battle, 'pan');
+    const enemies = battle.units.filter((x) => x.entry.id === 'jingyu');
+    // 模拟任意外来 aspdUp（垂天翼开战 / 丹师亡语等同型来源）
+    battle.addStatus(a, a, 'aspdUp', 30, 10);
+    const srcCount = () => a.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'killFrenzy').length;
+    expect(srcCount()).toBe(0);
+    for (const foe of enemies) {
+      foe.hp = 1;
+      battle.dealDamage(a, foe, 10 ** 6, 'true');
+    }
+    expect(srcCount()).toBe(2); // 两次击杀都吃到本源层数，不被外来层封顶
+  });
+
   it('赤练鞭：普攻上易伤', () => {
     const { battle } = duel('chilian');
     const vulns = battle.events.filter((e) => e.t === 'status' && e.kind === 'vulnerability' && e.added);
@@ -138,6 +161,20 @@ describe('装备钩子回归（v1.9 新件）', () => {
     expect(a.statuses.some((s) => s.kind === 'slow')).toBe(true);
     for (let i = 0; i < 160; i++) battle.step();
     expect(a.statuses.some((s) => s.kind === 'slow')).toBe(false);
+  });
+
+  it('玄铁重甲净化只摘一条：多段流血一次清一层（「净化一个减益」的语义）', () => {
+    // burn/bleed 是可多条并存的叠层 DoT。此前 removeStatus 按 kind 整类全清，
+    // 一次净化把几段流血全部抹平 —— 与文案"一个减益"直接矛盾
+    const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }, { items: ['xuantie'] }), unitInput('jingyu', 1, { c: 7, r: 1 })]);
+    const a = byDef(battle, 'pan');
+    const foe = byDef(battle, 'jingyu');
+    battle.addDot(foe, a, 'bleed', 5, 30, 'true');
+    battle.addDot(foe, a, 'bleed', 5, 30, 'true');
+    expect(a.statuses.filter((s) => s.kind === 'bleed').length).toBe(2);
+    for (let i = 0; i < 160; i++) battle.step(); // 5 秒一次净化：只到第一次（tick 150）
+    const left = a.statuses.filter((s) => s.kind === 'bleed').length;
+    expect(left).toBe(1); // 旧实现此处为 0（整类全清）
   });
 
   it('引魂灯：施法后治疗生命最低友军', () => {

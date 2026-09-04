@@ -104,9 +104,12 @@ for (const g of GOALS) {
   results.sort((a, b) => a - b);
   const pick = (q: number) => results[Math.floor(q * (results.length - 1))];
   const failPct = ((fail / nTrials) * 100).toFixed(1);
-  console.log(
-    `  ${g.name.padEnd(24)} 中位 ${pick(0.5).toString().padStart(4)}  p75 ${pick(0.75).toString().padStart(4)}  p90 ${pick(0.9).toString().padStart(4)}  未达成 ${failPct}%`
-  );
+  // 全员未达成时 results 为空，分位数无定义 —— 打印占位而不是让
+  // results[-1].toString() 把整条命令崩掉（高难目标改表后的常态路径）
+  const row = results.length === 0
+    ? `  ${g.name.padEnd(24)} 中位    —  p75    —  p90    —  未达成 ${failPct}%`
+    : `  ${g.name.padEnd(24)} 中位 ${pick(0.5).toString().padStart(4)}  p75 ${pick(0.75).toString().padStart(4)}  p90 ${pick(0.9).toString().padStart(4)}  未达成 ${failPct}%`;
+  console.log(row);
 }
 
 // ── 3. 可选：整局配对臂（与 sim:match 同种子调度）──────

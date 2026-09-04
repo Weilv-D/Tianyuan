@@ -28,3 +28,14 @@ export function requirePositiveInt(v: string | undefined, name: string, fallback
   }
   return n;
 }
+
+/** 整数参数（含下界与可选上界 [min, max)）：probe/diag/match 等命令的入参门，
+ *  非法即 throw（cli.ts 统一打印退出）—— 与 requirePositiveInt 同一失败口径。 */
+export function requireIntArg(v: string | undefined, name: string, min: number, fallback: number, max?: number): number {
+  if (v === undefined) return fallback;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < min || (max !== undefined && n >= max)) {
+    throw new Error(`✗ ${name} 必须为 ≥${min} 的整数${max !== undefined ? ` 且小于 ${max}` : ''}，收到：${v}`);
+  }
+  return n;
+}
