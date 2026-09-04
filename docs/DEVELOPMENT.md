@@ -61,8 +61,8 @@ checkout，先区分文件归属。无关改动继续保留；同一文件发生
 | `src/core` | 无头、确定性的战斗内核 | `core`、纯 `data` |
 | `src/data` | 棋子、羁绊、装备和调参数据 | `data`、`core` 类型或常量 |
 | `src/game` | 对局、经济、AI、卡池、存档和撤销 | `game`、`core`、`data` |
-| `src/render` | Phaser 场景、棋盘、特效与输入表现 | `render`、`ui`、`game`、`core`、`data`、`audio`、`music`、`assets`；npm 包 |
-| `src/ui` | 可复用界面组件 | `ui`、`render`、`core`、`data`、`audio`、`music`；`game` 仅限 save（偏好）与 state（类型/查表）白名单 |
+| `src/render` | Phaser 场景、棋盘、特效与输入表现 | `render`、`ui`、`game`、`core`、`data`、`audio`、`music`、`assets`、`root`（仅 version 常量）；npm 包 |
+| `src/ui` | 可复用界面组件 | `ui`、`render`、`core`、`data`、`audio`、`music`、`root`（仅 version 常量）；`game` 仅限 save（偏好）与 state（类型/查表）白名单 |
 | `src/audio`、`src/music` | 音频执行与曲目清单 | `audio` → `music`；`music` 自含；不读对局状态 |
 
 `core` 不得读取 DOM、存储、系统时间或全局随机源；`data` 不得依赖运行时场景；`game` 不得
