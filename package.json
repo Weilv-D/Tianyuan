@@ -1,7 +1,7 @@
 {
   "name": "tianyuan",
   "private": true,
-  "version": "1.17.3",
+  "version": "1.18.0",
   "type": "module",
   "description": "百战天元 · Tian Yuan — 商业级自走棋",
   "engines": {

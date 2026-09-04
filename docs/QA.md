@@ -20,7 +20,7 @@
 | 层级 | 入口 | 解决的问题 | 执行时机 |
 |---|---|---|---|
 | 静态正确性 | `npm run typecheck` | 类型错误、无效调用、未使用代码 | 每次改动 |
-| 架构边界 | `npm run check:boundaries` | 七层（core/data/game/render/ui/audio/music）加 src 根组合文件（main/version）的越层依赖、浏览器 API 和非确定性随机源；覆盖计数断言保证新文件不脱检 | 每次改动 |
+| 架构边界 | `npm run check:boundaries` | 七层（core/data/game/render/ui/audio/music）加 src 根组合文件（main/version）的越层依赖、浏览器 API 和非确定性随机源；覆盖计数断言保证新文件不脱检；未登记的顶层目录默认拒绝（要求显式登记层职责），game 层另禁 `performance.now` 与密码学随机 | 每次改动 |
 | 核心行为 | `npm test` | 玩法、资产、存档、回放、输入是否破坏 | 每次改动 |
 | 生产可构建 | `npm run build:app` | Vite 生产打包与资源解析是否成功 | 每次改动 |
 | 默认 QA | `npm run qa` | 依次执行以上四层 | 交付前、CI |
@@ -94,7 +94,7 @@ CI 追加两道发布门禁中最便宜的审计，让许可证、哈希漂移�
 | 战斗可信 | `determinism`、`battle-formula`、`grid`、`skills`、`traits-big`、`status-src` | 收敛、重演、战斗规则、占格、技能与大羁绊、叠层按源分计（外来层不挤占 maxStacks）与非法状态数值入表前即抛 |
 | 平衡锚点 | `balance`、`shop-odds` | 定档数值回归（CRN 断面关键锚）、商店概率表结构与 rollShop 行为契约 |
 | 工具链可信 | `balance-tools` | 平衡工具链自身：补丁四类路径往返与嵌套键级回退、CRN 配对公式金锁、进程池与串行逐位一致、SQLite 往返、**调参键白名单与 traits.ts 读取双向同源**、src 不引用工具链 |
-| 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为 |
+| 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix`、`champions-integrity` | 收入、卡池（卖价公式绝对值钉死 + 2★/3★ 卖出回池数）、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为、棋子表身份守卫（剪影×色相全表唯一、id 与中文名唯一） |
 | 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily`、`status-src` | 存读档、恢复推进、回放、撤销（含随机流游标回滚与奇遇恩赐对称回写）、每日成绩、坏档单元清洗与配对兜底重掷不双记交手史 |
 | 交互安全 | `hud-layout`、`input-coords`、`valid-placements`、`item-paging`、`robustness` | 单源几何（轨/日志/战报/弹窗/商店无重叠）、K=2 输入、拖拽落点合法域、器匣溢出分页的页数/钳制/绝对索引映射、满盘站位、坏输入与墨兽落地 |
 
@@ -119,6 +119,10 @@ CI 追加两道发布门禁中最便宜的审计，让许可证、哈希漂移�
 
 布局依赖真实渲染，平衡依赖统计模拟，授权资源依赖哈希审计。把这些问题写成普通单测只会制造
 虚假的确定性。
+
+`core/api`、`core/events`、`core/items`、`core/traits` 四个内核模块没有直接 import 的测试文件：
+它们经 `Battle` 构建路径（技能/羁绊/装备闭环门、`status-src`、确定性重演）获得实质覆盖，
+这是既定取舍而非缺口——为其拆出形式化的直接用例不满足 §5.1 准入条件。
 
 ## 6. 实机冒烟
 
