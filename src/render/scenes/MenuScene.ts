@@ -116,6 +116,12 @@ export class MenuScene extends Phaser.Scene {
         }
         fadeTo(this, 'Game', { fresh: true });
       });
+      freshBtn.on('pointerout', () => {
+        if (freshArmed) {
+          freshArmed = false;
+          freshBtn.setText('新 对 局');
+        }
+      });
     } else {
       mk('新 对 局', () => fadeTo(this, 'Game', { fresh: true }), { primary: true });
     }

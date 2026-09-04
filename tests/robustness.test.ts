@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { createUnit as createBattleUnit } from '../src/core/unit';
+import { createUnit as createBattleUnit, createMinion } from '../src/core/unit';
 import { TRAITS } from '../src/data/traits';
 import { autoArrange } from '../src/game/arrange';
 import { boardIdx, createUnit, powerScore, recallUnit } from '../src/game/state';
 const createCoreUnit = createBattleUnit;
-import { makePlayer } from './helpers';
+import { makePlayer, mkBattle, unitInput } from './helpers';
 import { Rng } from '../src/core/rng';
-import { CHAMPIONS } from '../src/data/champions';
+import { CHAMPIONS, CHAMPION_BY_ID, formatSkillDesc } from '../src/data/champions';
 import { generateBeastBoard } from '../src/game/beast';
 import { autoPlace } from '../src/game/comp';
 import { CardPool } from '../src/game/pool';
+import { Match } from '../src/game/match';
 
 describe('损坏输入与极端阵容', () => {
   it('自动站位在棋盘满员时截断而不是冻结或重叠', () => {
@@ -145,5 +146,60 @@ describe('损坏输入与极端阵容', () => {
     for (let i = 0; i < 9; i++) player.bench[i] = createUnit('ajiu');
     expect(recallUnit(player, player.board[0]!.iid)).toBe(false);
     expect(player.board[0]).not.toBeNull();
+  });
+
+  it('createUnit 保持 isMinion 输入状态，createMinion 严守有限性校验', () => {
+    const baseInput = { uid: 10, defId: 'pan', team: 0 as const, star: 1 as const, cell: { c: 0, r: 0 } };
+    const minionUnit = createCoreUnit({ ...baseInput, isMinion: true });
+    expect(minionUnit.isMinion).toBe(true);
+
+    const normalUnit = createCoreUnit({ ...baseInput, isMinion: false });
+    expect(normalUnit.isMinion).toBe(false);
+
+    expect(() => createMinion(11, normalUnit, { c: 0, r: 1 }, Number.NaN, 0.5)).toThrow();
+    expect(() => createMinion(11, normalUnit, { c: 0, r: 1 }, 0.5, Number.POSITIVE_INFINITY)).toThrow();
+
+    const m = createMinion(12, normalUnit, { c: 0, r: 1 }, 0.5, 0.5);
+    expect(m.isMinion).toBe(true);
+    expect(m.maxHp).toBeGreaterThanOrEqual(1);
+    expect(m.atk).toBeGreaterThanOrEqual(1);
+  });
+
+  it('技能描述模板化覆盖 falloff 参数（敖姻与禹算）', () => {
+    const aoyin = CHAMPION_BY_ID['aoyin'];
+    const aoyinDesc = formatSkillDesc(aoyin.skillSpec.desc, aoyin.skillSpec.params);
+    expect(aoyinDesc).toContain('每跳衰减 15%');
+    expect(aoyinDesc).not.toContain('{falloff}');
+
+    const yusuan = CHAMPION_BY_ID['yusuan'];
+    const yusuanDesc = formatSkillDesc(yusuan.skillSpec.desc, yusuan.skillSpec.params);
+    expect(yusuanDesc).toContain('每跳衰减 12%');
+    expect(yusuanDesc).not.toContain('{falloff}');
+  });
+
+  it('Battle.teleport 对越界目标格安全防御', () => {
+    const b = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }), unitInput('jingyu', 1, { c: 7, r: 1 })]);
+    const u = b.units[0];
+    const initialCell = { ...u.cell };
+    // 传入越界目标格
+    b.teleport(u, { c: -1, r: 10 }, 0.5);
+    // 坐标未变（安全取消），没有抛出异常或破坏占位表
+    expect(u.cell).toEqual(initialCell);
+  });
+
+  it('Match.fromJSON 对损坏的玩家数值和非法阶段抛错防御', () => {
+    const match = new Match(12345, '测试');
+    match.beginRound();
+    const json = match.toJSON();
+
+    // 损坏玩家 gold
+    const badGoldJson = JSON.parse(JSON.stringify(json));
+    badGoldJson.players[0].gold = Number.NaN;
+    expect(() => Match.fromJSON(badGoldJson)).toThrow();
+
+    // 损坏 round
+    const badRoundJson = JSON.parse(JSON.stringify(json));
+    badRoundJson.round = -1;
+    expect(() => Match.fromJSON(badRoundJson)).toThrow();
   });
 });

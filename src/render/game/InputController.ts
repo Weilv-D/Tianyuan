@@ -542,6 +542,11 @@ export class InputController {
     this.dragItemId = null;
     this.dragItemFrom = -1;
     this.itemTip.hide(); // 拖拽途中的提示卡跟随的是拖拽件，落定后即失效
+    // 奇遇遮挡守卫：拖拽落点在奇遇面板上时，不穿透到底层棋子，取消穿戴
+    if (this.scene.adventure.contains(x, y)) {
+      this.scene.refreshAll();
+      return;
+    }
     // 阶段守卫：拖拽中途已开战，装备状态随之锁定，放弃这次穿戴
     if (this.scene.phase !== 'prep' || this.scene.busy) {
       this.scene.refreshAll();
@@ -616,6 +621,10 @@ export class InputController {
    * 恰好是"拖动棋子时最需要跟手"的时刻。
    */
   private updateDragTarget(x: number, y: number): void {
+    if (this.scene.adventure.contains(x, y)) {
+      this.scene.boardBake.boardHover.clear();
+      return;
+    }
     const t = hitTarget(x, y, this.scene.hud.sellRect);
     this.scene.boardBake.boardHover.clear();
     if (!t || t.where === 'sell' || !this.dragUnit) return;
@@ -645,6 +654,9 @@ export class InputController {
     this.clearValid();
     if (!unit || !from) return;
     (from.where === 'board' ? this.scene.boardBake.boardPortraits : this.scene.boardBake.benchPortraits)[from.slot].setAlpha(1);
+
+    // 奇遇遮挡守卫：拖拽落点在奇遇面板范围内时，不穿透到底层格子，原样放回
+    if (this.scene.adventure.contains(x, y)) return;
 
     // 阶段守卫：拖拽中途已开战（配对已生成），此时落子会破坏已锁定的阵容 —— 原样放回
     if (this.scene.phase !== 'prep' || this.scene.busy) return;

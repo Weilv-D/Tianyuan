@@ -134,8 +134,8 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         u.critMult += t('critMult', 0.2);
         // 破甲：让"暴击流"成为重甲阵容的天然克星，
         // 否则纯堆护甲的阵容在数值上无解，环境会退化为比谁更肉。
-        // 0.22 → 0.15：原值把护卫系压得太死，快攻因此一路涨到 76%。
-        u.trait.armorPen = t('armorPen', 0.18);
+        // 破甲采用累加并在 0.85 封顶，保持多源破甲叠加的一致性。
+        u.trait.armorPen = Math.min(0.85, u.trait.armorPen + t('armorPen', 0.18));
       }
     }
     if (tier >= 1) {
@@ -486,8 +486,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       // 荆棘反弹和流血都是"被动挨打换伤害"，主动输出几乎为零。
       // 结果是它站得住但打不死人，对局拖到超时然后判负。
       // 让六护卫自己能还手，"站得住就赢"这句话才真正成立。
-      // 1.45 → 1.55：CRN 扫档（2026-09-01，n=200~500）把荆棘从 43% 拉回
-      // 中位 53~54%，极差 21%→11%，且未引入阵营偏置。
+      // 攻击倍率乘区提供基础输出，反弹与护盾持续提供肉度对抗。
       for (const u of members) u.atk = Math.round(u.atk * t('guard6Atk', 1.15));
       api.hooksOf(team).onTick.push((a, _t, tick) => {
         if (tick === 0 || tick % (3 * TICK_RATE) !== 0) return;

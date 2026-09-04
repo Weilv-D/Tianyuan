@@ -808,10 +808,10 @@ export class BattleScene extends Phaser.Scene {
         v?.endCast();
         const u = this.battle?.unitByUid(e.uid);
         if (u && u.entry.cost >= 5) {
-          audio.play('skillBig');
+          if (!this.ff) audio.play('skillBig');
           this.fx.fullscreenFlash(VOID.base, 0.6);
         } else {
-          audio.play('cast');
+          if (!this.ff) audio.play('cast');
         }
         break;
       }

@@ -1135,14 +1135,23 @@ export class Match implements AiWorld {
   }
 
   static fromJSON(data: ReturnType<Match['toJSON']>): Match {
-    const m = new Match(data.seed, '你', data.mode ?? 'normal');
+    if (!Number.isFinite(data.round) || data.round < 1) throw new Error('invalid round in save');
+    if (!Number.isFinite(data.rngState)) throw new Error('invalid rngState in save');
+    if (data.phase && !['prep', 'battle', 'result', 'over'].includes(data.phase)) throw new Error('invalid phase in save');
+    const seed = Number.isFinite(data.seed) ? data.seed : 0;
+    const m = new Match(seed, '你', data.mode ?? 'normal');
     m.rng.state = data.rngState;
     m.round = data.round;
-    m.phase = data.phase;
+    m.phase = data.phase ?? 'prep';
     m.pool.restore(data.pool);
     // 坏档/版本漂移守卫：board/bench 长度恒为 32/9（state.emptyBoard/emptyBench 口径）。
     // 长度漂移会让 moveOnBoard/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛。
     for (const pl of data.players ?? []) {
+      if (!pl || typeof pl !== 'object') throw new Error('corrupted player entry in save');
+      if (!Number.isFinite(pl.gold) || !Number.isFinite(pl.hp) || !Number.isFinite(pl.level)) {
+        throw new Error('corrupted player numeric stats in save');
+      }
+      if (pl.level < 1 || pl.level > 10) throw new Error('invalid player level in save');
       if (!Array.isArray((pl as any).board) || (pl as any).board.length !== 32) {
         const nb: (typeof pl.board) = new Array(32).fill(null);
         const src: unknown[] = Array.isArray((pl as any).board) ? (pl as any).board : [];

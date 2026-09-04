@@ -32,7 +32,7 @@ export interface TraitState {
   skillCritChance: number;
   /** 技能暴击倍率（绝对值；0 = 回落持有者普攻暴伤）。 */
   skillCritMult: number;
-  /** 已激活羁绊 → 档位+1（0 表示未激活）。供战斗内循环做 O(1) 查询。 */
+  /** 已激活羁绊 → 0-based 档位（0 为首档，未激活不在 map 中）。供战斗内循环做 O(1) 查询。 */
   tier: Record<string, number>;
   /** 累计伤害加深（余烬阶段等全局效果单独处理） */
 }
@@ -95,6 +95,10 @@ export interface AttackModifier {
   bonusMagic: number;
   /** 额外附加的物理伤害（绝对值） */
   bonusPhysical: number;
+  /** 附加法术伤害的来源归属（默认 'trait'） */
+  bonusMagicSource?: 'attack' | 'skill' | 'dot' | 'trait' | 'item';
+  /** 附加物理伤害的来源归属（默认 'trait'） */
+  bonusPhysicalSource?: 'attack' | 'skill' | 'dot' | 'trait' | 'item';
 }
 
 /** 钩子签名表 */

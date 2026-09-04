@@ -181,7 +181,7 @@ export class GameScene extends Phaser.Scene {
         this.input.keyboard?.off('keydown', this.devKeydown);
         this.devKeydown = null;
       }
-      if (!this.match.isOver()) this.flushSave();
+      if (this.match && !this.match.isOver()) this.flushSave();
     });
 
     if (data.match) {

@@ -735,6 +735,7 @@ export class Battle implements BattleApi {
 
   teleport(u: Unit, cell: Cell, dur: number): void {
     if (!u.alive) return;
+    if (!inBounds(cell.c, cell.r)) return;
     // 落点被占（典型：跃向敌阵最密集处）时改落就近空格；满盘找不到则取消位移。
     // 无条件覆写 occ 会把占格单位变成"幽灵"，占位表从此不可信。
     let dest = cell;
@@ -1109,12 +1110,12 @@ export class Battle implements BattleApi {
       forceCrit: crit,
     });
     if (mod.bonusMagic > 0) {
-      this.dealDamage(u, target, mod.bonusMagic, 'magic', { source: 'trait' });
+      this.dealDamage(u, target, mod.bonusMagic, 'magic', { source: mod.bonusMagicSource ?? 'trait' });
       this.fx('impact', { uid: u.uid, targetUid: target.uid, params: { hue: 2 } });
     }
     if (mod.bonusPhysical > 0) {
       // 附加物伤（机关第 4 击等）保持可暴击：canCrit 交给 dealDamage 掷骰
-      this.dealDamage(u, target, mod.bonusPhysical, 'physical', { source: 'trait', isAttack: true, canCrit: true });
+      this.dealDamage(u, target, mod.bonusPhysical, 'physical', { source: mod.bonusPhysicalSource ?? 'trait', isAttack: true, canCrit: true });
       this.fx('impact', { uid: u.uid, targetUid: target.uid, params: { hue: 0 } });
     }
 

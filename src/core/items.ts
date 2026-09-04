@@ -333,6 +333,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       src.traitStacks['jiuweiReady'] = 0;
       mod.forceCrit = true;
       mod.bonusMagic += src.sp * paramOf(src, 'bonusSpRatio');
+      mod.bonusMagicSource = 'item';
     });
   }
 

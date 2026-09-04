@@ -133,8 +133,8 @@ export function createUnit(input: BattleUnitInput): Unit {
   const legendHp = legend ? LEGEND_T3.hpMult : 1;
   const legendPow = legend ? LEGEND_T3.powerMult : 1;
   // 三星四费「登峰」（T3_ELITE_COST4）：数值乘区，无机制包（见 config 注释）。
-  // monster 排除与天命同口径 —— 墨兽后期池含四费 3★，不排除则 PvE 静默吃档。
-  const elite = entry.cost === 4 && input.star === 3 && !input.monster;
+  // monster 与 isMinion 排除与天命同口径 —— 墨兽与召唤物不继承登峰倍率。
+  const elite = entry.cost === 4 && input.star === 3 && !input.isMinion && !input.monster;
   const eliteHp = elite ? T3_ELITE_COST4.hpMult : 1;
   const elitePow = elite ? T3_ELITE_COST4.powerMult : 1;
 
@@ -151,7 +151,7 @@ export function createUnit(input: BattleUnitInput): Unit {
     entry,
     team: input.team,
     star: input.star,
-    isMinion: false,
+    isMinion: input.isMinion ?? false,
     isMonster: input.monster ?? false,
 
     maxHp,
@@ -225,12 +225,15 @@ export function createUnit(input: BattleUnitInput): Unit {
 
 /** 由已有单位派生召唤物 */
 export function createMinion(uid: number, src: Unit, cell: Cell, hpPct: number, atkPct: number): Unit {
-  const m: Unit = { ...createUnit({ uid, defId: src.entry.id, team: src.team, star: 1, cell }) };
+  if (!Number.isFinite(hpPct) || !Number.isFinite(atkPct)) {
+    throw new Error(`createMinion: invalid scaling percentages hpPct=${hpPct}, atkPct=${atkPct}`);
+  }
+  const m: Unit = { ...createUnit({ uid, defId: src.entry.id, team: src.team, star: 1, cell, isMinion: true }) };
   m.isMinion = true;
-  m.maxHp = Math.round(src.maxHp * hpPct);
+  m.maxHp = Math.max(1, Math.round(src.maxHp * Math.max(0, hpPct)));
   m.hp = m.maxHp;
-  m.atk = Math.round(src.atk * atkPct);
-  m.sp = Math.round(src.sp * atkPct);
+  m.atk = Math.max(1, Math.round(src.atk * Math.max(0, atkPct)));
+  m.sp = Math.max(0, Math.round(src.sp * Math.max(0, atkPct)));
   m.maxMp = Number.MAX_SAFE_INTEGER; // 召唤物不施法
   m.mp = 0;
   m.range = 1;

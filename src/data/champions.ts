@@ -381,7 +381,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'aoyin_q',
     skillSpec: {
       kind: 'chain', name: '潮生链', target: 'enemyNearest',
-      desc: '水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 15%），并降低 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}），并降低 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 1.75, jumps: 4, falloff: 0.15, type: 'magic', status: { kind: 'slow', dur: 3, value: 25 } },
     },
   },
@@ -763,7 +763,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yusuan_q',
     skillSpec: {
       kind: 'chain', name: '筹策', target: 'enemyNearest',
-      desc: '运筹百步：水算在 {jumps} 名敌人间流转，每次造成 {sp} 法强的法术伤害（每跳衰减 12%），并使命中者受到的伤害提高 15%，持续 3 秒。',
+      desc: '运筹百步：水算在 {jumps} 名敌人间流转，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}），并使命中者受到的伤害提高 {statusValue}，持续 {statusDur} 秒。',
       params: { sp: 2.4, jumps: 5, falloff: 0.12, type: 'magic', status: { kind: 'vulnerability', dur: 3, value: 15 } },
     },
   },
@@ -998,6 +998,7 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   length: (p) => String(p.length ?? 0),
   shots: (p) => String(p.shots ?? 1),
   jumps: (p) => String(p.jumps ?? 1),
+  falloff: (p) => pctv(p.falloff),
   knockback: (p) => String(p.knockback ?? 0),
   count: (p) => String(p.summon?.count ?? 0),
   stackAtkOnHit: (p) => pctv(p.stackAtkOnHit),

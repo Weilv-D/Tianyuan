@@ -81,7 +81,7 @@ npm ci
 
 ## 5. 核心测试策略
 
-默认套件保持精简，聚焦四类项目风险：
+默认套件保持精简，聚焦六类项目风险：
 
 | 风险 | 测试文件 | 保护内容 |
 |---|---|---|
@@ -90,7 +90,7 @@ npm ci
 | 工具链可信 | `balance-tools` | 平衡工具链自身：补丁四类路径往返与嵌套键级回退、CRN 配对公式金锁、进程池与串行逐位一致、SQLite 往返、**调参键白名单与 traits.ts 读取双向同源**、src 不引用工具链 |
 | 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为 |
 | 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销（含随机流游标回滚）与每日成绩 |
-| 交互安全 | `input-coords`、`valid-placements`、`robustness` | K=2 输入、拖拽落点合法域、满盘站位、坏输入与墨兽落地 |
+| 交互安全 | `hud-layout`、`input-coords`、`valid-placements`、`robustness` | 单源几何（轨/日志/战报/弹窗/商店无重叠）、K=2 输入、拖拽落点合法域、满盘站位、坏输入与墨兽落地 |
 
 ### 5.1 准入条件
 
