@@ -193,22 +193,32 @@ if (import.meta.env.DEV) {
   // QA 探针：把 console 的报错/警告抄一份到 ring buffer，供自动化脚本读取。
   // 只抄不吞 —— 原始 console 行为完全不变，所以"无 console 报错"这条验收
   // 依然是对着真实控制台说的，不是对着一个被静音的假控制台说的。
-  const qa = { errors: [] as string[], warns: [] as string[] };
-  (window as unknown as { __qa?: typeof qa }).__qa = qa;
-  const bump = (arr: string[], args: unknown[]) => {
-    arr.push(args.map((a) => (a instanceof Error ? a.stack ?? a.message : String(a))).join(' '));
-    if (arr.length > 200) arr.shift();
-  };
-  const origError = console.error.bind(console);
-  const origWarn = console.warn.bind(console);
-  console.error = (...args: unknown[]) => {
-    bump(qa.errors, args);
-    origError(...args);
-  };
-  console.warn = (...args: unknown[]) => {
-    bump(qa.warns, args);
-    origWarn(...args);
-  };
+  // window 级副作用（console 包裹 / 全局错误监听）与文字咽喉同款幂等守卫：
+  // 模块在无 HMR 边界时被重复求值，包裹会逐层叠加、ring buffer 被重置
+  const w = window as unknown as { __qa?: { errors: string[]; warns: string[] }; __qaPatched?: boolean };
+  if (!w.__qaPatched) {
+    w.__qaPatched = true;
+    const qa = { errors: [] as string[], warns: [] as string[] };
+    w.__qa = qa;
+    const bump = (arr: string[], args: unknown[]) => {
+      arr.push(args.map((a) => (a instanceof Error ? a.stack ?? a.message : String(a))).join(' '));
+      if (arr.length > 200) arr.shift();
+    };
+    const origError = console.error.bind(console);
+    const origWarn = console.warn.bind(console);
+    console.error = (...args: unknown[]) => {
+      bump(qa.errors, args);
+      origError(...args);
+    };
+    console.warn = (...args: unknown[]) => {
+      bump(qa.warns, args);
+      origWarn(...args);
+    };
+    // 开发期：把致命错误暴露在控制台之外，避免"白屏无提示"
+    window.addEventListener('error', (e) => {
+      console.error('[百战天元] 运行时错误', e.error ?? e.message);
+    });
+  }
 }
 
 // 首次交互解锁音频（浏览器自动播放策略）
@@ -247,10 +257,5 @@ if (boot) {
     window.setTimeout(() => boot.remove(), 1300);
   }, 1500);
 }
-
-// 开发期：把致命错误暴露在控制台之外，避免"白屏无提示"
-window.addEventListener('error', (e) => {
-  console.error('[百战天元] 运行时错误', e.error ?? e.message);
-});
 
 export default game;

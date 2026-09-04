@@ -88,7 +88,7 @@ npm run qa
 ```
 
 专项验证按 [QA.md §4](./QA.md#4-变更矩阵) 取并集。Canvas、WebGL、音频上下文和真实指针
-行为必须使用 `.qa/smoke-checklist.md` 在前台窗口检查，源码阅读不能代替实机结果。
+行为必须使用 `../.qa/smoke-checklist.md` 在前台窗口检查，源码阅读不能代替实机结果。
 
 ### 3.5 自审与完成定义
 

@@ -22,11 +22,11 @@ describe('准备阶段撤销', () => {
     player.items.length = 0;
     player.shop.fill(null);
 
-    restorePlayer(player, pool, before);
+    restorePlayer(player, pool, before, { adventureOffer: null });
     expect(snapshotPlayer(player, pool)).toEqual(before);
 
     player.board[boardIdx(3, 0)]!.items.push('duanhun');
-    restorePlayer(player, pool, before);
+    restorePlayer(player, pool, before, { adventureOffer: null });
     expect(snapshotPlayer(player, pool)).toEqual(before);
   });
 
@@ -44,7 +44,7 @@ describe('准备阶段撤销', () => {
     const goldAfterReroll = p.gold;
     expect(rolledShop.some((id) => id !== null)).toBe(true);
 
-    restorePlayer(p, match.pool, entry.snap);
+    restorePlayer(p, match.pool, entry.snap, match);
     match.rng.state = entry.rngState;
     expect(p.gold).toBe(50);
 
@@ -73,8 +73,7 @@ describe('准备阶段撤销', () => {
     expect(match.adventureOffer).toBeNull();
 
     // 撤销：offer 还原，玩家可重选
-    restorePlayer(match.human, match.pool, entry.snap);
-    match.adventureOffer = entry.snap.adventureOffer;
+    restorePlayer(match.human, match.pool, entry.snap, match);
     expect(match.adventureOffer).not.toBeNull();
     expect(match.adventureOffer!.options).toEqual(offerBefore.options);
   });

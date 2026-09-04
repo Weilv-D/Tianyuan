@@ -314,12 +314,13 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     });
   }
 
-  // 垂天翼：开战攻速（onBattleStart 每队各注册一次，has() 天然按持有者过滤）
+  // 垂天翼：开战攻速（onBattleStart 每队各注册一次，has() 天然按持有者过滤）。
+  // 打 src 标识归因来源；本件无层数上限，标不标都不参与任何 maxStacks 计数
   if (units.some((u) => has(u, 'wingStart'))) {
     h.onBattleStart.push((a, team) => {
       for (const u of a.units) {
         if (u.team !== team || !u.alive || !has(u, 'wingStart')) continue;
-        a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'));
+        a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'), 'wingStart');
       }
     });
   }

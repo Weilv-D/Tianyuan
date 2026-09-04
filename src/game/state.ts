@@ -215,7 +215,11 @@ export function sellRefundFor(cost: number, star: Star): number {
 }
 
 /** 棋子"战力估值"，用于 AI 选谁上场、卖谁。粗粒度即可，不需要精确。
- *  星级倍率与 config.STAR_*_SCALE 同源（调平衡只改 config 一处，此处不落字面量）。 */
+ *  星级倍率与 config.STAR_*_SCALE 同源（调平衡只改 config 一处，此处不落字面量）。
+ *  口径边界（有意为之，勿"补全"）：估值只覆盖血/攻/法三轴与天命/登峰的体量层；
+ *  技能倍率、开战盾、吸血、免控、增减伤等结算乘区不进估值 —— 天命机制包按
+ *  粗估常量折 90 分，其余机制差异由 AI 的羁绊/合成/费用偏好另行覆盖。
+ *  把它做成结算复算既无必要，也会让 AI 估值对每个数值旋钮过拟合。 */
 export function powerScore(u: UnitInstance): number {
   const def = CHAMPION_BY_ID[u.defId];
   if (!def) return 0;

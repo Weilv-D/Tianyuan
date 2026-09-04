@@ -1,6 +1,6 @@
 /** 职责：准备阶段的大漆盘与备战席底座——与战斗共用同一烘焙盘，运行期只换贴图不重画。 */
 import Phaser from 'phaser';
-import { FONT } from '../../ui/kit';
+import { FONT, ensurePlaceholderTex } from '../../ui/kit';
 import { UnitPortrait } from '../../ui/cards';
 import { bakedImage, bakedTexture } from '../view/bake';
 import { bakeLacquerBoard, bakeLacquerGrid } from '../board/BoardView';
@@ -64,7 +64,9 @@ export class BoardBake {
       for (let c = 0; c < 8; c++) {
         const x = GRID_X + c * CELL;
         const y = GRID_Y + (r + HALF_ROWS) * CELL; // 数据行 r 挂在下 4 行
-        this.boardCells.push(this.scene.add.image(x, y, '__cell').setOrigin(0));
+        // 构造期引用占位纹理，真实格底由 SceneRefresh 首刷经 drawBoardCells 换入
+        //（与 kit __btn 同一"构造引用、同帧换装"口径，不让裸键刷 Missing texture 警告）
+        this.boardCells.push(this.scene.add.image(x, y, ensurePlaceholderTex(this.scene, '__cell')).setOrigin(0));
         this.boardPortraits.push(new UnitPortrait(this.scene, x + 3, y + 3, CELL - 6));
       }
     }
@@ -129,7 +131,7 @@ export class BoardBake {
       .setOrigin(0.5);
 
     for (let i = 0; i < BENCH_N; i++) {
-      const g = this.scene.add.image(BENCH_X + i * BENCH_CELL, BENCH_Y, '__slot').setOrigin(0);
+      const g = this.scene.add.image(BENCH_X + i * BENCH_CELL, BENCH_Y, ensurePlaceholderTex(this.scene, '__slot')).setOrigin(0);
       this.benchSlots.push(g);
       this.benchPortraits.push(new UnitPortrait(this.scene, BENCH_X + i * BENCH_CELL + 3, BENCH_Y + 3, BENCH_CELL - 6));
     }

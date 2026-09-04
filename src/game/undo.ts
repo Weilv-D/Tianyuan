@@ -56,8 +56,16 @@ export function snapshotPlayer(p: PlayerState, pool: CardPool, adventureOffer: A
   };
 }
 
-/** 撤销：把快照回写进玩家状态。回写时再拷贝一次，保证同一份快照可安全复用 */
-export function restorePlayer(p: PlayerState, pool: CardPool, s: PlayerSnapshot): void {
+/** 撤销：把快照回写进玩家状态。回写时再拷贝一次，保证同一份快照可安全复用。
+ *  offer 目标必传（恩赐挂在 Match 上而非 PlayerState 上，快照才把它作为参数带入）：
+ *  恢复职责与快照职责对称收口在这一处 —— 若靠调用方各自记得补写 adventureOffer，
+ *  新增快照消费方时极易漏掉，出现"撤销把已领恩赐留在已领状态"的半回滚。 */
+export function restorePlayer(
+  p: PlayerState,
+  pool: CardPool,
+  s: PlayerSnapshot,
+  offer: { adventureOffer: AdventureOffer | null },
+): void {
   p.board = cloneBoard(s.board);
   p.bench = cloneSlots(s.bench);
   p.gold = s.gold;
@@ -67,4 +75,5 @@ export function restorePlayer(p: PlayerState, pool: CardPool, s: PlayerSnapshot)
   p.shopLocked = s.shopLocked;
   p.items = [...s.items];
   pool.restore(s.pool);
+  offer.adventureOffer = s.adventureOffer;
 }

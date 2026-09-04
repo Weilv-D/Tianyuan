@@ -16,7 +16,10 @@ export function fadeTo(scene: Phaser.Scene, key: string, data?: object, ms = 160
   scene.time.delayedCall(ms + 24, () => scene.scene.start(key, data));
 }
 
-/** 场景入场：从夜色淡入。各场景 create() 首部调用一次。 */
+/** 场景入场：从夜色淡入。各场景 create() 首部调用一次。
+ *  显式恢复输入：fadeOut 关掉的 enabled 只靠 InputPlugin 重启的隐式复位兜底，
+ *  同一场景实例被复用（scene.start 回已 shutdown 的 key）时这里是对称恢复点。 */
 export function fadeIn(scene: Phaser.Scene, ms = 160): void {
+  scene.input.enabled = true;
   scene.cameras.main.fadeIn(ms, ...COLOR);
 }

@@ -24,7 +24,7 @@ const DEBUFF_KINDS = new Set<StatusKind>([
  *  no-op，漏注册在数值扫描里立即可见，而不是静默强化施法者。 */
 const BUFF_KINDS = new Set<StatusKind>([
   'atkUp', 'aspdUp', 'armorUp', 'mrUp', 'shield', 'invuln', 'stealth',
-  'dr', 'spellCharge', 'ccImmune', 'drain',
+  'dr', 'spellCharge', 'ccImmune',
 ]);
 
 /** 技能原始伤害 = (攻击力 × atk倍率 + 法强 × sp倍率 + 固定值) × 星级技能倍率 × 天命倍率 */
@@ -337,13 +337,18 @@ export const IMPL: Record<string, Impl> = {
         // 叠层型增益（aspdUp 等在 STACKABLE_KINDS 内按条叠加）若声明了层数上限
         //（params.maxStacks，木机"至多 8 层"），按当前生效层数封顶，且只数本技能
         // 施加的条目（src 标识）—— 装备/羁绊的外来同 kind 层不挤占本技能的上限 ——
-        // 文案承诺的数值上限必须由实现兑现，不能只写在描述里
+        // 文案承诺的数值上限必须由实现兑现，不能只写在描述里。
+        // 标识用棋子 id 而非 spec.kind：'volley' 是七名棋子共享的技能类型字面量，
+        // 单位内单技能所以现状不串，但来源归因要以稳定 id 为准。
+        // 未声明 maxStacks 的弹幕（灵雀/抛车/潮机/啸虎）是有意不设帽：小数值叠条
+        // 靠持续窗自然回落，文案不承诺层数，每发照挂不封顶
+        const srcTag = `skill:${u.entry.id}`;
         const live = u.statuses.filter(
-          (s) => s.kind === (p.status as { kind: StatusKind }).kind && s.src === spec.kind,
+          (s) => s.kind === (p.status as { kind: StatusKind }).kind && s.src === srcTag,
         ).length;
         if (!p.maxStacks || live < p.maxStacks) {
           // u 本就是权威引用（units 不摘除；已亡则 addStatus 内部按 !dst.alive 空转）
-          a.addStatus(u, u, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0, spec.kind);
+          a.addStatus(u, u, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0, srcTag);
         }
       }
       fired++;

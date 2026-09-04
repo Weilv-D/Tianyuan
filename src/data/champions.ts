@@ -1014,8 +1014,9 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   // 阈值命中总倍率 / 弹幕末发倍率（1.0 = 100% 伤害），实现侧 p.thresholdMult / p.finalMult
   thresholdMult: (p) => pctv(p.thresholdMult ?? 2),
   finalMult: (p) => pctv(p.finalMult ?? 2),
-  // 控制附带易伤的驻留时长（秒）；实现侧缺省 dur + 2
-  vulnDur: (p) => String(p.vulnDur ?? 0),
+  // 控制附带易伤的驻留时长（秒）；实现侧缺省 dur + 2（skills.vuln 分支）——
+  // 回退表达式必须与实现同式，缺 params.vulnDur 的技能文案才不会落 0
+  vulnDur: (p) => String(p.vulnDur ?? ((p.dur ?? 0) + 2)),
   maxStacks: (p) => String(p.maxStacks ?? 0),
   maxRepeats: (p) => String(p.maxRepeats ?? 0),
   healPerExecute: (p) => pctv(p.healPerExecute),

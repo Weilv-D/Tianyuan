@@ -927,13 +927,25 @@ export class BattleScene extends Phaser.Scene {
 
     // 对局模式：把结果交回 Match，然后回主场景走结算。
     // 判定发生在内核，这里只是搬运 —— 渲染层永远不改变战斗结果。
-    this.finalizeRound();
+    const saved = this.finalizeRound();
 
     const panel = this.add.container(0, 0).setDepth(200);
     const shade = this.add.graphics();
     shade.fillStyle(SHADE, 0.62);
     shade.fillRect(0, 0, W, H);
     panel.add(shade);
+
+    if (!saved) {
+      panel.add(
+        this.add
+          .text(W / 2, H - 30, '存档失败：浏览器存储已满，本回合进度未写入存档', {
+            fontFamily: FONT.mono,
+            fontSize: '13px',
+            color: css(CINNABAR.base),
+          })
+          .setOrigin(0.5),
+      );
+    }
 
     // 战报：敌我各一列（每边最多 9 子，8v8 全员可见）——每单位「伤害 / 承伤」
     // 双细条，物理/法术/真伤三段堆叠（与飘字 DAMAGE_COLOR 同色源），盾吸并进
@@ -1143,11 +1155,13 @@ export class BattleScene extends Phaser.Scene {
    * 在开战时刻按配对顺序统一完成 —— 人类场结果是同一 config + 种子的无头重放，
    * 与本场景演出逐位同源。这里只推进阶段与落盘，绝不二次 applyBattleResult。
    */
-  private finalizeRound(): void {
-    if (!this.matchCtx) return;
+  private finalizeRound(): boolean {
+    if (!this.matchCtx) return false;
     const match = this.matchCtx.match;
     match.endRound();
-    saveMatch(match);
+    // 结算落盘是关页/切页高危点：失败必须可见（与 GameScene.persistMatch 同一口径），
+    // 不能静默 —— 否则玩家重进会整轮重放且无任何解释
+    return saveMatch(match);
   }
 
   private returnToGame(): void {

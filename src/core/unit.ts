@@ -84,7 +84,6 @@ export interface Unit {
   // ── 生命周期 ──
   revived: boolean;
   yaozuTransformed: boolean;
-  dandingReviveUsed: boolean;
 
   // ── 统计 ──
   dealtDamage: number;
@@ -211,7 +210,6 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     revived: false,
     yaozuTransformed: false,
-    dandingReviveUsed: false,
 
     dealtDamage: 0,
     takenDamage: 0,

@@ -207,6 +207,8 @@ export class Match implements AiWorld {
    * 商店概率表覆盖（平衡工具链 A/B 用）。缺省 null = 读全局 SHOP_ODDS 真源；
    * 设置后本局全部 rollShop 走该表 —— 与真源行数/列数一致的调用方责任。
    * 对局主路径（UI / 存档 / 回放）永不设置，确定性契约不受影响。
+   * 刻意不随 toJSON 持久化：覆盖表是进程内的工具链注入物，工具链档不支持存读，
+   * 持久化它反而会把实验数值带进玩家存档的语义面。
    */
   shopTable: readonly (readonly number[])[] | null = null;
   /** 事件日志，结算面板与调试用 */
@@ -574,11 +576,7 @@ export class Match implements AiWorld {
       // 无处安放，整体回滚到买入前（白嫖 2★ / 越席 10 格的单边漂移都禁止）
       while (p.bench.length > BENCH_SLOTS && p.bench[p.bench.length - 1] === null) p.bench.pop();
       if (merges.length === 0 || p.bench.length > BENCH_SLOTS) {
-        restorePlayer(p, this.pool, snap);
-        // 奇遇恩赐与随机流游标一并还原（与撤销层同一完整快照口径）：
-        // 未来 buy 内新增 rng/奇遇消费时不会出现只回滚了半场
-        this.adventureOffer = snap.adventureOffer;
-        this.rng.state = rngBackup;
+        this.rollbackBuy(p, snap, rngBackup);
         return { ok: false, reason: 'bench' };
       }
       for (const m of merges) {
@@ -598,9 +596,7 @@ export class Match implements AiWorld {
 
     // 常路径：新子直接落空格；落不下就整体回滚 —— 卡、钱、商店格一项都不能被吞掉
     if (addToBench(p, u) < 0) {
-      restorePlayer(p, this.pool, snap);
-      this.adventureOffer = snap.adventureOffer;
-      this.rng.state = rngBackup;
+      this.rollbackBuy(p, snap, rngBackup);
       return { ok: false, reason: 'bench' };
     }
     const merges = resolveMerges(p);
@@ -618,6 +614,14 @@ export class Match implements AiWorld {
     // 不会溢出，这里只是防御性确保 bench 长度恒 ≤ BENCH_SLOTS
     if (p.bench.length > BENCH_SLOTS) p.bench.length = BENCH_SLOTS;
     return { ok: true };
+  }
+
+  /** buy 的失败回滚：快照八项 + 奇遇恩赐 + 随机流游标一次还原到位（与撤销层同口径）。
+   *  两条失败路径（满席溢出 / 常路径落位失败）此前各持一份逐字重复的三行样板 ——
+   *  回滚字段一旦增删，两处必须同步，收口成一个入口。 */
+  private rollbackBuy(p: PlayerState, snap: ReturnType<typeof snapshotPlayer>, rngBackup: number): void {
+    restorePlayer(p, this.pool, snap, this);
+    this.rng.state = rngBackup;
   }
 
   /** 卖出棋子，按星级返还金币并把卡放回池 */
@@ -695,8 +699,12 @@ export class Match implements AiWorld {
    * 玩家最烦的事之一，就是连续三轮撞同一个人。
    * 人数为奇数时，落单者与「墨影」（最近一名被淘汰玩家的阵容）交战；
    * 若还没有人被淘汰，则轮空（不掉血也不加连胜）。
+   *
+   * recordHistory=false 供读档清洗后的开战兜底重掷使用：回合开始的原生成
+   * 已把本轮交手写入双方 opponents（随档持久化），重掷再记一次会把
+   * 回避窗口挤歪 —— 交手史必须恰好记一次。
    */
-  makePairings(): Pairing[] {
+  makePairings(recordHistory = true): Pairing[] {
     // 墨兽轮：每个存活玩家各自单挑同一只墨兽，玩家固定在下半场
     if (this.isBeastRound()) {
       return this.alivePlayers().map((p) => ({ a: p.idx, b: -1, ghost: -1, swap: true, beast: true }));
@@ -722,8 +730,10 @@ export class Match implements AiWorld {
       // 人类玩家固定打下半场
       out.push({ a, b, ghost: -1, swap: a === 0, beast: false });
       // 记录交手历史
-      this.players[a].opponents.push(b);
-      this.players[b].opponents.push(a);
+      if (recordHistory) {
+        this.players[a].opponents.push(b);
+        this.players[b].opponents.push(a);
+      }
     }
     return out;
   }
@@ -1206,6 +1216,7 @@ export class Match implements AiWorld {
     m.pool.restore(data.pool);
     // 坏档/版本漂移守卫：board/bench 长度恒为 32/9（state.emptyBoard/emptyBench 口径）。
     // 长度漂移会让 moveOnBoard/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛。
+    let totalUnitCleaned = 0;
     for (const pl of data.players ?? []) {
       if (!pl || typeof pl !== 'object') throw new Error('corrupted player entry in save');
       if (!Number.isFinite(pl.gold) || !Number.isFinite(pl.hp) || !Number.isFinite(pl.level)) {
@@ -1224,6 +1235,25 @@ export class Match implements AiWorld {
         for (let i = 0; i < Math.min(9, src.length); i++) nb[i] = src[i] as never;
         (pl as any).bench = nb;
       }
+      // 单元条目清洗：未知棋子是永不可战的占格死重，星级越界会让 powerScore 取
+      // undefined 乘区把 NaN 沿 AI 估值与布阵排序传播，未知装备是卸不掉、用不出
+      // 还占器匣容量计数的死重 —— 都不让进对局。粒度与 pool.restore 一致：
+      // 单格损坏不清空整档，条数汇总后一次性 warn。
+      let unitCleaned = 0;
+      (pl as any).board = ((pl as any).board as unknown[]).map((cell) => {
+        const r = sanitizeUnitEntry(cell);
+        unitCleaned += r.cleaned ? 1 : 0;
+        return r.unit;
+      });
+      (pl as any).bench = ((pl as any).bench as unknown[]).map((cell) => {
+        const r = sanitizeUnitEntry(cell);
+        unitCleaned += r.cleaned ? 1 : 0;
+        return r.unit;
+      });
+      totalUnitCleaned += unitCleaned;
+    }
+    if (totalUnitCleaned > 0) {
+      console.warn(`[save] 存档棋子/装备与本版名单不一致，已清洗 ${totalUnitCleaned} 处（丢弃/钳制），其余保留`);
     }
     m.players = data.players;
     m.ghosts = new Map(data.ghosts);
@@ -1253,4 +1283,34 @@ export class Match implements AiWorld {
     bumpIidCounter(maxIid);
     return m;
   }
+}
+
+/** 单元条目清洗（fromJSON 专用，pool.restore 同一容错粒度）：
+ *  - 未知 defId：本版名单外的棋子无法参战也无法卖出，整格丢弃；
+ *  - star 非有限数：无法归档到任何星级档位，整格丢弃；
+ *  - star 有限但越界/非整：钳回 [1,3]（不弃棋子 —— 越界星级没有任何已发布
+ *    版本能产出，纯属损坏，弃子会连装备与站位资产一起蒸发）；
+ *  - items 过滤到本版名单内的装备 id。
+ *  返回 cleaned 供调用方汇总 warn，不逐格刷屏。 */
+function sanitizeUnitEntry(raw: unknown): { unit: UnitInstance | null; cleaned: boolean } {
+  if (raw === null || raw === undefined) return { unit: null, cleaned: false };
+  if (typeof raw !== 'object') return { unit: null, cleaned: true };
+  const u = raw as UnitInstance;
+  if (typeof u.defId !== 'string' || !CHAMPION_BY_ID[u.defId]) return { unit: null, cleaned: true };
+  if (!Number.isFinite(u.star as number)) return { unit: null, cleaned: true };
+  let cleaned = false;
+  const star = u.star as number;
+  if (!Number.isInteger(star) || star < 1 || star > 3) {
+    u.star = Math.min(3, Math.max(1, Math.round(star))) as UnitInstance['star'];
+    cleaned = true;
+  }
+  if (Array.isArray(u.items)) {
+    const before = u.items.length;
+    u.items = u.items.filter((id) => typeof id === 'string' && !!ITEM_BY_ID[id]);
+    if (u.items.length !== before) cleaned = true;
+  } else {
+    u.items = [];
+    cleaned = true;
+  }
+  return { unit: u, cleaned };
 }

@@ -85,12 +85,15 @@ export class CodexScene extends Phaser.Scene {
     this.contents = { champs: null, traits: null, items: null };
     this.scrolls = { champs: null, traits: null, items: null };
     // 每次进入 create 都会重建三柄 scroll：SHUTDOWN 时统一销毁，
-    // 否则不入显示列表的遮罩 Graphics 逐次累积（C3）
+    // 否则不入显示列表的遮罩 Graphics 逐次累积（C3）。
+    // backData 一并释放：从对局进入时它持有 live Match 强引用，
+    // 停用中的图鉴场景不应在整局期间别名持有对局
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       for (const k of ['champs', 'traits', 'items'] as CodexTab[]) {
         this.scrolls[k]?.destroy();
         this.scrolls[k] = null;
       }
+      this.backData = {};
     });
 
     // 背景：夜色山海由 index.html 的 #bg 承担（透明画布），此处不再铺底

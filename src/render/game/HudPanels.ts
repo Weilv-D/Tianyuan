@@ -624,11 +624,13 @@ export class HudPanels {
 
   /** 撤销可用金点：栈非空点亮呼吸，空栈熄灭 */
   setUndoAvailable(has: boolean): void {
-    if (!this.undoDot || this.undoDotActive === has) return;
+    if (!this.undoDot || !this.undoBtn || this.undoDotActive === has) return;
     this.undoDotActive = has;
     this.scene.tweens.killTweensOf(this.undoDot);
-    const cx = ACT_X + ACT_BTN_W + 10 + 6;
-    const cy = ACT_Y + 5; // 撤销钮首行下方的小点：与钮顶对齐，不压钮文字
+    // 锚定撤销钮自身（操作列第二行第二枚）：此前 cy 漏加行距，金点画在了
+    // 第一行升级钮的左上角 —— 玩家会误读成"可升级"的呼吸提示
+    const cx = this.undoBtn.x + 6;
+    const cy = this.undoBtn.y + 5;
     if (!has) {
       this.undoDot.clear();
       return;

@@ -268,6 +268,13 @@ export class InputController {
         return;
       }
       if (this.pendingUnit) {
+        // 按住未松时阶段可能已切换（如空格开战/结算弹层）：
+        // 升级分支与 pointerdown/handleClick/endDrag 同守一套阶段闸，
+        // 否则战斗中会闪现一次落点衬底与半透明 ghost
+        if (this.scene.phase !== 'prep' || this.scene.busy) {
+          this.pendingUnit = null;
+          return;
+        }
         // 按住未松：位移过阈值才升级为拖拽（轻点 = 选中，不产生 ghost）
         if (
           Math.abs(x - this.pendingUnit.x) >= CLICK_DRAG_THRESHOLD ||

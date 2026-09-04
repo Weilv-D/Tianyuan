@@ -515,10 +515,9 @@ export class GameScene extends Phaser.Scene {
       this.showToast('没有可撤销的操作', true);
       return;
     }
-    // 整份快照对称回滚：金币、等级/经验、棋子与装备、商店、器匣、卡池计数、随机流游标，
-    // 以及本回合尚未领取/已领取后待还原的奇遇恩赐
-    restorePlayer(this.match.human, this.match.pool, e.snap);
-    this.match.adventureOffer = e.snap.adventureOffer;
+    // 整份快照对称回滚：金币、等级/经验、棋子与装备、商店、器匣、卡池计数、
+    // 奇遇恩赐（restorePlayer 内一并回写）与随机流游标
+    restorePlayer(this.match.human, this.match.pool, e.snap, this.match);
     this.match.rng.state = e.rngState;
     // 恩赐面板的"本回合已择"记忆随撤销失效：撤销到领赐前快照后 offer 已还原，
     // 面板必须重开，否则还原的恩赐没有领取入口（resolvedRound 守卫会拦掉重开）
@@ -740,8 +739,9 @@ export class GameScene extends Phaser.Scene {
     this.adventure.hide();
 
     // 配对已在 beginRound 生成（备战期全程可侦查本轮对手）；此处只消费。
-    // 兜底：异常路径进场而配对缺失时补生成一次。
-    if (this.match.pairings.length === 0) this.match.pairings = this.match.makePairings();
+    // 兜底：异常路径进场而配对缺失/脏表被弃时补生成一次 —— recordHistory=false，
+    // 回合开始的原生成已把交手写入 opponents（随档持久化），重掷再记即双记
+    if (this.match.pairings.length === 0) this.match.pairings = this.match.makePairings(false);
     const pairings = this.match.pairings;
 
     // 1) 全部战斗按配对顺序无头结算（含人类场 —— A3）。人类场随后由 BattleScene

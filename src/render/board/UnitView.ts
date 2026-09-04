@@ -528,6 +528,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   playDeath(onDone?: () => void): void {
     if (this.dead) return;
     this.dead = true;
+    // 吟唱一并终止：update 的吟唱块只看 castT 不看 dead，不清零的话
+    // 法阵会在尸体上把剩余 windup 画完（"死后重生法阵"）
+    this.castT = 0;
     this.bars.clear();
     this.pips.clear();
     this.crown.clear();

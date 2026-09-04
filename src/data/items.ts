@@ -573,6 +573,8 @@ export const ITEMS: readonly ItemDef[] = [
     recipe: ['fafu', 'doupeng'],
     bonus: { startMp: 16, mr: 14, hp: 100 },
     hooks: ['warBanner'],
+    // drPct 是百分点口径（22 = 22%）：warBanner 直接把它作为 dr 状态的 value，
+    // battle 按 value/100 结算 —— 与赤练鞭 vulnPct、妖族化形 35 同口径，勿改成 0.22
     params: { drPct: 22, dur: 8 },
     glyph: 'darkrobe',
   },

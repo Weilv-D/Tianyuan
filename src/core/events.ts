@@ -30,8 +30,9 @@ export type BattleEvent =
   | { t: 'move'; tick: number; uid: number; from: Cell; to: Cell; dur: number }
   /** 位移类技能（突进 / 击退） */
   | { t: 'blink'; tick: number; uid: number; from: Cell; to: Cell; dur: number }
-  /** 状态施加 / 移除 */
-  | { t: 'status'; tick: number; uid: number; kind: string; dur: number; value: number; added: boolean }
+  /** 状态施加 / 移除。src = 叠层来源标识（addStatus 的 srcTag），仅供回放/分析
+   *  归因；未打标的条目为 undefined（外来层，不参与任何 maxStacks 计数） */
+  | { t: 'status'; tick: number; uid: number; kind: string; dur: number; value: number; added: boolean; src?: string }
   /** 死亡退场 */
   | { t: 'death'; tick: number; uid: number; killerUid: number }
   /** 纯粹的表现层特效（不携带逻辑结果） */

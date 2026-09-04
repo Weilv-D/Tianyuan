@@ -66,9 +66,10 @@ export class DamageTextLayer {
     if (motion.calm) cfg = { ...cfg, pop: 1, shake: false, glow: false };
     const t = this.take();
 
-    // 错峰：同一目标 120ms 内的飘字横向错开
+    // 错峰：同一目标 120ms 内的飘字横向错开。x 主序 ×2048：画布高 1080，
+    // ×1000 会让相邻格的 (x, 1079)/(x+1, 79) 键相撞，误判成同目标叠字
     const now = this.scene.time.now;
-    const key = Math.round(x) * 1000 + Math.round(y);
+    const key = Math.round(x) * 2048 + Math.round(y);
     const last = this.lastAt.get(key) ?? 0;
     const stacked = now - last < 110;
     this.lastAt.set(key, now);

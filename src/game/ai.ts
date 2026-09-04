@@ -346,24 +346,24 @@ export function aiTakeTurn(w: AiWorld, p: PlayerState): void {
   let guard = 0;
   while (guard++ < 24) {
     let bought = false;
+    // 阈值随危机感下降：血少了，什么都买（先活下来再说）
+    const threshold = 26 - urgency * 14 + (1 - aggression) * 8;
     for (let s = 0; s < SHOP_SLOTS; s++) {
       const id = p.shop[s];
       if (!id) continue;
       const def = CHAMPION_BY_ID[id];
       if (!def) continue;
       if (p.gold < def.cost) continue;
-      if (benchCount(p) >= BENCH_SLOTS) {
-        // 备战席满了：先看看有没有值得为之腾位置的好牌
-        const probe = scoreCard(p, id, w.round, prof);
-        if (!makeRoomFor(w, p, probe)) break;
-      }
-
+      // 先判定想不想要（含决策噪声），再谈腾位置 —— 卖是破坏性动作，不能发生在
+      // "最终没买"的路径上：噪声把 want 拉到阈值之下、或买入因卡池缺货失败时，
+      // 先卖后想会让 AI 为一张没买的牌白卖掉手棋
       const want = scoreCard(p, id, w.round, prof) + (rng.next() - 0.5) * noise * 22;
-      // 阈值随危机感下降：血少了，什么都买（先活下来再说）
-      const threshold = 26 - urgency * 14 + (1 - aggression) * 8;
-      if (want >= threshold) {
-        if (w.buy(p, s).ok) bought = true;
-      }
+      if (want < threshold) continue;
+      // 缺货的牌买入必败（Match.buy 在卡池处整体回滚），不值得为它卖任何东西
+      if (w.pool.remaining(id) <= 0) continue;
+      // 备战席满了：好牌才值得为之腾位置
+      if (benchCount(p) >= BENCH_SLOTS && !makeRoomFor(w, p, want)) break;
+      if (w.buy(p, s).ok) bought = true;
     }
 
     const canAffordRoll = p.gold - REROLL_COST >= floor;
@@ -399,6 +399,13 @@ export function aiTakeTurn(w: AiWorld, p: PlayerState): void {
   // 必须放在布阵之后：装备只发给上场的棋子，发给备战席的等于浪费。
   autoEquip(p);
 
+  // ── 手滑：偶尔做一次没道理的事。这是"人味"最廉价也最有效的来源。 ──
+  // 必须先于锁店判定：手滑会洗掉商店，若锁在前，锁住的是已被洗掉的旧牌，
+  // shopLocked 还会拦下回合的合法刷新 —— 锁的意图被自己的手滑吞掉
+  if (rng.next() < noise * 0.18 && p.gold > 12) {
+    w.reroll(p);
+  }
+
   // ── 锁商店：有张很想要的牌，这回合买不起但下回合能买得起 ──
   p.shopLocked = p.shop.some((id) => {
     if (!id) return false;
@@ -408,11 +415,6 @@ export function aiTakeTurn(w: AiWorld, p: PlayerState): void {
     if (def.cost > p.gold + projectedNextIncome(p)) return false; // 下回合也买不起，锁了没意义
     return scoreCard(p, id, w.round, prof) >= 42;
   });
-
-  // ── 手滑：偶尔做一次没道理的事。这是"人味"最廉价也最有效的来源。 ──
-  if (rng.next() < noise * 0.18 && p.gold > 12) {
-    w.reroll(p);
-  }
 }
 
 /** 下一次准备阶段预计能拿到的钱（基础收入 + 利息的粗略估计）。

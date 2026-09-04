@@ -54,8 +54,7 @@ export type StatusKind =
   | 'dr' // 减伤：受到的所有伤害降低
   | 'vulnerability' // 受伤加深（易伤）
   | 'spellCharge' // 附魔：下次普攻附加额外法伤（value = 附加伤害数值）
-  | 'ccImmune' // 免疫控制
-  | 'drain'; // 吸血加成
+  | 'ccImmune'; // 免疫控制
 
 export interface StatusEffect {
   kind: StatusKind;
@@ -68,7 +67,10 @@ export interface StatusEffect {
   /** DoT 的结算伤害类型（burn=法术、bleed=真实）；非 DoT 状态不使用 */
   dtype?: DamageType;
   /** 叠层来源标识：多来源共用同一 StatusKind（如多件装备/技能都挂 aspdUp）时，
-   *  各自声明的层数上限（maxStacks）只数本源条目，互不挤占 */
+   *  各自声明的层数上限（maxStacks）只数本源条目，互不挤占。契约口径：
+   *  只有"带层数上限的生产者"需要打标（如 killFrenzy/castAspd/volley 系）；
+   *  src 为 undefined 的是外来层 —— 永不计入任何 maxStacks 计数，
+   *  但照常参与 sumStatus 求和（隔离的是上限计数，不是加成数值）。 */
   src?: string;
 }
 

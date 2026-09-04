@@ -79,7 +79,7 @@ CI 追加两道发布门禁中最便宜的审计，让许可证、哈希漂移�
 | 整局经济、AI、局长 | `npm run balance -- match` | 对局结束；局长与原型差异在设计包络内 |
 | 存档、结算、场景切换 | 对应核心测试（含本回合配对往返）+ 浏览器刷新/继续对局冒烟 | 不重复结算、不重掷本轮对手，不丢回合或玩家资产 |
 | 器匣、装备栏交互 | 对应核心测试（溢出分页映射）+ 器匣点选/拖拽/翻页冒烟 | 溢出资产逐件可点选、可拖拽、可合成；页码不越界 |
-| `src/render`、`src/ui`、布局、字体 | `.qa/smoke-checklist.md` | 目标分辨率与 K=2 下无裁切、遮挡、错位 |
+| `src/render`、`src/ui`、布局、字体 | `../.qa/smoke-checklist.md` | 目标分辨率与 K=2 下无裁切、遮挡、错位 |
 | 音频文件、清单、授权 | `npm run audit:music` + 开关往返冒烟 | 文件/哈希/授权一致；关闭时合成音回落 |
 | 发布脚本、Vite 配置、资源路径 | `npm run release` | 两种产物可生成；单文件无外链；zip 完整 |
 
@@ -91,11 +91,11 @@ CI 追加两道发布门禁中最便宜的审计，让许可证、哈希漂移�
 
 | 风险 | 测试文件 | 保护内容 |
 |---|---|---|
-| 战斗可信 | `determinism`、`battle-formula`、`grid`、`skills`、`traits-big` | 收敛、重演、战斗规则、占格、技能与大羁绊 |
+| 战斗可信 | `determinism`、`battle-formula`、`grid`、`skills`、`traits-big`、`status-src` | 收敛、重演、战斗规则、占格、技能与大羁绊、叠层按源分计（外来层不挤占 maxStacks）与非法状态数值入表前即抛 |
 | 平衡锚点 | `balance`、`shop-odds` | 定档数值回归（CRN 断面关键锚）、商店概率表结构与 rollShop 行为契约 |
 | 工具链可信 | `balance-tools` | 平衡工具链自身：补丁四类路径往返与嵌套键级回退、CRN 配对公式金锁、进程池与串行逐位一致、SQLite 往返、**调参键白名单与 traits.ts 读取双向同源**、src 不引用工具链 |
 | 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为 |
-| 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销（含随机流游标回滚）与每日成绩 |
+| 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily`、`status-src` | 存读档、恢复推进、回放、撤销（含随机流游标回滚与奇遇恩赐对称回写）、每日成绩、坏档单元清洗与配对兜底重掷不双记交手史 |
 | 交互安全 | `hud-layout`、`input-coords`、`valid-placements`、`item-paging`、`robustness` | 单源几何（轨/日志/战报/弹窗/商店无重叠）、K=2 输入、拖拽落点合法域、器匣溢出分页的页数/钳制/绝对索引映射、满盘站位、坏输入与墨兽落地 |
 
 ### 5.1 准入条件
@@ -123,7 +123,7 @@ CI 追加两道发布门禁中最便宜的审计，让许可证、哈希漂移�
 ## 6. 实机冒烟
 
 Canvas、WebGL、音频上下文和真实指针事件必须在前台窗口验证。统一清单位于
-`.qa/smoke-checklist.md`，最低覆盖：
+`../.qa/smoke-checklist.md`，最低覆盖：
 
 - 新对局、继续对局、每日挑战和图鉴往返；
 - 买入、拖拽上场、出售、装备、卸载、开战与结算；

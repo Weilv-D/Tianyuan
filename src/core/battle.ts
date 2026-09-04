@@ -701,6 +701,9 @@ export class Battle implements BattleApi {
   addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number, srcTag?: string): void {
     if (!dst.alive) return;
     if (!Number.isFinite(dur)) throw new Error(`非法状态时长: ${dur}（kind=${kind} src=${src.uid} dst=${dst.uid}）`);
+    // value 与 dur 同门槛：NaN/Infinity 一旦入表会沿 sumStatus 污染 effAspd/effAtk
+    // 等全部面板口径，在攻速与伤害链上静默传播 —— 与 heal/addShield/addDot 同一防线
+    if (!Number.isFinite(value)) throw new Error(`非法状态数值: ${value}（kind=${kind} src=${src.uid} dst=${dst.uid}）`);
     if (CONTROL_KINDS.has(kind) && (dst.ccImmune > 0 || dst.statuses.some((s) => s.kind === 'ccImmune'))) return;
     const ticks = Math.max(1, Math.round(dur * TICK_RATE));
     if (!STACKABLE_KINDS.has(kind)) {
@@ -710,12 +713,12 @@ export class Battle implements BattleApi {
         existing.value = Math.max(existing.value, value);
         existing.srcUid = src.uid;
         if (srcTag) existing.src = srcTag;
-        this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind, dur, value, added: true });
+        this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind, dur, value, added: true, src: srcTag });
         return;
       }
     }
     dst.statuses.push({ kind, ticks, value, srcUid: src.uid, src: srcTag });
-    this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind, dur, value, added: true });
+    this.emit({ t: 'status', tick: this.tick, uid: dst.uid, kind, dur, value, added: true, src: srcTag });
   }
 
   removeStatus(u: Unit, kind: StatusKind): void {
@@ -1164,7 +1167,13 @@ export class Battle implements BattleApi {
         this.emit({ t: 'status', tick: this.tick, uid: u.uid, kind: s.kind, dur: 0, value: 0, added: false });
         return false;
       });
-      if (shieldExpired) u.shield = 0;
+      if (shieldExpired) {
+        // 自然到期与破盾同口径发 shield 事件（amount = 消失的余量，total = 0）：
+        // 否则事件流消费者（回放/分析器）只看到 status removed，看不到护盾数值
+        // 归零这一步 —— 渲染层每帧轮询不受影响，事件侧不能缺账
+        this.emit({ t: 'shield', tick: this.tick, uid: u.uid, amount: -Math.round(u.shield), total: 0 });
+        u.shield = 0;
+      }
     }
   }
 

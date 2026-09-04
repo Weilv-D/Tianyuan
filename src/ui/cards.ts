@@ -242,6 +242,9 @@ export class ShopCard extends Phaser.GameObjects.Container {
   private owned = false;
   private hovered = false;
   private ownedTween: Phaser.Tweens.Tween | null = null;
+  /** 悬停上浮/回落补间句柄：快速抖动悬停时上/下两个补间会叠在 y 上互相拉扯，
+   *  换向先 stop 旧的（killTweensOf 的双参形式无类型定义，且会误杀 scale 购买反馈） */
+  private hoverTween: Phaser.Tweens.Tween | null = null;
   private deniedPulse: Phaser.GameObjects.Graphics | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, w: number, h: number, onClick: () => void) {
@@ -276,13 +279,15 @@ export class ShopCard extends Phaser.GameObjects.Container {
     this.on('pointerover', () => {
       this.hovered = true;
       if (this.defId) scene.input.setDefaultCursor('pointer');
-      scene.tweens.add({ targets: this, y: this.baseY - 8, duration: 320, ease: 'Quad.easeOut' });
+      this.hoverTween?.stop();
+      this.hoverTween = scene.tweens.add({ targets: this, y: this.baseY - 8, duration: 320, ease: 'Quad.easeOut' });
       this.redraw(true);
     });
     this.on('pointerout', () => {
       this.hovered = false;
       scene.input.setDefaultCursor('default');
-      scene.tweens.add({ targets: this, y: this.baseY, duration: 320, ease: 'Quad.easeOut' });
+      this.hoverTween?.stop();
+      this.hoverTween = scene.tweens.add({ targets: this, y: this.baseY, duration: 320, ease: 'Quad.easeOut' });
       this.redraw(false);
     });
     this.on('pointerdown', () => {
@@ -755,7 +760,7 @@ export class ItemChip extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number, size: number, onClick: () => void) {
     super(scene, x, y);
     this.chipSize = size;
-    this.bg = scene.add.image(-1, -1, '__ichip').setOrigin(0);
+    this.bg = scene.add.image(-1, -1, ensurePlaceholderTex(scene, '__ichip')).setOrigin(0);
     this.img = scene.add.image(size / 2, size / 2, '').setVisible(false);
     this.add([this.bg, this.img]);
     this.setSize(size, size);

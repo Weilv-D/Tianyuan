@@ -5,6 +5,7 @@
  * 断言本身必须落在被测模块的公开契约上，避免测试与实现细节共谋。
  */
 import { Battle } from '../src/core/battle';
+import { PLAYER_START_HP } from '../src/core/config';
 import type { BattleUnitInput, Cell } from '../src/core/types';
 import { emptyBench, emptyBoard, type PlayerState } from '../src/game/state';
 
@@ -13,7 +14,9 @@ export function makePlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     idx: 0,
     name: '测试玩家',
     isHuman: true,
-    hp: 100,
+    // 与对局真源同源：此前写死 100（真源已上调至 110），任何依赖初始血的
+    // 用例都会被带偏；需要特定血量时用 overrides.hp 覆写
+    hp: PLAYER_START_HP,
     gold: 0,
     level: 5,
     xp: 0,
