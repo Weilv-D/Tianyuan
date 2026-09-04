@@ -5,8 +5,7 @@ import { verifyReplay } from '../src/game/replay';
 function playRounds(rounds: number, manual = false): Match {
   const match = new Match(20260830);
   while (!match.isOver() && match.round < rounds) {
-    match.beginRound();
-    match.pairings = match.makePairings();
+    match.beginRound(); // 配对已由 beginRound 生成并写入交手史，重掷会双记 + 双倍消费洗牌 rng
     if (manual) {
       for (const pairing of match.pairings) {
         match.applyBattleResult(pairing, match.runBattleHeadless(pairing));

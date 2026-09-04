@@ -42,9 +42,9 @@ export function railBadgeWorldHit(i: number, containerY = RAIL_Y): { x: number; 
   return { x: RAIL_X + row.x, y: containerY + railBadgeY(i) + row.y, w: row.w, h: row.h };
 }
 
-/** 悬停笺应放置的世界位置：笺左缘贴轨计数串右缘；py 沿徽章行 y 钳位 */
+/** 悬停笺应放置的世界位置：笺左缘贴轨计数串右缘（环心 + 计数偏移 + 计数宽）外 3px 净距；py 沿徽章行 y 钳位 */
 export function railPopupPos(railBadgeWorldYPos: number, h: number): { x: number; y: number } {
-  return { x: 112, y: railPopupClampY(railBadgeWorldYPos, h) };
+  return { x: RAIL_X + RAIL_COUNT_DX + RAIL_COUNT_W + 3, y: railPopupClampY(railBadgeWorldYPos, h) };
 }
 
 // ── 羁绊轨 ─────────────────────────────────────────────

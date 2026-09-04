@@ -13,9 +13,13 @@
  */
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, renameSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SRC = 'design/items/item-sheet.png';
-const OUT = 'src/render/art/item/ai';
+// 输入/输出锚到仓库根：脚本从任意 cwd 运行都落同一位（与 slice-sheet.mjs 同口径）
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const SRC = join(root, 'design/items/item-sheet.png');
+const OUT = join(root, 'src/render/art/item/ai');
 const COLS = 8;
 const ROWS = 3;
 const PAD = 3;

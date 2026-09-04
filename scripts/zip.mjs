@@ -5,7 +5,7 @@
 // 已压缩内容（png/ogg）占大头，用 level 1：速度优先，压缩率损失可忽略。
 // 全量内存打包：面向当前 <50MB 级发布产物；产物若量级上涨需改流式（fflate Zip）。
 import { zipSync } from 'fflate';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +60,9 @@ for (const input of inputs) {
 const zipped = zipSync(entries, { level: 1 });
 const outAbs = resolve(root, out);
 mkdirSync(dirname(outAbs), { recursive: true });
-writeFileSync(outAbs, zipped);
+// 原子落盘：先写 .tmp 再改名，中断不留半截 zip（与 release 的产物承诺同口径）
+const tmpAbs = `${outAbs}.tmp`;
+writeFileSync(tmpAbs, zipped);
+renameSync(tmpAbs, outAbs);
 const mb = (zipped.length / 1024 / 1024).toFixed(1);
 console.log(`zip 完成 → ${out}（${Object.keys(entries).length} 个条目，${mb} MB）`);

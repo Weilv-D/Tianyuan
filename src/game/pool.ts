@@ -33,7 +33,8 @@ export class CardPool {
     return true;
   }
 
-  /** 归还一张（卖棋 / 淘汰时回池） */
+  /** 归还一张（卖棋 / 淘汰时回池）。不设上钳：调用方（买卖/淘汰/回滚）与 take
+   *  严格对称，钳制反而会把守恒破坏静默成吞牌 —— 溢出应当在调用侧暴露。 */
   give(defId: string): void {
     this.counts.set(defId, (this.counts.get(defId) ?? 0) + 1);
   }

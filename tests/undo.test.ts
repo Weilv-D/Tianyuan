@@ -63,12 +63,9 @@ describe('准备阶段撤销', () => {
     // 人为把人类置于奇遇轮语境：round 4 的 offer 是全体共享的同一份
     while (match.round < 4 && !match.isOver()) match.beginRound();
     const offerBefore = match.adventureOffer;
-    if (!offerBefore) {
-      // round 4 必然生成（human alive）—— 但用完整对局推进到 4 后 human 可能
-      // 已挨打掉血，仍活着即可；构造不出就跳过（防御）
-      expect(match.round).toBeGreaterThanOrEqual(4);
-      return;
-    }
+    // round 4 必然生成恩赐（人类存活）——缺失即 rollAdventureOffer 回归，
+    // 必须当场红：防御性 return 会把"恩赐不再生成"的回归静默跳过
+    if (!offerBefore) throw new Error('round 4 应生成奇遇恩赐（rollAdventureOffer 回归）');
     const entry = { snap: snapshotPlayer(match.human, match.pool, match.adventureOffer), rngState: match.rng.state };
 
     // 领取恩赐（走与 UI 相同的 resolveAdventure 入口）

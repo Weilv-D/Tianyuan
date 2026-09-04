@@ -111,9 +111,8 @@ export async function run(argv: string[]): Promise<void> {
   console.log('\n【3/5 CRN 稳定】');
   const r1 = runPair(0, 1, 24, 20260829, PRESET_COMPS);
   const r2 = runPair(0, 1, 24, 20260829, PRESET_COMPS);
-  const crnOk = r1.topWins === r2.topWins && r1.bottomWins === r2.bottomWins && r1.draws === r2.draws
-    && r1.totalTicks === r2.totalTicks && r1.timeouts === r2.timeouts
-    && r1.top.every((u, i) => u.dealt === r2.top[i].dealt);
+  // 逐位一致抽查全字段（含 bottom/casts/承伤）：单比 top.dealt 漏检一半的分歧面
+  const crnOk = JSON.stringify(r1) === JSON.stringify(r2);
   console.log(crnOk ? '  ✓ 同配对同种子重复执行逐位一致（配对消噪前提成立）' : '  ✗ 同种子两次执行出现分歧！');
   failed ||= !crnOk;
 
@@ -136,7 +135,8 @@ export async function run(argv: string[]): Promise<void> {
     const spec: CompSpec = randomComp(rnd, 7);
     // 每个随机阵容独立战斗种子（避免两个种子主导全部样本的老缺陷）
     const st = runPair(0, 0, 2, 2_000_000 + i * 2 * 7919, [spec, spec]);
-    firstWin += st.bottomWins;
+    // 平局双方各计半胜：把平局当失败会稀释分母、让公平率随超时增多而虚低
+    firstWin += st.bottomWins + st.draws * 0.5;
     mirrorBattles += 2;
   }
   const firstRate = firstWin / mirrorBattles;

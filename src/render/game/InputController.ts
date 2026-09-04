@@ -87,7 +87,11 @@ export class InputController {
       s.debug.isOpen ||
       s.hud.traitModalOpen ||
       s.pauseScout.scoutPanel ||
-      s.traitMembers.isOpen
+      s.traitMembers.isOpen ||
+      // 回合结算 / 淘汰两块模态：不进集合的话，遮罩下的 pointermove 仍会
+      // 刷出装备提示卡与棋子详情卡，空格也会同时触发场景级快捷键
+      s.roundResult.isOpen ||
+      s.eliminated.isOpen
     );
   }
   /** 页面隐藏：中止拖拽/点选（稳定引用，供 game.events 注册/摘除）。

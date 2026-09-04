@@ -2,9 +2,17 @@
 import { Battle } from '../../src/core/battle';
 import { PRESET_COMPS, buildTeam } from '../../src/game/comp';
 
-const ai = Number(process.argv[2] ?? 0); // 快攻压制
-const bi = Number(process.argv[3] ?? 1); // 后期大招
-const seed = Number(process.argv[4] ?? 4242);
+const intArg = (v: string | undefined, name: string, min: number, fallback: number, max?: number): number => {
+  const x = Number(v ?? fallback);
+  if (!Number.isInteger(x) || x < min || (max !== undefined && x >= max)) {
+    console.error(`✗ ${name} 必须为 ≥${min} 的整数${max !== undefined ? ` 且小于 ${max}` : ''}`);
+    process.exit(1);
+  }
+  return x;
+};
+const ai = intArg(process.argv[2], '阵容下标 A', 0, 0, PRESET_COMPS.length); // 快攻压制
+const bi = intArg(process.argv[3], '阵容下标 B', 0, 1, PRESET_COMPS.length); // 后期大招
+const seed = intArg(process.argv[4], '种子', 1, 4242);
 
 const a = buildTeam(PRESET_COMPS[ai], 0, 1);
 const b = buildTeam(PRESET_COMPS[bi], 1, 200);

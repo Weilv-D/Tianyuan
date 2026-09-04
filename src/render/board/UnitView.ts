@@ -103,6 +103,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   private flashT = 0;
   private castT = 0;
   private castTotal = 0;
+  /** 攻击/受击/收吟唱的位移补间剩余时长：期间待机呼吸不得写 sprite.y，
+   *  否则每帧 bob 覆盖会把突进/抖动的纵向分量整个吃掉（与 castT 同口径） */
+  private motionT = 0;
 
   constructor(scene: Phaser.Scene, defId: string, team: number, star: number, x: number, y: number, isBeast = false) {
     super(scene, x, y);
@@ -415,6 +418,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     const len = Math.hypot(dirX, dirY) || 1;
     const dx = (dirX / len) * 7.5;
     const dy = (dirY / len) * 7.5;
+    this.motionT = windup * 0.7 + 0.09 + 0.17; // 三段补间总时长（秒），锁住待机呼吸
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.add({
       targets: this.sprite,
@@ -458,6 +462,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     // 施法浮空若与受击抖动叠加，x/y 会在两个补间间互相拉扯出"乱颤"。
     // base 只被受击位移使用（sprite 挂在 base 上，两者同源位移）——
     // 清 sprite 即可打断攻击/施法的位置动画，base 位置由本次受击接管。
+    this.motionT = 0.11; // 55ms 往返，锁住待机呼吸
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.killTweensOf(this.base);
     this.scene.tweens.add({
@@ -500,6 +505,7 @@ export class UnitView extends Phaser.GameObjects.Container {
   /** 吟唱结束，恢复常态 */
   endCast(): void {
     this.castT = 0;
+    this.motionT = 0.18; // 归位补间期间同样锁呼吸，否则浮空被 bob 瞬间拉平
     this.scene.tweens.add({
       targets: this.sprite,
       y: 0,
@@ -578,7 +584,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     if (!this.dead && this.moveDur <= 0) {
       this.bobbing += dt;
       const bob = Math.sin(this.bobbing * 2.1 + this.x * 0.02) * 1.1;
-      if (this.castT <= 0) this.sprite.y = bob;
+      if (this.motionT > 0) this.motionT -= dt;
+      if (this.castT <= 0 && this.motionT <= 0) this.sprite.y = bob;
     }
 
     // 白闪衰减

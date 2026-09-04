@@ -755,7 +755,7 @@ export class Match implements AiWorld {
       typeof v === 'number' && Number.isInteger(v) && v >= min && v < n;
     const beastRound = this.isBeastRound();
     const parsed: Pairing[] = [];
-    const seenA = new Set<number>();
+    const covered = new Set<number>();
     for (const q of raw) {
       const p = q as Partial<Pairing> | null;
       if (
@@ -767,18 +767,23 @@ export class Match implements AiWorld {
         typeof p.swap !== 'boolean' ||
         typeof p.beast !== 'boolean' ||
         p.a === p.b ||
-        seenA.has(p.a) ||
+        covered.has(p.a) ||
+        (p.b >= 0 && covered.has(p.b)) ||
         p.beast !== beastRound ||
         (p.beast && (p.b !== -1 || p.ghost !== -1)) ||
         (p.ghost !== -1 && (this.players[p.ghost]?.alive ?? true))
       ) {
         return [];
       }
-      seenA.add(p.a);
+      covered.add(p.a);
+      if (p.b >= 0) covered.add(p.b);
       parsed.push({ a: p.a, b: p.b, ghost: p.ghost, swap: p.swap, beast: p.beast });
     }
+    // 覆盖不变量：每个存活玩家在 a∪b 中恰好出现一次（墨兽轮即每个存活玩家
+    // 各占一行 a）—— 缺人会让该玩家被静默跳过结算，重人会胜败同记
+    if (covered.size !== this.players.filter((p) => p.alive).length) return [];
     for (const p of this.players) {
-      if (p.alive && !seenA.has(p.idx)) return [];
+      if (p.alive && !covered.has(p.idx)) return [];
     }
     return parsed;
   }

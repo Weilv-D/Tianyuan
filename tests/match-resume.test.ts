@@ -46,7 +46,8 @@ describe('结算后恢复', () => {
     expect(restored.rng.state).toBe(rngState);
     expect(restored.players.map((p) => [...p.opponents])).toEqual(opponents);
 
-    // 开战消费恢复出的配对（startBattlePhase 只在 pairings 为空时才重掷）
+    // settleRound 消费恢复出的配对且不再重掷（渲染层 startBattlePhase 只在
+    // 空表时兜底重掷 —— 兜底在渲染层，Match 层空表就是空表）
     restored.settleRound();
     expect(restored.players.map((p) => [...p.opponents])).toEqual(opponents);
   });
@@ -78,5 +79,9 @@ describe('结算后恢复', () => {
     ];
     const restored = Match.fromJSON(saved as unknown as Parameters<typeof Match.fromJSON>[0]);
     expect(restored.pairings).toEqual([]);
+    // 空表的回落语义钉死：settleRound 对空表静默无结算、交手史不动 ——
+    // 重掷兜底在渲染层 startBattlePhase（「空表回落开战时重掷」的确切位置）
+    expect(restored.settleRound()).toEqual([]);
+    expect(restored.players.flatMap((p) => [...p.opponents])).toEqual([]);
   });
 });

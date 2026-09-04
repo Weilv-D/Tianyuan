@@ -160,14 +160,21 @@ describe('装备钩子回归（v1.9 新件）', () => {
   });
 
   it('九尾面：施法后下一次普攻必定暴击并追加法伤', () => {
-    const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }, { items: ['jiuwei'] }), unitInput('jingyu', 1, { c: 7, r: 1 })], 777, 900);
-    const a = byDef(battle, 'pan');
+    // 持件者必须是法强单位：追加法伤 = 300% 法强，物理手（pan 法强 0）拿九尾面
+    // 时该段恒为零、事件不可观测 —— 此前"至少其一"的 OR 断言把这一点掩盖了
+    //（第七轮审查实证）。靶子用 3★：吃住暴击物伤，法伤段才有出手窗口。
+    const battle = mkBattle(
+      [unitInput('wuhuo', 0, { c: 0, r: 6 }, { items: ['jiuwei'] }), unitInput('jingyu', 1, { c: 7, r: 1 }, { star: 3 })],
+      777,
+      900,
+    );
+    const a = byDef(battle, 'wuhuo');
     a.mp = a.maxMp;
     for (let i = 0; i < 180 && !battle.finished; i++) battle.step();
-    // 暴击包：attack 命中附 crit 标记 + item 魔法段（bonusMagic 走 'trait' 源）至少其一可观测
-    const foxCrit = battle.events.some((e) => e.t === 'damage' && e.srcUid === a.uid && e.crit && e.type === 'physical');
-    const bonusMagic = battle.events.some((e) => e.t === 'damage' && e.srcUid === a.uid && e.type === 'magic');
-    expect(foxCrit || bonusMagic).toBe(true);
+    const foxCrit = battle.events.some((e) => e.t === 'damage' && e.srcUid === a.uid && e.crit && e.type === 'physical' && e.source === 'attack');
+    const bonusMagic = battle.events.some((e) => e.t === 'damage' && e.srcUid === a.uid && e.type === 'magic' && e.source === 'item');
+    expect(foxCrit).toBe(true);
+    expect(bonusMagic).toBe(true);
   });
 
   it('狮心盾：承伤转蓝提高 40%（小伤害不受上限截断）', () => {

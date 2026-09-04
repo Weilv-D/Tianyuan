@@ -13,7 +13,14 @@ import type { PlayerState } from '../../game/state';
 export class EliminatedOverlay {
   constructor(private scene: Phaser.Scene) {}
 
+  /** 面板是否在屏（InputController.overlayOpen 的统一让路成员之一） */
+  private open = false;
+  get isOpen(): boolean {
+    return this.open;
+  }
+
   show(p: PlayerState, round: number, onFastForward: () => void, onRestart: () => void): void {
+    this.open = true;
     const panel = this.scene.add.container(W / 2, H / 2).setDepth(700);
     const shade = this.scene.add.graphics();
     shade.fillStyle(SHADE, 0.78);
@@ -80,16 +87,19 @@ export class EliminatedOverlay {
         .setOrigin(0.5, 0)
     );
 
+    const dismiss = (then: () => void) => {
+      this.open = false;
+      panel.destroy();
+      then();
+    };
     panel.add(
       new Button(this.scene, -220, bh / 2 - 64, '快进到终局', () => {
-        panel.destroy();
-        onFastForward();
+        dismiss(onFastForward);
       }, { width: 200, height: 44 })
     );
     panel.add(
       new Button(this.scene, 20, bh / 2 - 64, '再来一局', () => {
-        panel.destroy();
-        onRestart();
+        dismiss(onRestart);
       }, { width: 200, height: 44, variant: 'primary' })
     );
 

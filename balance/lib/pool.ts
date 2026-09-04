@@ -73,6 +73,9 @@ const INIT_TIMEOUT_MS = 30_000;
 
 const CHILD_URL = new URL('./poolChild.ts', import.meta.url);
 
+/** 显式 --workers 的硬上限：与 defaultWorkers 同帽，防手滑 fork 数百进程拖死宿主机 */
+export const WORKERS_CAP = 32;
+
 /** 默认并行度：留 2 个核给系统与父进程聚合。上限 32（更多进程只会抢内存） */
 export function defaultWorkers(): number {
   return Math.max(1, Math.min(32, availableParallelism() - 2));
@@ -153,7 +156,15 @@ export function runPool(
       }
       const { job, idx } = item;
       busy.add(proc);
-      proc.send({ type: 'job', ...job });
+      try {
+        proc.send({ type: 'job', ...job });
+      } catch (e) {
+        // 子进程恰在派发瞬间死亡：转整池受控失败，而不是让 ERR_IPC_CHANNEL_CLOSED
+        // 绕过 fail() 变成未捕获异常
+        busy.delete(proc);
+        fail(new Error(`池子派发失败（子进程已退出）：${e instanceof Error ? e.message : String(e)}`));
+        return;
+      }
       // 每作业超时：子进程若在作业中途挂死（异常退出被 exit 监听捕获 → fail；
       // 死循环 / IPC 静默丢失则靠本定时器兜底），不让命令永久挂起。
       const timer = setTimeout(() => {
@@ -171,7 +182,12 @@ export function runPool(
           fail(new Error(`池子作业失败 (${String(msg.itemKey ?? msg.configIdx)} pair ${String(msg.i)}v${String(msg.j)})：${String(msg.message)}`));
           return;
         }
-        if (msg.type !== 'result') { dispatch(proc); return; }
+        // 协议外消息 = 子进程状态已不可信：当前作业不回填就会留出空洞结果，
+        // 整池受控失败比 resolve 出 undefined 更诚实
+        if (msg.type !== 'result') {
+          fail(new Error(`池子协议外消息：${String(msg.type)}`));
+          return;
+        }
         if (msg.kind === 'item') {
           results[idx] = {
             kind: 'item', itemKey: String(msg.itemKey), i: Number(msg.i), j: Number(msg.j),

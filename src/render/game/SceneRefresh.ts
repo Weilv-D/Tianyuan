@@ -151,6 +151,11 @@ export class SceneRefresh {
     // 溢出分页：先按当前总数钳页（撤销/合成/卖出后页码可能越界），再驱动控件。
     // 无溢出时整套控件隐藏 —— 分页只在"确有看不见的装备"时出现。
     this.scene.itemPage = clampItemPage(this.scene.itemPage, n);
+    // 选中件若已被合成/卖出/撤销消耗（器匣里再无同名 id），就地回落中性态，
+    // 避免残留选中让下一次点棋子走进"装上失败"toast
+    if (this.scene.selectedItem && !p.items.includes(this.scene.selectedItem)) {
+      this.scene.selectedItem = null;
+    }
     this.scene.hud.setPageControls(n > ITEM_BAR_SLOTS ? this.scene.itemPage : null, itemPageCount(n));
     // 全配方后组件拖组件即合成 —— 手势在提示行里带上一句，玩家不必去图鉴查谱
     this.scene.hud.itemHint.setText(n === 0 ? '' : `${n} 件待装 · 拖到棋子装配，拖到组件直接合成`);

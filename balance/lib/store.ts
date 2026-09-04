@@ -147,10 +147,16 @@ export class Store {
   constructor(path: string = DB_PATH) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new (loadSqlite().DatabaseSync)(path);
-    this.db.exec('PRAGMA journal_mode = WAL');
-    this.db.exec('PRAGMA foreign_keys = ON');
-    this.db.exec('PRAGMA busy_timeout = 5000');
-    this.db.exec(DDL);
+    try {
+      this.db.exec('PRAGMA journal_mode = WAL');
+      this.db.exec('PRAGMA foreign_keys = ON');
+      this.db.exec('PRAGMA busy_timeout = 5000');
+      this.db.exec(DDL);
+    } catch (e) {
+      // 初始化半途失败必须关句柄：文件库留着一个打开的坏连接会锁住重建
+      try { this.db.close(); } catch { /* 已断开 */ }
+      throw new Error(`工件库初始化失败（${path}）：${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   beginRun(h: RunHeader): number {

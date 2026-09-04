@@ -1,7 +1,7 @@
 /** 核心命令的公共旗标解析：--seed/--workers/--serial/--comps/--no-save + 位置参数 n。 */
 import { parseArgs, requirePositiveInt } from './args';
 import { loadComps } from './comps';
-import { defaultWorkers } from './pool';
+import { defaultWorkers, WORKERS_CAP } from './pool';
 import { DEFAULT_SEED_BASE } from './seeds';
 import type { CompSpec } from '../../src/game/comp';
 
@@ -24,7 +24,7 @@ export function runCtx(argv: readonly string[], defaultN: number): RunCtx {
     compsSource: source,
     n: requirePositiveInt(rest[0], '每对局数', defaultN),
     seedBase: requirePositiveInt(flags.get('seed'), '种子基', DEFAULT_SEED_BASE),
-    workers: flags.has('serial') ? 0 : requirePositiveInt(flags.get('workers'), '并行度', defaultWorkers()),
+    workers: flags.has('serial') ? 0 : Math.min(requirePositiveInt(flags.get('workers'), '并行度', defaultWorkers()), WORKERS_CAP),
     save: !flags.has('no-save'),
   };
 }

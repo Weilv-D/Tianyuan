@@ -32,7 +32,12 @@ const fail = (msg) => {
 
 // 打包进浏览器的生产依赖必须随包携带许可证正文。package-lock 是依赖集合真源，
 // 不维护会随升级漂移的手写名单。
-const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+const lockPath = join(root, 'package-lock.json');
+if (!existsSync(lockPath)) {
+  console.error('✗ package-lock.json 不存在 —— 依赖许可证审计没有真源可读');
+  process.exit(1);
+}
+const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
 const runtimePackages = [];
 for (const [location, metadata] of Object.entries(lock.packages ?? {})) {
   if (!location.startsWith('node_modules/') || metadata.dev === true) continue;

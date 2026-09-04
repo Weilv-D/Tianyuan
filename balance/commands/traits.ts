@@ -71,12 +71,18 @@ export async function run(argv: string[]): Promise<void> {
   });
 
   rows.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
-  console.log('【明细】Δ = 压制后该阵容胜率 - 基线（负得多 = 羁绊贡献大）');
+  // Δ 是同阵容两次胜率之差，方差两倍于单读数：带 = 2.64 × √(0.5/有效样本)，
+  // 有效样本 = 2×(阵容数-1)×n（与 matrix 的 noiseBand 同族、按差值口径放大 √2）
+  const minLen = Math.min(...ctx.comps.map((c) => Object.keys(c.units).length));
+  const deltaBand = 2.64 * Math.sqrt(0.5 / Math.max(1, 2 * (minLen - 1) * ctx.n));
+  console.log('【明细】Δ = 压制后该阵容胜率 - 基线（负得多 = 羁绊贡献大；≈ = 带内，不构成结论）');
+  console.log(`  （±2.64σ 噪声带约 ±${(deltaBand * 100).toFixed(1)}p）`);
   console.log('  ' + '羁绊'.padEnd(6) + '档  阵容'.padEnd(8) + '基线    压制    Δ');
   for (const r of rows) {
+    const mark = Math.abs(r.delta) <= deltaBand ? ' ≈' : '';
     console.log(
       `  ${r.traitName.padEnd(6)}${String(r.tier).padStart(2)}  ${shortName(ctx.comps, r.comp).padEnd(8)}` +
-        `${(r.baseRate * 100).toFixed(1).padStart(5)}%  ${(r.suppressed * 100).toFixed(1).padStart(5)}%  ${r.delta >= 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}p`,
+        `${(r.baseRate * 100).toFixed(1).padStart(5)}%  ${(r.suppressed * 100).toFixed(1).padStart(5)}%  ${r.delta >= 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}p${mark}`,
     );
   }
 
@@ -157,6 +163,8 @@ async function runSelective(
           i: r.i, j: r.j, n: r.n, topWins: r.topWins, bottomWins: r.bottomWins, draws: r.draws,
           totalTicks: r.totalTicks, timeouts: r.timeouts, top: r.top, bottom: r.bottom,
         }));
+      // assemble 收到的是部分矩阵（只跑该阵容参与的配对）：未观测格以 0 初值
+      // 聚合，其 winRate/spread/meanBottom 不可读 —— 消费方只准取 winRate[m.comp]
       outcomes[m.configIdx] = assemble(configs[m.configIdx].label, configs[m.configIdx].overrides, comps, rows);
     }
     return outcomes;

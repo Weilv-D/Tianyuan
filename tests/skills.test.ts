@@ -69,31 +69,31 @@ describe('技能文案与参数同源', () => {
   it('木机连弩的攻速叠层封顶：生效层数不越过 params.maxStacks（文案承诺兑现）', () => {
     // 文案"至多 8 层"此前无实现（aspdUp 在 STACKABLE_KINDS 内按条无限叠加），
     // 长战斗可把攻速叠到 8×6%=48% 之上。maxStacks 封顶后，同时生效层数 ≤8。
-    const battle = mkBattleForSkill('muji');
-    const u = battle.units.find((x) => x.entry.id === 'muji')!;
-    const cap = battle.units.find((x) => x.entry.id === 'muji')!.entry.skillSpec.params.maxStacks!;
-    const layers = u.statuses.filter((s) => s.kind === 'aspdUp').length;
+    // 全程步进取峰值：战斗末段叠层可能已到期、单位可能已阵亡 —— 事后读
+    // statuses 会拿到 0，让"上限断言"以 0 ≤ 8 空洞通过（第七轮审查实证）。
+    const raw = new Battle(
+      {
+        seed: 20260903,
+        units: [
+          { uid: 101, defId: 'muji', team: 0, star: 2, cell: { c: 2, r: 3 } },
+          { uid: 201, defId: 'pan', team: 1, star: 1, cell: { c: 3, r: 7 } },
+          { uid: 202, defId: 'muyuan', team: 1, star: 1, cell: { c: 4, r: 7 } },
+        ],
+        traits: { 0: [], 1: [] },
+        maxTicks: 30 * 30,
+      },
+      null,
+      true,
+    );
+    const u = raw.units.find((x) => x.entry.id === 'muji')!;
+    const cap = u.entry.skillSpec.params.maxStacks!;
+    let maxLayers = 0;
+    for (let i = 0; i < 30 * 30 && !raw.finished; i++) {
+      raw.step();
+      maxLayers = Math.max(maxLayers, u.statuses.filter((s) => s.kind === 'aspdUp').length);
+    }
     expect(cap).toBe(8);
-    expect(layers).toBeLessThanOrEqual(cap);
+    expect(maxLayers).toBeGreaterThan(0);
+    expect(maxLayers).toBeLessThanOrEqual(cap);
   });
 });
-
-/** 单棋子技能施放的最小战斗（skills.test 内用）：跑完后返回 Battle，供读单位状态 */
-function mkBattleForSkill(defId: string, star: 1 | 2 | 3 = 2, ticks = 30 * 30): Battle {
-  const battle = new Battle(
-    {
-      seed: 20260903,
-      units: [
-        { uid: 101, defId, team: 0, star, cell: { c: 2, r: 3 } },
-        { uid: 201, defId: 'pan', team: 1, star: 1, cell: { c: 3, r: 7 } },
-        { uid: 202, defId: 'muyuan', team: 1, star: 1, cell: { c: 4, r: 7 } },
-      ],
-      traits: { 0: [], 1: [] },
-      maxTicks: ticks,
-    },
-    null,
-    true,
-  );
-  battle.run();
-  return battle;
-}

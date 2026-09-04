@@ -20,6 +20,7 @@ describe('奇遇回合', () => {
     expect(first.adventureOffer).not.toBeNull();
     expect(replay.adventureOffer).toEqual(first.adventureOffer);
 
+    const itemsBefore = first.human.items.length;
     const goldBefore = first.human.gold;
     const benchBefore = first.human.bench.filter(Boolean).length;
     const boardBefore = first.human.board.filter(Boolean).length;
@@ -34,7 +35,7 @@ describe('奇遇回合', () => {
       first.human.level > levelBefore ||
       first.human.bench.filter(Boolean).length > benchBefore ||
       first.human.board.filter(Boolean).length > boardBefore ||
-      first.human.items.length > 0;
+      first.human.items.length > itemsBefore;
     expect(gained).toBe(true);
     // 二次代选不可重复领取
     expect(first.resolveHumanAdventure()).toBe(false);

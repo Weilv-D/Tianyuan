@@ -12,10 +12,11 @@
  * 用法：balance items [n] [--ids=id1,id2] [--workers W] [--serial] [--no-save]
  *   --ids 定向复测：只测指定件（可加大 n），跳过合成/曲线段
  */
+import { noiseBand } from '../lib/matrix';
 import { ITEMS } from '../../src/data/items';
 import { PRESET_COMPS } from '../../src/game/comp';
 import { pairedItemsDelta } from '../lib/engine';
-import { runPool, defaultWorkers } from '../lib/pool';
+import { runPool, defaultWorkers, WORKERS_CAP } from '../lib/pool';
 import { requirePositiveInt } from '../lib/args';
 import { Store } from '../lib/store';
 
@@ -28,7 +29,7 @@ export async function run(argv: string[]): Promise<void> {
   const posN = argv.find((a) => !a.startsWith('--') && /^\d+$/.test(a));
   const n = requirePositiveInt(posN, '每格种子数', 16);
   const workersIdx = argv.indexOf('--workers');
-  const workers = argv.includes('--serial') ? 0 : requirePositiveInt(workersIdx >= 0 ? argv[workersIdx + 1] : undefined, '并行度', defaultWorkers());
+  const workers = argv.includes('--serial') ? 0 : Math.min(requirePositiveInt(workersIdx >= 0 ? argv[workersIdx + 1] : undefined, '并行度', defaultWorkers()), WORKERS_CAP);
   const save = !argv.includes('--no-save');
 
   const COMPS = PRESET_COMPS.length;
@@ -36,7 +37,7 @@ export async function run(argv: string[]): Promise<void> {
   const GAMES_PER_ITEM = PAIRS * n * 4;
 
   console.log('═════════ 百战天元 · 装备强度专项 ═════════\n');
-  console.log(`配对设计：${COMPS} 套预设 × ${COMPS - 1} 个对手 × 双向 × ${n} 种子 = ${GAMES_PER_ITEM} 局/件${ONLY ? `（定向复测：${ONLY.join('、')}，跳过合成/曲线段）` : ''}  ${workers > 0 ? `${workers} 进程` : '串行'}\n`);
+  console.log(`配对设计：${COMPS} 套预设 × ${COMPS - 1} 个对手（有序配对）× ${n} 种子 × 4（带装/裸装 × 正位/镜像）= ${GAMES_PER_ITEM} 局/件${ONLY ? `（定向复测：${ONLY.join('、')}，跳过合成/曲线段）` : ''}  ${workers > 0 ? `${workers} 进程` : '串行'}\n`);
 
   const t0 = Date.now();
 
@@ -91,6 +92,9 @@ export async function run(argv: string[]): Promise<void> {
     const v = delta.get(key);
     return v && v.cnt > 0 ? v.sum / v.cnt : 0;
   };
+  // 噪声带（与 matrix 同 z 口径）：每键有效样本 = 有序配对数 × n（每作业 n 局
+  // 配对差），带内读数不构成强弱结论 —— 此前全程点估计，小样本 Δ 无法与噪声区分
+  const bandOf = (key: string): number => noiseBand(Math.max(1, delta.get(key)?.cnt ?? 1) * n, 2, 2.64);
 
   // ── 1. 单件边际价值 ────────────────────────────────────
   console.log('【单件边际价值】同一阵容装 1 件 vs 不装，胜率增量\n');
@@ -108,8 +112,10 @@ export async function run(argv: string[]): Promise<void> {
   for (const r of rows) {
     const cells = Math.min(26, Math.abs(Math.round(r.d * 300)));
     const bar = r.d >= 0 ? ' '.repeat(11) + '▇'.repeat(cells) : ' '.repeat(Math.max(0, 11 - cells)) + '▇'.repeat(cells);
-    console.log(`  ${r.name.padEnd(5)} ${r.tier}  ${pct(r.d).padStart(7)}  ${bar}`);
+    const inBand = Math.abs(r.d) <= bandOf(r.id) ? '≈' : '  ';
+    console.log(`  ${r.name.padEnd(5)} ${r.tier}  ${pct(r.d).padStart(7)} ${inBand} ${bar}`);
   }
+  console.log(`  （≈ = 带内读数，±2.64σ 噪声带约 ±${(bandOf(rows[0]?.id ?? ITEMS[0].id) * 100).toFixed(1)}p，带内不构成强弱结论）`);
 
   if (ONLY) {
     const dt = (Date.now() - t0) / 1000;
@@ -132,9 +138,12 @@ export async function run(argv: string[]): Promise<void> {
 
   const warn: string[] = [];
   for (const r of comb) {
+    const band = bandOf(r.id);
+    // 带内读数只标注不定罪：±2.64σ 内的偏离无法与抽样噪声区分
     if (r.d > avgComb * 1.9 && r.d > 0.05) warn.push(`${r.name} 过强 ${pct(r.d)}`);
-    if (r.d < avgComb * 0.45) warn.push(`${r.name} 过弱 ${pct(r.d)}`);
-    if (r.d < 0) warn.push(`${r.name} 负收益 ${pct(r.d)}`);
+    if (r.d < avgComb * 0.45 && r.d < -band) warn.push(`${r.name} 过弱 ${pct(r.d)}`);
+    else if (r.d < avgComb * 0.45) console.log(`  ≈ ${r.name} 低于均值 ${pct(r.d)}（噪声带内，不下结论）`);
+    if (r.d < 0 && r.d < -band) warn.push(`${r.name} 负收益 ${pct(r.d)}`);
   }
 
   // ── 2. 合成正收益（复用检验 1 的结果，零额外对局）──────

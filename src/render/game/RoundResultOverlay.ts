@@ -15,10 +15,17 @@ import type { PlayerState } from '../../game/state';
 export class RoundResultOverlay {
   constructor(private scene: Phaser.Scene) {}
 
+  /** 面板是否在屏（InputController.overlayOpen 的统一让路成员之一） */
+  private open = false;
+  get isOpen(): boolean {
+    return this.open;
+  }
+
   show(p: PlayerState, next: () => void): void {
     const won = p.lastOutcome === 'win';
     const isDraw = p.lastOutcome === 'draw';
     const isBye = p.lastOutcome === 'bye';
+    this.open = true;
     const panel = this.scene.add.container(W / 2, H / 2).setDepth(600);
     const shade = this.scene.add.graphics();
     shade.fillStyle(SHADE, 0.55);
@@ -115,6 +122,7 @@ export class RoundResultOverlay {
     const proceed = () => {
       if (closed) return;
       closed = true;
+      this.open = false;
       panel.destroy();
       next();
     };
@@ -131,6 +139,7 @@ export class RoundResultOverlay {
     });
     panel.once('destroy', () => {
       closed = true;
+      this.open = false;
       this.scene.input.keyboard?.off('keydown', onKey);
     });
 

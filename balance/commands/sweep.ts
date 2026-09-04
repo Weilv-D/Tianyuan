@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { noiseBand, runConfigs, type MatrixConfig } from '../lib/matrix';
 import { Patcher, readCurrent, type Overrides } from '../lib/patch';
-import { defaultWorkers } from '../lib/pool';
+import { defaultWorkers, WORKERS_CAP } from '../lib/pool';
 import { edgeStats, printDeltaReport, printSlopes, shortName } from '../lib/report';
 import { DEFAULT_SEED_BASE } from '../lib/seeds';
 import { loadComps } from '../lib/comps';
@@ -48,7 +48,7 @@ export async function run(argv: string[]): Promise<void> {
   for (const w of warnings) console.log(`  ⚠ ${w}`);
   const n = requirePositiveInt(flags.get('n'), '每对局数', 80);
   const seedBase = requirePositiveInt(flags.get('seed'), '种子基', DEFAULT_SEED_BASE);
-  const workers = flags.has('serial') ? 0 : requirePositiveInt(flags.get('workers'), '并行度', defaultWorkers());
+  const workers = flags.has('serial') ? 0 : Math.min(requirePositiveInt(flags.get('workers'), '并行度', defaultWorkers()), WORKERS_CAP);
   const setArg = flags.get('set');
   const compareArg = flags.get('compare');
 

@@ -19,8 +19,12 @@
  */
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync, renameSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const OUT = 'src/render/art/item/ai';
+// 输出锚到仓库根：脚本从任意 cwd 运行都落同一位（与 slice-sheet.mjs 同口径）
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const OUT = join(root, 'src/render/art/item/ai');
 const T_BODY = 45;    // 组件阈值（低：部件保持完整）
 const T_GLOW = 12;    // 晕光阈值
 const MIN_PART = 150; // 组件最小面积（更小的是碎屑，交给 BFS 归属）
