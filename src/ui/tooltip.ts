@@ -36,6 +36,12 @@ export class ItemTooltip {
   }
 
   show(itemId: string, px: number, py: number): void {
+    // 名单外 id：不显示上一件的旧卡（rebuild 对未知 id 早退后若照常 setVisible，
+    // 悬停会弹出一个内容与指针所指完全无关的提示卡）
+    if (!ITEM_BY_ID[itemId]) {
+      this.hide();
+      return;
+    }
     if (!this.card || this.itemId !== itemId) this.rebuild(itemId);
     this.card?.setVisible(true);
     this.move(px, py);

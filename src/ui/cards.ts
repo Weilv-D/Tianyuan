@@ -10,6 +10,7 @@ import Phaser from 'phaser';
 import { CHAMPION_BY_ID, formatSkillDesc } from '../data/champions';
 import { ITEM_BY_ID } from '../data/items';
 import { TRAIT_BY_ID } from '../data/traits';
+import { STAR_HP_SCALE, STAR_POWER_SCALE } from '../core/config';
 import { CINNABAR, GILT, INK, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../render/view/palette';
 import { motion } from '../render/view/motion';
 import { SIL_ORIGIN_Y, silContentScale, silhouetteKey } from '../render/board/silhouetteFactory';
@@ -673,9 +674,10 @@ export class UnitDetailCard {
     this.costT.setText(`${def.cost} 费`);
 
     const s = def.base;
+    // 星级换算与结算/估值同一真源（core/config）：内联字面量会在调档时与实战脱钩
     const rows = [
-      `生命 ${Math.round(s.hp * (u.star === 1 ? 1 : u.star === 2 ? 1.8 : 3.24))}`,
-      `攻击 ${Math.round(s.atk * (u.star === 1 ? 1 : u.star === 2 ? 1.45 : 2.1))}　法强 ${Math.round(s.sp * (u.star === 1 ? 1 : u.star === 2 ? 1.45 : 2.1))}`,
+      `生命 ${Math.round(s.hp * STAR_HP_SCALE[u.star - 1])}`,
+      `攻击 ${Math.round(s.atk * STAR_POWER_SCALE[u.star - 1])}　法强 ${Math.round(s.sp * STAR_POWER_SCALE[u.star - 1])}`,
       `护甲 ${s.armor}　魔抗 ${s.mr}`,
       `攻速 ${s.aspd.toFixed(2)}　射程 ${s.range}　法力 ${s.maxMp}`,
     ];

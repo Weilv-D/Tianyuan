@@ -1,5 +1,4 @@
 import { defineConfig } from 'vitest/config';
-import { fileURLToPath, URL } from 'node:url';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
 /**
@@ -15,11 +14,6 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'singlefile';
   return {
     base: './',
-    resolve: {
-      alias: {
-        '@': fileURLToPath(new URL('./src', import.meta.url)),
-      },
-    },
     server: {
       port: 5199,
       host: true,

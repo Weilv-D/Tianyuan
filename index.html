@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#08111b">
+<script>/* 隐藏系统光标由 JS 门控：禁用脚本时（noscript 提示页）指针必须可见 */
+document.documentElement.classList.add('js');</script>
 <link rel="icon" href="data:,">
 <title>百战天元 · 夜宴</title>
 <style>
@@ -24,7 +26,7 @@
 ::selection{background:var(--gold);color:var(--n1)}
 html,body{height:100%;overflow:hidden;background:var(--n1);color:var(--tx);
   font-family:var(--song);-webkit-font-smoothing:antialiased}
-body{cursor:none}
+.js body{cursor:none}
 @media(pointer:coarse){body{cursor:auto}}
 
 #bg{position:fixed;inset:0;width:100%;height:100%;z-index:0}
@@ -36,7 +38,7 @@ body{cursor:none}
   transition:width .4s var(--ez-in),height .4s var(--ez-in),border-color .4s}
 body.cur-hover #cur-ring{width:46px;height:46px;border-color:var(--gold)}
 @media(pointer:coarse){#cur-dot,#cur-ring{display:none}}
-#app canvas{cursor:none!important}
+.js #app canvas{cursor:none!important}
 
 /* ═══════════ 加载序章 ═══════════ */
 #boot{position:fixed;inset:0;z-index:5000;background:var(--n1);

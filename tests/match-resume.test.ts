@@ -84,4 +84,60 @@ describe('结算后恢复', () => {
     expect(restored.settleRound()).toEqual([]);
     expect(restored.players.flatMap((p) => [...p.opponents])).toEqual([]);
   });
+
+  it('墨影位指向空快照的配对整表弃用（与 pickGhost 的可用判据同口径）', () => {
+    // 指向"已淘汰但快照为空"玩家的墨影位会以空阵开战 = 对手直胜；
+    // 生成侧（pickGhost）与清洗侧都必须把「有墨影」建立在非空快照上
+    const match = new Match(20260904);
+    match.beginRound();
+    while (match.isBeastRound() && !match.isOver()) match.beginRound(); // 走到 PvP 轮
+    const saved = match.toJSON() as unknown as Record<string, unknown>;
+    const players = saved.players as { alive: boolean }[];
+    players[7].alive = false;
+    saved.ghosts = [[7, new Array(32).fill(null)]]; // 快照存在但空
+    saved.pairings = [
+      { a: 0, b: 1, ghost: -1, swap: false, beast: false },
+      { a: 2, b: 3, ghost: -1, swap: false, beast: false },
+      { a: 4, b: 5, ghost: -1, swap: false, beast: false },
+      { a: 6, b: -1, ghost: 7, swap: false, beast: false }, // 落单者对空快照墨影
+    ];
+    const restored = Match.fromJSON(saved as unknown as Parameters<typeof Match.fromJSON>[0]);
+    expect(restored.pairings).toEqual([]); // 整表弃用回落重掷，不让脏表改写结算
+  });
+
+  it('墨影快照与实况同 iid 不被去重误杀（存活玩家每回合都写阵容快照，快照=实况克隆）', () => {
+    const match = new Match(20260904);
+    match.beginRound();
+    const saved = match.toJSON() as unknown as Record<string, unknown>;
+    const players = saved.players as { board: (ReturnType<typeof createUnit> | null)[] }[];
+    const slot = players[0].board.findIndex((c) => c === null);
+    const unit = createUnit('pan');
+    unit.iid = 424242;
+    players[0].board[slot] = unit;
+    // 墨影棋盘 = 实况棋盘的克隆（snapshot 的真实形态）：iid 合法同源
+    saved.ghosts = [[0, players[0].board.map((c) => (c ? { ...c, items: [...c.items] } : null))]];
+    const restored = Match.fromJSON(saved as unknown as Parameters<typeof Match.fromJSON>[0]);
+    // ghosts 是私有字段：测试经类型断言只读访问，不为此放宽封装
+    const ghosts = (restored as unknown as { ghosts: Map<number, (ReturnType<typeof createUnit> | null)[]> }).ghosts;
+    expect(ghosts.get(0)![slot]).not.toBeNull();
+    expect(restored.players[0].board[slot]).not.toBeNull();
+  });
+
+  it('恩赐清洗：当轮有效 offer 原样往返；空 options 与轮次脱钩的 offer 置空', () => {
+    const match = new Match(20260905);
+    match.beginRound();
+    while (!match.isAdventureRound() && !match.isOver()) match.beginRound(); // 奇遇轮 4
+    expect(match.adventureOffer).not.toBeNull();
+    const json = match.toJSON() as unknown as Record<string, unknown>;
+
+    const ok = Match.fromJSON(json as unknown as Parameters<typeof Match.fromJSON>[0]);
+    expect(ok.adventureOffer).toEqual(match.adventureOffer);
+
+    (json.adventureOffer as { options: unknown[] }).options = []; // 空表会让 AI 即选取出 undefined
+    expect(Match.fromJSON(json as unknown as Parameters<typeof Match.fromJSON>[0]).adventureOffer).toBeNull();
+
+    (json.adventureOffer as { options: unknown[]; round: number }).options = match.adventureOffer!.options;
+    (json.adventureOffer as { round: number }).round = 99; // 轮次脱钩 = 冒领非当轮档位
+    expect(Match.fromJSON(json as unknown as Parameters<typeof Match.fromJSON>[0]).adventureOffer).toBeNull();
+  });
 });

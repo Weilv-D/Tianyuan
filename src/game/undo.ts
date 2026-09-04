@@ -40,6 +40,12 @@ export interface PlayerSnapshot {
 const cloneSlots = (slots: readonly (UnitInstance | null)[]): (UnitInstance | null)[] =>
   slots.map((u) => (u ? { ...u, items: [...u.items] } : null));
 
+/** 恩赐浅克隆：options 数组拷贝一份，选项对象本身是发放时新建的只读规格
+ *  （optionFor 产物，无人原地改写）。不克隆的话快照与 Match 持同一引用，
+ *  "回写时再拷贝、同一快照可安全复用"的承诺对它是空的。 */
+const cloneOffer = (offer: AdventureOffer | null): AdventureOffer | null =>
+  offer ? { ...offer, options: [...offer.options] } : null;
+
 /** 在动作发生前调用：把玩家可变状态连同卡池一起定格 */
 export function snapshotPlayer(p: PlayerState, pool: CardPool, adventureOffer: AdventureOffer | null = null): PlayerSnapshot {
   return {
@@ -52,7 +58,7 @@ export function snapshotPlayer(p: PlayerState, pool: CardPool, adventureOffer: A
     shopLocked: p.shopLocked,
     items: [...p.items],
     pool: pool.snapshot(),
-    adventureOffer,
+    adventureOffer: cloneOffer(adventureOffer),
   };
 }
 
@@ -75,5 +81,5 @@ export function restorePlayer(
   p.shopLocked = s.shopLocked;
   p.items = [...s.items];
   pool.restore(s.pool);
-  offer.adventureOffer = s.adventureOffer;
+  offer.adventureOffer = cloneOffer(s.adventureOffer);
 }

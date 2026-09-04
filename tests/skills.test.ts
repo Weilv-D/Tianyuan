@@ -66,8 +66,10 @@ describe('技能文案与参数同源', () => {
     expect(fmt('mozhai')).toContain('8 秒');
     expect(fmt('kutong')).toContain('50%');
     expect(fmt('taozhu')).toContain('40%');
-    expect(fmt('gouchen')).toContain('30%');
-    expect(fmt('yinglong')).toContain('35%');
+    // 魔抗击碎（mrShred）是平值口径（effMr 平减），文案走 {statusFlat} 而非百分比 ——
+    // 此前钉过 '30%'/'35%'，那钉住的正是文案与结算脱节的旧账
+    expect(fmt('gouchen')).toContain('魔抗 -30');
+    expect(fmt('yinglong')).toContain('魔抗 -35');
     expect(fmt('muji')).toContain('至多 8 层');
     expect(fmt('qingqiu')).toContain('40% 攻速');
     expect(fmt('qingqiu')).toContain('20%');

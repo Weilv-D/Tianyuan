@@ -8,7 +8,7 @@
  */
 
 import { POOL_COUNTS, SHOP_ODDS, SHOP_SLOTS } from '../core/config';
-import { CHAMPIONS, CHAMPION_IDS_BY_COST } from '../data/champions';
+import { CHAMPIONS, CHAMPION_BY_ID, CHAMPION_IDS_BY_COST } from '../data/champions';
 import type { Rng } from '../core/rng';
 
 export class CardPool {
@@ -34,8 +34,11 @@ export class CardPool {
   }
 
   /** 归还一张（卖棋 / 淘汰时回池）。不设上钳：调用方（买卖/淘汰/回滚）与 take
-   *  严格对称，钳制反而会把守恒破坏静默成吞牌 —— 溢出应当在调用侧暴露。 */
+   *  严格对称，钳制反而会把守恒破坏静默成吞牌 —— 溢出应当在调用侧暴露。
+   *  名单外 id 直接拒收：give 会凭空造出池内从未存在过的 phantom 键，
+   *  totalRemaining 与按费用统计从此虚高（纵深防御，正常生产者只产已知 id）。 */
   give(defId: string): void {
+    if (!CHAMPION_BY_ID[defId]) return;
     this.counts.set(defId, (this.counts.get(defId) ?? 0) + 1);
   }
 

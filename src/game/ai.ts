@@ -361,15 +361,25 @@ export function aiTakeTurn(w: AiWorld, p: PlayerState): void {
       if (want < threshold) continue;
       // 缺货的牌买入必败（Match.buy 在卡池处整体回滚），不值得为它卖任何东西
       if (w.pool.remaining(id) <= 0) continue;
-      // 备战席满了：好牌才值得为之腾位置
-      if (benchCount(p) >= BENCH_SLOTS && !makeRoomFor(w, p, want)) break;
+      // 备战席满了：好牌才值得为之腾位置。腾不动只跳过这一格 —— 后面格子
+      // 可能站着更想买的牌（makeRoomFor 的判定随 want 水涨船高），break 会把
+      // 本轮商店剩余的合成关键牌一并放弃
+      if (benchCount(p) >= BENCH_SLOTS && !makeRoomFor(w, p, want)) continue;
       if (w.buy(p, s).ok) bought = true;
     }
 
     const canAffordRoll = p.gold - REROLL_COST >= floor;
     // 商店里已经没想要的了，才值得刷新
     const shopIsDry = !p.shop.some((id) => id && scoreCard(p, id, w.round, prof) >= 26 - urgency * 14);
-    const wantMore = (shopIsDry || !bought) && rng.next() < 0.35 + aggression * 0.6;
+    // 锁店候选在场时不刷新：买不起但下回合买得起的牌，刷新一次就永久洗掉了 ——
+    // 与回合末的锁店判定同一口径（掷骰在先，保持随机流消费顺序不变）
+    const lockWorthy = p.shop.some((id) => {
+      if (!id) return false;
+      const def = CHAMPION_BY_ID[id];
+      if (!def || def.cost <= p.gold || def.cost > p.gold + projectedNextIncome(p)) return false;
+      return scoreCard(p, id, w.round, prof) >= 42;
+    });
+    const wantMore = (shopIsDry || !bought) && rng.next() < 0.35 + aggression * 0.6 && !lockWorthy;
     if (rollsLeft > 0 && canAffordRoll && wantMore) {
       if (!w.reroll(p)) break;
       rollsLeft--;

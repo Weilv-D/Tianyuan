@@ -28,6 +28,10 @@ const CONTENT_H = 68;
 /** 宽体角色的宽度收口 */
 const CONTENT_W = 55;
 
+/** 3★ 冠弧的两段角域：crownArcSpan 是纯常量函数，预计算一次 —— 3★ 存续期间
+ *  每帧重画冠弧，现场构造数组与返回对象是渲染层唯一的常量分配热路径 */
+const CROWN_ARCS = [crownArcSpan(0), crownArcSpan(1)] as const;
+
 /**
  * 当前"我方"是哪一队。
  *
@@ -248,7 +252,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.moveT = 0;
     this.moveDur = Math.max(0.016, dur);
     // 突进：拉出一道残影（缩放 = 内容缩放 × 星级容器缩放，漏乘星级会让 3★ 残影偏小）。
-    // 补间目标从残影自身初值起算 —— 写容器 scale 会漏乘内容缩放，残影几乎不胀
+    // 补间目标从残影自身初值起算 —— 旧写法以容器缩放为目标，漏乘内容缩放：
+    // 大体型（内容缩放 <1）多胀、小体型反而收缩
     const ghost = this.scene.add
       .image(this.x, this.y, silhouetteKey(this.defId, this.isBeast ? BEAST_TEAM : this.side, this.star))
       .setOrigin(0.5, SIL_ORIGIN_Y)
@@ -256,6 +261,9 @@ export class UnitView extends Phaser.GameObjects.Container {
       .setTint(TEAM_COLOR[this.side] ?? SPIRIT.base)
       .setAlpha(0.5)
       .setBlendMode(Phaser.BlendModes.ADD);
+    // this.x/y 是棋盘层局部坐标：残影必须与视图同层（parentContainer 即
+    // boardLayer），挂场景根会被当世界坐标解释，残影整体错位出盘且缩放失配
+    if (this.parentContainer) this.parentContainer.add(ghost);
     this.scene.tweens.add({
       targets: ghost,
       alpha: 0,
@@ -263,7 +271,9 @@ export class UnitView extends Phaser.GameObjects.Container {
       scaleY: ghost.scaleY * 1.25,
       duration: 260,
       onComplete: () => {
-        if (ghost.scene) ghost.destroy();
+        // 销毁语义以 active 为准（EffectsLayer/LegendaryFx 同口径）：清场后
+        // scene 引用不保证为空，以它判活会对已销毁对象二次 destroy
+        if (ghost.active) ghost.destroy();
       },
     });
     // 残影本体归还调用方登记（BattleScene 经 trackStray 统一清理）：
@@ -386,8 +396,7 @@ export class UnitView extends Phaser.GameObjects.Container {
 
     // 断环：上半两段弧，段间与冠顶留白，像界格钉出的冠
     g.lineStyle(1.8 * k, GILT.base, 0.62);
-    for (const kk of [0, 1] as const) {
-      const { start, end } = crownArcSpan(kk);
+    for (const { start, end } of CROWN_ARCS) {
       g.beginPath();
       g.arc(0, cy, r, start, end);
       g.strokePath();
@@ -434,6 +443,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     const dy = (dirY / len) * 7.5;
     this.motionT = windup * 0.7 + 0.09 + 0.17; // 三段补间总时长（秒），锁住待机呼吸
     this.scene.tweens.killTweensOf(this.sprite);
+    // 被打断的若是吟唱（浮空 + 1.06 放大），本补间只接管 x/y —— 缩放必须先
+    // 复位基准，否则半程放大值会冻结在棋子身上直到下一次 endCast
+    this.sprite.setScale(this.baseSpriteScale.x, this.baseSpriteScale.y);
     this.scene.tweens.add({
       targets: this.sprite,
       x: -dx * 0.4,
@@ -477,6 +489,21 @@ export class UnitView extends Phaser.GameObjects.Container {
     // base 只被受击位移使用（sprite 挂在 base 上，两者同源位移）——
     // 清 sprite 即可打断攻击/施法的位置动画，base 位置由本次受击接管。
     this.motionT = 0.11; // 55ms 往返，锁住待机呼吸
+    if (this.castT > 0) {
+      // 施法中受击：只抖 base，不夺 sprite 的浮空/缩放权 —— 杀掉吟唱补间的话
+      // 浮空骤失、半程放大冻结到 endCast 才归位；白闪照常，表现差异不可感
+      this.scene.tweens.killTweensOf(this.base);
+      this.scene.tweens.add({
+        targets: this.base,
+        x: kx,
+        y: ky,
+        duration: 55,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onComplete: () => this.base.setPosition(0, 0),
+      });
+      return;
+    }
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.killTweensOf(this.base);
     this.scene.tweens.add({
@@ -503,6 +530,9 @@ export class UnitView extends Phaser.GameObjects.Container {
     // 上一次的 1.06 累乘进来，否则施法次数越多棋子越大
     this.scene.tweens.killTweensOf(this.sprite);
     this.sprite.setScale(this.baseSpriteScale.x, this.baseSpriteScale.y);
+    // 上一段位移补间（攻击前摇/受击抖动）可能被 kill 在半程：x 无人接管会
+    // 永久残留（吟唱补间只驱动 y/缩放），先归零再浮空
+    this.sprite.x = 0;
     this.scene.tweens.add({
       targets: this.sprite,
       y: -8,
@@ -511,6 +541,8 @@ export class UnitView extends Phaser.GameObjects.Container {
       duration: windup * 1000,
       ease: 'Sine.easeInOut',
     });
+    // 开场淡入与上次吟唱的旋开可能仍在途：同目标双补间会竞争终值，先杀旧的
+    this.scene.tweens.killTweensOf(this.aura);
     this.scene.tweens.add({
       targets: this.aura,
       alpha: 0.75,
@@ -569,8 +601,9 @@ export class UnitView extends Phaser.GameObjects.Container {
       targets: this.sprite,
       y: 14,
       angle: this.friendly ? -16 : 16,
-      scaleX: this.sprite.scaleX * 0.82,
-      scaleY: this.sprite.scaleY * 0.86,
+      // 从构造期基准起算：吟唱中阵亡若从当前值累乘，1.06 放大会混进尸体姿态
+      scaleX: this.baseSpriteScale.x * 0.82,
+      scaleY: this.baseSpriteScale.y * 0.86,
       duration: 420,
       ease: 'Quad.easeIn',
       onComplete: () => onDone?.(),

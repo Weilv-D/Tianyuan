@@ -332,6 +332,9 @@ describe('三星五费 · 天命（v1.9 大加强定档）', () => {
     const u = byDef(battle, 'haotian');
     const base = { hp: 1180, atk: 190 };
     // 3★ 常规倍率 × 天命层：HP 3.24×2.0 = 6.48；攻 2.1×2.0 = 4.2
+    // 定值金锁：期望不镜像被测常量 —— 天命乘区改动必须作为定档变更过测试
+    expect(LEGEND_T3.hpMult).toBe(2.0);
+    expect(LEGEND_T3.powerMult).toBe(2.0);
     expect(u.maxHp).toBe(Math.round(base.hp * 3.24 * LEGEND_T3.hpMult));
     expect(u.atk).toBe(Math.round(base.atk * 2.1 * LEGEND_T3.powerMult));
     expect(u.shield).toBe(Math.round(u.maxHp * 0.35));

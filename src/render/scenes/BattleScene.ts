@@ -94,6 +94,8 @@ export class BattleScene extends Phaser.Scene {
   private hoverCard: Phaser.GameObjects.Container | null = null;
 
   private projectiles: Projectile[] = [];
+  /** 行 0 的层内 y（深度公式的基准线）：棋盘几何常量，create 期算一次 */
+  private rowBaseY = 0;
   private lastBars = new Map<number, number>();
   private lastShake = 0;
   private creatingBattle = false;
@@ -168,6 +170,7 @@ export class BattleScene extends Phaser.Scene {
     this.boardLayer = this.add.container(BATTLE_BOARD_LX, BATTLE_BOARD_LY).setScale(BATTLE_BOARD_SCALE);
     this.board = new BoardView(this, 0, 0);
     this.boardLayer.add(this.board);
+    this.rowBaseY = this.cellWorld(0, 0).y;
     this.fx = new EffectsLayer(this, this.boardLayer);
     this.dmgText = new DamageTextLayer(this, this.boardLayer);
 
@@ -177,6 +180,9 @@ export class BattleScene extends Phaser.Scene {
 
     // 交互：悬停查看棋子详情（p.x/y 是画布像素，先换算到 1920×1080 世界系 —— A1）
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      // 结算态下场景级 pointermove 不在 shade 的拦截链上（它只拦 GameObject
+      // 事件），必须自己早退 —— 否则每帧都在为看不见的悬停卡销毁重建十余个文本
+      if (this.resultPanel) return;
       const { x, y } = screenToWorld(p.x, p.y, this.cameras.main.zoom);
       // 逆变换到棋盘层局部系（层被放大 BOARD_SCALE，指针世界坐标要先平移再除缩放）
       const local = battleWorldToLayer(x, y);
@@ -204,9 +210,11 @@ export class BattleScene extends Phaser.Scene {
         this.togglePause();
       }
     });
-    this.input.keyboard?.on('keydown-ONE', () => this.setSpeed(1));
-    this.input.keyboard?.on('keydown-TWO', () => this.setSpeed(2));
-    this.input.keyboard?.on('keydown-FOUR', () => this.setSpeed(4));
+    // 倍速键与 F 同口径守结算态：面板期间身后控制条已被 shade 拦截，
+    // 键盘路不拦的话倍速按钮态会在遮罩下被静默改写
+    this.input.keyboard?.on('keydown-ONE', () => { if (!this.resultPanel) this.setSpeed(1); });
+    this.input.keyboard?.on('keydown-TWO', () => { if (!this.resultPanel) this.setSpeed(2); });
+    this.input.keyboard?.on('keydown-FOUR', () => { if (!this.resultPanel) this.setSpeed(4); });
     this.input.keyboard?.on('keydown-F', () => {
       if (this.matchCtx && !this.resultPanel) this.fastForward();
     });
@@ -400,7 +408,8 @@ export class BattleScene extends Phaser.Scene {
       : 0;
     setFriendlyTeam(this.viewerTeam);
 
-    // 构造期间内核会派发 'start'/'blink'（如刺客跳后排），此时视图尚未建立，必须跳过
+    // 构造期间内核会派发开局 'start' 批（此时视图尚未建立，必须跳过；
+    // 中途增援走 'spawn'，由 onEvent 的共路分支正常建视图）
     this.creatingBattle = true;
     this.battle = new Battle(cfg, (e) => this.onEvent(e), false);
     this.creatingBattle = false;
@@ -683,19 +692,28 @@ export class BattleScene extends Phaser.Scene {
   private onEvent(e: BattleEvent): void {
     if (this.creatingBattle) return;
     switch (e.t) {
-      // 开局就位与中途增援（召唤）同一建视图路径：开局批在构造期已被
-      // views.has 短路，真正走到这里建视图的只有 spawn——登场演出正是给它演的
+      // 开局就位与中途增援（召唤/复活重新入场）同一建视图路径：开局批在构造期
+      // 已被短路，真正走到这里建视图的只有 spawn——登场演出正是给它演的
       case 'start':
       case 'spawn':
         for (const s of e.units) {
-          if (this.views.has(s.uid)) continue;
+          // 复活重新入场时旧视图可能仍挂在死亡演出回调前：直接销毁重建 ——
+          // 若只是跳过，旧视图播完死亡回调删掉自己，复活单位就再无视图
+          const stale = this.views.get(s.uid);
+          if (stale) {
+            stale.destroy();
+            this.views.delete(s.uid);
+          }
           const p = this.cellWorld(s.cell.c, s.cell.r);
           const v = new UnitView(this, s.defId, s.team, s.star, p.x, p.y, this.monsterUids.has(s.uid));
           v.setDepth(30 + s.cell.r * 2);
           this.boardLayer.add(v);
           this.views.set(s.uid, v);
           v.syncBars(s.hp, s.maxHp, 0, 0, 0);
-          // 召唤物登场演出：先记下星级体量，缩小后补间回去
+          // 快进排水时只建视图不播演出：登场特效/缩放补间是墙钟动画，
+          // 与弹道/飘字的 ff 收敛纪律同口径（血条由 update 轮询自然收敛）
+          if (this.ff) continue;
+          // 增援登场演出：先记下星级体量，缩小后补间回去
           this.fx.play({ kind: 'summon', x: p.x, y: p.y });
           const fullScale = v.scaleX;
           v.setScale(0.2);
@@ -914,6 +932,9 @@ export class BattleScene extends Phaser.Scene {
       quantity: 14,
       emitting: false,
     });
+    // 入参是棋盘层局部坐标，必须收编进棋盘层（EffectsLayer.trackStray 同款
+    // root.add）：挂场景根的话坐标被当世界值解释，墨点整体错位出盘
+    this.boardLayer.add(em);
     em.setDepth(28);
     em.explode(14);
     this.trackStray(em);
@@ -927,6 +948,12 @@ export class BattleScene extends Phaser.Scene {
   private onBattleEnd(winner: number | null, timeout: boolean): void {
     this.running = false;
     audio.stopBgm();
+    // 结算面板压场后 updateHover 冻结，残存的单位悬停卡会停在遮罩下：
+    // 与 clearBattle 同口径先清，不让过期信息陪葬进结算画面
+    if (this.hoverCard) {
+      this.hoverCard.destroy();
+      this.hoverCard = null;
+    }
     // 胜负以观众队号为准（演示模式观众在 0 队），不能写死 1
     const won = winner !== null && winner === this.viewerTeam;
     if (winner !== null) audio.play(won ? 'victory' : 'defeat');
@@ -942,18 +969,6 @@ export class BattleScene extends Phaser.Scene {
     // 与其余浮层同口径：遮罩接管指针，结算态下身后底部控制条不可点穿
     shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
     panel.add(shade);
-
-    if (!saved) {
-      panel.add(
-        this.add
-          .text(W / 2, H - 30, '存档失败：浏览器存储已满，本回合进度未写入存档', {
-            fontFamily: FONT.mono,
-            fontSize: '13px',
-            color: css(CINNABAR.base),
-          })
-          .setOrigin(0.5),
-      );
-    }
 
     // 战报：敌我各一列（每边最多 9 子，8v8 全员可见）——每单位「伤害 / 承伤」
     // 双细条，物理/法术/真伤三段堆叠（与飘字 DAMAGE_COLOR 同色源），盾吸并进
@@ -1144,6 +1159,20 @@ export class BattleScene extends Phaser.Scene {
     }, { width: 180, height: BTN_H, variant: 'primary' });
     panel.add(btn);
 
+    // 存档失败行：贴在面板卡片底缘（与 GameScene.persistMatch 的提示同色系同措辞）
+    // —— 落盘失败是关页/切页高危点，不能静默，也不能游离在面板视觉之外
+    if (!saved) {
+      panel.add(
+        this.add
+          .text(W / 2, by + bh - 10, '存档失败：浏览器存储已满，本回合进度未写入存档', {
+            fontFamily: FONT.mono,
+            fontSize: '11px',
+            color: css(CINNABAR.light),
+          })
+          .setOrigin(0.5, 1),
+      );
+    }
+
     panel.setAlpha(0);
     this.tweens.add({ targets: panel, alpha: 1, duration: 320, ease: 'Quad.easeOut' });
     this.tweens.add({
@@ -1164,7 +1193,8 @@ export class BattleScene extends Phaser.Scene {
    * 与本场景演出逐位同源。这里只推进阶段与落盘，绝不二次 applyBattleResult。
    */
   private finalizeRound(): boolean {
-    if (!this.matchCtx) return false;
+    // 无对局上下文（演示/对拍模式）＝无档可存，不是存档失败
+    if (!this.matchCtx) return true;
     const match = this.matchCtx.match;
     match.endRound();
     // 结算落盘是关页/切页高危点：失败必须可见（与 GameScene.persistMatch 同一口径），
@@ -1304,6 +1334,9 @@ export class BattleScene extends Phaser.Scene {
         .setOrigin(1, 0),
     );
 
+    // 建卡前自清悬停数组：调用方虽已先清，但数组与卡片的生命周期绑在这里，
+    // 自清让未来第二处调用点不可能造出"8 行文本 + 刷新停摆"的静默故障
+    this.hoverStatTexts.length = 0;
     this.unitStatLines(u).forEach((s, i) => {
       const t = this.add
         .text(14, 62 + i * 18, s, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
@@ -1357,12 +1390,16 @@ export class BattleScene extends Phaser.Scene {
       }
     }
 
-    // 2) 单位表现：以内核单位为遍历主体，避免 O(n²) 反查
+    // 2) 单位表现：以内核单位为遍历主体，避免 O(n²) 反查。
+    //    行深度随视觉位置连续更新：只在事件点赋值的话，位移途中单位会以起点
+    //    行的深度穿过中间行（刺客切后/击退约 0.2s 的前后关系穿帮）—— 深度是
+    //    y 的线性函数，静止时与事件点的 30 + r*2 逐位一致
     if (this.battle) {
       for (const u of this.battle.units) {
         const v = this.views.get(u.uid);
         if (!v) continue;
         v.update(dt);
+        v.setDepth(30 + ((v.y - this.rowBaseY) / CELL) * 2);
         this.syncUnitBars(v, u);
       }
     }

@@ -236,23 +236,6 @@ export class BoardView extends Phaser.GameObjects.Container {
     g.fillRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3);
   }
 
-  /** 高亮若干格（用于技能范围预览 / 可放置提示） */
-  markCells(cells: { c: number; r: number }[], color: number, alpha = 0.18): void {
-    const g = this.overlay;
-    for (const cell of cells) {
-      const x = BOARD_PAD + cell.c * CELL;
-      const y = BOARD_PAD + cell.r * CELL;
-      g.fillStyle(color, alpha);
-      g.fillRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3);
-      g.lineStyle(1.3, color, 0.7);
-      g.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3);
-    }
-  }
-
-  clearMarks(): void {
-    this.overlay.clear();
-  }
-
   /** 阶段切换：准备 / 战斗 的氛围差异 */
   setPhase(phase: 'prep' | 'battle' | 'final'): void {
     if (phase === 'prep') {

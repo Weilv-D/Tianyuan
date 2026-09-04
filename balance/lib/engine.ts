@@ -12,6 +12,7 @@
  */
 import { Battle } from '../../src/core/battle';
 import { buildTeam, type CompSpec } from '../../src/game/comp';
+import { ITEM_BY_ID } from '../../src/data/items';
 import { pairIndex, pairSeed } from './seeds';
 
 /** 召唤物的聚合桶 id（傀儡/守卫等 isMinion 单位统一计入，不与真棋子混淆） */
@@ -138,6 +139,10 @@ export interface ItemsPairDelta {
  * 种子方案：正位 seedBase + i*7919，镜像再 +104729（uid 基与站位方案不变）。
  */
 export function pairedItemsDelta(i: number, j: number, items: readonly string[], n: number, seedBase: number, comps: readonly CompSpec[]): ItemsPairDelta {
+  // 装备 id 预检（与 items --ids 同口径）：core.itemEffects 对名单外 id 抛错，
+  // 与其让它在 fork 子进程/循环中段炸出整批失败，入口先一次性喊清楚
+  const unknown = items.filter((id) => !ITEM_BY_ID[id]);
+  if (unknown.length > 0) throw new Error(`装备边际配对引用不存在的装备：${unknown.join('、')}`);
   let withSum = 0;
   let withoutSum = 0;
   const specA = comps[i];

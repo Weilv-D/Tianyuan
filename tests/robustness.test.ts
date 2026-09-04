@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createUnit as createBattleUnit, createMinion } from '../src/core/unit';
+import { itemEffects } from '../src/core/items';
+import { ITEMS } from '../src/data/items';
 import { TRAITS } from '../src/data/traits';
 import { autoArrange } from '../src/game/arrange';
 import { boardIdx, createUnit, powerScore, moveToSlot } from '../src/game/state';
 const createCoreUnit = createBattleUnit;
-import { makePlayer, mkBattle, unitInput } from './helpers';
+import { cornerPair, makePlayer, mkBattle, unitInput } from './helpers';
 import { Rng } from '../src/core/rng';
 import { CHAMPIONS, CHAMPION_BY_ID, formatSkillDesc } from '../src/data/champions';
 import { generateBeastBoard } from '../src/game/beast';
@@ -139,15 +141,22 @@ describe('损坏输入与极端阵容', () => {
     expect(total).toBe(9);
   });
 
-  it('moveToSlot 拒绝越界槽位，不撑长 board/bench 数组', () => {
+  it('moveToSlot 拒绝越界/非整数槽位，不撑长数组也不动棋子', () => {
     const player = makePlayer();
     player.board[0] = createUnit('pan');
     player.bench[0] = createUnit('ajiu');
     expect(moveToSlot(player, player.board[0]!.iid, 'bench', 9)).toBe(false);
     expect(moveToSlot(player, player.board[0]!.iid, 'bench', -1)).toBe(false);
     expect(moveToSlot(player, player.bench[0]!.iid, 'board', 32)).toBe(false);
+    // 非整数槽位：旧实现在这里挂上浮点数组属性，棋子从索引枚举中"消失"
+    expect(moveToSlot(player, player.board[0]!.iid, 'bench', 1.5)).toBe(false);
     expect(player.board).toHaveLength(32);
     expect(player.bench).toHaveLength(9);
+    // 拒绝路径不得惊动任何棋子：来源格与目标格原样保留
+    expect(player.board[0]?.defId).toBe('pan');
+    expect(player.bench[0]?.defId).toBe('ajiu');
+    expect(player.board.filter(Boolean)).toHaveLength(1);
+    expect(player.bench.filter(Boolean)).toHaveLength(1);
   });
 
   it('createUnit 保持 isMinion 输入状态，createMinion 严守有限性校验', () => {
@@ -203,5 +212,71 @@ describe('损坏输入与极端阵容', () => {
     const badRoundJson = JSON.parse(JSON.stringify(json));
     badRoundJson.round = -1;
     expect(() => Match.fromJSON(badRoundJson)).toThrow();
+  });
+
+  it('墨影表/墨兽板的元素级坏档降级收敛，不炸整档', () => {
+    const match = new Match(54321, '测试');
+    match.beginRound();
+    const base = match.toJSON() as unknown as Record<string, unknown>;
+
+    // ghosts：非条目/非数字键/棋盘非数组三种坏形状 —— 坏条目整条丢弃，
+    // 短板/坏板收敛回 32 格（与玩家棋盘同一容错粒度，不再整档作废）
+    const badGhosts = JSON.parse(JSON.stringify(base));
+    badGhosts.ghosts = ['junk', ['x', 'y'], [5, 'not-array'], [6, [null, null]]];
+    const reread = Match.fromJSON(badGhosts as never).toJSON() as unknown as { ghosts: [number, unknown[]][] };
+    expect(reread.ghosts.map(([k]) => k).sort((a, b) => a - b)).toEqual([5, 6]);
+    for (const [, board] of reread.ghosts) expect(board).toHaveLength(32);
+
+    // beastBoard：非数组整体回落 null（开战走生成路径，不带脏板进内核）
+    const badBeast = JSON.parse(JSON.stringify(base));
+    badBeast.beastBoard = { 0: 'not-an-array' };
+    expect((Match.fromJSON(badBeast as never).toJSON() as unknown as { beastBoard: unknown }).beastBoard).toBeNull();
+  });
+
+  it('读档快照按保留窗口收敛：坏条目丢弃、超窗裁最旧', () => {
+    const match = new Match(99999, '测试');
+    match.beginRound();
+    const saved = match.toJSON() as unknown as Record<string, unknown>;
+    // 1 条合法 + 1 条 null + 70 条合法：清洗后 71 条，超窗裁到 60、最旧先走
+    saved.battleSnapshots = [
+      { round: 0, config: {}, winner: 0, ticks: 1, eventsDigest: '' },
+      null,
+      ...Array.from({ length: 70 }, (_, i) => ({ round: i + 1, config: {}, winner: 0, ticks: 1, eventsDigest: '' })),
+    ];
+    const restored = Match.fromJSON(saved as never);
+    expect(restored.battleSnapshots).toHaveLength(60);
+    expect(restored.battleSnapshots[0]!.round).toBe(11);
+    expect(restored.battleSnapshots[59]!.round).toBe(70);
+  });
+
+  it('itemEffects 对名单外装备 id 立即失败，已知装备照常聚合', () => {
+    expect(() => itemEffects(['__nope__'])).toThrow(/未知装备/);
+    const known = ITEMS.find((it) => Object.keys(it.bonus).length > 0)!;
+    const eff = itemEffects([known.id]);
+    for (const [k, v] of Object.entries(known.bonus)) {
+      expect(eff.bonus[k as keyof typeof eff.bonus]).toBe(v);
+    }
+  });
+});
+
+describe('战斗事件流契约', () => {
+  it('复活重新入场补发 spawn 事件（渲染层死亡删视图后唯一的重建入口）', () => {
+    const b = mkBattle(cornerPair());
+    const [a, d] = b.units;
+    a.alive = false;
+    b.revive(a, 0.5, d);
+    const events = b.drainEvents();
+    // heal 保留（治疗量账本），spawn 补发（在场账本：谁回到了哪格）
+    expect(events.some((e) => e.t === 'heal' && e.dstUid === a.uid)).toBe(true);
+    const spawn = events.find((e) => e.t === 'spawn');
+    expect(spawn).toBeDefined();
+    if (spawn?.t !== 'spawn') return;
+    expect(spawn.units).toHaveLength(1);
+    const info = spawn.units[0]!;
+    expect(info.uid).toBe(a.uid);
+    expect(info.defId).toBe('pan');
+    expect(info.cell).toEqual(a.cell);
+    expect(info.hp).toBe(a.hp);
+    expect(info.maxHp).toBe(a.maxHp);
   });
 });

@@ -40,7 +40,7 @@ export type StatusKind =
   | 'slow' // 缓速：攻速与移速下降
   | 'wound' // 重伤：受到治疗降低
   | 'burn' // 灼烧：法术持续伤害
-  | 'bleed' // 流血：物理持续伤害
+  | 'bleed' // 流血：真实持续伤害（dtype 由调用方声明；山海按目标最大生命取值绕过抗性曲线）
   | 'atkUp' // 攻击力提升
   | 'aspdUp' // 攻速提升
   | 'armorUp' // 护甲提升

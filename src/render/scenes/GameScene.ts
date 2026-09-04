@@ -280,6 +280,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   onItemChipClick(i: number): void {
+    if (this.inputCtl.dragging) return; // 与键盘路同口径：拖拽中不接受第二输入源
     const id = this.itemAt(i);
     if (!id) return;
     // 点一下选中，再点棋子装上；拖也行。两条路都留着，
@@ -380,6 +381,7 @@ export class GameScene extends Phaser.Scene {
   /** 卸载器开关（器匣右上「卸 载」钮）：仅备战阶段可用 */
   onToggleUnload(): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return; // 拖拽中翻卸载模式会抢走拖拽的选择语境
     this.unloadMode = !this.unloadMode;
     if (this.unloadMode) this.selectedItem = null;
     this.hud.setUnloadMode(this.unloadMode);

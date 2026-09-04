@@ -102,12 +102,17 @@ describe('补丁层（patch.ts）', () => {
 
 describe('羁绊调参表（tuning.ts）', () => {
   it('优先级：单点覆盖 > 整条缩放 > 代码默认', () => {
-    expect(tune('jianzong', 'crit', 0.18)).toBe(0.18); // 默认
-    TRAIT_TUNING.jianzong = 0.5;
-    expect(tune('jianzong', 'crit', 0.18)).toBeCloseTo(0.09);
-    TRAIT_TUNING_KEYS.jianzong = { crit: 0.4 };
-    expect(tune('jianzong', 'crit', 0.18)).toBe(0.4); // 单点不吃缩放
-    resetTuning();
+    // 全局调参表的污染必须用 try/finally 兜底：中间断言抛错而跳过 resetTuning
+    // 的话，脏表会沿文件内后续用例级联失败（失败点与病根隔了几个文件）
+    try {
+      expect(tune('jianzong', 'crit', 0.18)).toBe(0.18); // 默认
+      TRAIT_TUNING.jianzong = 0.5;
+      expect(tune('jianzong', 'crit', 0.18)).toBeCloseTo(0.09, 10);
+      TRAIT_TUNING_KEYS.jianzong = { crit: 0.4 };
+      expect(tune('jianzong', 'crit', 0.18)).toBe(0.4); // 单点不吃缩放
+    } finally {
+      resetTuning();
+    }
     expect(tune('jianzong', 'crit', 0.18)).toBe(0.18);
   });
 });
@@ -178,18 +183,16 @@ describe('进程池（pool.ts）', () => {
 
 describe('工件库（store.ts，:memory:）', () => {
   it('工件目录钉在 gitignored 的 balance/out/（曾落到库内 out/ 被整体提交）', async () => {
-    // OUT_DIR 推导若经错 dirname 会落到 <repo>/out —— 该路径不被 ignore、
-    // 曾被整体入库（2026-09-02 修复）。金锁用可移植的 URL 语义：相对
-    // balance/lib 模块位置再拼 out/，跨平台不依赖 cwd。
-    const { fileURLToPath } = await import('node:url');
+    // 期望值用独立真源推导（tests/ 的上级 = 仓库根），不镜像 store.ts 的
+    // dirname 推导 —— 镜像式断言在实现与期望同错时依然全绿，发现力为零
     const { dirname, resolve } = await import('node:path');
-    const storeUrl = new URL('../balance/lib/', import.meta.url);
-    const expected = resolve(dirname(fileURLToPath(storeUrl)), 'out');
-    expect(OUT_DIR).toBe(expected);
-    // balance/ 目录在 <repo> 根层下有同名兄弟 out/ —— 断言落点真的在
-    // balance 子目录之下，而不是根层的 out/（曾被入库的那个）
-    const parts = OUT_DIR.split(/[\\/]/);
-    expect(parts).toContain('balance');
+    const { fileURLToPath } = await import('node:url');
+    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    const expected = resolve(repoRoot, 'balance', 'out');
+    expect(resolve(OUT_DIR)).toBe(expected);
+    // 尾段必须是 balance/out 两级，而不是根层 out/（曾被入库的那个）
+    const tail = OUT_DIR.split(/[\\/]/).slice(-2);
+    expect(tail).toEqual(['balance', 'out']);
   });
 
   it('run/config/pair/unit/item/trait 全链写读一致', () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Match } from '../src/game/match';
-import { clearSave, hasSave, loadMatch, saveMatch } from '../src/game/save';
+import { DEFAULT_PREFS, clearSave, hasSave, loadMatch, saveMatch, savePrefs } from '../src/game/save';
 import { createUnit } from '../src/game/state';
 
 const SAVE_KEY = 'inkarena.save.v3';
@@ -144,5 +144,17 @@ describe('本地存档', () => {
     expect(hasSave('daily')).toBe(true);
     clearSave('daily');
     expect(hasSave('daily')).toBe(false);
+  });
+
+  it('savePrefs 写入成功返回 true，存储抛错（隐私模式/配额满）返回 false', () => {
+    expect(savePrefs({ ...DEFAULT_PREFS })).toBe(true);
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+      removeItem: () => undefined,
+    });
+    expect(savePrefs({ ...DEFAULT_PREFS })).toBe(false);
   });
 });

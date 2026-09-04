@@ -35,3 +35,6 @@ Thumbs.db
 .DS_Store
 *.tsbuildinfo
 .vite/
+
+# 审查会话的临时基线快照
+.tmp-*.diff

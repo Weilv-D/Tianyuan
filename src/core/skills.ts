@@ -55,9 +55,13 @@ export function skillDamage(
   const tr = src.trait.skillTrueRatio;
   const total = raw * amp;
   if (tr > 0 && type !== 'true') {
+    // 暴击对"整个技能"决骰一次、两段共享判定：此前各段独立掷骰，一次技能
+    // 会消费两颗随机数且可出现"半爆"，实际暴击覆盖比面板承诺的概率高出近一倍
+    const critDecided =
+      !forceCrit && src.trait.skillCritChance > 0 ? api.rollSkillCrit(src) : undefined;
     const dealt =
-      api.dealDamage(src, dst, total * tr, 'true', { source: 'skill', forceCrit }) +
-      api.dealDamage(src, dst, total * (1 - tr), type, { source: 'skill', forceCrit });
+      api.dealDamage(src, dst, total * tr, 'true', { source: 'skill', forceCrit, critDecided }) +
+      api.dealDamage(src, dst, total * (1 - tr), type, { source: 'skill', forceCrit, critDecided });
     return dealt;
   }
   return api.dealDamage(src, dst, total, type, { source: 'skill', forceCrit });
@@ -228,7 +232,10 @@ export const IMPL: Record<string, Impl> = {
     const p = spec.params;
     const type = p.type ?? 'magic';
     const length = p.length ?? 5;
-    if (p.invulnWhileCasting) api.addStatus(u, u, 'ccImmune', 1.2, 0);
+    // 引导读专属旗标：beam 是引导蓄力系，蓄力窗只免控不吃无敌 —— 与 nova/selfBuff
+    // 的 invulnWhileCasting（无敌）语义相区分，旗标混用会让配表者按字面配出
+    // 不可击杀的引导技能（祖龙吐息挂本旗标，行为与历史版本一致）
+    if (p.ccImmuneWhileCasting) api.addStatus(u, u, 'ccImmune', 1.2, 0);
     const emitAt = (a: BattleApi) => {
       if (!u.alive) return; // 0.55s 延迟光束：施法者已死则不再结算
       const cells = lineCells(u.cell, cell, length);
@@ -501,7 +508,9 @@ export const IMPL: Record<string, Impl> = {
         api.dealDamage(u, e, e.hp + e.shield + 1, 'true', { source: 'skill', ignoreTrueCap: true });
         executed++;
       } else {
-        skillDamage(api, u, e, raw, 'true');
+        // 不足阈值者按数据声明的伤害类型结算（现役两处均为 'true'，与上方
+        // 处决跳同类型）—— 读数据而非写死，是让"改数据生效"的惯例成立
+        skillDamage(api, u, e, raw, p.type ?? 'true');
       }
     }
     if (executed > 0) {

@@ -459,6 +459,10 @@ export class Battle implements BattleApi {
 
   // ───────────────── 数值结算 ─────────────────
 
+  rollSkillCrit(src: Unit): boolean {
+    return this.rng.chance(Math.min(1, src.trait.skillCritChance));
+  }
+
   dealDamage(src: Unit | null, dst: Unit, raw: number, type: DamageType, opts: DamageOptions = {}): number {
     // 数值口径：NaN/Infinity 是数据污染 —— 它不满足 raw <= 0，会绕过守卫把
     // dst.hp 打成 NaN 并沿血量比例/超时裁定全链路静默传播，必须立即终止；
@@ -507,7 +511,8 @@ export class Battle implements BattleApi {
       source === 'skill' &&
       src.trait.skillCritChance > 0
     ) {
-      crit = this.rng.chance(Math.min(1, src.trait.skillCritChance));
+      // critDecided 已决（拆分技能的共享判定）则不再掷骰 —— 一颗技能一颗骰
+      crit = opts.critDecided ?? this.rng.chance(Math.min(1, src.trait.skillCritChance));
       if (crit) amount *= src.trait.skillCritMult > 0 ? src.trait.skillCritMult : src.critMult;
     }
 
@@ -659,8 +664,10 @@ export class Battle implements BattleApi {
     dst.hp = Math.min(dst.maxHp, dst.hp + amt);
     const healed = dst.hp - before;
     const overflow = Math.max(0, amt - healed);
+    // healed 记账口径：dst 记收治；src 仅在与 dst 不同体时记治疗产出 ——
+    // 自体治疗（吸血/自奶）是同一条治疗，双记会让结算面板的治疗量虚高一倍
     dst.healed += healed;
-    if (src) src.healed += healed;
+    if (src && src !== dst) src.healed += healed;
     if (healed > 0.5) {
       this.emit({ t: 'heal', tick: this.tick, srcUid: src?.uid ?? -1, dstUid: dst.uid, amount: Math.round(healed) });
     }
@@ -881,11 +888,37 @@ export class Battle implements BattleApi {
     u.targetUid = -1;
     u.cell = dest;
     this.occ[cellIndex(dest.c, dest.r)] = u.uid;
+    // 复活量与 heal() 同口径记账：复活复用 heal 事件做表现，统计侧不补账的话
+    // 飘字总额与结算面板的 healed 永远对不上（影响全部复活通道）
+    u.healed += u.hp;
+    if (src !== u) src.healed += u.hp;
     this.emit({ t: 'heal', tick: this.tick, srcUid: src.uid, dstUid: u.uid, amount: u.hp });
+    // 复活重新入场走 spawn：渲染层在死亡时已删视图，spawn 分支是唯一的建视图
+    // 入口 —— 只发 heal 的话复活单位逻辑存活、输出占位照常，画面上却是隐身人。
+    // heal 与 spawn 各司其职：前者是治疗量账本，后者是"谁回到了哪格"的在场账本
+    this.emit({
+      t: 'spawn',
+      tick: this.tick,
+      units: [
+        {
+          uid: u.uid,
+          defId: u.entry.id,
+          team: u.team,
+          star: u.star,
+          cell: { c: dest.c, r: dest.r },
+          maxHp: u.maxHp,
+          hp: u.hp,
+        },
+      ],
+    });
   }
 
   addZone(o: ZoneOptions): void {
+    // dps/radius 与 dur 同防线：NaN dps 会在 tickZones 循环中途才被 dealDamage
+    // 拦下，此前已命中的敌人构成部分提交；负半径无几何意义
     if (!Number.isFinite(o.dur)) throw new Error(`非法领域时长: ${o.dur}`);
+    if (!Number.isFinite(o.dps)) throw new Error(`非法领域每秒伤害: ${o.dps}`);
+    if (!Number.isFinite(o.radius) || o.radius < 0) throw new Error(`非法领域半径: ${o.radius}`);
     this.zones.push({ ...o, id: this.zoneId++, endsAtTick: this.tick + Math.round(o.dur * TICK_RATE) });
   }
 
@@ -899,6 +932,11 @@ export class Battle implements BattleApi {
    * 让 checkEnd 在复活兑现前不终局。到期先删占位再复活（复活失败也不悬空）。
    */
   scheduleRevive(u: Unit, delaySeconds: number, hpPct: number): void {
+    // 入队即验（与 schedule / revive 同口径）：NaN 延迟会造出 atTick=NaN 的
+    // 永不到期条目，pendingRevives 悬空、checkEnd 对被灭队永不终局 —— 软锁；
+    // NaN 比例若拖到复活兑现才由 revive 抛，就不是边界即抛了
+    if (!Number.isFinite(delaySeconds)) throw new Error(`非法复活延迟: ${delaySeconds}`);
+    if (!Number.isFinite(hpPct)) throw new Error(`非法复活比例: ${hpPct}（uid=${u.uid}）`);
     this.pendingRevives.set(u.uid, u.team);
     this.scheduled.push({
       atTick: this.tick + Math.max(1, Math.round(delaySeconds * TICK_RATE)),
@@ -1111,11 +1149,12 @@ export class Battle implements BattleApi {
     const mod: AttackModifier = { forceCrit: false, bonusMagic: 0, bonusPhysical: 0 };
     for (const fn of this.hooks.get(u.team)?.onPreAttack ?? []) fn(this, u, target, mod);
 
-    // 龙渊「施法附魔」
-    const chargeIdx = u.statuses.findIndex((s) => s.kind === 'spellCharge');
-    if (chargeIdx >= 0) {
-      mod.bonusMagic += u.statuses[chargeIdx].value;
-      u.statuses.splice(chargeIdx, 1);
+    // 龙渊「施法附魔」：消耗走 removeOneStatus —— 与其余摘层路径同走状态事件流，
+    // 手写 splice 会绕开事件（消费侧无账，观察面与纪律双重缺口）
+    if (u.statuses.some((s) => s.kind === 'spellCharge')) {
+      const charge = u.statuses.find((s) => s.kind === 'spellCharge');
+      mod.bonusMagic += charge ? charge.value : 0;
+      this.removeOneStatus(u, 'spellCharge');
     }
 
     const base = effAtk(u);

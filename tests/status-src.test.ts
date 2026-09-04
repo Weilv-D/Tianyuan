@@ -76,6 +76,25 @@ describe('叠层按源分计（StatusEffect.src）', () => {
     expect(a.statuses.filter((s) => s.kind === 'aspdUp').length).toBe(4);
   });
 
+  it('killFrenzy 端到端：真实击杀打标入表，「至多 2 层」由钩子兑现', () => {
+    // 第二用例的合成入表只验计数隔离，不验装备钩子真的打了标 —— tag 拼错
+    // 时该用例仍全绿。此用例走真实战斗：流星弩持有者连续击杀，层数钉在 2。
+    const battle = mkBattle([
+      unitInput('pan', 0, { c: 0, r: 4 }, { star: 2, items: ['liuxing'] }),
+      unitInput('jingyu', 1, { c: 0, r: 3 }),
+      unitInput('jingyu', 1, { c: 1, r: 3 }),
+      unitInput('jingyu', 1, { c: 2, r: 3 }),
+    ]);
+    for (const u of battle.units) if (u.team === 1) u.hp = 1;
+    const pan = byDef(battle, 'pan');
+    let maxKf = 0;
+    for (let i = 0; i < 30 * 20 && !battle.finished; i++) {
+      battle.step();
+      maxKf = Math.max(maxKf, pan.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'killFrenzy').length);
+    }
+    expect(maxKf).toBe(2); // 三杀只叠 2 层
+  });
+
   it('addStatus 拒绝非有限数值：NaN/Infinity 在入表前即抛', () => {
     const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }), unitInput('jingyu', 1, { c: 7, r: 1 })]);
     const a = byDef(battle, 'pan');
@@ -136,5 +155,30 @@ describe('读档单元清洗（fromJSON 坏档容错）', () => {
     expect(regenerated.length).toBe(match.alivePlayers().length / 2);
     const histAfter = match.players.flatMap((p) => p.opponents).length;
     expect(histAfter).toBe(histBefore); // 重掷不再写入 opponents —— 双记即回避窗口失真
+  });
+
+  it('清洗补全：装备超限截断、玩家条目墨兽标记剥离、iid 重号去重、超长棋子回池、坏恩赐置空', () => {
+    const match = new Match(20260905);
+    match.beginRound();
+    const base = Match.fromJSON(match.toJSON() as never); // 干净往返基线（回池对照用）
+    const json = match.toJSON() as Record<string, unknown>;
+    const players = json.players as { board: (Record<string, unknown> | null)[] }[];
+    const board = players[0].board;
+    const slots = board.map((c, i) => (c === null ? i : -1)).filter((i) => i >= 0);
+    expect(slots.length).toBeGreaterThanOrEqual(3);
+    board[slots[0]] = { iid: 91001, defId: 'pan', star: 1, items: ['xuanjia', 'xuanjia', 'xuanjia', 'xuanjia'] };
+    board[slots[1]] = { iid: 91002, defId: 'muyuan', star: 2, items: [], isBeast: true };
+    board[slots[2]] = { iid: 91001, defId: 'pan', star: 1, items: [] }; // 与 slots[0] 重号
+    (board as unknown[]).push({ iid: 91003, defId: 'kutong', star: 3, items: [] }); // 第 33 格
+    json.adventureOffer = { round: 4, options: [{ kind: 'bogus', title: 'x', desc: 'y' }] };
+
+    const restored = Match.fromJSON(json as never);
+    const rb = restored.human.board;
+    expect(rb[slots[0]]!.items.length).toBe(3); // 「至多 3 件」在读档口成立
+    expect(rb[slots[1]]!.isBeast).toBeUndefined(); // 玩家棋子不带墨兽标记
+    expect(rb[slots[2]]).toBeNull(); // iid 重号：保留首见、丢弃后见
+    // 超长截断不蒸发资产：名单内棋子按星级拆张回池（3★ = 9 张）
+    expect(restored.pool.remaining('kutong')).toBe(base.pool.remaining('kutong') + 9);
+    expect(restored.adventureOffer).toBeNull(); // 未知 kind 的恩赐整体置空，不留无声蒸发的选项
   });
 });

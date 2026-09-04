@@ -11,6 +11,7 @@
  */
 import { Battle } from '../../src/core/battle';
 import { PRESET_COMPS, buildTeam, type CompSpec } from '../../src/game/comp';
+import { CHAMPION_BY_ID } from '../../src/data/champions';
 
 const N = Number(process.argv[2] ?? 120);
 if (!Number.isInteger(N) || N <= 0) {
@@ -28,6 +29,13 @@ const BINGJIA8: CompSpec = {
   desc: '8兵家+墨岩补位（56金，9人口天胡）：百战滚雪球，与主矩阵5兵家(54金)对比看8人口提升。',
   units: { zhenfeng: 2, jinghong: 2, xijue: 2, paoche: 2, guzhen: 2, podu: 2, zhechong: 2, taibu: 1, moyan: 2 },
 };
+// 名单硬编码自检：棋子改名/删除后 computeTraits 会静默少算（探针读数变
+// "强度跌"假象），启动先断言全部 id 在名单内，把漂移变成显式失败
+for (const comp of [MOMEN9, BINGJIA8]) {
+  for (const id of Object.keys(comp.units)) {
+    if (!CHAMPION_BY_ID[id]) throw new Error(`「${comp.name}」引用不存在的棋子：${id}`);
+  }
+}
 
 /** 双向平均胜率（i 的视角） */
 function pairWin(i: CompSpec, j: CompSpec, n: number, seedBase: number): number {

@@ -34,6 +34,7 @@ import { restorePlayer, snapshotPlayer } from './undo';
 import { aiTakeTurn, AI_ROSTER, chooseAdventureIndex, makeProfile, type AiWorld } from './ai';
 import {
   COMBINED_ITEM_IDS,
+  DISPLAY_ORDER,
   fnv1aHex,
   rollAdventureOffer,
   adventureGold,
@@ -46,7 +47,7 @@ import {
 } from './adventure';
 import type { BattleSnapshot } from './replay';
 import { generateBeastBoard, BEAST_NAME } from './beast';
-import { addItem, autoEquip, stripItems } from './inventory';
+import { addItem, autoEquip, stripItems, MAX_ITEMS_PER_UNIT } from './inventory';
 import { COMPONENT_IDS, ITEM_BY_ID } from '../data/items';
 import {
   allUnits,
@@ -750,9 +751,16 @@ export class Match implements AiWorld {
     // 取 rank 最大的（最早被淘汰的）反而最弱，取 rank 最小的（最近淘汰的）最有挑战性
     dead.sort((x, y) => (x.rank || 99) - (y.rank || 99));
     for (const d of dead) {
-      if (this.ghosts.has(d.idx) && this.ghosts.get(d.idx)!.some((u) => u !== null)) return d.idx;
+      if (this.hasGhostSquad(d.idx)) return d.idx;
     }
     return -1;
+  }
+
+  /** 该玩家的墨影快照可用：快照存在且至少有一名棋子。配对生成与配对表清洗
+   *  共用同一判据 —— 指向空快照的墨影位会以空阵开战（对手直胜），生成侧视为
+   *  轮空、清洗侧整表弃用，两条路都不能把"有墨影"建立在空快照上。 */
+  private hasGhostSquad(idx: number): boolean {
+    return this.ghosts.get(idx)?.some((u) => u !== null) ?? false;
   }
 
   /**
@@ -786,7 +794,7 @@ export class Match implements AiWorld {
         (p.b >= 0 && covered.has(p.b)) ||
         p.beast !== beastRound ||
         (p.beast && (p.b !== -1 || p.ghost !== -1)) ||
-        (p.ghost !== -1 && (this.players[p.ghost]?.alive ?? true))
+        (p.ghost !== -1 && ((this.players[p.ghost]?.alive ?? true) || !this.hasGhostSquad(p.ghost)))
       ) {
         return [];
       }
@@ -1223,7 +1231,8 @@ export class Match implements AiWorld {
     m.phase = data.phase ?? 'prep';
     m.pool.restore(data.pool);
     // 坏档/版本漂移守卫：board/bench 长度恒为 32/9（state.emptyBoard/emptyBench 口径）。
-    // 长度漂移会让 moveToSlot/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛。
+    // 长度漂移会让 moveToSlot/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛；
+    // 被截断丢弃的名单内棋子回池补偿（守恒：卡可以坏，但不能凭空蒸发）。
     let totalUnitCleaned = 0;
     for (const pl of data.players ?? []) {
       if (!pl || typeof pl !== 'object') throw new Error('corrupted player entry in save');
@@ -1231,30 +1240,43 @@ export class Match implements AiWorld {
         throw new Error('corrupted player numeric stats in save');
       }
       if (pl.level < 1 || pl.level > MAX_LEVEL) throw new Error('invalid player level in save');
+      const repairSlots = (raw: unknown, width: number): unknown[] => {
+        const src: unknown[] = Array.isArray(raw) ? raw : [];
+        const nb: unknown[] = new Array(width).fill(null);
+        for (let i = 0; i < Math.min(width, src.length); i++) nb[i] = src[i];
+        // 越界丢弃只发生在"超长"方向：溢出格子里的名单内棋子回池。星级先钳进
+        // [1,3] 再折张数 —— giveUnit 按星级拆张，回池若信任损坏 star（如 99）
+        // 会凭空造出 9 张卡；钳制口径与 sanitizeUnitEntry 一致
+        for (let i = width; i < src.length; i++) {
+          const u = src[i] as UnitInstance | null;
+          if (u && typeof u === 'object' && typeof u.defId === 'string' && CHAMPION_BY_ID[u.defId]) {
+            const rawStar = u.star as number;
+            const star = Number.isFinite(rawStar) ? (Math.min(3, Math.max(1, Math.round(rawStar))) as UnitInstance['star']) : 1;
+            m.pool.giveUnit(u.defId, star);
+            totalUnitCleaned++;
+          }
+        }
+        return nb;
+      };
       if (!Array.isArray((pl as any).board) || (pl as any).board.length !== 32) {
-        const nb: (typeof pl.board) = new Array(32).fill(null);
-        const src: unknown[] = Array.isArray((pl as any).board) ? (pl as any).board : [];
-        for (let i = 0; i < Math.min(32, src.length); i++) nb[i] = src[i] as never;
-        (pl as any).board = nb;
+        (pl as any).board = repairSlots((pl as any).board, 32);
       }
       if (!Array.isArray((pl as any).bench) || (pl as any).bench.length !== 9) {
-        const nb: (typeof pl.bench) = new Array(9).fill(null);
-        const src: unknown[] = Array.isArray((pl as any).bench) ? (pl as any).bench : [];
-        for (let i = 0; i < Math.min(9, src.length); i++) nb[i] = src[i] as never;
-        (pl as any).bench = nb;
+        (pl as any).bench = repairSlots((pl as any).bench, 9);
       }
       // 单元条目清洗：未知棋子是永不可战的占格死重，星级越界会让 powerScore 取
       // undefined 乘区把 NaN 沿 AI 估值与布阵排序传播，未知装备是卸不掉、用不出
       // 还占器匣容量计数的死重 —— 都不让进对局。粒度与 pool.restore 一致：
-      // 单格损坏不清空整档，条数汇总后一次性 warn。
+      // 单格损坏不清空整档，条数汇总后一次性 warn。玩家条目剥墨兽标记（玩家棋子
+      // 带上 isBeast 会被渲染成墨兽、还不吃天命/登峰判定），墨影与墨兽不受影响。
       let unitCleaned = 0;
       (pl as any).board = ((pl as any).board as unknown[]).map((cell) => {
-        const r = sanitizeUnitEntry(cell);
+        const r = sanitizeUnitEntry(cell, true);
         unitCleaned += r.cleaned ? 1 : 0;
         return r.unit;
       });
       (pl as any).bench = ((pl as any).bench as unknown[]).map((cell) => {
-        const r = sanitizeUnitEntry(cell);
+        const r = sanitizeUnitEntry(cell, true);
         unitCleaned += r.cleaned ? 1 : 0;
         return r.unit;
       });
@@ -1263,8 +1285,23 @@ export class Match implements AiWorld {
     m.players = data.players;
     // 墨影快照与墨兽阵容与玩家棋盘同口径清洗：它们随开战原样进内核
     // buildBattleConfig，脏 id 会在"读档成功 → 开战抛错"上形成可重复软锁。
-    m.ghosts = new Map(data.ghosts);
-    m.beastBoard = data.beastBoard ? cloneBoard(data.beastBoard) : null;
+    // 形状守卫与玩家棋盘同一容错粒度：坏形状降级为空板/裁齐 32 格，
+    // 不让元素级损坏沿 new Map/cloneBoard 炸成整档作废。
+    const convergeBoard32 = (raw: unknown): (UnitInstance | null)[] => {
+      const src: unknown[] = Array.isArray(raw) ? raw : [];
+      const board: (UnitInstance | null)[] = new Array(32).fill(null);
+      for (let i = 0; i < Math.min(32, src.length); i++) board[i] = (src[i] ?? null) as UnitInstance | null;
+      return board;
+    };
+    m.ghosts = new Map(
+      (Array.isArray(data.ghosts) ? data.ghosts : []).flatMap((entry): [number, (UnitInstance | null)[]][] => {
+        // 每条墨影必须是 [玩家序号, 棋盘数组]；坏条目整条丢弃（墨影缺席只影响
+        // 敌情预览与配对渲染，对局层有轮空/缺员兜底，比整档作废便宜得多）
+        if (!Array.isArray(entry) || typeof entry[0] !== 'number' || !Number.isInteger(entry[0])) return [];
+        return [[entry[0] as number, convergeBoard32(entry[1])]];
+      }),
+    );
+    m.beastBoard = Array.isArray(data.beastBoard) ? convergeBoard32(data.beastBoard) : null;
     for (const [, board] of m.ghosts) {
       for (let i = 0; i < board.length; i++) {
         const r = sanitizeUnitEntry(board[i]);
@@ -1279,12 +1316,61 @@ export class Match implements AiWorld {
         m.beastBoard[i] = r.unit;
       }
     }
+    // iid 去重：findIndex/sell/moveToSlot 全按 iid 寻址，重号会让操作永远命中
+    // 第一格（卖一留一、拖拽串单位）。正常对局不可能产出重号，属纯损坏 —— 保留
+    // 首见、丢弃后见（不回池：同一张卡的两个条目回池就是凭空多发）。
+    // 去重域必须分层：对局实况（全部玩家的棋盘+备战席）共用一域；每条墨影
+    // 快照、墨兽阵容各自一域 —— 存活玩家每回合结束都会写阵容快照（cloneBoard
+    // 保留 iid），快照与本人实况合法地同 iid，跨域共集会把好档的墨影整片误杀。
+    const makeDedup = (): ((cells: (UnitInstance | null)[]) => void) => {
+      const seen = new Set<number>();
+      return (cells: (UnitInstance | null)[]): void => {
+        for (let i = 0; i < cells.length; i++) {
+          const u = cells[i];
+          if (!u) continue;
+          if (seen.has(u.iid)) {
+            cells[i] = null;
+            totalUnitCleaned++;
+          } else {
+            seen.add(u.iid);
+          }
+        }
+      };
+    };
+    const dedupLive = makeDedup();
+    for (const p of m.players) {
+      dedupLive(p.board as (UnitInstance | null)[]);
+      dedupLive(p.bench as (UnitInstance | null)[]);
+    }
+    for (const [, board] of m.ghosts) makeDedup()(board);
+    if (m.beastBoard) makeDedup()(m.beastBoard);
     if (totalUnitCleaned > 0) {
-      console.warn(`[save] 存档棋子/装备与本版名单不一致，已清洗 ${totalUnitCleaned} 处（丢弃/钳制），其余保留`);
+      console.warn(`[save] 存档内容与本版名单/口径不一致，已清洗 ${totalUnitCleaned} 处（丢弃/钳制/回池），其余保留`);
     }
     m.settings = data.settings ?? { autoDeploy: true };
-    m.battleSnapshots = data.battleSnapshots ?? [];
-    m.adventureOffer = data.adventureOffer ?? null;
+    // 快照载荷验型 + 窗口收敛：坏条目丢弃，超窗裁最旧（与写入侧同一窗口）——
+    // 旧版无界档读入即收敛，坏 shape 也不再直进 verifyReplay 的重跑面
+    m.battleSnapshots = (Array.isArray(data.battleSnapshots) ? data.battleSnapshots : [])
+      .filter((s): s is BattleSnapshot => {
+        if (!s || typeof s !== 'object') return false;
+        const b = s as Partial<BattleSnapshot>;
+        return (
+          Number.isFinite(b.round) &&
+          Number.isFinite(b.ticks) &&
+          (b.winner === 0 || b.winner === 1 || b.winner === null) &&
+          !!b.config &&
+          typeof b.config === 'object' &&
+          typeof b.eventsDigest === 'string'
+        );
+      })
+      .slice(-BATTLE_SNAPSHOT_KEEP);
+    m.adventureOffer = sanitizeOffer(data.adventureOffer);
+    // 时刻自洽：恩赐只在奇遇轮的本回合内存在（战斗开始即清空、非奇遇轮不生成），
+    // round 与当前回合脱钩的 offer 可用手改档冒领非当轮档位，整体置空同一回落
+    if (m.adventureOffer && (m.adventureOffer.round !== m.round || !m.isAdventureRound())) {
+      m.adventureOffer = null;
+    }
+    if (data.adventureOffer && !m.adventureOffer) totalUnitCleaned++;
     m.humanRank = data.humanRank ?? 0;
     // 本回合配对（v3.2 起）：逐条验型 + 全表自洽，任何违例即整表弃用 —— 半可用
     // 的配对表比空表更危险（空表回落开战时重掷，行为与旧版一致；残缺表则会
@@ -1309,18 +1395,40 @@ export class Match implements AiWorld {
   }
 }
 
+/** 奇遇恩赐验型（fromJSON 专用）：round 非有限数、options 非数组或长度越出
+ *  2~3 选 1（rollAdventureOffer 只产 2 或 3 项；空表会让 AI 即选路径
+ *  options[idx] 取出 undefined、grantAdventure 当场炸）、或任一选项的
+ *  kind 不在本版清单内的 offer 是脏档残渣 —— 发放 switch 对未知 kind 无动作，
+ *  玩家点选后恩赐无声蒸发，不如读档时整体置空（本回合没有恩赐，与旧档缺字段
+ *  同一行为，回落后下个奇遇轮正常再发）。 */
+function sanitizeOffer(raw: unknown): AdventureOffer | null {
+  if (raw === null || raw === undefined) return null;
+  const offer = raw as AdventureOffer;
+  if (!Number.isFinite(offer.round) || !Array.isArray(offer.options)) return null;
+  if (offer.options.length < 2 || offer.options.length > 3) return null;
+  const kinds = new Set<string>(DISPLAY_ORDER);
+  for (const opt of offer.options) {
+    if (!opt || typeof opt !== 'object' || !kinds.has((opt as AdventureOption).kind)) return null;
+  }
+  return offer;
+}
+
 /** 单元条目清洗（fromJSON 专用，pool.restore 同一容错粒度）：
  *  - 未知 defId：本版名单外的棋子无法参战也无法卖出，整格丢弃；
  *  - iid 非有限数：拖拽/卖出/视图绑定全部按 iid 寻址，缺它的棋子是
- *    "卖不掉拖不动"的死子，整格丢弃；
+ *    "卖不掉拖不动"的死子，整格丢弃（档内重号由 fromJSON 的去重趟统一处理）；
  *  - star 非有限数：无法归档到任何星级档位，整格丢弃；
  *  - star 有限但越界/非整：钳回 [1,3]（不弃棋子 —— 越界星级没有任何已发布
  *    版本能产出，纯属损坏，弃子会连装备与站位资产一起蒸发）；
  *  - powMult 存在但非有限：直接剥掉该键回落缺省 1（开战时内核会对非有限
  *    倍率抛错，读档入口先清掉就不给软锁留门）；
- *  - items 过滤到本版名单内的装备 id。
+ *  - items 过滤到本版名单内的装备 id，并截断到 3 件上限（"至多 3 件"是全表
+ *    统一口径，多出的件数没有任何已发布版本能产出）；
+ *  - stripBeast：玩家棋盘条目上的墨兽标记剥除 —— isBeast 驱动墨色剪影与
+ *    天命排除，玩家棋子带上它会被渲染成墨兽还不吃登峰/天命判定；墨影快照
+ *    与墨兽阵容（stripBeast=false）原样保留。
  *  返回 cleaned 供调用方汇总 warn，不逐格刷屏。 */
-function sanitizeUnitEntry(raw: unknown): { unit: UnitInstance | null; cleaned: boolean } {
+function sanitizeUnitEntry(raw: unknown, stripBeast = false): { unit: UnitInstance | null; cleaned: boolean } {
   if (raw === null || raw === undefined) return { unit: null, cleaned: false };
   if (typeof raw !== 'object') return { unit: null, cleaned: true };
   const u = raw as UnitInstance;
@@ -1332,6 +1440,10 @@ function sanitizeUnitEntry(raw: unknown): { unit: UnitInstance | null; cleaned: 
     delete u.powMult;
     cleaned = true;
   }
+  if (stripBeast && u.isBeast) {
+    delete u.isBeast;
+    cleaned = true;
+  }
   const star = u.star as number;
   if (!Number.isInteger(star) || star < 1 || star > 3) {
     u.star = Math.min(3, Math.max(1, Math.round(star))) as UnitInstance['star'];
@@ -1340,6 +1452,7 @@ function sanitizeUnitEntry(raw: unknown): { unit: UnitInstance | null; cleaned: 
   if (Array.isArray(u.items)) {
     const before = u.items.length;
     u.items = u.items.filter((id) => typeof id === 'string' && !!ITEM_BY_ID[id]);
+    if (u.items.length > MAX_ITEMS_PER_UNIT) u.items = u.items.slice(0, MAX_ITEMS_PER_UNIT);
     if (u.items.length !== before) cleaned = true;
   } else {
     u.items = [];

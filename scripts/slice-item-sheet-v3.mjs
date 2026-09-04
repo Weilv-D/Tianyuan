@@ -18,7 +18,7 @@
  * 运行：node scripts/slice-item-sheet-v3.mjs
  */
 import { PNG } from 'pngjs';
-import { readFileSync, writeFileSync, renameSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

@@ -7,8 +7,8 @@
 //   4. 授权恒为 CC0-1.0（ADR D1：禁 CC-BY / 自定义授权）
 // 同时从 package-lock 收集生产依赖许可证，生成完整的 THIRD_PARTY_LICENSES.txt。
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { copyFileSync, existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, unlinkSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -90,6 +90,11 @@ for (const mood of REQUIRED_MOODS) {
 for (const t of tracks) {
   if (t.license !== 'CC0-1.0') fail(`${t.id}: 授权 ${t.license} 不符（只收 CC0-1.0）`);
   const file = join(root, t.file);
+  // 清单路径必须落在仓库内：`../` 之类越界路径会把库外文件的内容哈希进发布清单
+  if (relative(root, file).startsWith('..')) {
+    fail(`${t.id}: 路径越出仓库 ${t.file}`);
+    continue;
+  }
   if (!existsSync(file)) {
     fail(`${t.id}: 文件缺失 ${t.file}`);
     continue;
@@ -138,6 +143,28 @@ if (!failed) {
   writeFileSync(tmpPath, lines.join('\r\n'), 'utf8');
   renameSync(tmpPath, outPath);
   console.log(`✓ 授权清单已生成 → ${process.argv[2] ?? 'release/THIRD_PARTY_LICENSES.txt'}`);
+}
+
+function renameWithRetry(src, dst) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      renameSync(src, dst);
+      return;
+    } catch (err) {
+      const retryable = err && (err.code === 'EPERM' || err.code === 'EBUSY');
+      if (retryable && attempt < 2) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300 * (attempt + 1));
+        continue;
+      }
+      if (retryable) {
+        unlinkSync(dst);
+        copyFileSync(src, dst);
+        unlinkSync(src);
+        return;
+      }
+      throw err;
+    }
+  }
 }
 
 if (failed) {

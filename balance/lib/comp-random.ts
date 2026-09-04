@@ -15,8 +15,14 @@ import type { CompSpec } from '../../src/game/comp';
 export function randomComp(rng: () => number, size = 7): CompSpec {
   const pool = [...CHAMPIONS];
   const picked: string[] = [];
-  // 先随机挑一条主轴羁绊，再围绕它选人 —— 保证随机出来的阵容是"有思路的"
+  // 先随机挑一条主轴羁绊，再围绕它选人 —— 保证随机出来的阵容是"有思路的"。
+  // 主轴名单硬编码自检：羁绊改名/删除后 inAnchor 恒空、该轴永不被抽中（静默
+  // 失真），启动先断言每个锚都是现役羁绊 id，把漂移变成显式失败
   const anchors = ['jianzong', 'longyuan', 'shanhai', 'youming', 'yaozu', 'jiguan', 'tian', 'danding', 'momen', 'bingjia'];
+  const known = new Set([...pool.flatMap((c) => c.origins), ...pool.flatMap((c) => c.classes)]);
+  for (const a of anchors) {
+    if (!known.has(a)) throw new Error(`随机阵容主轴引用不存在的羁绊：${a}`);
+  }
   const anchor = anchors[Math.floor(rng() * anchors.length)];
   const inAnchor = pool.filter((c) => c.origins.includes(anchor) || c.classes.includes(anchor));
   for (const c of inAnchor) {

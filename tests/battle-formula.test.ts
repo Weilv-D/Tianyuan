@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SHIELD_CAP_RATIO, TIMEOUT_WIN_RATIO, TICK_RATE } from '../src/core/config';
 import { Battle } from '../src/core/battle';
 import { cornerPair, mkBattle } from './helpers';
+import { skillDamage } from '../src/core/skills';
 
 describe('玩家可感知的战斗规则', () => {
   it('物理、真实、暴击和持续伤害保持各自结算语义', () => {
@@ -138,5 +139,73 @@ describe('玩家可感知的战斗规则', () => {
       ],
       traits: { 0: [], 1: [] },
     })).toThrow();
+  });
+});
+
+describe('治疗与暴击的记账口径', () => {
+  it('自体治疗单计；异体治疗各记其位；复活量计入 healed', () => {
+    const b = mkBattle(cornerPair());
+    const [a, d] = b.units;
+    // 自体（吸血/自奶）是同一条治疗：dst 计收治、src 不再重复记产出 ——
+    // 双记会让结算面板的治疗量虚高一倍
+    a.hp = 10;
+    const selfGain = b.heal(a, a, 100, 'skill');
+    expect(a.healed).toBeCloseTo(selfGain, 4);
+    // 异体：收治记在受者、产出记在施者
+    d.hp = 10;
+    const otherGain = b.heal(a, d, 100, 'skill');
+    expect(d.healed).toBeCloseTo(otherGain, 4);
+    expect(a.healed).toBeCloseTo(selfGain + otherGain, 4);
+    // 复活复用 heal 事件做表现，统计侧必须同账（影响全部复活通道）
+    const before = a.healed;
+    a.alive = false;
+    b.revive(a, 0.5, d);
+    expect(a.healed).toBeCloseTo(before + a.hp, 4);
+    expect(d.healed).toBeCloseTo(otherGain + a.hp, 4); // 自体那份只记在 a 自己身上
+  });
+
+  it('术士真伤拆分的技能只掷一颗暴击骰，两段共享同一判定', () => {
+    const b = mkBattle(cornerPair());
+    const [caster, target] = b.units;
+    caster.trait.skillTrueRatio = 0.3;
+    caster.trait.skillCritChance = 1; // 必暴：判定次数与两段判定值都可精确断言
+    let rolls = 0;
+    const orig = b.rng.next.bind(b.rng);
+    b.rng.next = () => {
+      rolls++;
+      return orig();
+    };
+    const dealt = skillDamage(b, caster, target, 100, 'magic');
+    // 旧实现拆成两段各掷一次（rolls=2），可出现"半爆"且实际暴击覆盖翻倍
+    expect(rolls).toBe(1);
+    const segments = b.drainEvents().filter((e) => e.t === 'damage' && e.source === 'skill');
+    expect(segments).toHaveLength(2); // 真伤段 + 原类型段
+    expect(segments.every((e) => e.t === 'damage' && e.crit === true)).toBe(true);
+    expect(dealt).toBeGreaterThan(0);
+  });
+
+  it('scheduleRevive/addZone 的非法数值入队即抛（拖到兑现时才炸就不是边界即抛）', () => {
+    const b = mkBattle(cornerPair());
+    const [a] = b.units;
+    // NaN 延迟会造出 atTick=NaN 的永不到期条目：pendingRevives 悬空、checkEnd 永不终局
+    expect(() => b.scheduleRevive(a, NaN, 0.5)).toThrow();
+    expect(() => b.scheduleRevive(a, 2, Number.NaN)).toThrow();
+    // NaN dps 会在 zone tick 循环中途被 dealDamage 拦下，此前已命中的敌人构成部分提交
+    expect(() => b.addZone({ cell: a.cell, radius: 1, dur: 2, srcUid: a.uid, team: a.team, dps: Number.NaN, type: 'magic' })).toThrow();
+    expect(() => b.addZone({ cell: a.cell, radius: -1, dur: 2, srcUid: a.uid, team: a.team, dps: 10, type: 'magic' })).toThrow();
+  });
+
+  it('无技能暴击来源时不额外消耗随机流', () => {
+    const b = mkBattle(cornerPair());
+    const [caster, target] = b.units;
+    caster.trait.skillTrueRatio = 0.3; // 有拆分、无惊雷锤
+    let rolls = 0;
+    const orig = b.rng.next.bind(b.rng);
+    b.rng.next = () => {
+      rolls++;
+      return orig();
+    };
+    skillDamage(b, caster, target, 100, 'magic');
+    expect(rolls).toBe(0);
   });
 });

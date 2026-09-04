@@ -135,6 +135,10 @@ export class Patcher {
    * 整张调参表，嵌套时会把外层补丁一并清掉，外层 journal 却仍以为有效；
    * 现按"本实例写过的键"逐键回退，天然支持嵌套）。trait 单点覆盖的
    * TRAIT_TUNING_KEYS[id] 桶由本实例建档时同样还原（delete 空桶或回旧值）。
+   *
+   * 禁忌：嵌套补丁的 fn 内禁止调用 tuning.resetTuning() —— 它无条件清空整张
+   * 调参表，会把外层补丁的调参写入一并抹掉，而外层 journal 仍以为生效。
+   * 与 src/data/tuning.ts 语义相反的是 Patcher.reset（只回自己的 journal）。
    */
   reset(): void {
     // 键级回退（逆序）+ 建桶清理：建桶记录必须在所有键删除**之后**才判定

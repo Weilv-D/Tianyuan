@@ -35,7 +35,12 @@ export class DamageTextLayer {
 
   private take(): Phaser.GameObjects.Text {
     const t = this.pool.pop();
-    if (t) return t.setVisible(true);
+    if (t) {
+      // 池对象的 alpha 尾回调（入池点）先于 y 补间结束：复用时不杀旧补间，
+      // 残余的几十毫秒会继续写 y，新飘字开场被上一命的目标拽一下
+      this.scene.tweens.killTweensOf(t);
+      return t.setVisible(true);
+    }
     const created = this.scene.add
       .text(0, 0, '', {
         fontFamily: FONT.num,

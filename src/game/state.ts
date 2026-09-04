@@ -12,7 +12,7 @@
  *    带来的代价（少了一种堆叠玩法）远小于收益。
  */
 
-import { BENCH_SLOTS, BOARD_COLS, LEGEND_T3, ROWS_PER_SIDE, STAR_HP_SCALE, STAR_POWER_SCALE, T3_ELITE_COST4 } from '../core/config';
+import { BENCH_SLOTS, BOARD_COLS, GLOBAL_HP_SCALE, LEGEND_T3, ROWS_PER_SIDE, STAR_HP_SCALE, STAR_POWER_SCALE, T3_ELITE_COST4 } from '../core/config';
 import { CHAMPION_BY_ID } from '../data/champions';
 import type { Star } from '../core/types';
 import type { AdventureKind } from './adventure';
@@ -235,7 +235,9 @@ export function powerScore(u: UnitInstance): number {
   const elite = def.cost === 4 && s === 3;
   const eliteHpM = elite ? T3_ELITE_COST4.hpMult : 1;
   const elitePowM = elite ? T3_ELITE_COST4.powerMult : 1;
-  const hp = def.base.hp * STAR_HP_SCALE[si] * hpM * eliteHpM;
+  // GLOBAL_HP_SCALE 与结算（unit.ts 同乘）同源 —— 现值 1.0 无差，但这是调全局
+  // 血量的旋钮，漏乘会让 AI 估值在旋钮一动的瞬间系统性偏离实战
+  const hp = def.base.hp * GLOBAL_HP_SCALE * STAR_HP_SCALE[si] * hpM * eliteHpM;
   const atk = def.base.atk * STAR_POWER_SCALE[si] * powM * elitePowM;
   const sp = def.base.sp * STAR_POWER_SCALE[si] * powM * elitePowM;
   // 生命按 0.35 折算成"战力"，避免纯肉棋子在估值里虚高
@@ -386,7 +388,9 @@ export function moveToSlot(p: PlayerState, iid: number, where: 'board' | 'bench'
   const srcArr = srcBoard >= 0 ? p.board : p.bench;
   const srcSlot = srcBoard >= 0 ? srcBoard : srcBench;
   const dstArr = where === 'board' ? p.board : p.bench;
-  if (slot < 0 || slot >= dstArr.length) return false;
+  // 与 canPlace 同口径的槽位守卫：非整数（如 1.5）会以数组属性形式挂上，
+  // 32/9 格不变式即告腐坏；越界同理。拒绝路径不触碰任何数组。
+  if (!Number.isInteger(slot) || slot < 0 || slot >= dstArr.length) return false;
   const u = srcArr[srcSlot];
   if (!u) return false;
   const occupant = dstArr[slot];

@@ -9,7 +9,7 @@
  * 塔盾武士→镇岳、红幡→九原、龟蛇缠矛→玄武），行优先读格。
  */
 
-import { readFileSync, writeFileSync, renameSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

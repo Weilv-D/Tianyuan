@@ -34,7 +34,6 @@ export interface TraitState {
   skillCritMult: number;
   /** 已激活羁绊 → 0-based 档位（0 为首档，未激活不在 map 中）。供战斗内循环做 O(1) 查询。 */
   tier: Record<string, number>;
-  /** 累计伤害加深（余烬阶段等全局效果单独处理） */
 }
 
 export function createTraitState(): TraitState {
@@ -62,6 +61,10 @@ export interface DamageOptions {
   source?: 'attack' | 'skill' | 'dot' | 'trait' | 'item';
   canCrit?: boolean;
   forceCrit?: boolean;
+  /** 已决出的技能暴击判定（true/false 都算已决）：调用方先掷一骰、多段共享
+   *  同一判定时传入。定义即生效且不再消耗随机流；缺省时 source='skill' 的
+   *  伤害按持有者 skillCritChance 自行掷骰。 */
+  critDecided?: boolean;
   /** 是否触发攻击类钩子（山海流血、武将叠层…） */
   isAttack?: boolean;
   /** 由反伤等"派生伤害"置位，防止 A 反弹给 B、B 再反弹给 A 的无限递归 */
@@ -196,6 +199,9 @@ export interface BattleApi {
   resolveTargetCell(u: Unit, mode: TargetMode): Cell;
 
   dealDamage(src: Unit | null, dst: Unit, raw: number, type: DamageType, opts?: DamageOptions): number;
+  /** 掷一次技能暴击判定（按 src.trait.skillCritChance）：拆分多段的技能先骰
+   *  一次、经 critDecided 共享给各段，整段技能要么全暴击要么全不暴击 */
+  rollSkillCrit(src: Unit): boolean;
   heal(src: Unit | null, dst: Unit, amount: number, source: 'skill' | 'trait' | 'item'): number;
   addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void;
   addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number, srcTag?: string): void;

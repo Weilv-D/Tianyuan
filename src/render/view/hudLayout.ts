@@ -100,11 +100,11 @@ export function railBadgeHit(): { x: number; y: number; w: number; h: number } {
 
 /**
  * 轨是否越进左下「记事」栏（不变量：必须为 false）。
- * 轨内容在遮罩窗（RAIL_Y-20 → +RAIL_VIEW_H）内滚动，真正可能侵入记事栏的
- * 是视口底缘而非内容尾端——环距与上轨数变化都不该让此不变量误报。
+ * 轨内容在遮罩窗 RAIL_VIEW 内滚动，真正可能侵入记事栏的是视口底缘
+ * （RAIL_VIEW.y + RAIL_VIEW.h）而非内容尾端——环距与上轨数变化都不该让此不变量误报。
  */
 export function railOverlapsLog(): boolean {
-  return RAIL_Y - 20 + RAIL_VIEW_H > LOG_Y - 12;
+  return RAIL_VIEW.y + RAIL_VIEW.h > LOG_Y - 12;
 }
 
 // ── 诸侯计分板行（右栏，行高 30）────────────────────────

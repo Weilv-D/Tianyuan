@@ -101,7 +101,13 @@ export class InputController {
     this.pendingUnit = null;
     if (this.dragGhost) {
       // endDrag 会走完整收尾（ghost 销毁 / 落点衬底清除 / 原格透明度复位），
-      // 但画布外坐标既无落点也无 hover 目标，结束时避免走 afterAction 副作用
+      // 但画布外坐标既无落点也无 hover 目标，结束时避免走 afterAction 副作用。
+      // 原格透明度必须在这里手动复位：beginDrag 把来源格压到 0.3 表示"拿走了"，
+      // 漏复位的话中止后棋子半透明潜伏到下一次 refreshAll 才自愈
+      const from = this.dragFrom;
+      if (from) {
+        (from.where === 'board' ? this.scene.boardBake?.boardPortraits : this.scene.boardBake?.benchPortraits)?.[from.slot]?.setAlpha(1);
+      }
       this.dragGhost.destroy();
       this.dragGhost = null;
       this.dragUnit = null;

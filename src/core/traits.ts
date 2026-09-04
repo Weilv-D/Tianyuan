@@ -1,5 +1,5 @@
 import type { BattleApi } from './api';
-import { ASSASSIN_LEAP_DELAY, ASSASSIN_SMOKE_DURATION, MECH, TICK_RATE } from './config';
+import { ASSASSIN_LEAP_DELAY, ASSASSIN_SMOKE_DURATION, BOARD_COLS, BOARD_ROWS, MECH, TICK_RATE } from './config';
 import { chebyshev } from './grid';
 import { effArmor, effSp, type Unit } from './unit';
 import { tune } from '../data/tuning';
@@ -72,7 +72,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
       // 反复用廉价召唤物喂满回血与叠层。
       if (victim.isMinion) return;
       // 阵亡补偿：为最近的存活友军回血。
-      // M 残留专项双向试配均量化否决（scripts/ab-pair.ts / sim.ts 200）：
+      // M 残留专项双向试配均量化否决（npm run balance -- ab，CRN n=200）：
       //   下调 0.04 —— 「亡语→机关」+4.4p，机关（全矩阵下限）综合再降 0.9p，极差恶化；
       //   上调 0.08 —— 「亡语→后期」边回到 100%（超时裁定被回血续命翻转，非线性）
       //   且「荆棘→亡语」+11.9p，极差 22.4 → 24.9，全门崩。维持 0.06。
@@ -174,10 +174,19 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         dst.yaozuTransformed = true;
         a.heal(dst, dst, dst.maxHp * t('transformHeal', 0.24), 'trait');
         a.fx('healWave', { uid: dst.uid });
-        // 化形：清除一切负面 + 攻速暴涨 + 减伤
-        dst.statuses = dst.statuses.filter(
-          (s) => s.kind !== 'stun' && s.kind !== 'silence' && s.kind !== 'disarm' && s.kind !== 'slow',
+        // 化形：清除一切负面 + 攻速暴涨 + 减伤。清负面与 removeStatus 同走
+        // 状态事件流（逐条补 removed 账）—— 手写 filter 绕开事件是观察面缺口
+        const purged = dst.statuses.filter(
+          (s) => s.kind === 'stun' || s.kind === 'silence' || s.kind === 'disarm' || s.kind === 'slow',
         );
+        if (purged.length > 0) {
+          dst.statuses = dst.statuses.filter(
+            (s) => s.kind !== 'stun' && s.kind !== 'silence' && s.kind !== 'disarm' && s.kind !== 'slow',
+          );
+          for (const s of purged) {
+            a.emit({ t: 'status', tick: a.tick, uid: dst.uid, kind: s.kind, dur: 0, value: 0, added: false });
+          }
+        }
         a.addStatus(dst, dst, 'aspdUp', 6, t('transformAspd', 35));
         a.addStatus(dst, dst, 'dr', 6, t('transformDr', 35));
         a.addStatus(dst, dst, 'atkUp', 6, t('transformAtk', 15));
@@ -273,7 +282,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     const team = members[0].team;
     if (tier >= 1) {
       // 破甲通道（二档起，默认 0 = 冬眠）：机关是普攻人海流，输出构成几乎全是
-      // 物理（普攻 + 第 4 击附加物伤）。M 残留专项量化结论（scripts/ab-pair.ts，
+      // 物理（普攻 + 第 4 击附加物伤）。M 残留专项量化结论（npm run balance -- ab，
       // CRN n=250，patch trait.jiguan.pen 扫档）：「机关→荆棘」边对穿甲完全不
       // 敏感 —— 0.10/0.15/0.20/0.35/0.60/0.85 全档该边一律 0.0p（单场总输出
       // 实测仅 +20.5% @0.85，距翻盘悬崖 ~+37% 相差甚远），同时非目标边剧烈
@@ -365,7 +374,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
           //   fourthHitGiant —— 巨型杀手：按目标最大生命追加；
           //   fourthHitCrush —— 破甲冲击：按目标有效护甲追加（结算内禀
           //     自缩放 100A/(100+A)，对甲墙特异、低甲无感）。
-          // N 残留专项扫档结论（scripts/ab-pair.ts，CRN n=250 --pairs 4，
+          // N 残留专项扫档结论（npm run balance -- ab，CRN n=250 --pairs 4，
           // 另附 .qa/probes/n4-output-probe.ts 输出量探针）：
           //   A 档 0.010/0.015/0.020/0.05/0.10/0.20/0.30 与 B 档
           //   0.3/0.5/0.8/1.5/3.0/5.0/7.0 —— 「机关→荆棘」目标边全部
@@ -569,9 +578,9 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
             if (Math.abs(f.cell.r - u.cell.r) > Math.abs(backRow - u.cell.r)) backRow = f.cell.r;
           }
           const candidates: { c: number; r: number }[] = [];
-          for (let c = 0; c < 8; c++) {
+          for (let c = 0; c < BOARD_COLS; c++) {
             for (const r of [backRow, backRow + (u.cell.r > backRow ? -1 : 1)]) {
-              if (r >= 0 && r < 8 && !api.occupied(c, r)) candidates.push({ c, r });
+              if (r >= 0 && r < BOARD_ROWS && !api.occupied(c, r)) candidates.push({ c, r });
             }
           }
           if (candidates.length === 0) continue;
@@ -613,7 +622,8 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     const tier = members[0].trait.tier['marksman'] ?? 0;
     for (const u of members) {
       u.range += 1;
-      // 两档攻击加成同为 15%（文案二档不提攻击力，只加必暴效果）
+      // 两档攻击加成同为 15%（二档文案已自含距离与攻击力，v1.18.1 起口径统一为
+      // "高档文本列出全部常驻效果的绝对值"）
       u.atk = Math.round(u.atk * (1 + t('atk', 0.15)));
     }
     if (tier >= 1) {

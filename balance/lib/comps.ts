@@ -26,7 +26,18 @@ export function goldOf(units: Record<string, number>): number {
  * 天花板探针类场景本来就允许越带，但混带对拍测出的是造价差，必须显式提示。
  */
 export function loadComps(path?: string): { comps: CompSpec[]; source: string; warnings: string[] } {
-  if (!path) return { comps: [...PRESET_COMPS], source: 'PRESET_COMPS', warnings: [] };
+  // 预设与自定义同一校验口径：PRESET_COMPS 活 import 自 src/game/comp.ts，
+  // 棋子改名后 buildTeam 会静默 continue（探针读数失真不报错）——默认路径
+  // 也过一遍存在性校验，改名/删子在第一次 sweep 就显式炸出来
+  if (!path) {
+    const presets = [...PRESET_COMPS];
+    for (const c of presets) {
+      for (const id of Object.keys(c.units)) {
+        if (!CHAMPION_BY_ID[id]) throw new Error(`预设阵容「${c.name}」引用不存在的棋子 ${id}（src/game/comp.ts 与名单脱节）`);
+      }
+    }
+    return { comps: presets, source: 'PRESET_COMPS', warnings: [] };
+  }
   const raw = JSON.parse(readFileSync(resolve(path), 'utf8')) as CompSpec[];
   if (!Array.isArray(raw) || raw.length < 2 || raw.some((c) => !c.name || !c.units)) {
     throw new Error(`阵容文件需为 CompSpec[] JSON（≥2 套，含 name/units）：${path}`);

@@ -1,4 +1,4 @@
-import type { ChampionDef, Rarity, UnitClass } from '../core/types';
+import type { ChampionDef, Rarity, StatusKind, UnitClass } from '../core/types';
 
 /**
  * 技能行为种类。
@@ -53,8 +53,9 @@ export interface SkillParams {
   radius?: number;
   /** 持续秒数 */
   dur?: number;
-  /** 附加状态 */
-  status?: { kind: string; dur: number; value?: number };
+  /** 附加状态（kind 收紧到 StatusKind：拼错键名会在编译期报错，而不是
+   *  穿过消费侧白名单静默 no-op） */
+  status?: { kind: StatusKind; dur: number; value?: number };
   /** 治疗 / 护盾 / 增益的百分比值 */
   value?: number;
   /** 弹幕次数 */
@@ -82,8 +83,10 @@ export interface SkillParams {
   resetOnKill?: number;
   /** 附加：连斩次数上限 */
   maxRepeats?: number;
-  /** 附加：施法期间无敌 */
+  /** 附加：施法期间无敌（nova/selfBuff 系 —— 蓄力窗不吃任何伤害与控制） */
   invulnWhileCasting?: boolean;
+  /** 附加：施法期间免疫控制（beam 引导系专用 —— 只免控，蓄力窗照常吃伤害） */
+  ccImmuneWhileCasting?: boolean;
   /** 附加：施法延迟（秒），用于"预兆 → 落地"的二段演出 */
   delay?: number;
   /** 附加：命中后回复自身生命（最大生命百分比） */
@@ -109,7 +112,7 @@ export interface SkillParams {
   /** 全场处决：每处决一名敌人，全体友军回复的最大生命百分比 */
   healPerExecute?: number;
   /** 附加：第二段自身状态（如苍嗥狂血的攻击力提升，与 status 并列生效） */
-  extraStatus?: { kind: string; dur?: number; value?: number };
+  extraStatus?: { kind: StatusKind; dur?: number; value?: number };
   /** 附加：期间击杀敌人时，把本技能施加的自身状态时长刷新至满 */
   killRenew?: boolean;
 }
@@ -195,7 +198,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'qinghe_q',
     skillSpec: {
       kind: 'healBurst', name: '春风化雨', target: 'allyLowestHp',
-      desc: '为生命最低的 2 名友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 {statusDur} 秒 {statusValue} 攻速。',
+      desc: '为生命最低的 {shots} 名友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 {statusDur} 秒 {statusValue} 攻速。',
       params: { value: 0.18, sp: 0.6, shots: 2, status: { kind: 'aspdUp', dur: 5, value: 20 } },
     },
   },
@@ -207,7 +210,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jingyu_q',
     skillSpec: {
       kind: 'volley', name: '连珠箭', target: 'currentTarget',
-      desc: '3 秒内连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，最后一箭造成 {finalMult} 伤害。',
+      desc: '{volleySpan} 秒内连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，最后一箭造成 {finalMult} 伤害。',
       params: { finalMult: 2, atk: 0.7, type: 'physical', shots: 5, interval: 0.6 },
     },
   },
@@ -323,7 +326,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skillSpec: {
       kind: 'healBurst', name: '蛇涎回春', target: 'allAllies',
       desc: '为全体友军回复 {value} 最大生命 + {sp} 法强的生命；同时对 {shots} 名随机敌人施加 {statusDur} 秒重伤（受治疗降低 {statusValue}）。',
-      params: { value: 0.12, sp: 0.5, shots: 3, dur: 3, status: { kind: 'wound', dur: 3, value: 40 } },
+      params: { value: 0.12, sp: 0.5, shots: 3, status: { kind: 'wound', dur: 3, value: 40 } },
     },
   },
 
@@ -427,8 +430,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'zhenyue_q',
     skillSpec: {
       kind: 'nova', name: '镇岳', target: 'enemyDensest',
-      desc: '跃向敌阵最密集处并砸落：{radius} 格内造成 {atk} 攻击力的物理伤害并眩晕 {dur} 秒，自身获得 {shieldOnHit} 最大生命的护盾。',
-      params: { atk: 2.6, radius: 2, type: 'physical', status: { kind: 'stun', dur: 1.8, value: 0 }, shieldOnHit: 0.18, dur: 1.8 },
+      desc: '跃向敌阵最密集处并砸落：{radius} 格内造成 {atk} 攻击力的物理伤害并眩晕 {statusDur} 秒，自身获得 {shieldOnHit} 最大生命的护盾。',
+      params: { atk: 2.6, radius: 2, type: 'physical', status: { kind: 'stun', dur: 1.8, value: 0 }, shieldOnHit: 0.18 },
     },
   },
   {
@@ -487,7 +490,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'zhuyan_q',
     skillSpec: {
       kind: 'beam', name: '焚天羽', target: 'enemyLongestLine',
-      desc: '喷吐贯穿 {length} 格的焚天火羽，沿途造成 {sp} 法强的法术伤害，并附加 4 秒灼烧（每秒 {dpsSp} 法强）。',
+      desc: '喷吐贯穿 {length} 格的焚天火羽，沿途造成 {sp} 法强的法术伤害，并附加 {statusDur} 秒灼烧（每秒 {dpsSp} 法强）。',
       params: { sp: 3.2, length: 5, type: 'magic', status: { kind: 'burn', dur: 4, value: 0 }, dpsSp: 0.35 },
     },
   },
@@ -526,7 +529,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yunchu_q',
     skillSpec: {
       kind: 'chain', name: '飞杼', target: 'enemyNearest',
-      desc: '掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 15%）并降低 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}）并降低 {statusValue} 攻速 {statusDur} 秒。',
       params: { sp: 1.5, jumps: 3, falloff: 0.15, type: 'magic', status: { kind: 'slow', dur: 2, value: 20 } },
     },
   },
@@ -576,7 +579,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'lingque_q',
     skillSpec: {
       kind: 'volley', name: '雀鸣', target: 'currentTarget',
-      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；每箭命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
+      desc: '连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；每箭命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。',
       params: { finalMult: 2, atk: 0.5, type: 'physical', shots: 5, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 5 } },
     },
   },
@@ -638,7 +641,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'paoche_q',
     skillSpec: {
       kind: 'volley', name: '石弩', target: 'currentTarget',
-      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。',
       params: { finalMult: 2, atk: 0.62, type: 'physical', shots: 4, interval: 0.55, status: { kind: 'aspdUp', dur: 3, value: 8 } },
     },
   },
@@ -674,7 +677,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'chaoji_q',
     skillSpec: {
       kind: 'volley', name: '潮弩', target: 'currentTarget',
-      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（持续 {statusDur} 秒）。',
+      desc: '海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。',
       params: { finalMult: 2, atk: 0.5, type: 'physical', shots: 6, interval: 0.4, status: { kind: 'aspdUp', dur: 5, value: 6 } },
     },
   },
@@ -713,7 +716,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skillSpec: {
       kind: 'selfBuff', name: '擂鼓', target: 'self',
       desc: '擂鼓进军：攻速 +{statusValue}，持续 {dur} 秒。',
-      params: { status: { kind: 'aspdUp', dur: 7, value: 45 } },
+      params: { dur: 7, status: { kind: 'aspdUp', dur: 7, value: 45 } },
     },
   },
   {
@@ -825,7 +828,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'shihu_q',
     skillSpec: {
       kind: 'volley', name: '虎啸', target: 'currentTarget',
-      desc: '啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；命中后自身获得 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；每箭命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。',
       params: { finalMult: 2, atk: 0.75, type: 'physical', shots: 4, interval: 0.5, status: { kind: 'aspdUp', dur: 5, value: 10 } },
     },
   },
@@ -863,7 +866,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'gouchen_q',
     skillSpec: {
       kind: 'beam', name: '勾陈垣', target: 'enemyLongestLine',
-      desc: '勾陈六星贯穿 {length} 格，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusValue}（持续 {statusDur} 秒）。',
+      desc: '勾陈六星贯穿 {length} 格，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusFlat}（持续 {statusDur} 秒）。',
       params: { sp: 4.2, length: 6, type: 'magic', status: { kind: 'mrShred', dur: 6, value: 30 } },
     },
   },
@@ -933,8 +936,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yinglong_q',
     skillSpec: {
       kind: 'beam', name: '祖龙吐息', target: 'enemyLongestLine',
-      desc: '蓄力后喷吐贯穿 {length} 格的祖龙之息，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusValue}（持续 {statusDur} 秒）。',
-      params: { sp: 4.7, length: 8, type: 'magic', status: { kind: 'mrShred', dur: 6, value: 35 }, invulnWhileCasting: true },
+      desc: '蓄力后喷吐贯穿 {length} 格的祖龙之息，蓄力期间免疫控制，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusFlat}（持续 {statusDur} 秒）。',
+      params: { sp: 4.7, length: 8, type: 'magic', status: { kind: 'mrShred', dur: 6, value: 35 }, ccImmuneWhileCasting: true },
     },
   },
   {
@@ -1011,6 +1014,10 @@ const DESC_KEYS: Record<string, (p: SkillParams) => string> = {
   delay: (p) => String(p.delay ?? 0),
   length: (p) => String(p.length ?? 0),
   shots: (p) => String(p.shots ?? 1),
+  // 弹幕连射总时长（秒）＝(shots − 1) × interval：首发即时落地，其后每 interval
+  // 一发，推导式与 skills.volley 的排程同式 —— 调 shots/interval 任一，文案跟着走
+  volleySpan: (p) =>
+    String(Math.max(0, Math.round(((p.shots ?? 1) - 1) * (p.interval ?? 0) * 100) / 100)),
   jumps: (p) => String(p.jumps ?? 1),
   falloff: (p) => pctv(p.falloff),
   knockback: (p) => String(p.knockback ?? 0),

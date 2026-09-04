@@ -145,8 +145,9 @@ function optionFor(kind: AdventureKind, round: number): AdventureOption {
 /**
  * 选项展示顺序。掷出的种类集合是无序的，按此固定次序排列，
  * 保证同一 offer 全员看到的排序一致、断言可写死。
+ * 导出供读档清洗复用：kind 不在清单内的恩赐选项是脏档残渣，读档即弃。
  */
-const DISPLAY_ORDER: readonly AdventureKind[] = ['gold', 'xp', 'components', 'item', 'level', 'reinforce'];
+export const DISPLAY_ORDER: readonly AdventureKind[] = ['gold', 'xp', 'components', 'item', 'level', 'reinforce'];
 
 /**
  * 由对局 rng 掷出本回合的恩赐选项。
