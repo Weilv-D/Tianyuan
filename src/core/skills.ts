@@ -397,7 +397,9 @@ const IMPL: Record<string, Impl> = {
     for (const al of api.units) {
       if (!al.alive || al.team !== u.team) continue;
       api.addShield(u, al, amount, shieldDur);
-      if (p.status && !DEBUFF_KINDS.has(p.status.kind as StatusKind)) api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
+      // 与 nova/volley/healBurst 同一口径：只认增益白名单。此前用 !DEBUFF_KINDS
+      // 反向判断，新增 StatusKind 忘注册 DEBUFF 会被误当增益推给全体友军。
+      if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       if (p.damageReduction) api.addStatus(u, al, 'dr', shieldDur, p.damageReduction * 100);
       api.fx('shieldWall', { cell: al.cell });
     }
@@ -435,7 +437,9 @@ const IMPL: Record<string, Impl> = {
         }
       }
     }
-    if (p.status) {
+    // 召唤登场的全队增益同样只认白名单：误配的减益安全 no-op，
+    // 而不是静默施加给全体友军（与 nova/volley/shieldAll 同口径）
+    if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
       for (const al of api.units) {
         if (al.alive && al.team === u.team) api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
       }

@@ -23,7 +23,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # 与本地/engines 同源：node:sqlite（balance 工具链）要求 ≥22.5，
+          # 写死 "22" 会随 runner 默认漂移，读 .nvmrc 保证三处一致
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies

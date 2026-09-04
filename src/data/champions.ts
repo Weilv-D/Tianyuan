@@ -725,6 +725,9 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'wuhuo_q',
     skillSpec: {
       kind: 'strike', name: '焚祭', target: 'enemyHighestAtk',
+      // 灼烧为定值骑标（有意不吃星级）：与烛阴的 dpsSp 灼烧线（skillRaw 放大）
+      // 并行的另一档口径。真伤主体已随星级放大，骑标定值让文案「每秒 40 伤害」
+      // 全星级为真；若要改线必须走 `npm run balance -- matrix` 复核现役断面。
       desc: '以火焚祭：对攻击最高的敌人造成 {sp} 法强的真实伤害，并附加 {dur} 秒灼烧（每秒 {statusFlat} 伤害）。',
       params: { sp: 1.6, type: 'true', status: { kind: 'burn', dur: 3, value: 40 } },
     },

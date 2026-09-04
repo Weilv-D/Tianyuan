@@ -362,9 +362,9 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   }
 
   // 紫金炉：普攻命中额外回蓝（与内核每次普攻 +10 并行，吃法力锁与上限）
-  if (units.some((u) => has(u, 'critMana'))) {
+  if (units.some((u) => has(u, 'onHitMana'))) {
     h.onAttackHit.push((a, src) => {
-      if (!has(src, 'critMana') || !src.alive || src.isMinion) return;
+      if (!has(src, 'onHitMana') || !src.alive || src.isMinion) return;
       if (src.manaLock > 0) return;
       const before = src.mp;
       src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'mpPerHit'));

@@ -88,6 +88,10 @@ export class HudPanels {
   private unloadBtn: Button | null = null;
   itemChips: ItemChip[] = [];
   itemHint!: Phaser.GameObjects.Text;
+  /** 器匣溢出分页控件（仅溢出时可见，停在与「卸载」同带的中段空闲区） */
+  private pagePrev: Button | null = null;
+  private pageNext: Button | null = null;
+  private pageText: Phaser.GameObjects.Text | null = null;
 
   // 侧栏
   traitContainer!: Phaser.GameObjects.Container;
@@ -361,6 +365,37 @@ export class HudPanels {
     );
     this.unloadBtn.setDepth(5);
 
+    // 器匣溢出分页：系统回收按守恒口径允许器匣超过 10 格，超格资产此前
+    // "一键装备摸得到、玩家摸不到"。控件停在与卸载钮同带的中段空闲区
+    // （「器匣」签右缘与卸载钮左缘之间，命中区互不相触、不压框线）；
+    // 仅在 items 超过一页时出现（setPageControls 驱动），初始隐藏。
+    this.pagePrev = new Button(
+      this.scene,
+      ITEM_BAR_X + 80,
+      ITEM_BAR_Y + UNLOAD_BTN_DY,
+      '◀',
+      () => this.scene.onItemPage(-1),
+      { width: 26, height: 26, fontSize: 11 },
+    );
+    this.pagePrev.setVisible(false).setDepth(5);
+    this.pageNext = new Button(
+      this.scene,
+      ITEM_BAR_X + 160,
+      ITEM_BAR_Y + UNLOAD_BTN_DY,
+      '▶',
+      () => this.scene.onItemPage(1),
+      { width: 26, height: 26, fontSize: 11 },
+    );
+    this.pageNext.setVisible(false).setDepth(5);
+    this.pageText = this.scene.add
+      .text(ITEM_BAR_X + 133, ITEM_BAR_Y + UNLOAD_BTN_DY + 13, '', {
+        fontFamily: FONT.mono,
+        fontSize: '11px',
+        color: css(PAPER[400]),
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+
     this.itemHint = this.scene.add
       .text(ITEM_BAR_X - 8, ITEM_BAR_Y + gh + 22, '', {
         fontFamily: FONT.body,
@@ -567,6 +602,24 @@ export class HudPanels {
     if (!this.unloadBtn) return;
     this.unloadBtn.setText(on ? '卸载中…' : '卸 载');
     this.unloadBtn.setAlpha(on ? 1 : 0.85);
+  }
+
+  /**
+   * 器匣溢出分页控件态（SceneRefresh.refreshItems 按器匣总数驱动）。
+   * page=null 表示无溢出：整套控件隐藏；溢出时按钮按页边界禁用。
+   */
+  setPageControls(page: number | null, pages: number): void {
+    const prev = this.pagePrev;
+    const next = this.pageNext;
+    const label = this.pageText;
+    const show = page !== null && pages > 1;
+    prev?.setVisible(show);
+    next?.setVisible(show);
+    label?.setVisible(show);
+    if (!show || page === null || !prev || !next || !label) return;
+    prev.setDisabled(page <= 0);
+    next.setDisabled(page >= pages - 1);
+    label.setText(`${page + 1}/${pages}`);
   }
 
   /** 撤销可用金点：栈非空点亮呼吸，空栈熄灭 */

@@ -87,7 +87,7 @@ export type ItemHookId =
   | 'foxReady' // 九尾面：施法后必爆强击
   | 'disarmSwat' // 拂尘扇：计数缴械
   | 'onHitHeal' // 霜翎环：普攻回复(按最大生命)
-  | 'critMana' // 紫金炉：普攻回蓝
+  | 'onHitMana' // 紫金炉：普攻回蓝（历史名 critMana 实为普攻回蓝，2026-09-05 正名）
   | 'warBanner' // 墨龙旗：开战全队减伤
   | 'bellStun'; // 摄魂铃：受击概率眩晕
 
@@ -551,7 +551,7 @@ export const ITEMS: readonly ItemDef[] = [
     desc: '初始法力 +12，暴击率 +18%，攻击力 +8。普攻命中额外回复 6 点法力。',
     recipe: ['fafu', 'quantao'],
     bonus: { startMp: 12, critChance: 0.18, atk: 8 },
-    hooks: ['critMana'],
+    hooks: ['onHitMana'],
     params: { mpPerHit: 6 },
     glyph: 'voidpearl',
   },

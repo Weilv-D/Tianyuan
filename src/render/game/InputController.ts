@@ -71,8 +71,8 @@ export class InputController {
 
   constructor(private scene: GameScene) {}
 
-  /** 棋子或装备拖拽进行中（多点触控/快捷键守卫共用） */
-  private get dragging(): boolean {
+  /** 棋子或装备拖拽进行中（多点触控/快捷键守卫/翻页守卫共用；public：场景模块读取） */
+  get dragging(): boolean {
     return this.dragGhost !== null || this.dragItemGhost !== null;
   }
 

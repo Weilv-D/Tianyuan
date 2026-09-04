@@ -338,6 +338,10 @@ export class BattleScene extends Phaser.Scene {
     if (!this.battle || !this.running || this.paused) return;
     this.ff = true;
     this.speed = 4;
+    // 在途弹道按墙钟推进，逻辑钟 240× 排水必然追不上 —— 快进启用即清场，
+    // 后续弹道事件也不再生成（onEvent 同口径），对象不会积压到结算面板下
+    for (const p of this.projectiles) p.img.destroy();
+    this.projectiles = [];
     this.speedBtns.forEach((b, i) => b.setAlpha(i === 2 ? 1 : 0.55));
     audio.play('ui');
   }
@@ -733,6 +737,9 @@ export class BattleScene extends Phaser.Scene {
       }
 
       case 'projectile': {
+        // 真快进：逻辑一帧可排出数十发弹道事件，表现层按墙钟推进必然积压 ——
+        // 快进期间不生成弹道对象（伤害飘字与命中演出仍在，终局结果不变）
+        if (this.ff) break;
         const from = this.unitAnchor(e.uid);
         const to = this.unitAnchor(e.targetUid);
         if (!from || !to) break;

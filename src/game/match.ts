@@ -740,6 +740,49 @@ export class Match implements AiWorld {
     return -1;
   }
 
+  /**
+   * 读档配对表清洗（fromJSON 专用）：逐条验型 + 全表自洽，任一违例整表弃用。
+   *
+   * 类型层：a 必须是真实玩家下标，b/ghost 允许 -1，swap/beast 必须为布尔。
+   * 自洽层（手改/半截写入的档可能类型全对而语义残缺）：不自配、同一 a 不重复、
+   * beast 标志必须与本回合轮型一致（makePairings 全员同构，不混排）、
+   * 墨兽行 b/ghost 必空、墨影对手必须指向已淘汰玩家、每个存活玩家恰被覆盖一次。
+   * 弃用即回落空表 —— 开战兜底重掷，与旧档缺字段行为一致。
+   */
+  private sanitizePairings(raw: unknown[]): Pairing[] {
+    const n = this.players.length;
+    const idx = (v: unknown, min: number): v is number =>
+      typeof v === 'number' && Number.isInteger(v) && v >= min && v < n;
+    const beastRound = this.isBeastRound();
+    const parsed: Pairing[] = [];
+    const seenA = new Set<number>();
+    for (const q of raw) {
+      const p = q as Partial<Pairing> | null;
+      if (
+        !p ||
+        typeof p !== 'object' ||
+        !idx(p.a, 0) ||
+        !idx(p.b, -1) ||
+        !idx(p.ghost, -1) ||
+        typeof p.swap !== 'boolean' ||
+        typeof p.beast !== 'boolean' ||
+        p.a === p.b ||
+        seenA.has(p.a) ||
+        p.beast !== beastRound ||
+        (p.beast && (p.b !== -1 || p.ghost !== -1)) ||
+        (p.ghost !== -1 && (this.players[p.ghost]?.alive ?? true))
+      ) {
+        return [];
+      }
+      seenA.add(p.a);
+      parsed.push({ a: p.a, b: p.b, ghost: p.ghost, swap: p.swap, beast: p.beast });
+    }
+    for (const p of this.players) {
+      if (p.alive && !seenA.has(p.idx)) return [];
+    }
+    return parsed;
+  }
+
   /** 记录一个玩家的阵容快照（每回合结束时调用，淘汰后即成为墨影） */
   private snapshot(p: PlayerState): void {
     this.ghosts.set(p.idx, cloneBoard(p.board));
@@ -1116,6 +1159,13 @@ export class Match implements AiWorld {
     adventureOffer: AdventureOffer | null;
     /** 人类玩家最终名次（淘汰时写入）；旧档缺省 0 = 未定名次 */
     humanRank: number;
+    /**
+     * 本回合配对（beginRound 末尾已生成并写入双方交手史）。不入档的话读档后
+     * 开战会重新 makePairings —— rng 流自此分叉、交手史双记、侦查对手改变，
+     * 「同一种子同一输入同一局」的对局确定性契约被存读档打断。
+     * v3.2 起持久化；旧档缺字段回落重掷，与旧版行为一致。
+     */
+    pairings: Pairing[];
   } {
     return {
       seed: this.seed,
@@ -1123,21 +1173,26 @@ export class Match implements AiWorld {
       round: this.round,
       phase: this.phase,
       pool: this.pool.snapshot(),
-      players: this.players,
-      ghosts: [...this.ghosts.entries()],
+      // 复合字段一律深拷贝：toJSON 的返回物是序列化快照，不得与活对局共享引用 ——
+      // 内存内 toJSON→fromJSON 轮转（测试/回放/未来换端）才不会把两局别名成同一批对象
+      players: structuredClone(this.players),
+      ghosts: structuredClone([...this.ghosts.entries()]),
       beastBoard: this.beastBoard ? cloneBoard(this.beastBoard) : null,
-      settings: this.settings,
+      settings: structuredClone(this.settings),
       mode: this.mode,
-      battleSnapshots: [...this.battleSnapshots],
-      adventureOffer: this.adventureOffer,
+      battleSnapshots: structuredClone(this.battleSnapshots),
+      adventureOffer: structuredClone(this.adventureOffer),
       humanRank: this.humanRank,
+      pairings: this.pairings.map((q) => ({ ...q })),
     };
   }
 
   static fromJSON(data: ReturnType<Match['toJSON']>): Match {
     if (!Number.isFinite(data.round) || data.round < 1) throw new Error('invalid round in save');
     if (!Number.isFinite(data.rngState)) throw new Error('invalid rngState in save');
-    if (data.phase && !['prep', 'battle', 'result', 'over'].includes(data.phase)) throw new Error('invalid phase in save');
+    // 白名单只含 Match 真正会产出的三态：'battle' 是渲染层的演出阶段，Match 从不
+    // 置位 —— 坏档里出现即拒收，不给"绕过读档推进语义"的残档留门。
+    if (data.phase && !['prep', 'result', 'over'].includes(data.phase)) throw new Error('invalid phase in save');
     const seed = Number.isFinite(data.seed) ? data.seed : 0;
     const m = new Match(seed, '你', data.mode ?? 'normal');
     m.rng.state = data.rngState;
@@ -1151,7 +1206,7 @@ export class Match implements AiWorld {
       if (!Number.isFinite(pl.gold) || !Number.isFinite(pl.hp) || !Number.isFinite(pl.level)) {
         throw new Error('corrupted player numeric stats in save');
       }
-      if (pl.level < 1 || pl.level > 10) throw new Error('invalid player level in save');
+      if (pl.level < 1 || pl.level > MAX_LEVEL) throw new Error('invalid player level in save');
       if (!Array.isArray((pl as any).board) || (pl as any).board.length !== 32) {
         const nb: (typeof pl.board) = new Array(32).fill(null);
         const src: unknown[] = Array.isArray((pl as any).board) ? (pl as any).board : [];
@@ -1172,6 +1227,12 @@ export class Match implements AiWorld {
     m.battleSnapshots = data.battleSnapshots ?? [];
     m.adventureOffer = data.adventureOffer ?? null;
     m.humanRank = data.humanRank ?? 0;
+    // 本回合配对（v3.2 起）：逐条验型 + 全表自洽，任何违例即整表弃用 —— 半可用
+    // 的配对表比空表更危险（空表回落开战时重掷，行为与旧版一致；残缺表则会
+    // 让一部分玩家被静默跳过结算）。非数组与逐条非法同一容错粒度，不放大成整档作废。
+    if (data.pairings !== undefined) {
+      m.pairings = Array.isArray(data.pairings) ? m.sanitizePairings(data.pairings) : [];
+    }
     // iid 计数器必须扫到所有存活引用（含墨影快照与墨兽阵容），
     // 否则读档后 createUnit 可能发出重复 iid，拖拽与视图绑定会串单位
     let maxIid = 0;

@@ -69,15 +69,16 @@ npm ci
 
 | 变更领域 | 追加验证 | 通过标准 |
 |---|---|---|
-| `src/core`、战斗数据、羁绊、装备 | `npm run sim`；定向改动再跑 `npm run sim:ab` | 无死锁；强度与先手偏差在设计包络内 |
-| 装备数值与合成 | `npm run sim:items` | 成品正收益、合成正收益、协同不过界 |
-| 整局经济、AI、局长 | `npm run sim:match` | 对局结束；局长与原型差异在设计包络内 |
-| 存档、结算、场景切换 | 对应核心测试 + 浏览器刷新/继续对局冒烟 | 不重复结算，不丢回合或玩家资产 |
+| `src/core`、战斗数据、羁绊、装备 | `npm run balance -- matrix`；定向改动再跑 `npm run balance -- ab` | 无死锁；强度与先手偏差在设计包络内 |
+| 装备数值与合成 | `npm run balance -- items` | 成品正收益、合成正收益、协同不过界 |
+| 整局经济、AI、局长 | `npm run balance -- match` | 对局结束；局长与原型差异在设计包络内 |
+| 存档、结算、场景切换 | 对应核心测试（含本回合配对往返）+ 浏览器刷新/继续对局冒烟 | 不重复结算、不重掷本轮对手，不丢回合或玩家资产 |
+| 器匣、装备栏交互 | 对应核心测试（溢出分页映射）+ 器匣点选/拖拽/翻页冒烟 | 溢出资产逐件可点选、可拖拽、可合成；页码不越界 |
 | `src/render`、`src/ui`、布局、字体 | `.qa/smoke-checklist.md` | 目标分辨率与 K=2 下无裁切、遮挡、错位 |
 | 音频文件、清单、授权 | `npm run audit:music` + 开关往返冒烟 | 文件/哈希/授权一致；关闭时合成音回落 |
 | 发布脚本、Vite 配置、资源路径 | `npm run release` | 两种产物可生成；单文件无外链；zip 完整 |
 
-同时影响多个领域时取验证集合的并集，不因改动规模小而省略对应门禁。
+平衡命令以 `npm run balance -- <command>` 为唯一入口；`package.json` 中的 `sim:*` 仅是等价别名，文档与 CI 一律写 canonical 形式。同时影响多个领域时取验证集合的并集，不因改动规模小而省略对应门禁。
 
 ## 5. 核心测试策略
 
@@ -90,7 +91,7 @@ npm ci
 | 工具链可信 | `balance-tools` | 平衡工具链自身：补丁四类路径往返与嵌套键级回退、CRN 配对公式金锁、进程池与串行逐位一致、SQLite 往返、**调参键白名单与 traits.ts 读取双向同源**、src 不引用工具链 |
 | 资产正确 | `economy`、`conservation`、`adventure`、`round-flow`、`legend-qol`、`items-matrix` | 收入、卡池、装备、奇遇六类、对局节奏与引导轮、天命与卸载、36 配方完备性与装备钩子行为 |
 | 进度连续 | `save`、`match-resume`、`replay`、`undo`、`daily` | 存读档、恢复推进、回放、撤销（含随机流游标回滚）与每日成绩 |
-| 交互安全 | `hud-layout`、`input-coords`、`valid-placements`、`robustness` | 单源几何（轨/日志/战报/弹窗/商店无重叠）、K=2 输入、拖拽落点合法域、满盘站位、坏输入与墨兽落地 |
+| 交互安全 | `hud-layout`、`input-coords`、`valid-placements`、`item-paging`、`robustness` | 单源几何（轨/日志/战报/弹窗/商店无重叠）、K=2 输入、拖拽落点合法域、器匣溢出分页的页数/钳制/绝对索引映射、满盘站位、坏输入与墨兽落地 |
 
 ### 5.1 准入条件
 

@@ -121,8 +121,16 @@ export class RoundResultOverlay {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.code === 'Enter') proceed();
     };
-    this.scene.input.keyboard?.on('keydown', onKey);
+    // 延一帧再订阅键盘：开战（空格）→ 空阵直败结算 → show() 可能在同一次
+    // keydown 的派发中途执行，Phaser 对同一事件的后续发射仍会送达此刻新注册
+    // 的监听 —— 同一次物理按键会瞬间跳过面板。延帧后按键语义回归
+    // 「再按一次才推进」，点「继续」不受影响。
+    this.scene.time.delayedCall(0, () => {
+      if (closed) return;
+      this.scene.input.keyboard?.on('keydown', onKey);
+    });
     panel.once('destroy', () => {
+      closed = true;
       this.scene.input.keyboard?.off('keydown', onKey);
     });
 

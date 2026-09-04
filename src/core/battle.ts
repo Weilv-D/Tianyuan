@@ -1159,6 +1159,9 @@ export class Battle implements BattleApi {
     for (const u of this.units) {
       if (!u.alive) continue;
       for (const s of u.statuses) {
+        // 本 tick 内前面的 DoT 可能已把 u 打死（killUnit 会整体替换 statuses）：
+        // 旧数组引用继续迭代会对尸体补发 tick 演出 —— 死亡即停
+        if (!u.alive) break;
         if (s.kind !== 'burn' && s.kind !== 'bleed') continue;
         const src = this.unitByUid(s.srcUid);
         const type: DamageType = s.dtype ?? (s.kind === 'burn' ? 'magic' : 'physical');

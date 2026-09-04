@@ -5,6 +5,7 @@ import { CHAMPION_BY_ID } from '../../data/champions';
 import { TRAIT_BY_ID } from '../../data/traits';
 import { boardCap, boardCount } from '../../game/state';
 import { interestOf, streakGold, xpToNext } from '../../game/economy';
+import { clampItemPage, itemPageCount } from './itemPaging';
 import { Bar, FONT, clipToWidth, setTextIf } from '../../ui/kit';
 import { INK, GILT, CINNABAR, SPIRIT, MOON, VOID, PAPER, TRAIT_TIER_COLOR_HEX, css } from '../view/palette';
 import { ITEM_BAR_SLOTS, LOG_H, RAIL_PITCH, RAIL_Y, SIDE_W } from '../view/layout';
@@ -147,6 +148,10 @@ export class SceneRefresh {
       this.scene.hud.itemChips[i].setAlpha(this.scene.selectedItem && this.scene.selectedItem !== this.scene.itemAt(i) ? 0.55 : 1);
     }
     const n = p.items.length;
+    // 溢出分页：先按当前总数钳页（撤销/合成/卖出后页码可能越界），再驱动控件。
+    // 无溢出时整套控件隐藏 —— 分页只在"确有看不见的装备"时出现。
+    this.scene.itemPage = clampItemPage(this.scene.itemPage, n);
+    this.scene.hud.setPageControls(n > ITEM_BAR_SLOTS ? this.scene.itemPage : null, itemPageCount(n));
     // 全配方后组件拖组件即合成 —— 手势在提示行里带上一句，玩家不必去图鉴查谱
     this.scene.hud.itemHint.setText(n === 0 ? '' : `${n} 件待装 · 拖到棋子装配，拖到组件直接合成`);
   }

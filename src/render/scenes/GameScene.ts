@@ -27,6 +27,7 @@ import { fadeIn, fadeTo } from '../view/transition';
 import { HudPanels } from '../game/HudPanels';
 import { BoardBake } from '../game/BoardBake';
 import { SceneRefresh } from '../game/SceneRefresh';
+import { absoluteItemIndex, clampItemPage } from '../game/itemPaging';
 import { AdventurePanel } from '../game/AdventurePanel';
 import { PauseScoutOverlay } from '../game/PauseScoutOverlay';
 import { TraitMembersCard } from '../game/TraitMembersCard';
@@ -100,6 +101,9 @@ export class GameScene extends Phaser.Scene {
   lastReport = '';
   /** 器匣里点选中的装备（点一下选中，再点棋子装上） */
   selectedItem: string | null = null;
+  /** 器匣当前页（视觉 10 格 ↔ 绝对索引映射，见 game/itemPaging.ts）：
+   *  系统回收允许器匣溢出 10 格（守恒优先），分页让溢出资产保持可点选可拖拽 */
+  itemPage = 0;
   /** 卸载器模式：点选后点击任意棋子，全身装备一键回器匣（开局可用） */
   unloadMode = false;
   settingsPanel: SettingsPanel | null = null;
@@ -142,6 +146,7 @@ export class GameScene extends Phaser.Scene {
     this.toast = null;
     this.paused = false;
     this.selectedItem = null;
+    this.itemPage = 0;
     this.unloadMode = false;
     // settingsPanel 内部持有已销毁的容器：不置空则 isOpen 永真，设置面板再也打不开
     this.settingsPanel = null;
@@ -269,9 +274,9 @@ export class GameScene extends Phaser.Scene {
 
   // ══════════════ 器匣点选 ══════════════
 
-  /** 装备栏第 i 格的装备 id */
+  /** 装备栏第 i 格（本页可视格）的装备 id —— 溢出分页映射到器匣绝对索引 */
   itemAt(i: number): string | null {
-    return this.match.human.items[i] ?? null;
+    return this.match.human.items[absoluteItemIndex(this.itemPage, i)] ?? null;
   }
 
   onItemChipClick(i: number): void {
@@ -289,6 +294,21 @@ export class GameScene extends Phaser.Scene {
       this.exitUnloadMode();
       audio.play('ui');
     }
+    this.refreshAll();
+  }
+
+  /** 器匣翻页（溢出分页控件回调）：delta 为 -1（上一页）/ +1（下一页） */
+  onItemPage(delta: number): void {
+    if (this.phase !== 'prep' || this.busy) return;
+    // 拖拽中翻页会让 InputController 持有的视觉格映射到错误的绝对索引
+    if (this.inputCtl.dragging) return;
+    const next = clampItemPage(this.itemPage + delta, this.match.human.items.length);
+    if (next === this.itemPage) return;
+    this.itemPage = next;
+    // 选中件可能已不在本页：翻页即回中性态，避免"点棋子装上的是看不见的那件"
+    this.selectedItem = null;
+    this.exitUnloadMode();
+    audio.play('ui');
     this.refreshAll();
   }
 
@@ -317,8 +337,9 @@ export class GameScene extends Phaser.Scene {
     }
     this.pushUndo('器匣合成');
     const p = this.match.human;
-    const lo = Math.min(from, to);
-    const hi = Math.max(from, to);
+    // 视觉格 → 绝对索引：溢出分页下，合成消费的是本页两个绝对格位
+    const lo = absoluteItemIndex(this.itemPage, Math.min(from, to));
+    const hi = absoluteItemIndex(this.itemPage, Math.max(from, to));
     p.items.splice(hi, 1);
     p.items.splice(lo, 1, out);
     this.selectedItem = null;
