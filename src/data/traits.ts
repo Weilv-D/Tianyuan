@@ -190,7 +190,7 @@ export const TRAITS: readonly TraitDef[] = [
     breakpoints: [2, 3],
     effectText: [
       '攻击距离 +1；攻击力 +15%。',
-      '每第 3 次攻击必定暴击，且暴击伤害 +30%。',
+      '攻击距离 +1；攻击力 +15%；每第 3 次攻击必定暴击，且暴击伤害 +30%。',
     ],
     colors: [1, 2],
   },

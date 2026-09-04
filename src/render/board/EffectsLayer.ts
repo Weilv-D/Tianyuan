@@ -27,9 +27,8 @@ export interface FxRequest {
 export class EffectsLayer {
   private readonly scene: Phaser.Scene;
   private readonly layer: Phaser.GameObjects.Container;
-  private readonly upper: Phaser.GameObjects.Container;
   /**
-   * 不挂在 layer/upper 里的场景级特效对象（粒子发射器、地面法阵 graphics）。
+   * 不挂在 layer 里的场景级特效对象（粒子发射器、地面法阵 graphics、界格线）。
    * clear() 必须连它们一起销毁，否则残留在下一场战斗里继续播。
    */
   private readonly strays = new Set<Phaser.GameObjects.GameObject>();
@@ -45,13 +44,9 @@ export class EffectsLayer {
   constructor(scene: Phaser.Scene, parent?: Phaser.GameObjects.Container) {
     this.scene = scene;
     this.layer = scene.add.container(0, 0).setDepth(20);
-    this.upper = scene.add.container(0, 0).setDepth(60);
     this.root = parent ?? null;
-    // 挂进棋盘层（战斗时随层放大）：layer/upper 与 strays 都要在同一坐标系里
-    if (parent) {
-      parent.add(this.layer);
-      parent.add(this.upper);
-    }
+    // 挂进棋盘层（战斗时随层放大）：layer 与 strays 都要在同一坐标系里
+    if (parent) parent.add(this.layer);
   }
 
   /** 登记一个场景级特效对象；对象自毁时自动出列 */
@@ -172,6 +167,8 @@ export class EffectsLayer {
         this.tick(r, CINNABAR.base);
         break;
       default:
+        // 内核新增 FxKind 而表现层未跟进时开发期喊出（线上静默省略，不影响判定）
+        if (import.meta.env.DEV) console.warn(`[fx] 未登记的特效种类：${r.kind}`);
         break;
     }
   }
@@ -950,7 +947,8 @@ export class EffectsLayer {
           from: 100,
           to: 0,
           duration: telegraph ? 200 : dur,
-          delay: telegraph ? dur - 300 : 200,
+          // dur 允许调用方传小值：delay 钳非负，负 delay 的补间语义未定义
+          delay: telegraph ? Math.max(0, dur - 300) : 200,
           onUpdate: (tw) => draw((tw.getValue() ?? 0) / 100),
           onComplete: () => g.destroy(),
         });
@@ -1002,15 +1000,16 @@ export class EffectsLayer {
     // 代际 +1：让还在飞行的延时回调（crit 第二环等）知道自己是上一场的
     this.gen++;
     // 先杀补间再移除（对齐 DamageTextLayer 范式）：补间的 onComplete 会
-    // destroy 目标，若目标已被 removeAll(true) 销毁，就是对尸体发后事
-    const children = [...this.layer.getAll(), ...this.upper.getAll()];
+    // destroy 目标，若目标已被 removeAll(true) 销毁，就是对尸体发后事。
+    // strays 里也有挂普通补间的（界格十字线的 alpha 淡出），一并杀掉，
+    // 否则销毁后 onComplete 仍会触发一次二次 destroy
+    const children = [...this.layer.getAll(), ...this.strays];
     if (children.length > 0) this.scene.tweens.killTweensOf(children);
     // 计数器补间的目标不是显示对象，killTweensOf 够不到 —— 显式停掉，
     // 否则它们对已销毁的 Graphics 空转到 duration 结束，还可能拖进下一场
     for (const tw of this.counters) tw.stop();
     this.counters.clear();
     this.layer.removeAll(true);
-    this.upper.removeAll(true);
     for (const s of [...this.strays]) s.destroy();
     this.strays.clear();
     this.shakeAccum = 0;

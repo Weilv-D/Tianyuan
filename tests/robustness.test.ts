@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createUnit as createBattleUnit, createMinion } from '../src/core/unit';
 import { TRAITS } from '../src/data/traits';
 import { autoArrange } from '../src/game/arrange';
-import { boardIdx, createUnit, powerScore, recallUnit } from '../src/game/state';
+import { boardIdx, createUnit, powerScore, moveToSlot } from '../src/game/state';
 const createCoreUnit = createBattleUnit;
 import { makePlayer, mkBattle, unitInput } from './helpers';
 import { Rng } from '../src/core/rng';
@@ -139,13 +139,15 @@ describe('损坏输入与极端阵容', () => {
     expect(total).toBe(9);
   });
 
-  it('recallUnit 严格限制在备战席有效槽位内', () => {
+  it('moveToSlot 拒绝越界槽位，不撑长 board/bench 数组', () => {
     const player = makePlayer();
     player.board[0] = createUnit('pan');
-    // 备战席全满
-    for (let i = 0; i < 9; i++) player.bench[i] = createUnit('ajiu');
-    expect(recallUnit(player, player.board[0]!.iid)).toBe(false);
-    expect(player.board[0]).not.toBeNull();
+    player.bench[0] = createUnit('ajiu');
+    expect(moveToSlot(player, player.board[0]!.iid, 'bench', 9)).toBe(false);
+    expect(moveToSlot(player, player.board[0]!.iid, 'bench', -1)).toBe(false);
+    expect(moveToSlot(player, player.bench[0]!.iid, 'board', 32)).toBe(false);
+    expect(player.board).toHaveLength(32);
+    expect(player.bench).toHaveLength(9);
   });
 
   it('createUnit 保持 isMinion 输入状态，createMinion 严守有限性校验', () => {

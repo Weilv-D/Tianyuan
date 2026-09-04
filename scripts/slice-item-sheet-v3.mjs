@@ -283,7 +283,7 @@ for (const sheet of SHEETS) {
     const dest = `${OUT}/${id}.png`;
     const tmp = `${dest}.tmp`;
     writeFileSync(tmp, PNG.sync.write(img));
-    rmSync(dest, { force: true });
+    // rename 同盘覆盖目标，先 rm 是有害的：两步之间崩溃会丢掉原 art 文件
     renameSync(tmp, dest);
     console.log(`${id}.png  ${w}x${h}  @(${b.minX},${b.minY})`);
   });

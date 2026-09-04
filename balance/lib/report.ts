@@ -118,7 +118,7 @@ export function printSlopes(comps: readonly { name: string }[], axes: { path: st
 }
 
 /** 单位排行（棋子维）：默认按场均伤害降序；type=1 按承伤 */
-export function printUnitBoard(comps: readonly { name: string }[], rows: UnitRow[], sort: 'dealt' | 'taken' | 'dpm' = 'dealt'): void {
+export function printUnitBoard(comps: readonly { name: string }[], rows: UnitRow[], sort: 'dealt' | 'taken' = 'dealt'): void {
   const key = (r: UnitRow): number => {
     const perBattle = r.battles > 0 ? r.battles : 1;
     if (sort === 'taken') return r.taken / perBattle;

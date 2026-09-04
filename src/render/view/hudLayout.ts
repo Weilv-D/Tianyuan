@@ -58,6 +58,14 @@ export const RAIL_ITEMS = 17;
  */
 export const RAIL_VIEW_W = 76;
 export const RAIL_VIEW_H = 660;
+/** 轨滚动视口的世界系矩形（真源）：HudPanels 建遮罩窗与 SceneRefresh 的
+ *  输入门（滚动出视口的行不可悬停/点选）都必须消费同一组数，勿再手写偏移 */
+export const RAIL_VIEW = { x: RAIL_X - 24, y: RAIL_Y - 20, w: RAIL_VIEW_W, h: RAIL_VIEW_H };
+/** 行世界矩形是否落在轨视口内。遮罩只裁渲染不裁输入 —— 滚动把行移出
+ *  视口后若输入不跟着失效，会出现"看不见的徽章"弹笺、开卡的幽灵热区 */
+export function railRowVisible(rowWorldY: number, rowH: number): boolean {
+  return rowWorldY + rowH > RAIL_VIEW.y && rowWorldY < RAIL_VIEW.y + RAIL_VIEW.h;
+}
 /**
  * 计数相对环心的横向偏移：计数放环右侧外（origin 0,0.5）。
  * 圆内只留篆字——小字号 mono 的真实墨迹高度带抗锯齿余量后必然蹭到 r16 底弧，

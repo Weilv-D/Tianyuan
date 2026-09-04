@@ -822,8 +822,9 @@ export class Battle implements BattleApi {
     const m = createMinion(uid, src, dest, hpPct, atkPct);
     this.units.push(m);
     this.occ[cellIndex(dest.c, dest.r)] = uid;
+    // 中途增援走 spawn（start 契约 = 每局恰一次的开局事件），渲染层两案同路
     this.emit({
-      t: 'start',
+      t: 'spawn',
       tick: this.tick,
       units: [
         {

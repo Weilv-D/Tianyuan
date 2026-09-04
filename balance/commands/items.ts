@@ -26,6 +26,11 @@ const STACK_ITEM = 'duanhun';
 export async function run(argv: string[]): Promise<void> {
   const idsArg = argv.find((a) => a.startsWith('--ids='));
   const ONLY: readonly string[] | null = idsArg ? idsArg.slice('--ids='.length).split(',').filter((s) => s.length > 0) : null;
+  if (ONLY) {
+    // 与 loadComps 的"引用不存在即抛"同口径：静默过滤会空跑一轮后空入库
+    const unknown = ONLY.filter((id) => !ITEMS.some((it) => it.id === id));
+    if (unknown.length > 0) throw new Error(`--ids 引用不存在的装备：${unknown.join('、')}`);
+  }
   const posN = argv.find((a) => !a.startsWith('--') && /^\d+$/.test(a));
   const n = requirePositiveInt(posN, '每格种子数', 16);
   const workersIdx = argv.indexOf('--workers');

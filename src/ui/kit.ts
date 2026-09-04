@@ -251,8 +251,7 @@ export class Button extends Phaser.GameObjects.Container {
       // 三变体的漆底与线色：primary 金、danger 朱、ghost 墨
       const wash = this.variant === 'ghost' ? INK[800] : this.variant === 'primary' ? GILT.base : CINNABAR.base;
       const washA = this.variant === 'ghost' ? 0.5 : this.variant === 'primary' ? 0.13 : 0.09;
-      const line =
-        this.variant === 'primary' ? GILT.base : this.variant === 'danger' ? CINNABAR.base : GILT.base;
+      const line = this.variant === 'danger' ? CINNABAR.base : GILT.base;
 
       if (!this.disabled) {
         g.fillStyle(wash, washA);

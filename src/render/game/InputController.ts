@@ -124,6 +124,12 @@ export class InputController {
     this.scene.boardBake?.boardHover?.clear();
   };
 
+  /** 阶段切换（开战等）的交互中止入口：与 onGameHidden 同一套幂等收尾 ——
+   *  多点触控下第二指可在拖拽中点按 HUD，开战不得带着悬空残影进演出 */
+  cancelDrag(): void {
+    this.onGameHidden();
+  }
+
   /** create() 时与原场景字段复位一一对应（itemTip 重建、detailCard/拖拽状态/悬停键清空） */
   resetForCreate(): void {
     this.itemTip = new ItemTooltip(this.scene);

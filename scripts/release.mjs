@@ -204,7 +204,16 @@ for (const [tmp, dest] of [[distTmp, DIST], [relTmp, RELEASE]]) {
   try {
     await safeMove(tmp, dest, `${tmp} -> ${dest}`);
   } catch (err) {
-    if (hadOld) { try { await safeMove(bak, dest, `${bak} -> ${dest} (回滚)`); } catch {} }
+    if (hadOld) {
+      try {
+        await safeMove(bak, dest, `${bak} -> ${dest} (回滚)`);
+      } catch (rollbackErr) {
+        // 回滚再失败 = 旧产物在 .bak、新产物在 .tmp，dest 缺失 —— 必须把
+        // 残留位置喊出来让用户手动恢复，吞掉就只剩一个"莫名没有产物"的现场
+        console.error(`✗ 回滚也失败：旧产物滞留 ${bak}，新产物滞留 ${tmp}，${dest} 缺失，请手动恢复后重试：${rollbackErr.message}`);
+        process.exit(1);
+      }
+    }
     throw err;
   }
   if (hadOld && existsSync(bak)) rmSync(bak, { recursive: true, force: true });

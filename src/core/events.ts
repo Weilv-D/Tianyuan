@@ -8,8 +8,10 @@ import type { Cell, DamageType, Star, TeamId } from './types';
  * 这样保证了：无头模拟 === 画面表现，且战斗可被完整录制回放。
  */
 export type BattleEvent =
-  /** 战斗开始：所有单位就位 */
+  /** 战斗开始：所有单位就位。每局恰一次（tick=0），中途增援走 spawn */
   | { t: 'start'; tick: number; units: SpawnInfo[] }
+  /** 中途增援（召唤物登场 / 复活单位重新入场）：一局可发生任意次 */
+  | { t: 'spawn'; tick: number; units: SpawnInfo[] }
   /** 吟唱起手：单位满蓝，开始读条（渲染层播"蓄力预兆"） */
   | { t: 'castStart'; tick: number; uid: number; skillId: string; windup: number }
   /** 技能生效：特效主体 + 命中判定的那一刻 */

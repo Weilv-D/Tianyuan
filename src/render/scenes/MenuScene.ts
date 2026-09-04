@@ -87,6 +87,11 @@ export class MenuScene extends Phaser.Scene {
     const saveAvailable = hasSave();
     const prefs = loadPrefs();
     audio.setMuted(prefs.muted);
+    // 三条总线音量与 GameScene 同口径水合：菜单 BGM 是多数玩家的第一声，
+    // 缺水合会按引擎默认 0.5 播放，进对局才跳回持久化值
+    audio.setVolume('bgm', prefs.volBgm);
+    audio.setVolume('sfx', prefs.volSfx);
+    audio.setVolume('ui', prefs.volUi);
     audio.setLicensedMusicEnabled(prefs.licensedMusic);
     motion.calm = prefs.calm;
 

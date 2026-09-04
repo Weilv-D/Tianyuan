@@ -40,7 +40,9 @@ export function itemEffects(itemIds: readonly string[]): ItemEffects {
 
   for (const id of itemIds) {
     const def = ITEM_BY_ID[id];
-    if (!def) continue;
+    // 与未知棋子（createUnit）/未知羁绊（applyTraits）/未知技能（executeSkill）同口径：
+    // 名单外装备立即失败，绝不带着缺装静默开战（扫参与平衡脚本绕过 game 层校验直供输入）
+    if (!def) throw new Error(`未知装备 id：${id}`);
     for (const [k, v] of Object.entries(def.bonus)) {
       bonus[k] = (bonus[k] ?? 0) + (v as number);
     }

@@ -112,6 +112,6 @@ console.log(`入库 ${ok}/22；空格：${empty.length ? empty.join(' ') : '无'
 function atomicWrite(dest, data) {
   const tmp = `${dest}.tmp`;
   writeFileSync(tmp, data);
-  rmSync(dest, { force: true });
+  // rename 同盘覆盖目标，先 rm 是有害的：两步之间崩溃会丢掉原 art 文件
   renameSync(tmp, dest);
 }

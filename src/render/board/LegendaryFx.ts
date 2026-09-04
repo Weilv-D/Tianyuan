@@ -153,7 +153,8 @@ function burst(
   root.add(p);
   p.explode(count);
   scene.time.delayedCall(900, () => {
-    if (p.scene) p.destroy();
+    // 销毁语义以 active 为准（EffectsLayer 同口径）：shutdown 清场后 scene 引用不保证为空
+    if (p.active) p.destroy();
   });
 }
 

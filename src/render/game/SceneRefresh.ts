@@ -20,6 +20,7 @@ import {
   railCountPos,
   railPopupPos,
   railPopupLayout,
+  railRowVisible,
   RAIL_POPUP_W,
 } from '../view/hudLayout';
 import type { GameScene } from '../scenes/GameScene';
@@ -218,9 +219,16 @@ export class SceneRefresh {
       const hit = railBadgeHit();
       item.setInteractive(new Phaser.Geom.Rectangle(hit.x, hit.y, hit.w, hit.h), Phaser.Geom.Rectangle.Contains);
       const worldY = () => railBadgeWorldY(i, this.scene.hud.traitContainer.y);
+      // 行世界矩形：滚动出视口后遮罩只裁渲染不裁输入，悬停/点选先过可见门，
+      // 否则"看不见的徽章"仍会弹悬停笺、被点开成员卡
+      const rowVisible = (): boolean => {
+        const w = railBadgeWorldHit(i, this.scene.hud.traitContainer.y);
+        return railRowVisible(w.y, w.h);
+      };
       // 悬停出效果笺；点击钉成员卡。成员卡打开时不弹效果笺（两卡叠放抢读）。
       // pointerup 带 8px 位移阈值：徽章在可滚轨内，滚动结束的落点不得被当成点选
       item.on('pointerover', () => {
+        if (!rowVisible()) return;
         if (this.scene.traitMembers.isOpen) return;
         this.showRailPopup(s.def.id, s.t.count, s.t.tier, color, worldY());
       });
@@ -231,6 +239,7 @@ export class SceneRefresh {
         this.scene.input.setDefaultCursor('default');
       });
       item.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
+        if (!rowVisible()) return;
         this.railDown = { x: ptr.x, y: ptr.y, id: s.def.id, badgeWorldY: worldY() };
       });
       item.on('pointerup', (ptr: Phaser.Input.Pointer) => {
@@ -242,8 +251,10 @@ export class SceneRefresh {
         ) {
           // 打开（非收起同徽章）时清掉棋子详情卡的钉住态，避免成员卡与详情卡叠放
           const closing = this.scene.traitMembers.isOpen && this.scene.traitMembers.traitId === s.def.id;
-          if (!closing) this.scene.inputCtl.clearSelection();
-          this.scene.traitMembers.toggle(s.def.id, worldY());
+          if (!closing && rowVisible()) {
+            this.scene.inputCtl.clearSelection();
+            this.scene.traitMembers.toggle(s.def.id, worldY());
+          }
         }
         this.railDown = null;
       });
@@ -260,12 +271,15 @@ export class SceneRefresh {
 
   /** 世界坐标是否命中任一徽章行。输入层"点徽章不关卡"的判断用。
    *  徽章行世界位由容器实时 y 平移（railBadgeWorldHit(i, container.y)），
-   *  与滚动后的视觉位置一致 —— 滚动把行移出视口，点旧位置不应再命中该行。 */
+   *  与滚动后的视觉位置一致 —— 滚动把行移出视口，点旧位置不应再命中该行；
+   *  视口外的行还要再过 railRowVisible 门：遮罩只裁渲染不裁输入 */
   hitTraitBadge(x: number, y: number): boolean {
     const containerY = this.scene.hud.traitContainer?.y ?? RAIL_Y;
     for (let i = 0; i < this.badgeIds.length; i++) {
       const hit = railBadgeWorldHit(i, containerY);
-      if (x >= hit.x && x <= hit.x + hit.w && y >= hit.y && y <= hit.y + hit.h) return true;
+      if (x >= hit.x && x <= hit.x + hit.w && y >= hit.y && y <= hit.y + hit.h) {
+        return railRowVisible(hit.y, hit.h);
+      }
     }
     return false;
   }
@@ -342,7 +356,6 @@ export class SceneRefresh {
     const pr = this.scene.match.pairings.find((x) => x.a === 0 || x.b === 0);
     const other = pr ? (pr.a === 0 ? pr.b : pr.a) : -2;
     const sig = `${pr?.beast ? 'b' : other}#${pr?.ghost ?? -1}`;
-    const p = this.scene.match.human;
     // 敌情预览的棋盘真源：真人对手读其当前棋盘；墨影读出局阵容快照
     //（boardOfOpponent 同一入口，备战期看到的就是开战要打的）
     const previewBoard =
@@ -357,7 +370,9 @@ export class SceneRefresh {
           .map((u) => `${u.defId}${u.star}`)
           .join(',') || '')
       : '';
-    const full = `${sig}#${boardSig}#${p.gold}`;
+    // 签名只收敌情真实依赖（配对 + 棋盘）：混入金币会让每次买卖/刷新
+    // 都无谓地整容器销毁重建三行文本
+    const full = `${sig}#${boardSig}`;
     if (full === this.intelSig) return;
     this.intelSig = full;
 

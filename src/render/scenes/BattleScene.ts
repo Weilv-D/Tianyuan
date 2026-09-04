@@ -683,7 +683,10 @@ export class BattleScene extends Phaser.Scene {
   private onEvent(e: BattleEvent): void {
     if (this.creatingBattle) return;
     switch (e.t) {
+      // 开局就位与中途增援（召唤）同一建视图路径：开局批在构造期已被
+      // views.has 短路，真正走到这里建视图的只有 spawn——登场演出正是给它演的
       case 'start':
+      case 'spawn':
         for (const s of e.units) {
           if (this.views.has(s.uid)) continue;
           const p = this.cellWorld(s.cell.c, s.cell.r);
@@ -892,6 +895,9 @@ export class BattleScene extends Phaser.Scene {
         break;
 
       default:
+        // status / mana 事件有意不订阅：晕眩/缴械等控制态当前无专属演出，
+        // 血条与蓝条由 update() 每帧轮询 syncBars 承担，事件流仅作回放/归因账本。
+        // 新增种类未跟进表现层时也落在这里——数值判定不受影响，勿在此补逻辑。
         break;
     }
   }
@@ -933,6 +939,8 @@ export class BattleScene extends Phaser.Scene {
     const shade = this.add.graphics();
     shade.fillStyle(SHADE, 0.62);
     shade.fillRect(0, 0, W, H);
+    // 与其余浮层同口径：遮罩接管指针，结算态下身后底部控制条不可点穿
+    shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
     panel.add(shade);
 
     if (!saved) {
@@ -1234,9 +1242,9 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  /** 悬停期间的数值行：有效值与基础值并列，buff/debuff 实时可感（M1） */
-  private syncHoverStats(u: Unit): void {
-    if (this.hoverStatTexts.length !== 4) return;
+  /** 悬停卡四行数值（生命/攻法/双抗/攻速射程）：有效值与基础值并列，buff/debuff 实时可感（M1）。
+   *  建卡与跟随刷新共用同一构造 —— 两处口径一旦分叉，悬停过程数字会跳变。 */
+  private unitStatLines(u: Unit): string[] {
     const atk = Math.round(effAtk(u));
     const armor = Math.round(effArmor(u));
     const mr = Math.round(effMr(u));
@@ -1246,12 +1254,18 @@ export class BattleScene extends Phaser.Scene {
     const mrLine = mr !== Math.round(u.baseMr) ? `魔抗 ${mr}（${Math.round(u.baseMr)}）` : `魔抗 ${Math.round(u.baseMr)}`;
     const baseAspdStr = (u.baseAspd * (1 + u.permAspdPct)).toFixed(2);
     const aspdLine = aspd !== baseAspdStr ? `攻速 ${aspd}（${baseAspdStr}）` : `攻速 ${aspd}`;
-    const stats = [
+    return [
       `生命 ${Math.round(u.hp)} / ${u.maxHp}`,
       `${atkLine}　法强 ${Math.round(u.sp)}`,
       `${armorLine}　${mrLine}`,
       `${aspdLine}　射程 ${u.range}`,
     ];
+  }
+
+  /** 悬停期间的数值行刷新 */
+  private syncHoverStats(u: Unit): void {
+    if (this.hoverStatTexts.length !== 4) return;
+    const stats = this.unitStatLines(u);
     for (let i = 0; i < 4; i++) {
       if (this.hoverStatTexts[i].text !== stats[i]) this.hoverStatTexts[i].setText(stats[i]);
     }
@@ -1290,30 +1304,13 @@ export class BattleScene extends Phaser.Scene {
         .setOrigin(1, 0),
     );
 
-    {
-      const atk0 = Math.round(effAtk(u));
-      const armor0 = Math.round(effArmor(u));
-      const mr0 = Math.round(effMr(u));
-      const aspd0 = effAspd(u).toFixed(2);
-      const atkLine0 = atk0 !== u.atk ? `攻击 ${atk0}（${u.atk}）` : `攻击 ${u.atk}`;
-      const armorLine0 = armor0 !== Math.round(u.baseArmor) ? `护甲 ${armor0}（${Math.round(u.baseArmor)}）` : `护甲 ${Math.round(u.baseArmor)}`;
-      const mrLine0 = mr0 !== Math.round(u.baseMr) ? `魔抗 ${mr0}（${Math.round(u.baseMr)}）` : `魔抗 ${Math.round(u.baseMr)}`;
-      const baseAspdStr0 = (u.baseAspd * (1 + u.permAspdPct)).toFixed(2);
-      const aspdLine0 = aspd0 !== baseAspdStr0 ? `攻速 ${aspd0}（${baseAspdStr0}）` : `攻速 ${aspd0}`;
-      const stats0 = [
-        `生命 ${Math.round(u.hp)} / ${u.maxHp}`,
-        `${atkLine0}　法强 ${Math.round(u.sp)}`,
-        `${armorLine0}　${mrLine0}`,
-        `${aspdLine0}　射程 ${u.range}`,
-      ];
-      stats0.forEach((s, i) => {
-        const t = this.add
-          .text(14, 62 + i * 18, s, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
-          .setOrigin(0, 0);
-        c.add(t);
-        this.hoverStatTexts.push(t);
-      });
-    }
+    this.unitStatLines(u).forEach((s, i) => {
+      const t = this.add
+        .text(14, 62 + i * 18, s, { fontFamily: FONT.body, fontSize: '12px', color: css(PAPER[300]) })
+        .setOrigin(0, 0);
+      c.add(t);
+      this.hoverStatTexts.push(t);
+    });
 
     const sk = e.skillSpec;
     c.add(

@@ -35,6 +35,8 @@ const layers = [
     allowedLayers: new Set(['core', 'data', 'game']),
     forbiddenApis: [
       ['Math.random', /\bMath\.random\s*\(/g],
+      ['crypto random', /\b(?:getRandomValues|randomUUID)\s*\(/g],
+      ['browser clock', /\bperformance\.now\s*\(/g],
       ['system time outside save adapter', /\b(?:Date\.now\s*\(|new\s+Date\s*\()/g, new Set(['src/game/save.ts'])],
     ],
   },
@@ -215,8 +217,19 @@ for (const layer of layers) {
   }
 }
 for (const file of allSrcFiles) {
-  const first = relative(srcRoot, file).split(sep)[0];
-  if (!layerDirNames.has(first)) checkLayerFile(file, layerByName.get('root'));
+  const parts = relative(srcRoot, file).split(sep);
+  if (parts.length === 1) {
+    // src 根组合文件（main.ts / version.ts）：归 root 组合层，与 DEVELOPMENT §3.3 一致
+    checkLayerFile(file, layerByName.get('root'));
+    continue;
+  }
+  // 默认拒绝：未登记的新顶层目录按 root 桶（最松规则）检等于纪律 bypass ——
+  // 直接失败要求显式登记 layers，把"新目录该归哪层"变成一个必须回答的问题
+  //（已登记目录由上面的层循环检查，这里不重复计数）
+  if (!layerDirNames.has(parts[0])) {
+    console.error(`架构边界检查失败：src 下存在未登记的顶层目录「${parts[0]}」（${file}）——请在 layers 表显式登记该层的职责与禁区`);
+    process.exit(1);
+  }
 }
 // 覆盖完整性：每个 src 文件必须恰好被检一次（层目录与 root 归堆互斥且并集为全量）。
 // 断言挡住未来"新增目录忘了挂进 layers"的漂移。

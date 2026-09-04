@@ -53,6 +53,9 @@ import './render/view/textScale';
       get(this: Phaser.GameObjects.Container) {
         return 0;
       },
+      // 写操作按左上口径直接忽略：只读属性在严格模式下一次赋值就会炸掉
+      // 启动咽喉（ES 模块全严格），空 setter 让"有人想写"无害降级为 no-op
+      set(this: Phaser.GameObjects.Container, _v: number) {},
       configurable: true,
     });
   }

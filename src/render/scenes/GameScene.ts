@@ -439,6 +439,7 @@ export class GameScene extends Phaser.Scene {
 
   onBuy(slot: number): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return; // 与键盘路同口径：拖拽中不接受第二输入源
     const p = this.match.human;
     const before = p.gold;
     const starsBefore = this.snapshotStars();
@@ -463,6 +464,7 @@ export class GameScene extends Phaser.Scene {
 
   onReroll(): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return;
     this.pushUndo('刷新');
     if (this.match.reroll(this.match.human)) {
       audio.play('ui');
@@ -476,6 +478,7 @@ export class GameScene extends Phaser.Scene {
 
   onBuyXp(): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return;
     const before = this.match.human.level;
     this.pushUndo('升级');
     if (this.match.buyExp(this.match.human)) {
@@ -491,6 +494,7 @@ export class GameScene extends Phaser.Scene {
 
   onAutoArrange(): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return;
     this.pushUndo('布阵');
     autoArrange(this.match.human, this.match.pool);
     audio.play('uiBig');
@@ -508,6 +512,7 @@ export class GameScene extends Phaser.Scene {
   onUndo(): void {
     // 开战/结算期间撤销会把"战前快照"盖回已结算的状态（血量/金币已变），必须禁止
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return;
     // 撤销恢复的是快照时刻的阵容，卸载模式的"点棋子卸全身"语境已失效，回中性态
     this.exitUnloadMode();
     const e = this.undoStack.pop();
@@ -719,7 +724,7 @@ export class GameScene extends Phaser.Scene {
     this.pauseScout.setPaused(false);
     this.pauseScout.closeScout();
     this.traitMembers.close(); // 成员卡/悬停笺在战斗演出页无意义，随开战收起
-    this.inputCtl.clearSelection(); // 阵容锁定：选中态随开战清空
+    this.inputCtl.cancelDrag(); // 阵容锁定：拖拽残影与选中态随开战一并中止
     this.busy = true;
     this.phase = 'battle';
     // 阵容锁定：撤销栈清空（防止结算期间 Ctrl+Z 回滚到战前快照），

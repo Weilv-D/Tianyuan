@@ -373,51 +373,6 @@ export function resolveMerges(p: PlayerState): MergeEvent[] {
 
 // ── 上场 / 下场 ─────────────────────────────────────────
 
-/** 把场上棋子收回备战席。备战席满则返回 false。 */
-export function recallUnit(p: PlayerState, iid: number): boolean {
-  const slot = p.board.findIndex((x) => x !== null && x.iid === iid);
-  if (slot < 0) return false;
-  const u = p.board[slot]!;
-  let benchSlot = -1;
-  for (let i = 0; i < BENCH_SLOTS; i++) {
-    if (p.bench[i] === null) {
-      benchSlot = i;
-      break;
-    }
-  }
-  if (benchSlot < 0) return false;
-  p.board[slot] = null;
-  p.bench[benchSlot] = u;
-  return true;
-}
-
-/** 在场上内部移动（拖拽换站位） */
-export function moveOnBoard(p: PlayerState, iid: number, slot: number): boolean {
-  // 与 canPlace / moveToSlot 同口径的槽位守卫：越界 slot 会把 board 数组撑长
-  //（稀疏扩容）或挂上 "-1" 属性，32 格不变式即告腐坏，此处直接拒绝。
-  if (!Number.isInteger(slot) || slot < 0 || slot >= p.board.length) return false;
-  const from = p.board.findIndex((x) => x !== null && x.iid === iid);
-  if (from < 0) return false;
-  if (from === slot) return false;
-  const tmp = p.board[slot];
-  p.board[slot] = p.board[from];
-  p.board[from] = tmp;
-  return true;
-}
-
-/** 备战席内部移动 */
-export function moveOnBench(p: PlayerState, iid: number, slot: number): boolean {
-  // 同 moveOnBoard：越界直接拒绝，不撑长 bench 数组（9 格不变式）。
-  if (!Number.isInteger(slot) || slot < 0 || slot >= p.bench.length) return false;
-  const from = p.bench.findIndex((x) => x !== null && x.iid === iid);
-  if (from < 0) return false;
-  if (from === slot) return false;
-  const tmp = p.bench[slot];
-  p.bench[slot] = p.bench[from];
-  p.bench[from] = tmp;
-  return true;
-}
-
 /**
  * 把棋子移动到任意槽位（棋盘 ↔ 备战席，或各自内部），目标格有人则两者交换。
  *

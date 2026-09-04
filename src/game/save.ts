@@ -250,10 +250,13 @@ export function loadPrefs(): Preferences {
   }
 }
 
-export function savePrefs(p: Preferences): void {
+export function savePrefs(p: Preferences): boolean {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify(p));
+    return true;
   } catch {
-    /* 忽略 */
+    // 拖动音量等高频路径保持静默（对局存档的失败提示口径不适用于每次 pointermove）；
+    // 返回值供设置面板关闭路径做一次性可见提示
+    return false;
   }
 }

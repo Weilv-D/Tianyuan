@@ -80,6 +80,9 @@ export class UnitView extends Phaser.GameObjects.Container {
   private readonly castRing: Phaser.GameObjects.Graphics;
   /** 归一后的内容高（1★ 基准逻辑 px）：血条 / 星标等头顶锚件的唯一依据 */
   private readonly contentH: number;
+  /** 剪影本体的基准缩放（构造期内容归一结果）。吟唱放大/归位都以它为锚 ——
+   *  若从"当前值"累乘，打断再吟唱会把 1.06 乘上去层层叠高，施法越多棋子越大 */
+  private readonly baseSpriteScale: { x: number; y: number };
   /** 头顶栈（真源 unitLayout）：构造期一次算定——战斗内星级恒定，锚件不跳动 */
   private readonly head: HeadStackLayout;
 
@@ -142,6 +145,7 @@ export class UnitView extends Phaser.GameObjects.Container {
     // 内容归一：不同原型的墨迹占框差异大，按可见内容高统一体量，
     // 星级体量差仍由容器级缩放表达
     this.sprite.setScale(silContentScale(defId, star, CONTENT_H, CONTENT_W));
+    this.baseSpriteScale = { x: this.sprite.scaleX, y: this.sprite.scaleY };
     this.contentH = silContentHeight(defId, star, CONTENT_H, CONTENT_W);
     this.head = headStackLayout(this.contentH, unitContainerScale(star, this.cost, isBeast));
     this.castRing = scene.add.graphics();
@@ -174,16 +178,23 @@ export class UnitView extends Phaser.GameObjects.Container {
    */
   setItems(itemIds: readonly string[]): void {
     this.itemRow.removeAll(true);
-    const n = Math.min(3, itemIds.length);
+    // 先滤掉缺纹理的图标再排版：边滤边排会让空位留在行内（totalW 已按全数占位）
+    const keys = itemIds
+      .slice(0, 3)
+      .map((id) => ({ id, key: itemIconKey(id) }))
+      .filter((k) => {
+        if (this.scene.textures.exists(k.key)) return true;
+        if (import.meta.env.DEV) console.warn(`[UnitView] 缺少装备图标纹理：${k.key}`);
+        return false;
+      });
+    const n = keys.length;
     if (n === 0) return;
     // 图标世界尺寸恒定：局部 = 世界 / 容器缩放（头顶 UI 是跨星级标准件）
     const size = ITEM_ICON / this.head.scale;
     const gap = ITEM_GAP / this.head.scale;
     const totalW = n * size + (n - 1) * gap;
     for (let i = 0; i < n; i++) {
-      const id = itemIds[i];
-      const key = itemIconKey(id);
-      if (!this.scene.textures.exists(key)) continue;
+      const { id, key } = keys[i];
       const img = this.scene.add.image(-totalW / 2 + i * (size + gap) + size / 2, 0, key);
       img.setDisplaySize(size, size);
       this.itemRow.add(img);
@@ -236,7 +247,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.ty = y;
     this.moveT = 0;
     this.moveDur = Math.max(0.016, dur);
-    // 突进：拉出一道残影（缩放 = 内容缩放 × 星级容器缩放，漏乘星级会让 3★ 残影偏小）
+    // 突进：拉出一道残影（缩放 = 内容缩放 × 星级容器缩放，漏乘星级会让 3★ 残影偏小）。
+    // 补间目标从残影自身初值起算 —— 写容器 scale 会漏乘内容缩放，残影几乎不胀
     const ghost = this.scene.add
       .image(this.x, this.y, silhouetteKey(this.defId, this.isBeast ? BEAST_TEAM : this.side, this.star))
       .setOrigin(0.5, SIL_ORIGIN_Y)
@@ -247,8 +259,8 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.scene.tweens.add({
       targets: ghost,
       alpha: 0,
-      scaleX: this.scaleX * 1.25,
-      scaleY: this.scaleY * 1.25,
+      scaleX: ghost.scaleX * 1.25,
+      scaleY: ghost.scaleY * 1.25,
       duration: 260,
       onComplete: () => {
         if (ghost.scene) ghost.destroy();
@@ -280,8 +292,10 @@ export class UnitView extends Phaser.GameObjects.Container {
     const y = this.head.barsY;
     const h = HP_BAR_H * k;
     const w = BAR_W * k;
-    const hpRatio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
-    const shieldRatio = Phaser.Math.Clamp(this.shield / this.maxHp, 0, 1);
+    // maxHp/maxMp 恒 >0，但渲染层不做这个假设：除零的 NaN 会沿 Clamp 原样
+    // 传进 fillRect，画出未定义矩形（防御在展示边界，不在业务口径）
+    const hpRatio = Phaser.Math.Clamp(this.maxHp > 0 ? this.hp / this.maxHp : 0, 0, 1);
+    const shieldRatio = Phaser.Math.Clamp(this.maxHp > 0 ? this.shield / this.maxHp : 0, 0, 1);
 
     // 底槽（描边偏移同样随世界尺寸换算）
     const e = 1 * k;
@@ -485,11 +499,15 @@ export class UnitView extends Phaser.GameObjects.Container {
     this.castT = windup;
     this.castTotal = windup;
     const col = this.friendly ? SPIRIT.light : CINNABAR.light;
+    // 从基准值起算并清掉未完成的吟唱补间：重入（打断后再吟唱）不得把
+    // 上一次的 1.06 累乘进来，否则施法次数越多棋子越大
+    this.scene.tweens.killTweensOf(this.sprite);
+    this.sprite.setScale(this.baseSpriteScale.x, this.baseSpriteScale.y);
     this.scene.tweens.add({
       targets: this.sprite,
       y: -8,
-      scaleX: this.sprite.scaleX * 1.06,
-      scaleY: this.sprite.scaleY * 1.06,
+      scaleX: this.baseSpriteScale.x * 1.06,
+      scaleY: this.baseSpriteScale.y * 1.06,
       duration: windup * 1000,
       ease: 'Sine.easeInOut',
     });
@@ -502,13 +520,17 @@ export class UnitView extends Phaser.GameObjects.Container {
     void col;
   }
 
-  /** 吟唱结束，恢复常态 */
+  /** 吟唱结束，恢复常态。缩放必须一并归位到基准值 —— 只归 y 的话，
+   *  1.06 放大会永久留在棋子身上，一场十几次施法后肉眼可见地膨胀 */
   endCast(): void {
     this.castT = 0;
     this.motionT = 0.18; // 归位补间期间同样锁呼吸，否则浮空被 bob 瞬间拉平
+    this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.add({
       targets: this.sprite,
       y: 0,
+      scaleX: this.baseSpriteScale.x,
+      scaleY: this.baseSpriteScale.y,
       duration: 180,
       ease: 'Back.easeOut',
     });

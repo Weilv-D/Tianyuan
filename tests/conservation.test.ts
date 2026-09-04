@@ -55,6 +55,38 @@ describe('玩家资产守恒', () => {
     expect(match.pool.snapshot()).toEqual(poolBefore);
   });
 
+  it('卖价公式钉死绝对值：1★=费、2★=3×费−1、3★=9×费−1', () => {
+    // 期望值手写不经过 sellValue —— 卖价公式若被改坏，与实现同源的断言测不出来
+    expect(sellValue({ defId: 'pan', star: 1, items: [] } as unknown as UnitInstance)).toBe(1); // 1 费
+    expect(sellValue({ defId: 'pan', star: 2, items: [] } as unknown as UnitInstance)).toBe(2);
+    expect(sellValue({ defId: 'pan', star: 3, items: [] } as unknown as UnitInstance)).toBe(8);
+    expect(sellValue({ defId: 'haotian', star: 2, items: [] } as unknown as UnitInstance)).toBe(14); // 5 费
+    expect(sellValue({ defId: 'haotian', star: 3, items: [] } as unknown as UnitInstance)).toBe(44);
+  });
+
+  it('2★/3★ 卖出：金币按公式返还、按 3/9 张 1★ 回池', () => {
+    for (const [star, goldBack, cards] of [
+      [2, 2, 3],
+      [3, 8, 9],
+    ] as const) {
+      const match = new Match(20260 + star);
+      const player = match.human;
+      player.gold = 50;
+      player.board = emptyBoard();
+      player.bench = emptyBench();
+      const unit = createUnit('pan');
+      unit.star = star;
+      player.bench[0] = unit;
+      const poolBefore = match.pool.snapshot();
+      const goldBefore = player.gold;
+
+      expect(match.sell(player, unit.iid)).toBe(true);
+
+      expect(player.gold).toBe(goldBefore + goldBack);
+      expect(match.pool.snapshot()).toEqual({ ...poolBefore, pan: poolBefore.pan + cards });
+    }
+  });
+
   it('买入第三张触发合成后会把合成产物自动上场', () => {
     const match = new Match(2028);
     const player = match.human;

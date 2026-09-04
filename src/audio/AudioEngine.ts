@@ -252,9 +252,12 @@ export class AudioEngine {
    *  引用保持到物理 stop 才清空：淡出窗口内 maybeTakeover 见到非空即不再
    *  起新源 —— 否则切心境时旧源还响着、新源已起，两个源叠 260ms。 */
   private stopLicensed(fadeMs: number): void {
-    this.licensedGen++;
     const src = this.licensedSrc;
+    // 无源在播时不递增代际：代际拦的是"旧源迟到的 onended/接管"，不是加载批次 ——
+    // 解锁后 ~1s 的加载窗口内 stopBgm 若白白递增，全部在途解码会被判过期丢弃，
+    // licensedBufs 永久缺曲且无重抓路径，此后整个会话只能回落程序化
     if (!src) return;
+    this.licensedGen++;
     const kill = () => {
       try { src.stop(); } catch { /* 已自然结束 */ }
       try { src.disconnect(); } catch { /* 已断开 */ }
@@ -595,7 +598,10 @@ export class AudioEngine {
     if (this.mood === mood && (this.bgmTimer !== null || this.licensedSrc !== null)) return;
     const prev = this.mood;
     this.mood = mood;
-    if (prev !== 'none' && this.buses) {
+    // 无条件抬升总线：从 'none' 起播（首次进入、以及设置面板切换典藏音乐的
+    // stopBgm→startBgm 热切换）若跳过 ramp，总线停在 stopBgm 淡出后的 0.0001 ——
+    // 而 stopBgm 的 240ms 恢复回调见 mood 已变会跳过恢复，BGM 就此永久极小声
+    if (this.buses) {
       const now = this.now();
       const g = this.buses.bgm.gain;
       try {

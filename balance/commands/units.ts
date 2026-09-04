@@ -8,8 +8,7 @@
  *   --run 缺省取库里最近一次有单位数据的 run；--label 选 sweep 里的某个配置。
  */
 import { PRESET_COMPS, type CompSpec } from '../../src/game/comp';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { loadComps } from '../lib/comps';
 import { printUnitBoard } from '../lib/report';
 import { Store } from '../lib/store';
 
@@ -22,7 +21,9 @@ export async function run(argv: string[]): Promise<void> {
   const sort = sortIdx >= 0 && argv[sortIdx + 1] === 'taken' ? 'taken' : 'dealt';
   let comps: CompSpec[] = [...PRESET_COMPS];
   if (compsIdx >= 0) {
-    comps = JSON.parse(readFileSync(resolve(argv[compsIdx + 1]), 'utf8')) as CompSpec[];
+    // 走 loadComps 统一校验（棋子存在/星级合法），裸 JSON.parse 会在排行打印时
+    // 才以 undefined.name 崩出来，或静默错位
+    comps = loadComps(argv[compsIdx + 1]).comps;
   }
 
   const store = new Store();

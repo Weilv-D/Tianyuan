@@ -160,6 +160,11 @@ export const BEAST_ROUND_SCHEDULE: readonly number[] = [1, 7, 13, 19, 25];
 /** 对局节奏真源：奇遇轮恰三次，对准开局 / 中盘 / 后程三段成长弧 */
 export const ADVENTURE_ROUND_SCHEDULE: readonly number[] = [4, 10, 16];
 
+/** 战斗快照保留窗口（M4 回放校验面）。常规对局 30–35 场战斗，窗口 60 覆盖
+ *  全程；仅异常长局（超 LateCurve 拖人节奏的极端对局）才裁掉最旧记录 ——
+ *  换来存档载荷有界，不随对局长度单调膨胀。 */
+export const BATTLE_SNAPSHOT_KEEP = 60;
+
 /** 单只墨兽的掉落档：全员保底（胜负同发）+ 胜场追加（含成品件数） */
 export interface BeastDropTier {
   round: number;
@@ -858,6 +863,9 @@ export class Match implements AiWorld {
       ticks: result.ticks,
       eventsDigest: recordEvents ? fnv1aHex(JSON.stringify(battle.events)) : '',
     });
+    // 保留窗口封顶（≥ 单局最坏战斗数 ~40）：快照随档持久化（M4 回放校验面），
+    // 不封顶会单调推高写盘载荷与配额失败概率；校验面只需最近一段窗口。
+    if (this.battleSnapshots.length > BATTLE_SNAPSHOT_KEEP) this.battleSnapshots.shift();
     return result;
   }
 
@@ -1215,7 +1223,7 @@ export class Match implements AiWorld {
     m.phase = data.phase ?? 'prep';
     m.pool.restore(data.pool);
     // 坏档/版本漂移守卫：board/bench 长度恒为 32/9（state.emptyBoard/emptyBench 口径）。
-    // 长度漂移会让 moveOnBoard/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛。
+    // 长度漂移会让 moveToSlot/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛。
     let totalUnitCleaned = 0;
     for (const pl of data.players ?? []) {
       if (!pl || typeof pl !== 'object') throw new Error('corrupted player entry in save');
@@ -1252,12 +1260,28 @@ export class Match implements AiWorld {
       });
       totalUnitCleaned += unitCleaned;
     }
+    m.players = data.players;
+    // 墨影快照与墨兽阵容与玩家棋盘同口径清洗：它们随开战原样进内核
+    // buildBattleConfig，脏 id 会在"读档成功 → 开战抛错"上形成可重复软锁。
+    m.ghosts = new Map(data.ghosts);
+    m.beastBoard = data.beastBoard ? cloneBoard(data.beastBoard) : null;
+    for (const [, board] of m.ghosts) {
+      for (let i = 0; i < board.length; i++) {
+        const r = sanitizeUnitEntry(board[i]);
+        if (r.cleaned) totalUnitCleaned++;
+        board[i] = r.unit;
+      }
+    }
+    if (m.beastBoard) {
+      for (let i = 0; i < m.beastBoard.length; i++) {
+        const r = sanitizeUnitEntry(m.beastBoard[i]);
+        if (r.cleaned) totalUnitCleaned++;
+        m.beastBoard[i] = r.unit;
+      }
+    }
     if (totalUnitCleaned > 0) {
       console.warn(`[save] 存档棋子/装备与本版名单不一致，已清洗 ${totalUnitCleaned} 处（丢弃/钳制），其余保留`);
     }
-    m.players = data.players;
-    m.ghosts = new Map(data.ghosts);
-    m.beastBoard = data.beastBoard ? cloneBoard(data.beastBoard) : null;
     m.settings = data.settings ?? { autoDeploy: true };
     m.battleSnapshots = data.battleSnapshots ?? [];
     m.adventureOffer = data.adventureOffer ?? null;
@@ -1287,9 +1311,13 @@ export class Match implements AiWorld {
 
 /** 单元条目清洗（fromJSON 专用，pool.restore 同一容错粒度）：
  *  - 未知 defId：本版名单外的棋子无法参战也无法卖出，整格丢弃；
+ *  - iid 非有限数：拖拽/卖出/视图绑定全部按 iid 寻址，缺它的棋子是
+ *    "卖不掉拖不动"的死子，整格丢弃；
  *  - star 非有限数：无法归档到任何星级档位，整格丢弃；
  *  - star 有限但越界/非整：钳回 [1,3]（不弃棋子 —— 越界星级没有任何已发布
  *    版本能产出，纯属损坏，弃子会连装备与站位资产一起蒸发）；
+ *  - powMult 存在但非有限：直接剥掉该键回落缺省 1（开战时内核会对非有限
+ *    倍率抛错，读档入口先清掉就不给软锁留门）；
  *  - items 过滤到本版名单内的装备 id。
  *  返回 cleaned 供调用方汇总 warn，不逐格刷屏。 */
 function sanitizeUnitEntry(raw: unknown): { unit: UnitInstance | null; cleaned: boolean } {
@@ -1297,8 +1325,13 @@ function sanitizeUnitEntry(raw: unknown): { unit: UnitInstance | null; cleaned: 
   if (typeof raw !== 'object') return { unit: null, cleaned: true };
   const u = raw as UnitInstance;
   if (typeof u.defId !== 'string' || !CHAMPION_BY_ID[u.defId]) return { unit: null, cleaned: true };
+  if (!Number.isFinite(u.iid as number)) return { unit: null, cleaned: true };
   if (!Number.isFinite(u.star as number)) return { unit: null, cleaned: true };
   let cleaned = false;
+  if (u.powMult !== undefined && !Number.isFinite(u.powMult)) {
+    delete u.powMult;
+    cleaned = true;
+  }
   const star = u.star as number;
   if (!Number.isInteger(star) || star < 1 || star > 3) {
     u.star = Math.min(3, Math.max(1, Math.round(star))) as UnitInstance['star'];

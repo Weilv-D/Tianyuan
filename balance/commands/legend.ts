@@ -32,9 +32,13 @@ if (!Number.isInteger(N) || N <= 0) {
   process.exit(1);
 }
 
-/** 预设阵容里被升星的对象：--unit 优先，否则取费用最高者（平局取名字序，稳定） */
+/** 预设阵容里被升星的对象：--unit 优先（须在名单内），否则取费用最高者（平局取名字序，稳定） */
 function legendTargetOf(compIdx: number): string {
-  if (UNIT_ARG) return UNIT_ARG.slice('--unit='.length);
+  if (UNIT_ARG) {
+    const id = UNIT_ARG.slice('--unit='.length);
+    if (!CHAMPION_BY_ID[id]) throw new Error(`--unit 指定不存在的棋子：${id}`);
+    return id;
+  }
   const ids = Object.keys(PRESET_COMPS[compIdx].units);
   ids.sort((a, b) => {
     const d = CHAMPION_BY_ID[b].cost - CHAMPION_BY_ID[a].cost;
@@ -114,8 +118,10 @@ console.log('  设计口径（v1.9 定档）：天命组镜像 ≈98% 近乎接�
 
 // ── 口径 2：天命包贡献 = 升级价值(包开) − 升级价值(包关) ──
 // Patcher 是全局的，包关时 A 的 3★ 也失去天命 —— 于是「包关下的 2★→3★ 升级价值」
-// 就是纯星级缩放的贡献，两者之差即天命包的净贡献。
-console.log('\n【天命包贡献】升级价值（包开）对比 升级价值（包关，纯星级缩放）\n');
+// 就是纯星级缩放的贡献。注意：归零表只覆盖 LEGEND_T3 的数值键，布尔键 ccImmune（控制免疫）
+// 不在补丁面上、包关时依旧生效 —— 本口径输出的是数值包净贡献，不含控制免疫的贡献
+// （traits.ts「数值档贡献下界」同类声明口径）。
+console.log('\n【天命包贡献】升级价值（包开）对比 升级价值（包关，数值键归零；不含控制免疫）\n');
 const pkgRows: number[] = [];
 for (let i = 0; i < PRESET_COMPS.length; i++) {
   if (CHAMPION_BY_ID[legendTargetOf(i)].cost !== 5) continue;

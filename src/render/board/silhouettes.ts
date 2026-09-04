@@ -48,7 +48,11 @@ export function drawSilhouette(
   variant?: string,
 ): void {
   g.clear();
-  DRAWERS[key]?.(g, s, detail, variant) ?? DRAWERS.bladeGeneral(g, s, detail, variant);
+  // 名单外的剪影键回落刀将保图（不白块），但开发期必须喊出来 ——
+  // 新增 SilhouetteKey 只改类型不加抽屉时，线上就是张冠李戴的错图且难排查
+  const drawer = DRAWERS[key];
+  if (!drawer && import.meta.env.DEV) console.warn(`[silhouettes] 未知剪影键回落刀将：${key}`);
+  (drawer ?? DRAWERS.bladeGeneral)(g, s, detail, variant);
   drawExtraIdentity(g, s, variant);
 }
 

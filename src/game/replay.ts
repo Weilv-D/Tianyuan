@@ -2,7 +2,8 @@
  * 回放（M4）· 契约与校验。
  *
  * 每场战斗在结算时记录 BattleSnapshot（种子 + 双方完整配置 + 结果指纹），
- * 随存档持久化；verifyReplay 用同一种子与配置重跑战斗，逐字节比对事件流。
+ * 随存档持久化（保留窗口 BATTLE_SNAPSHOT_KEEP，超窗裁最旧 —— 载荷有界）；
+ * verifyReplay 用同一种子与配置重跑战斗，逐字节比对事件流。
  *
  * 摘要口径：eventsDigest = 事件流 JSON 的同步字符串指纹（FNV-1a 十六进制，
  * 实现于本文件 —— 必须同步可算，禁止 crypto.subtle 等异步源），

@@ -49,7 +49,7 @@ import {
 } from '../view/layout';
 import { screenToWorld } from '../view/viewScale';
 import { TRAIT_BY_ID } from '../../data/traits';
-import { RAIL_VIEW_H, RAIL_VIEW_W } from '../view/hudLayout';
+import { RAIL_VIEW, RAIL_VIEW_W } from '../view/hudLayout';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
@@ -479,8 +479,9 @@ export class HudPanels {
         .setOrigin(0.5, 0);
     });
     this.traitContainer = this.scene.add.container(RAIL_X, RAIL_Y);
-    // 视口一窗收全「徽章 40 + 右侧计数」；旧宽 48 只罩圆环，计数被遮罩裁成半截
-    this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_X - 24, RAIL_Y - 20, RAIL_VIEW_W, RAIL_VIEW_H);
+    // 视口一窗收全「徽章 40 + 右侧计数」；旧宽 48 只罩圆环，计数被遮罩裁成半截。
+    // 几何真源 = RAIL_VIEW（hudLayout），SceneRefresh 的输入门消费同一组数
+    this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_VIEW.x, RAIL_VIEW.y, RAIL_VIEW.w, RAIL_VIEW.h);
     // 轨尾渐隐缘：内容超出视口时显示 —— "下面还有、滚轮可看"的常驻信号。
     // 17 族最坏情形溢出 88px，此前没有任何可滚提示，超出的族静默不可见。
     const FADE_H = 24;
@@ -493,7 +494,7 @@ export class HudPanels {
       }
     });
     this.railFade = this.scene.add
-      .image(RAIL_X - 24, RAIL_Y - 20 + RAIL_VIEW_H - FADE_H, `railfade_v1_${RAIL_VIEW_W}x${FADE_H}`)
+      .image(RAIL_VIEW.x, RAIL_VIEW.y + RAIL_VIEW.h - FADE_H, `railfade_v1_${RAIL_VIEW_W}x${FADE_H}`)
       .setOrigin(0, 0)
       .setDepth(3)
       .setVisible(false);

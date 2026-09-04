@@ -47,7 +47,11 @@ export class SettingsPanel {
 
   close(): void {
     if (!this.panel) return;
-    savePrefs(this.host.prefs);
+    // 关闭面板 = 用户认为设置已经生效的时刻，失败必须喊出（对齐 saveMatch 的可见口径）；
+    // 拖动路径的高频落盘保持静默，只在关闭这一次给提示
+    if (!savePrefs(this.host.prefs)) {
+      console.warn('[settings] 偏好写入失败（隐私模式或存储配额已满），本次调整在刷新后不会保留');
+    }
     this.panel.destroy();
     this.panel = null;
   }

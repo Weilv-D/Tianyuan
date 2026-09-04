@@ -421,7 +421,9 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     id: 'zhenyue', name: '镇岳', title: '天王', cost: 4 as Rarity,
     origins: ['tian'], classes: ['guardian'], cls: 'guardian',
     base: S(1180, 110, 0, 44, 42, 0.6, 1, 0.55, 0, 90),
-    silhouette: 'spearVanguard', hue: 0xa8853f,
+    // 与凌霄（同剪影 spearVanguard）错开色相：跨费用同剪影同色会让商店与
+    // 侦查面板无法辨认；深赭铁色保持夜墨体系的低饱和土系
+    silhouette: 'spearVanguard', hue: 0x6b5334,
     skill: 'zhenyue_q',
     skillSpec: {
       kind: 'nova', name: '镇岳', target: 'enemyDensest',
@@ -449,7 +451,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'gongshu_q',
     skillSpec: {
       kind: 'summon', name: '机关兽', target: 'self',
-      desc: '召唤 {count} 只机关傀儡参战（继承 {hpPct} 生命与 {atkPct} 攻击力）；召唤时全体友军获得 6 秒 25% 攻速。',
+      desc: '召唤 {count} 只机关傀儡参战（继承 {hpPct} 生命与 {atkPct} 攻击力）；召唤时全体友军获得 {statusDur} 秒 {statusValue} 攻速。',
       params: { summon: { count: 2, hpPct: 0.55, atkPct: 0.75 }, status: { kind: 'aspdUp', dur: 6, value: 25 } },
     },
   },
@@ -519,7 +521,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     id: 'yunchu', name: '云杼', title: '织机师', cost: 1 as Rarity,
     origins: ['momen'], classes: ['mage'], cls: 'mage',
     base: S(560, 34, 120, 16, 28, 0.6, 3, 0.6, 0, 55),
-    silhouette: 'talismanMage', hue: 0x7286ad,
+    // 与元素（同剪影 talismanMage）错开色相：青灰换黛绿灰，剪影同族的辨识差留给色相
+    silhouette: 'talismanMage', hue: 0x76a09c,
     skill: 'yunchu_q',
     skillSpec: {
       kind: 'chain', name: '飞杼', target: 'enemyNearest',
@@ -528,6 +531,8 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     },
   },
   {
+    // id 沿用发布命名（"砺"读 lì，拼音应为 lifeng）：id 已进历史存档与回放
+    // 快照的 defId 契约面，改名即弃档 —— 只留注释，不做迁移
     id: 'zhenfeng', name: '砺锋', title: '磨刀叟', cost: 1 as Rarity,
     origins: ['bingjia'], classes: ['warrior'], cls: 'warrior',
     base: S(720, 62, 0, 24, 20, 0.65, 1, 0.55, 15, 60, 0.15, 1.55),
@@ -846,7 +851,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'taibu_q',
     skillSpec: {
       kind: 'execute', name: '卜凶', target: 'allEnemies',
-      desc: '卜敌凶期：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 生命。',
+      desc: '卜敌凶期：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 最大生命。',
       params: { sp: 1.7, type: 'true', threshold: 0.2, healPerExecute: 0.1 },
     },
   },
@@ -908,7 +913,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'shidian_q',
     skillSpec: {
       kind: 'execute', name: '十殿审判', target: 'allEnemies',
-      desc: '审判全场：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 生命。',
+      desc: '审判全场：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 最大生命。',
       // threshold 0.24 → 0.20（M 残留专项）：处决斩杀窗收窄 4 个百分点。
       // 量化依据（scripts/ab-pair.ts，CRN n=250）：「亡语→后期」双向平均
       // 99.8% → 90.0%（-9.8p，目标门 ≤92% 达标）；其余配对全部 |Δ| ≤ 2p，
