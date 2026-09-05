@@ -87,7 +87,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
             nearest = al;
           }
         }
-        a.heal(null, nearest, victim.maxHp * t('deathHeal', 0.06), 'trait');
+        a.heal(null, nearest, victim.maxHp * t('deathHeal', 0.06));
       }
 
       // 四档：首次阵亡复活（M2修复：与不朽衣解耦，各自一次）
@@ -152,6 +152,10 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     if (tier >= 1) {
       api.hooksOf(members[0].team).onKill.push((a, killer) => {
         if (!isMember(members, killer)) return;
+        // 击杀回蓝与其余增量通道（普攻/受击/紫金炉）同一口径：施法锁定窗口
+        // （MANA_LOCK_AFTER_CAST）内不回蓝。否则吟唱后 0.5s 内的击杀会绕过
+        // 锁定提前攒出下一次施法，破坏「施法后锁定」的全局节奏约定
+        if (killer.manaLock > 0) return;
         killer.mp = Math.min(killer.maxMp, killer.mp + t('killMana', 20));
         a.emit({ t: 'mana', tick: a.tick, uid: killer.uid, mp: killer.mp, maxMp: killer.maxMp });
       });
@@ -172,7 +176,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
         // 这才符合"绝境化形"这四个字。
         if (dst.hp / dst.maxHp > t('transformAt', 0.6)) return;
         dst.yaozuTransformed = true;
-        a.heal(dst, dst, dst.maxHp * t('transformHeal', 0.24), 'trait');
+        a.heal(dst, dst, dst.maxHp * t('transformHeal', 0.24));
         a.fx('healWave', { uid: dst.uid });
         // 化形：清除一切负面 + 攻速暴涨 + 减伤。清负面与 removeStatus 同走
         // 状态事件流（逐条补 removed 账）—— 手写 filter 绕开事件是观察面缺口
@@ -407,7 +411,8 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
     if (tier >= 1) {
       api.hooksOf(members[0].team).onHealOverflow.push((a, target, _src, overflow) => {
         if (!isMember(members, target)) return;
-        a.addShield(null, target, overflow, 999);
+        // 溢出额已在 heal() 内吃过加时窗衰减，alreadySustained 防 0.5×0.5 双重衰减
+        a.addShield(null, target, overflow, 999, { alreadySustained: true });
       });
     }
   },

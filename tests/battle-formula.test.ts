@@ -149,11 +149,11 @@ describe('治疗与暴击的记账口径', () => {
     // 自体（吸血/自奶）是同一条治疗：dst 计收治、src 不再重复记产出 ——
     // 双记会让结算面板的治疗量虚高一倍
     a.hp = 10;
-    const selfGain = b.heal(a, a, 100, 'skill');
+    const selfGain = b.heal(a, a, 100);
     expect(a.healed).toBeCloseTo(selfGain, 4);
     // 异体：收治记在受者、产出记在施者
     d.hp = 10;
-    const otherGain = b.heal(a, d, 100, 'skill');
+    const otherGain = b.heal(a, d, 100);
     expect(d.healed).toBeCloseTo(otherGain, 4);
     expect(a.healed).toBeCloseTo(selfGain + otherGain, 4);
     // 复活复用 heal 事件做表现，统计侧必须同账（影响全部复活通道）

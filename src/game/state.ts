@@ -382,8 +382,8 @@ export function resolveMerges(p: PlayerState): MergeEvent[] {
  * 不会出现"从棋盘拖到备战席"和"从备战席拖到棋盘"两套代码各错一半的情况。
  */
 export function moveToSlot(p: PlayerState, iid: number, where: 'board' | 'bench', slot: number): boolean {
-  const srcBoard = p.board.findIndex((u) => u !== null && u.iid === iid);
-  const srcBench = srcBoard >= 0 ? -1 : p.bench.findIndex((u) => u !== null && u.iid === iid);
+  const srcBoard = p.board.findIndex((u) => !!u && u.iid === iid);
+  const srcBench = srcBoard >= 0 ? -1 : p.bench.findIndex((u) => !!u && u.iid === iid);
   if (srcBoard < 0 && srcBench < 0) return false;
   const srcArr = srcBoard >= 0 ? p.board : p.bench;
   const srcSlot = srcBoard >= 0 ? srcBoard : srcBench;
@@ -411,9 +411,9 @@ export function canPlace(p: PlayerState, iid: number, where: 'board' | 'bench', 
   if (!Number.isInteger(slot) || slot < 0 || slot >= maxSlots) {
     return { ok: false, reason: '无效的位置' };
   }
-  const srcBoard = p.board.findIndex((u) => u !== null && u.iid === iid);
+  const srcBoard = p.board.findIndex((u) => !!u && u.iid === iid);
   const onBoardNow = srcBoard >= 0;
-  const u = onBoardNow ? p.board[srcBoard] : p.bench[p.bench.findIndex((x) => x !== null && x.iid === iid)];
+  const u = onBoardNow ? p.board[srcBoard] : p.bench[p.bench.findIndex((x) => !!x && x.iid === iid)];
   if (!u) return { ok: false, reason: '找不到这个棋子' };
 
   if (where === 'board') {

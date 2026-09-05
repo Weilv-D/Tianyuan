@@ -279,4 +279,32 @@ describe('战斗事件流契约', () => {
     expect(info.hp).toBe(a.hp);
     expect(info.maxHp).toBe(a.maxHp);
   });
+
+  it('施法清空与复活重入补发 mana 事件（法力账本覆盖全部通道）', () => {
+    // 复活通道：mp 回满必须入账 —— heal 承担治疗量、spawn 承担在场、mana 承担法力，
+    // 三本账各司其职；缺账会让按事件流消费法力轨迹的回放/分析读到无声跳变
+    const b = mkBattle(cornerPair());
+    const [dead, killer] = b.units;
+    dead.alive = false;
+    b.revive(dead, 0.5, killer);
+    const revMana = b.drainEvents().find((e) => e.t === 'mana' && e.uid === dead.uid);
+    expect(revMana).toBeDefined();
+    if (revMana?.t !== 'mana') return;
+    expect(revMana.mp).toBe(dead.maxMp);
+
+    // 施法通道：清空必须入账 —— 每条 cast 同 tick 存在 mp=0 的 mana 事件
+    const full = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }), unitInput('jingyu', 1, { c: 7, r: 1 })], 777, 900);
+    for (const u of full.units) u.mp = u.maxMp;
+    full.run();
+    const events = full.drainEvents();
+    const casts = events.filter((e) => e.t === 'cast');
+    expect(casts.length).toBeGreaterThan(0);
+    for (const cast of casts) {
+      if (cast.t !== 'cast') continue;
+      const cleared = events.some(
+        (e) => e.t === 'mana' && e.uid === cast.uid && e.tick === cast.tick && e.mp === 0,
+      );
+      expect(cleared).toBe(true);
+    }
+  });
 });

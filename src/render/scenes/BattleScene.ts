@@ -5,7 +5,7 @@ import type { BattleEvent } from '../../core/events';
 import { effArmor, effAspd, effAtk, effMr } from '../../core/unit';
 import { CHAMPION_BY_ID, formatSkillDesc } from '../../data/champions';
 import { TRAIT_BY_ID } from '../../data/traits';
-import { SHADE, TRAIT_TIER_COLOR_HEX, CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, css } from '../view/palette';
+import { SHADE, TRAIT_TIER_COLOR_HEX, CINNABAR, GILT, INK, MOON, PAPER, RARITY_COLOR, SPIRIT, VOID, css, rgbOf } from '../view/palette';
 import { buildTextures, grainOverlay, TEX } from '../view/textures';
 import { bakeSilhouettes } from '../board/silhouetteFactory';
 import { BoardView, CELL } from '../board/BoardView';
@@ -15,6 +15,7 @@ import { baseZoom, battleWorldToLayer, BATTLE_BOARD_LX, BATTLE_BOARD_LY, BATTLE_
 import { EffectsLayer } from '../board/EffectsLayer';
 import { DamageTextLayer, type DamageTier } from '../board/DamageText';
 import { motion } from '../view/motion';
+import { W, H } from '../view/layout';
 import { fadeIn, fadeTo } from '../view/transition';
 import { shakeFactor } from '../view/fxPrefs';
 import { audio } from '../../audio/AudioEngine';
@@ -25,10 +26,9 @@ import { saveMatch } from '../../game/save';
 import type { Unit } from '../../core/unit';
 import type { ActiveTrait, BattleConfig, DamageType } from '../../core/types';
 
-const W = 1920;
-const H = 1080;
-// 棋盘层的位置 / 缩放真源在 viewScale（BATTLE_BOARD_*），此处不另立常量——
-// 指针逆变换 battleWorldToLayer 与布局必须同一出处，测试才能断言同一契约。
+// W/H 取 layout 单一真源（其余场景同源）；棋盘层的位置 / 缩放真源在 viewScale
+//（BATTLE_BOARD_*）—— 指针逆变换 battleWorldToLayer 与布局必须同一出处，
+// 测试才能断言同一契约。
 /** 悬停单位卡尺寸（updateHoverCard 与 makeUnitCard 共用）；高度容纳两行技能描述 */
 const UNIT_CARD_W = 268;
 const UNIT_CARD_H = 184;
@@ -197,7 +197,7 @@ export class BattleScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-SPACE', () => {
       if (this.resultPanel) {
         if (this.matchCtx) this.returnToGame();
-        else { this.resultPanel.destroy(); this.restart(); }
+        else { this.resultPanel.destroy(); this.resultPanel = null; this.restart(); }
       } else {
         this.togglePause();
       }
@@ -205,7 +205,7 @@ export class BattleScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ESC', () => {
       if (this.resultPanel) {
         if (this.matchCtx) this.returnToGame();
-        else { this.resultPanel.destroy(); this.restart(); }
+        else { this.resultPanel.destroy(); this.resultPanel = null; this.restart(); }
       } else {
         this.togglePause();
       }
@@ -435,8 +435,8 @@ export class BattleScene extends Phaser.Scene {
       this.scrollB?.setHeight(hb);
       this.topSub.setText(`第 ${m.round} 回合　${m.displayNameOfTeam(pr, this.viewerTeam)}　VS　${m.displayNameOfTeam(pr, foe)}`);
     } else {
-      const ha = this.renderTraitPanel(this.traitPanelA, this.compA, cfgTraits[0] ?? [], 0);
-      const hb = this.renderTraitPanel(this.traitPanelB, this.compB, cfgTraits[1] ?? [], 1);
+      const ha = this.renderTraitPanel(this.traitPanelA, this.compA, cfgTraits[0] ?? []);
+      const hb = this.renderTraitPanel(this.traitPanelB, this.compB, cfgTraits[1] ?? []);
       this.scrollA?.setHeight(ha);
       this.scrollB?.setHeight(hb);
       this.topSub.setText(`${this.compA.name}　VS　${this.compB.name}`);
@@ -461,7 +461,11 @@ export class BattleScene extends Phaser.Scene {
       this.phaseText.setColor(css(CINNABAR.light));
       audio.startBgm('battle');
       audio.play('warn');
-      if (!motion.calm) this.cameras.main.flash(220, 0xc6, 0x5a, 0x45); // 朱砂 CINNABAR.base（静观关闭）
+      if (!motion.calm) {
+        // 朱砂开战闪（静观关闭）：色值必须走调色板真源，flash 只吃三个分量
+        const [r, g, b] = rgbOf(CINNABAR.base);
+        this.cameras.main.flash(220, r, g, b);
+      }
     });
   }
 
@@ -504,7 +508,6 @@ export class BattleScene extends Phaser.Scene {
     container: Phaser.GameObjects.Container,
     spec: CompSpec,
     traits: { id: string; count: number; tier: number }[],
-    team: number,
   ): number {
     container.removeAll(true);
     let y = 0;
@@ -581,7 +584,6 @@ export class BattleScene extends Phaser.Scene {
       container.add(row);
       y += 22;
     }
-    void team;
     return y;
   }
 
@@ -698,9 +700,12 @@ export class BattleScene extends Phaser.Scene {
       case 'spawn':
         for (const s of e.units) {
           // 复活重新入场时旧视图可能仍挂在死亡演出回调前：直接销毁重建 ——
-          // 若只是跳过，旧视图播完死亡回调删掉自己，复活单位就再无视图
+          // 若只是跳过，旧视图播完死亡回调删掉自己，复活单位就再无视图。
+          // 先杀补间再销毁（与 clearBattle 同纪律）：拖着死亡溶解补间销毁，
+          // 补间的 onComplete 会在新视图登记后把 views 里的新条目误删
           const stale = this.views.get(s.uid);
           if (stale) {
+            this.tweens.killTweensOf(stale);
             stale.destroy();
             this.views.delete(s.uid);
           }
@@ -792,7 +797,8 @@ export class BattleScene extends Phaser.Scene {
         if (e.amount > 0) view?.playHit(src?.x ?? t.x, src?.y ?? t.y);
 
         let tier: DamageTier = 'normal';
-        if (e.source === 'dot') tier = 'dot';
+        // DoT 分色与 EffectsLayer 的火苗/血珠形态同口径：灼烧（法术）酡橙、流血（真伤）深朱
+        if (e.source === 'dot') tier = e.type === 'true' ? 'dotBleed' : 'dotBurn';
         else if (e.source === 'skill') tier = e.type === 'true' ? 'true' : 'skill';
         if (e.crit && e.source === 'attack') tier = 'crit';
         if (e.kill && e.amount > 0) tier = 'execute';
@@ -863,7 +869,10 @@ export class BattleScene extends Phaser.Scene {
         }
         v.playDeath(() => {
           if (v.scene) v.destroy();
-          this.views.delete(e.uid);
+          // 身份守卫：死亡溶解的 420ms 窗口内同 uid 可能已走 spawn 重建（即时
+          // 复活同 tick 先后发 death → spawn）—— 旧补间的 onComplete 只许删掉
+          // 仍是自己的登记，不许把复活新视图从 views 里误删（删了就永久隐身）
+          if (this.views.get(e.uid) === v) this.views.delete(e.uid);
         });
         break;
       }
@@ -1154,6 +1163,7 @@ export class BattleScene extends Phaser.Scene {
         this.returnToGame();
       } else {
         panel.destroy();
+        if (this.resultPanel === panel) this.resultPanel = null;
         this.restart();
       }
     }, { width: 180, height: BTN_H, variant: 'primary' });

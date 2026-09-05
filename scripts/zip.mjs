@@ -6,7 +6,7 @@
 // 全量内存打包：面向当前 <50MB 级发布产物；产物若量级上涨需改流式（fflate Zip）。
 import { zipSync } from 'fflate';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,6 +43,11 @@ function* walkDirs(abs, dirPrefix) {
 const entries = {};
 for (const input of inputs) {
   const abs = resolve(root, input);
+  // 输入路径与 audit-music 的清单检查同一越界纪律：不把库外文件打进包
+  if (relative(root, abs).startsWith('..')) {
+    console.error(`✗ 打包输入越出仓库根，拒绝读取: ${input}`);
+    process.exit(1);
+  }
   if (!existsSync(abs)) {
     console.error(`✗ 打包输入不存在: ${input}`);
     process.exit(1);
@@ -59,17 +64,36 @@ for (const input of inputs) {
 
 const zipped = zipSync(entries, { level: 1 });
 const outAbs = resolve(root, out);
+// 输出路径同一越界纪律：不把 zip 写到库外
+if (relative(root, outAbs).startsWith('..')) {
+  console.error(`✗ 输出路径越出仓库根，拒绝写入: ${out}`);
+  process.exit(1);
+}
 mkdirSync(dirname(outAbs), { recursive: true });
-// 原子落盘：先写 .tmp 再改名，中断不留半截 zip（与 release 的产物承诺同口径）
+// 原子落盘：先写 .tmp 再改名，中断不留半截 zip（与 release 的产物承诺同口径）。
+// Windows 下目标被占用（EPERM/EBUSY）按 release safeMove 同款重试后回落复制，
+// 跨盘（EXDEV）直接回落复制 —— 半截 .tmp 不留在产物目录
 const tmpAbs = `${outAbs}.tmp`;
 writeFileSync(tmpAbs, zipped);
-try {
-  renameSync(tmpAbs, outAbs);
-} catch (err) {
-  // 跨盘（EXDEV）rename 直接抛错且留 .tmp：与 release 的 safeMove 同口径回落复制
-  if (err.code !== 'EXDEV') throw err;
-  cpSync(tmpAbs, outAbs);
-  rmSync(tmpAbs);
+let moved = false;
+for (let attempt = 0; attempt < 3 && !moved; attempt++) {
+  try {
+    renameSync(tmpAbs, outAbs);
+    moved = true;
+  } catch (err) {
+    const retryable = err && (err.code === 'EPERM' || err.code === 'EBUSY' || err.code === 'EXDEV');
+    if (retryable && attempt < 2) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300 * (attempt + 1));
+      continue;
+    }
+    if (retryable) {
+      cpSync(tmpAbs, outAbs);
+      rmSync(tmpAbs);
+      moved = true;
+    } else {
+      throw err;
+    }
+  }
 }
 const mb = (zipped.length / 1024 / 1024).toFixed(1);
 console.log(`zip 完成 → ${out}（${Object.keys(entries).length} 个条目，${mb} MB）`);

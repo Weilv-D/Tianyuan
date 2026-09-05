@@ -14,6 +14,7 @@ const layers = [
       ['Date.now', /\bDate\.now\s*\(/g],
       ['Date constructor', /\bnew\s+Date\s*\(/g],
       ['browser global', /\b(?:window|document|localStorage|sessionStorage)\b/g],
+      ['crypto random', /\b(?:getRandomValues|randomUUID)\s*\(/g],
       ['browser clock', /\bperformance\.now\s*\(/g],
       ['browser I/O', /\b(?:fetch|requestAnimationFrame|setTimeout|setInterval)\s*\(/g],
     ],
@@ -26,6 +27,7 @@ const layers = [
       ['Date.now', /\bDate\.now\s*\(/g],
       ['Date constructor', /\bnew\s+Date\s*\(/g],
       ['browser global', /\b(?:window|document|localStorage|sessionStorage)\b/g],
+      ['crypto random', /\b(?:getRandomValues|randomUUID)\s*\(/g],
       ['browser clock', /\bperformance\.now\s*\(/g],
       ['browser I/O', /\b(?:fetch|requestAnimationFrame|setTimeout|setInterval)\s*\(/g],
     ],
@@ -43,17 +45,22 @@ const layers = [
   {
     // 表现层（DEVELOPMENT §3.3）：消费下层模块与 UI 组件，不反向输出规则。
     // render ↔ ui 双向可达是既定事实（卡片/提示卡/面板互相复用），一并放行。
+    // root 桶只放行 version 常量白名单 —— main.ts 是启动组合根，被表现层
+    // 反向引用即循环，门禁不得比文档松。
     name: 'render',
-    allowedLayers: new Set(['render', 'ui', 'game', 'core', 'data', 'audio', 'music', 'assets', 'root']),
+    allowedLayers: new Set(['render', 'ui', 'game', 'core', 'data', 'audio', 'music', 'assets']),
+    allowedRootModules: new Set(['version']),
     allowPackages: true,
   },
   {
     // 可复用界面组件：表现层与只读领域数据。对 game 层只开放偏好存取（save.ts）
     // 与状态类型/查表助手（state.ts）两个白名单文件 —— 阻断 UI 直接改写
-    // 对局可变状态（match/pool/ai 等一旦被 UI 引用即报错）。
+    // 对局可变状态（match/pool/ai 等一旦被 UI 引用即报错）。root 同 render：
+    // 仅 version 常量白名单。
     name: 'ui',
-    allowedLayers: new Set(['ui', 'render', 'core', 'data', 'audio', 'music', 'root']),
+    allowedLayers: new Set(['ui', 'render', 'core', 'data', 'audio', 'music']),
     allowedGameModules: new Set(['game/save', 'game/state']),
+    allowedRootModules: new Set(['version']),
     allowPackages: true,
   },
   {
@@ -185,6 +192,14 @@ function checkLayerFile(file, layer) {
       // 带白名单的层：game 目录只放行名单内的模块，名单外一律报错
       if (!layer.allowedGameModules.has(modPath)) {
         violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得依赖 src/${modPath}（game 白名单外）`);
+      }
+      continue;
+    }
+    if (layer.allowedRootModules && target === 'root') {
+      // root 白名单（render/ui → version 常量）：名单外的根文件（含 main.ts
+      // 组合根）一律报错，避免门禁比 DEVELOPMENT §3.3 的边界表松
+      if (!layer.allowedRootModules.has(modPath)) {
+        violations.push(`${displayPath}:${lineNumber(code, index)} ${layer.name} 不得依赖 src/${modPath}（root 白名单外）`);
       }
       continue;
     }

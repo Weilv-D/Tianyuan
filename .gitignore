@@ -21,11 +21,11 @@ sweep-out/
 .vscode/
 .idea/
 
-# 审计/浏览器实测的临时产物（截图与报告，不入库）
+# 审计/浏览器实测的临时产物（截图与报告，不入库）；.tmp-* 通配收编全部
+# 一次性诊断探针与对账清单（.tmp-cdp.mjs / .tmp-*.diff 等），命名即约定
 .tmp-shots/
 .tmp/
-# 一次性诊断探针脚本（.tmp-cdp.mjs 等）
-.tmp-*.mjs
+.tmp-*
 
 # Python 隔离环境（uv 管理，Python 仅用于一次性辅助脚本，非项目运行时依赖）
 .venv/
@@ -35,6 +35,3 @@ Thumbs.db
 .DS_Store
 *.tsbuildinfo
 .vite/
-
-# 审查会话的临时基线快照
-.tmp-*.diff

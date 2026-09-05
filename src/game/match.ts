@@ -71,6 +71,7 @@ import {
   type PlayerState,
   type Phase,
   type UnitInstance,
+  type AiArchetype,
 } from './state';
 import type { ActiveTrait, BattleConfig, BattleResult, BattleUnitInput } from '../core/types';
 
@@ -594,9 +595,11 @@ export class Match implements AiWorld {
         if (upgraded) this.tryAutoDeploy(p, upgraded.iid);
       }
       // 自动上场把第 10 格的合成幸存者搬走后尾部必空；即便没搬（autoDeploy=false
-      // 且尾部已空），此处也无条件把长度收敛回 BENCH_SLOTS=9 —— 尾部空位是
-      // 合成净腾一格的常态，不留幽灵槽（length 不变式见 conservation 测试）
-      p.bench.length = BENCH_SLOTS;
+      // 且尾部已空），此处也把长度收敛回 BENCH_SLOTS=9 —— 尾部空位是
+      // 合成净腾一格的常态，不留幽灵槽（length 不变式见 conservation 测试）。
+      // 只截断不拉长：length 赋值在不足 9 时会补 undefined 洞，洞会让
+      // moveToSlot/canPlace 的 `u !== null && u.iid` 寻址抛 TypeError
+      while (p.bench.length > BENCH_SLOTS) p.bench.pop();
       return { ok: true };
     }
 
@@ -794,6 +797,10 @@ export class Match implements AiWorld {
         (p.b >= 0 && covered.has(p.b)) ||
         p.beast !== beastRound ||
         (p.beast && (p.b !== -1 || p.ghost !== -1)) ||
+        // 非墨兽行 b 与 ghost 互斥：双设的行语义不明（boardOfOpponent 只认 b，
+        // 墨影对手被静默丢弃），与墨兽行「b/ghost 必空」同一粒度整表弃用。
+        // 全负（b=-1 且 ghost=-1）是合法轮空行，不在此列。
+        (!p.beast && p.b >= 0 && p.ghost !== -1) ||
         (p.ghost !== -1 && ((this.players[p.ghost]?.alive ?? true) || !this.hasGhostSquad(p.ghost)))
       ) {
         return [];
@@ -1234,12 +1241,61 @@ export class Match implements AiWorld {
     // 长度漂移会让 moveToSlot/canPlace 的槽位守卫与 Hud 落点染色分裂，此处整体收敛；
     // 被截断丢弃的名单内棋子回池补偿（守恒：卡可以坏，但不能凭空蒸发）。
     let totalUnitCleaned = 0;
-    for (const pl of data.players ?? []) {
+    if (!Array.isArray(data.players)) throw new Error('corrupted players array in save');
+    for (let pi = 0; pi < data.players.length; pi++) {
+      const pl = data.players[pi] as unknown as Record<string, unknown>;
       if (!pl || typeof pl !== 'object') throw new Error('corrupted player entry in save');
-      if (!Number.isFinite(pl.gold) || !Number.isFinite(pl.hp) || !Number.isFinite(pl.level)) {
+      if (!Number.isFinite(pl.gold as number) || !Number.isFinite(pl.hp as number) || !Number.isFinite(pl.level as number)) {
         throw new Error('corrupted player numeric stats in save');
       }
-      if (pl.level < 1 || pl.level > MAX_LEVEL) throw new Error('invalid player level in save');
+      if ((pl.level as number) < 1 || (pl.level as number) > MAX_LEVEL) throw new Error('invalid player level in save');
+      // 运行时字段清洗与 board/bench 同一容错粒度（「单格损坏不清空整档」）：
+      // 手改/半截写入的档可能数值三件套完好而其余字段残缺 —— opponents 坏形状
+      // 会让下回合配对生成抛错、streak 非有限数让收入算成 NaN 沿金币静默传播
+      // （NaN < 花费恒 false = 免费购买）、items/shop 非数组在墨兽掉落与商肆
+      // 渲染上炸出「读档成功、继续即崩」的软锁。全部收敛到类型安全的缺省值。
+      const finiteOr = (v: unknown, fallback: number): number =>
+        typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+      pl.idx = pi; // 序号以数组位置为真源：idx 漂移会让配对覆盖校验错乱
+      pl.xp = finiteOr(pl.xp, 0);
+      pl.streak = finiteOr(pl.streak, 0);
+      pl.bestStreak = finiteOr(pl.bestStreak, 0);
+      pl.wins = finiteOr(pl.wins, 0);
+      pl.losses = finiteOr(pl.losses, 0);
+      pl.rank = finiteOr(pl.rank, 0);
+      pl.lastDamage = finiteOr(pl.lastDamage, 0);
+      pl.totalDamage = finiteOr(pl.totalDamage, 0);
+      if (typeof pl.isHuman !== 'boolean') pl.isHuman = pi === 0;
+      if (typeof pl.name !== 'string' || !pl.name) pl.name = pl.isHuman ? '你' : `诸侯${pi}`;
+      if (typeof pl.alive !== 'boolean') pl.alive = (pl.hp as number) > 0;
+      const outcome = pl.lastOutcome;
+      if (!(outcome === null || outcome === 'win' || outcome === 'loss' || outcome === 'draw' || outcome === 'bye')) {
+        pl.lastOutcome = null;
+      }
+      // 器匣：非数组清空，名单外装备剥离（与棋子身上装备的剥离同口径）
+      if (!Array.isArray(pl.items)) pl.items = [];
+      pl.items = (pl.items as unknown[]).filter((id) => typeof id === 'string' && !!ITEM_BY_ID[id]);
+      // 商店：恒 5 格的（棋子 id | null)；坏条目收敛为空格，不重掷 —— 商店随档
+      // 持久化是随机流契约面，这里只做形状修复、不补抽（补抽要消费 rng）
+      const rawShop = Array.isArray(pl.shop) ? (pl.shop as unknown[]) : [];
+      pl.shop = Array.from({ length: SHOP_SLOTS }, (_, i) => {
+        const v = rawShop[i];
+        return typeof v === 'string' && !!CHAMPION_BY_ID[v] ? v : null;
+      });
+      pl.shopLocked = pl.shopLocked === true;
+      if (!Array.isArray(pl.opponents)) pl.opponents = [];
+      pl.opponents = (pl.opponents as unknown[]).filter(
+        (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < data.players.length,
+      );
+      // AI 原型档案：损坏时按 arch 重建，arch 不在名单内回落「老谋」；
+      // 人类玩家的 ai 必须是 null（非 null 会让对局编排把它当 AI 调度）
+      const aiRaw = pl.ai as { arch?: unknown } | null | undefined;
+      const ARCHES = ['aggro', 'econ', 'balanced', 'hyperroll', 'greedy'] as const;
+      const archRaw = aiRaw && typeof aiRaw === 'object' ? aiRaw.arch : null;
+      const arch = typeof archRaw === 'string' && (ARCHES as readonly string[]).includes(archRaw)
+        ? (archRaw as AiArchetype)
+        : 'balanced';
+      pl.ai = pl.isHuman ? null : makeProfile(arch);
       const repairSlots = (raw: unknown, width: number): unknown[] => {
         const src: unknown[] = Array.isArray(raw) ? raw : [];
         const nb: unknown[] = new Array(width).fill(null);

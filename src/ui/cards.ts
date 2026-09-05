@@ -21,7 +21,6 @@ import { bakedTexture } from '../render/view/bake';
 import { portraitItemSlotRect } from '../render/view/hudLayout';
 import { DETAIL_SELL_BAND } from '../render/view/layout';
 import type { UnitInstance } from '../game/state';
-import type { Star } from '../core/types';
 
 /** 底框烘焙图向外扩出的边距 —— 三星光环画在卡片边界之外 */
 const CHROME_PAD = 8;
@@ -329,6 +328,9 @@ export class ShopCard extends Phaser.GameObjects.Container {
       this.sil.setScale(scale).setOrigin(0.5, SIL_ORIGIN_Y);
       this.sil.setPosition(this.cardW / 2, this.cardH - 62);
       this.sil.setVisible(true);
+    } else {
+      // 缺纹理不残留上一张卡的剪影：否则新卡顶着别人的画像上架
+      this.sil.setVisible(false);
     }
     this.nameText.setText(def.name);
     this.nameText.setAlpha(1);
@@ -386,6 +388,10 @@ export class ShopCard extends Phaser.GameObjects.Container {
   override destroy(fromScene?: boolean): void {
     this.ownedTween?.remove();
     this.ownedTween = null;
+    // 悬停补间与 ownedTween 同口径摘除：补间中销毁卡片时目标已死，补间回调
+    // 仍会写 y/重画 —— Phaser 不会随 GameObject 销毁自动停掉指向它的 tween
+    this.hoverTween?.remove();
+    this.hoverTween = null;
     this.deniedPulse?.destroy();
     this.deniedPulse = null;
     super.destroy(fromScene);
@@ -530,11 +536,6 @@ export class TraitRow extends Phaser.GameObjects.Container {
     this.bg.setTexture(key);
     this.setSize(this.cardW, h);
   }
-}
-
-/** 星级小标记，用于计分板与提示 */
-export function starGlyph(star: Star): string {
-  return star === 1 ? '★' : star === 2 ? '★★' : '★★★';
 }
 
 // ── 详情卡装备三格槽（icon 即视觉，名字/效果进悬停 tooltip）────────

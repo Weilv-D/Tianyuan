@@ -85,6 +85,19 @@ describe('结算后恢复', () => {
     expect(restored.players.flatMap((p) => [...p.opponents])).toEqual([]);
   });
 
+  it('非墨兽行 b 与 ghost 双设的配对整表弃用（与墨兽行必空同一互斥粒度）', () => {
+    const match = new Match(20260904);
+    match.beginRound();
+    while (match.isBeastRound() && !match.isOver()) match.beginRound();
+    const saved = match.toJSON() as unknown as Record<string, unknown>;
+    saved.pairings = [
+      { a: 0, b: 1, ghost: 6, swap: false, beast: false }, // 双设：语义不明（墨影对手被 b 静默顶替）
+      { a: 2, b: 3, ghost: -1, swap: false, beast: false },
+    ];
+    const restored = Match.fromJSON(saved as unknown as Parameters<typeof Match.fromJSON>[0]);
+    expect(restored.pairings).toEqual([]);
+  });
+
   it('墨影位指向空快照的配对整表弃用（与 pickGhost 的可用判据同口径）', () => {
     // 指向"已淘汰但快照为空"玩家的墨影位会以空阵开战 = 对手直胜；
     // 生成侧（pickGhost）与清洗侧都必须把「有墨影」建立在非空快照上

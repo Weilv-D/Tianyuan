@@ -16,6 +16,11 @@ const manifestPath = join(root, 'src/music/tracks.json');
 const outPath = process.argv[2]
   ? resolve(root, process.argv[2])
   : join(root, 'release/THIRD_PARTY_LICENSES.txt');
+// 输出路径与仓库内清单同一越界纪律：绝对路径或 ../ 会把清单写到库外任意位置
+if (relative(root, outPath).startsWith('..')) {
+  console.error('✗ 输出路径越出仓库根，拒绝写入：', process.argv[2]);
+  process.exit(1);
+}
 
 if (!existsSync(manifestPath)) {
   console.error('✗ 典藏音乐清单不存在：src/music/tracks.json');
@@ -141,7 +146,8 @@ if (!failed) {
   //（与 zip.mjs / subset-seal.mjs 的 .tmp → rename 纪律同口径）
   const tmpPath = `${outPath}.tmp`;
   writeFileSync(tmpPath, lines.join('\r\n'), 'utf8');
-  renameSync(tmpPath, outPath);
+  // 与 release/zip 同一改名纪律：Windows 下目标被占用（EPERM/EBUSY）重试后回落复制
+  renameWithRetry(tmpPath, outPath);
   console.log(`✓ 授权清单已生成 → ${process.argv[2] ?? 'release/THIRD_PARTY_LICENSES.txt'}`);
 }
 

@@ -29,7 +29,12 @@ export async function run(argv: string[]): Promise<void> {
   const store = new Store();
   try {
     let runId: number | null = runIdx >= 0 ? Number(argv[runIdx + 1]) : null;
-    if (runId === null || !Number.isInteger(runId)) {
+    // 显式传 --run 而解析失败 → 立即抛错：静默回落「最近一次 run」会让用户
+    // 看着别人的断面而不自知（与 loadComps 引用不存在即抛的 fail-fast 同口径）
+    if (runIdx >= 0 && (runId === null || !Number.isInteger(runId))) {
+      throw new Error(`--run 需要整数 run id，收到：${argv[runIdx + 1] ?? '（缺值）'}`);
+    }
+    if (runId === null) {
       // 最近一次有 unit 数据的 matrix/sweep run
       for (const r of store.recentRuns(null, 30)) {
         if (r.command !== 'matrix' && r.command !== 'sweep') continue;

@@ -149,6 +149,9 @@ describe('进程池（pool.ts）', () => {
     expect(pooled[0].matrix).toEqual(serial[0].matrix);
     expect(pooled[0].timeouts).toBe(serial[0].timeouts);
     expect(pooled[0].pairRows).toEqual(serial[0].pairRows);
+    // 逐单位聚合同在看守面：聚合分发若漂移而胜负恰好相同，只比胜率/矩阵
+    // 会漏检 —— units 命令与 trend 的 unit_stats 数据源就建立在这份聚合上
+    expect(pooled[0].units).toEqual(serial[0].units);
   }, 30_000);
 
   it('装备配对原语确定且值域合法', () => {

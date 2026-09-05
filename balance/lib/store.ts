@@ -157,6 +157,22 @@ export class Store {
       try { this.db.close(); } catch { /* 已断开 */ }
       throw new Error(`工件库初始化失败（${path}）：${e instanceof Error ? e.message : String(e)}`);
     }
+    // 断尾 run 清理：pair/unit/item/trait 行先落库、summary 后写，进程中途
+    // 崩掉会留下永远不进 recentRuns 的孤儿行。查询面已过滤（读数不受污染），
+    // 这里负责不让死行只进不出地堆积。外键无级联（旧库 DDL 已定型），
+    // 按子表 → configs → runs 顺序显式删除。
+    try {
+      this.db.exec(`
+        DELETE FROM pair_results  WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
+        DELETE FROM unit_stats    WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
+        DELETE FROM item_results  WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
+        DELETE FROM trait_results WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
+        DELETE FROM configs       WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
+        DELETE FROM runs          WHERE summary_json IS NULL;
+      `);
+    } catch {
+      // 清理失败不阻塞使用（只读路径本就过滤孤儿行）
+    }
   }
 
   beginRun(h: RunHeader): number {

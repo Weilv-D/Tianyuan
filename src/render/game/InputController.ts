@@ -198,8 +198,9 @@ export class InputController {
       audio.unlock();
       if (this.scene.phase !== 'prep' || this.scene.busy) return;
       const { x, y } = this.worldOf(p);
-      // 已有拖拽进行中（多点触控的第二指）：不透传，避免覆盖状态泄漏旧 ghost
-      if (this.dragGhost || this.dragItemGhost) return;
+      // 已有拖拽/点选进行中（多点触控的第二指）：不透传，避免覆盖状态泄漏旧
+      // ghost 或顶掉第一指尚未升级的 pendingUnit（升级分支用的起点快照会被改写）
+      if (this.dragGhost || this.dragItemGhost || this.pendingUnit) return;
       // 浮层开着：不透传棋盘/装备栏的拖拽与点选（遮罩只挡 GameObject 事件，
       // 挡不住场景级 pointerdown，必须在此统一让路）。
       // 唯一例外是成员卡：点卡外且非徽章 → 收卡再走正常交互（一次点击完成
@@ -282,8 +283,10 @@ export class InputController {
       if (this.pendingUnit) {
         // 按住未松时阶段可能已切换（如空格开战/结算弹层）：
         // 升级分支与 pointerdown/handleClick/endDrag 同守一套阶段闸，
-        // 否则战斗中会闪现一次落点衬底与半透明 ghost
-        if (this.scene.phase !== 'prep' || this.scene.busy) {
+        // 否则战斗中会闪现一次落点衬底与半透明 ghost。
+        // 浮层同口径让路：按住期间浮层被打开（ESC 暂停/第二入口），拖拽不得
+        // 在遮罩下升级起手。
+        if (this.scene.phase !== 'prep' || this.scene.busy || this.overlayOpen()) {
           this.pendingUnit = null;
           return;
         }
@@ -294,7 +297,13 @@ export class InputController {
         ) {
           const p0 = this.pendingUnit;
           this.pendingUnit = null;
-          this.beginDrag(p0.where, p0.slot, p0.unit, x, y);
+          // 槽位内容重验：pending 窗口内的刷新/买入/撤销（热键路）可能已重排
+          // board/bench 或吃掉该子 —— 拿按下时的过期快照起拖会让来源格高亮
+          // 压错棋子、endDrag 按旧 iid 落子。内容不一致时放弃升级（保留点选语义）。
+          const arr = p0.where === 'board' ? this.scene.match.human.board : this.scene.match.human.bench;
+          const cur = arr[p0.slot];
+          if (!cur || cur.iid !== p0.unit.iid) return;
+          this.beginDrag(p0.where, p0.slot, cur, x, y);
         }
         return;
       }
@@ -302,6 +311,12 @@ export class InputController {
     });
 
     this.scene.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      // 拖拽/点选中浮层被打开（多点触控第二指点开徽章或奇遇卡）：与页面隐藏
+      // 中止同一口径复原不落子 —— 浮层开着不允许隔空完成买卖、移动与穿戴
+      if (this.overlayOpen()) {
+        if (this.dragGhost || this.dragItemGhost || this.pendingUnit) this.onGameHidden();
+        return;
+      }
       const { x, y } = this.worldOf(p);
       if (this.dragItemGhost) {
         this.endItemDrag(x, y);
@@ -312,6 +327,11 @@ export class InputController {
     });
     // L31：画布外释放兜底（Phaser pointerupoutside / gameout）
     this.scene.input.on('pointerupoutside', (p: Phaser.Input.Pointer) => {
+      // 与 pointerup 同一浮层守卫：画布外松手同样不把落点交给已打开的浮层之下
+      if (this.overlayOpen()) {
+        this.onGameHidden();
+        return;
+      }
       const { x, y } = this.worldOf(p);
       this.pendingUnit = null; // 画布外松手：取消这次点选
       if (this.dragItemGhost) this.endItemDrag(x, y);
@@ -359,8 +379,14 @@ export class InputController {
         this.scene.onBuy(i);
       });
     }
-    // ESC 统一分发：设置 → 调试 → 羁绊全览 → 成员卡 → 侦查 → 选中/卸载模式 → 暂停，一次只关一层
+    // ESC 统一分发：拖拽/点选中止 → 设置 → 调试 → 羁绊全览 → 成员卡 → 侦查 → 选中/卸载模式 → 暂停，一次只关一层。
+    // 拖拽中止排最前：ESC 的肌肉记忆是"取消当前操作"，残影不散就直接暂停
+    // 会把半透 ghost 与来源格 0.3 压暗带进暂停遮罩后面
     this.scene.input.keyboard?.on('keydown-ESC', () => {
+      if (this.dragging || this.pendingUnit) {
+        this.cancelDrag();
+        return;
+      }
       if (this.scene.settingsPanel?.isOpen) {
         this.scene.settingsPanel.close();
         return;

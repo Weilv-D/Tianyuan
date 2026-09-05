@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { DAMAGE_OUTLINE, GILT, MOON, PAPER, SHADE, CINNABAR, SPIRIT, VOID, css } from '../view/palette';
+import { DAMAGE_OUTLINE, GILT, MOON, PAPER, SHADE, CINNABAR, EMBER, SPIRIT, VOID, css } from '../view/palette';
 import { FONT } from '../../ui/kit';
 import { TEXT_SCALE } from '../view/textScale';
 import { motion } from '../view/motion';
 import { fxPrefs } from '../view/fxPrefs';
 
-export type DamageTier = 'normal' | 'crit' | 'skill' | 'true' | 'heal' | 'shield' | 'execute' | 'dot';
+/** dotBurn = 灼烧（法术 DoT），dotBleed = 流血（真伤 DoT）—— 色相按 ART_BIBLE §7.3 分化 */
+export type DamageTier = 'normal' | 'crit' | 'skill' | 'true' | 'heal' | 'shield' | 'execute' | 'dotBurn' | 'dotBleed';
 
 /**
  * 伤害飘字。
@@ -184,8 +185,12 @@ const STYLE: Record<DamageTier, TierStyle> = {
     size: 36, color: css(GILT.glow), stroke: css(DAMAGE_OUTLINE.execute), strokeWidth: 6, bold: true,
     rise: 54, life: 1100, pop: 2.0, hold: true, glow: true, shake: true, depth: 76,
   },
-  dot: {
-    size: 16, color: css(CINNABAR.glow), stroke: css(DAMAGE_OUTLINE.dot), strokeWidth: 3, bold: false,
+  dotBurn: {
+    size: 16, color: css(EMBER.light), stroke: css(DAMAGE_OUTLINE.dotBurn), strokeWidth: 3, bold: false,
+    rise: 26, life: 620, pop: 1.05, hold: false, glow: false, shake: false, depth: 68,
+  },
+  dotBleed: {
+    size: 16, color: css(CINNABAR.base), stroke: css(DAMAGE_OUTLINE.dotBleed), strokeWidth: 3, bold: false,
     rise: 26, life: 620, pop: 1.05, hold: false, glow: false, shake: false, depth: 68,
   },
 };

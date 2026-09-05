@@ -55,7 +55,15 @@ export async function run(argv: string[]): Promise<void> {
     }
   }
   const { comps } = loadComps();
-  const focusSet = new Set(focus.split(',').map(Number).filter((x) => Number.isInteger(x) && x >= 0 && x < comps.length));
+  // 逐 token 验型：部分非法的下标被静默丢弃会让定向复测悄悄漏掉目标对
+  const focusSet = new Set<number>();
+  for (const tok of focus.split(',')) {
+    const v = Number(tok);
+    if (!tok.trim() || !Number.isInteger(v) || v < 0 || v >= comps.length) {
+      throw new Error(`--pairs 含非法下标「${tok}」（合法范围 0~${comps.length - 1}）`);
+    }
+    focusSet.add(v);
+  }
   if (focusSet.size === 0) throw new Error(`--pairs 下标全部非法：${focus}`);
 
   const len = comps.length;

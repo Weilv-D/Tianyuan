@@ -100,6 +100,15 @@ export class Battle implements BattleApi {
     const inputs = [...cfg.units].sort((a, b) => a.uid - b.uid);
     const seenUid = new Set<number>();
     for (const input of inputs) {
+      // uid 与格坐标必须为整数：小数 uid 入 Int16Array 被截断后 unitByUid 错位；
+      // 小数格下标会让 occ 占位表读写静默失效（Int16Array 忽略小数键），
+      // 重叠检查虚过、寻路与命中全盘错位 —— 与越界/重叠同口径入口即抛
+      if (!Number.isInteger(input.uid)) {
+        throw new Error(`战斗输入非整数 uid: ${input.uid}（${input.defId}）`);
+      }
+      if (!Number.isInteger(input.cell.c) || !Number.isInteger(input.cell.r)) {
+        throw new Error(`战斗输入非整数格: (${input.cell.c},${input.cell.r}) ${input.defId}`);
+      }
       if (seenUid.has(input.uid)) {
         throw new Error(`战斗输入重复 uid: ${input.uid}（${input.defId}）`);
       }
@@ -398,15 +407,17 @@ export class Battle implements BattleApi {
     }
   }
 
-  /** 敌人最密集的格子（邻域计分，平局取行优先的最小格） */
+  /** 敌人最密集的格子（邻域计分，平局取行优先的最小格）。
+   *  落点通道与 resolveTargets 的单位通道同一可目标口径（isTargetable），
+   *  否则格子通道会指向单位通道拒绝的目标位置。 */
   private densestEnemyCell(u: Unit, radius: number): Cell {
-    const foes = this.units.filter((x) => x.alive && x.team !== u.team);
+    const foes = this.units.filter((x) => isTargetable(x) && x.team !== u.team);
     if (foes.length === 0) return u.cell;
     return densest(foes, radius);
   }
 
   private enemyHalfBoardCell(u: Unit): Cell {
-    const foes = this.units.filter((x) => x.alive && x.team !== u.team);
+    const foes = this.units.filter((x) => isTargetable(x) && x.team !== u.team);
     if (foes.length === 0) return u.cell;
     let sc = 0;
     let sr = 0;
@@ -419,7 +430,7 @@ export class Battle implements BattleApi {
 
   /** 找一个能贯穿最多敌人的方向，返回该方向末端格 */
   private longestLineEndpoint(u: Unit): Cell {
-    const foes = this.units.filter((x) => x.alive && x.team !== u.team);
+    const foes = this.units.filter((x) => isTargetable(x) && x.team !== u.team);
     if (foes.length === 0) return u.cell;
     const dirs: [number, number][] = [
       [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1],
@@ -616,14 +627,15 @@ export class Battle implements BattleApi {
       MANA_FROM_DAMAGE_CAP,
       (final / dst.maxHp) * MANA_FROM_DAMAGE_RATIO * dst.trait.manaFromDamageMult,
     );
-    if (!dst.isMinion && dst.manaLock <= 0) {
+    if (!dst.isMinion && dst.manaLock <= 0 && manaGain > 0) {
       dst.mp = Math.min(dst.maxMp, dst.mp + manaGain);
+      this.emit({ t: 'mana', tick: this.tick, uid: dst.uid, mp: dst.mp, maxMp: dst.maxMp });
     }
 
     // 吸血语义：普攻 = 普攻吸血 + 全能吸血；其余伤害（技能/DoT/反伤）只吃全能吸血
     if (src && final > 0) {
       const pct = opts.isAttack === true ? src.lifesteal + src.omnivamp : src.omnivamp;
-      if (pct > 0) this.heal(src, src, final * pct, 'trait');
+      if (pct > 0) this.heal(src, src, final * pct);
     }
 
     const kill = dst.hp <= 0;
@@ -651,7 +663,7 @@ export class Battle implements BattleApi {
     return final;
   }
 
-  heal(src: Unit | null, dst: Unit, amount: number, source: 'skill' | 'trait' | 'item'): number {
+  heal(src: Unit | null, dst: Unit, amount: number): number {
     if (!dst.alive) return 0;
     if (!Number.isFinite(amount)) throw new Error(`非法治疗值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (amount <= 0) return 0;
@@ -674,7 +686,6 @@ export class Battle implements BattleApi {
     if (overflow > 0.5) {
       for (const fn of this.hooks.get(dst.team)?.onHealOverflow ?? []) fn(this, dst, src, overflow);
     }
-    void source;
     return healed;
   }
 
@@ -682,14 +693,19 @@ export class Battle implements BattleApi {
    * 护盾口径（渲染层与测试照此消费）：unit.shield 为当前总量；shield 事件的
    * amount 是本次增量、total 是累加后总量；shield 状态的 value 存总量。
    * 续盾是"刷新"而非"叠加"：时长取剩余与新增的较大者，数值并入总量。
+   *
+   * opts.alreadySustained：加时窗衰减只允许吃一次。治疗溢出转盾（丹鼎/回天灯）
+   * 传入的溢出额已在 heal() 内乘过 overtimeSustainFactor，再走本函数的衰减
+   * 等于 0.5×0.5=0.25，与「治疗/护盾产出衰减 50%」口径不符 —— 该路径必须带此标记。
    */
-  addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void {
+  addShield(src: Unit | null, dst: Unit, amount: number, dur: number, opts?: { alreadySustained?: boolean }): void {
     if (!dst.alive) return;
     if (!Number.isFinite(amount)) throw new Error(`非法护盾值: ${amount}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (!Number.isFinite(dur)) throw new Error(`非法护盾时长: ${dur}（src=${src?.uid ?? -1} dst=${dst.uid}）`);
     if (amount <= 0) return;
-    const amt = amount * (1 + (src?.trait.shieldAmp ?? 0))
-      * (this.tick >= OVERTIME_START_TICK ? MECH.overtimeSustainFactor : 1);
+    const sustain = opts?.alreadySustained ? 1
+      : this.tick >= OVERTIME_START_TICK ? MECH.overtimeSustainFactor : 1;
+    const amt = amount * (1 + (src?.trait.shieldAmp ?? 0)) * sustain;
     const before = dst.shield;
     dst.shield = Math.min(dst.shield + amt, dst.maxHp * SHIELD_CAP_RATIO);
     const added = dst.shield - before;
@@ -888,6 +904,7 @@ export class Battle implements BattleApi {
     u.targetUid = -1;
     u.cell = dest;
     this.occ[cellIndex(dest.c, dest.r)] = u.uid;
+    this.emit({ t: 'mana', tick: this.tick, uid: u.uid, mp: u.mp, maxMp: u.maxMp });
     // 复活量与 heal() 同口径记账：复活复用 heal 事件做表现，统计侧不补账的话
     // 飘字总额与结算面板的 healed 永远对不上（影响全部复活通道）
     u.healed += u.hp;
@@ -919,6 +936,11 @@ export class Battle implements BattleApi {
     if (!Number.isFinite(o.dur)) throw new Error(`非法领域时长: ${o.dur}`);
     if (!Number.isFinite(o.dps)) throw new Error(`非法领域每秒伤害: ${o.dps}`);
     if (!Number.isFinite(o.radius) || o.radius < 0) throw new Error(`非法领域半径: ${o.radius}`);
+    // 嵌套的 status 子字段同防线：坏值存进 zones 后要等 EFFECT 间隔的 tickZones
+    // 才被 addStatus 拦下，此前已命中的伤害构成部分提交
+    if (o.status && (!Number.isFinite(o.status.dur) || !Number.isFinite(o.status.value))) {
+      throw new Error(`非法领域状态参数: dur=${o.status.dur} value=${o.status.value}`);
+    }
     this.zones.push({ ...o, id: this.zoneId++, endsAtTick: this.tick + Math.round(o.dur * TICK_RATE) });
   }
 
@@ -1191,6 +1213,7 @@ export class Battle implements BattleApi {
     u.mp = 0;
     u.manaLock = MANA_LOCK_AFTER_CAST;
     u.castCount++;
+    this.emit({ t: 'mana', tick: this.tick, uid: u.uid, mp: 0, maxMp: u.maxMp });
     this.emit({ t: 'cast', tick: this.tick, uid: u.uid, skillId: u.entry.skill, params: { star: u.star } });
     executeSkill(this, u);
     for (const fn of this.hooks.get(u.team)?.onCast ?? []) fn(this, u);

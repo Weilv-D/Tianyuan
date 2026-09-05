@@ -179,7 +179,11 @@ export class HudPanels {
         this.scene.input.setDefaultCursor('default');
       });
       c.on('pointerdown', () => this.scene.tweens.add({ targets: c, scale: 0.96, duration: 70, yoyo: true }));
-      c.on('pointerup', onClick);
+      c.on('pointerup', () => {
+        // 拖拽中第二指点 nav（切场景/开浮层）：拖拽会带着残影进新场景或遮罩背后，先让路
+        if (this.scene.inputCtl.dragging) return;
+        onClick();
+      });
     });
 
     // ── 中央品牌：楷体 + 引线 + 英文微注（样稿 .brand） ──
@@ -481,7 +485,16 @@ export class HudPanels {
     this.traitContainer = this.scene.add.container(RAIL_X, RAIL_Y);
     // 视口一窗收全「徽章 40 + 右侧计数」；旧宽 48 只罩圆环，计数被遮罩裁成半截。
     // 几何真源 = RAIL_VIEW（hudLayout），SceneRefresh 的输入门消费同一组数
-    this.traitScroll = enableScroll(this.scene, this.traitContainer, RAIL_VIEW.x, RAIL_VIEW.y, RAIL_VIEW.w, RAIL_VIEW.h);
+    this.traitScroll = enableScroll(
+      this.scene,
+      this.traitContainer,
+      RAIL_VIEW.x,
+      RAIL_VIEW.y,
+      RAIL_VIEW.w,
+      RAIL_VIEW.h,
+      // 滚动即收悬停笺：笺按 pointerover 瞬间的行世界位贴附，滚动后与徽章脱钩
+      () => this.scene.refresher.closeRailPopup(),
+    );
     // 轨尾渐隐缘：内容超出视口时显示 —— "下面还有、滚轮可看"的常驻信号。
     // 17 族最坏情形溢出 88px，此前没有任何可滚提示，超出的族静默不可见。
     const FADE_H = 24;

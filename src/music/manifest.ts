@@ -52,12 +52,22 @@ const URLS: Record<MusicMood, string> = {
 };
 
 const ALLOWED_MOODS = new Set<string>(['menu', 'prep', 'battle', 'final']);
-export const LICENSED_MUSIC: LicensedTrack[] = rawTracks.map((t) => {
-  if (!ALLOWED_MOODS.has(t.id)) throw new Error('tracks.json 非法 id：' + t.id + '（仅允许 menu/prep/battle/final）');
-  if (t.license !== 'CC0-1.0') throw new Error('tracks.json 仅允许 CC0-1.0，' + t.id + ' 为 ' + t.license);
+
+/**
+ * 单条校验失败只跳过该条目并告警，不让整份清单在模块加载期抛错 ——
+ * 清单与构建产物的绑定由发布链的 audit-music 把关（哈希/授权/存在性），
+ * 运行时面对漂移的清单应回落程序化合成（见文件头授权纪律），而不是白屏。
+ */
+function parseTrack(t: TrackJson): LicensedTrack | null {
+  const bad = (why: string): null => {
+    if (import.meta.env.DEV) console.warn(`[music] tracks.json 条目跳过（${why}）：`, t.id);
+    return null;
+  };
+  if (!ALLOWED_MOODS.has(t.id)) return bad('非法 id（仅允许 menu/prep/battle/final）');
+  if (t.license !== 'CC0-1.0') return bad('仅允许 CC0-1.0');
   const url = URLS[t.id as MusicMood];
-  if (!url) throw new Error('tracks.json id ' + t.id + ' 无对应构建产物 URL');
-  if (!/^([0-9a-f]{64})$/.test(t.sha256)) throw new Error('tracks.json ' + t.id + ' sha256 非 64 位 hex：' + t.sha256);
+  if (!url) return bad('无对应构建产物 URL');
+  if (!/^([0-9a-f]{64})$/.test(t.sha256)) return bad('sha256 非 64 位 hex');
   return {
     id: t.id as MusicMood,
     file: t.file,
@@ -68,12 +78,11 @@ export const LICENSED_MUSIC: LicensedTrack[] = rawTracks.map((t) => {
     sha256: t.sha256,
     url,
   };
-});
-
-/** 按心境取曲；无对应曲目返回 null（调用方回落程序化合成） */
-export function licensedTrackOf(mood: MusicMood): LicensedTrack | null {
-  return LICENSED_MUSIC.find((t) => t.id === mood) ?? null;
 }
+
+export const LICENSED_MUSIC: LicensedTrack[] = rawTracks
+  .map(parseTrack)
+  .filter((t): t is LicensedTrack => t !== null);
 
 /** 出处脚注一行（设置面板 / 菜单脚注显示用） */
 export function musicCreditLine(): string {

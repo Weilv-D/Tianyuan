@@ -202,8 +202,8 @@ export interface BattleApi {
   /** 掷一次技能暴击判定（按 src.trait.skillCritChance）：拆分多段的技能先骰
    *  一次、经 critDecided 共享给各段，整段技能要么全暴击要么全不暴击 */
   rollSkillCrit(src: Unit): boolean;
-  heal(src: Unit | null, dst: Unit, amount: number, source: 'skill' | 'trait' | 'item'): number;
-  addShield(src: Unit | null, dst: Unit, amount: number, dur: number): void;
+  heal(src: Unit | null, dst: Unit, amount: number): number;
+  addShield(src: Unit | null, dst: Unit, amount: number, dur: number, opts?: { alreadySustained?: boolean }): void;
   addStatus(src: Unit, dst: Unit, kind: StatusKind, dur: number, value: number, srcTag?: string): void;
   removeStatus(u: Unit, kind: StatusKind): void;
   /** 只摘除该 kind 的一条（最旧叠层）：多段 DoT 的「净化一个减益」语义 */

@@ -159,7 +159,8 @@ export const DAMAGE_OUTLINE = {
   heal: 0x0f2a20,
   shield: 0x18222a,
   execute: 0x382c0e,
-  dot: 0x301a12,
+  dotBurn: 0x2e1a0e,
+  dotBleed: 0x301a12,
 } as const;
 
 /** 伤害类型的飘字 / 特效配色 */
@@ -214,4 +215,9 @@ export function mix(a: number, b: number, t: number): number {
   const g = Math.round(ag + (bg - ag) * t);
   const bl = Math.round(ab + (bb - ab) * t);
   return (r << 16) | (g << 8) | bl;
+}
+
+/** 0xRRGGBB → [r, g, b]。Phaser 的 flash 只吃三个分量，不吃整数色值。 */
+export function rgbOf(hex: number): [number, number, number] {
+  return [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];
 }

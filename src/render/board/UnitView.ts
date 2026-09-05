@@ -19,6 +19,7 @@ import {
 } from './unitLayout';
 import { itemIconKey } from './itemIcons';
 import { ITEM_BY_ID } from '../../data/items';
+import { bakedTexture } from '../view/bake';
 import { CINNABAR, GILT, INK, PAPER, PURE_WHITE, RARITY_COLOR, SHADE, SPIRIT, TEAM_COLOR, VOID } from '../view/palette';
 import { TEX } from '../view/textures';
 
@@ -202,12 +203,19 @@ export class UnitView extends Phaser.GameObjects.Container {
       const img = this.scene.add.image(-totalW / 2 + i * (size + gap) + size / 2, 0, key);
       img.setDisplaySize(size, size);
       this.itemRow.add(img);
-      // 成品加一圈鎏金底光，让"神装"在余光里也藏不住
+      // 成品加一圈鎏金底光，让"神装"在余光里也藏不住。
+      // 形态恒定的圆角矩形按烘焙纪律走纹理 —— WebGL 下实时 Graphics 每帧
+      // 重放命令缓冲，9 单位 × 3 件的底光不该进这条路径
       if (ITEM_BY_ID[id]?.tier === 'combined') {
-        const g = this.scene.add.graphics();
-        g.fillStyle(GILT.base, 0.22);
-        g.fillRoundedRect(-totalW / 2 + i * (size + gap), -size / 2, size, size, 3);
-        this.itemRow.addAt(g, 0);
+        const glowKey = bakedTexture(this.scene, 'unit-item-glow', 48, 48, (g) => {
+          g.fillStyle(GILT.base, 0.22);
+          g.fillRoundedRect(0, 0, 48, 48, 6);
+        });
+        const glow = this.scene.add
+          .image(-totalW / 2 + i * (size + gap), -size / 2, glowKey)
+          .setOrigin(0, 0)
+          .setDisplaySize(size, size);
+        this.itemRow.addAt(glow, 0);
       }
     }
   }

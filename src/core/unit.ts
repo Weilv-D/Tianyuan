@@ -183,7 +183,7 @@ export function createUnit(input: BattleUnitInput): Unit {
 
     // 开战护盾（无 shield 状态 → 永不到期，只能被伤害打掉）。
     // 口径钉死：battle 受击回蓝把护盾吸收额计入 final（battle.ts dealDamage），
-    // 因此 25% 大盾会让受击者开局回蓝大涨 —— 与 TFT 同款的有意行为，勿改口径。
+    // 因此 35% 开战盾会让受击者开局回蓝大涨 —— 与 TFT 同款的有意行为，勿改口径。
     shield: legend ? Math.round(maxHp * LEGEND_T3.startShieldPct) : 0,
     statuses: [],
     permAtkPct: 0,

@@ -77,7 +77,7 @@ function applyStatus(api: BattleApi, src: Unit, dst: Unit, p: SkillSpec['params'
 /** 选中目标后的通用收尾：治疗、叠层、护盾 */
 function onHits(api: BattleApi, src: Unit, hitCount: number, p: SkillSpec['params']): void {
   if (p.healOnHit && hitCount > 0) {
-    api.heal(src, src, src.maxHp * p.healOnHit * hitCount, 'skill');
+    api.heal(src, src, src.maxHp * p.healOnHit * hitCount);
   }
   if (p.shieldOnHit && hitCount > 0) {
     api.addShield(src, src, src.maxHp * p.shieldOnHit, 8);
@@ -297,6 +297,9 @@ export const IMPL: Record<string, Impl> = {
       onHits(a, u, hits, p);
       if (killed && p.resetOnKill) {
         u.mp = Math.min(u.maxMp, u.maxMp * p.resetOnKill);
+        // 斩杀返蓝是离散大额跳变：与其余回蓝通道同走 mana 事件流，
+        // 回放/分析消费的 mp 轨迹才与内核逐 tick 一致
+        a.emit({ t: 'mana', tick: a.tick, uid: u.uid, mp: u.mp, maxMp: u.maxMp });
         // maxRepeats 语义 = 最多额外施放次数（青冥文案"至多 2 次"）
         if (p.maxRepeats && depth < p.maxRepeats) {
           a.schedule(0.25, (api2) => {
@@ -378,7 +381,7 @@ export const IMPL: Record<string, Impl> = {
 
     api.fx('healWave', { uid: u.uid, params: { hue: 4 } });
     for (const al of healed) {
-      api.heal(u, al, amount, 'skill');
+      api.heal(u, al, amount);
       // 减益类 status（白娘的重伤）只走下方"随机敌人"分支，绝不能套在友军身上
       if (p.status && BUFF_KINDS.has(p.status.kind as StatusKind)) {
         api.addStatus(u, al, p.status.kind as StatusKind, p.status.dur, p.status.value ?? 0);
@@ -517,7 +520,7 @@ export const IMPL: Record<string, Impl> = {
       // 十殿：每处决一人，全体友军回复 15%（此前只按"处决过"结一次）
       const healPct = (p.healPerExecute ?? 0.15) * executed;
       for (const al of api.units) {
-        if (al.alive && al.team === u.team) api.heal(u, al, al.maxHp * healPct, 'skill');
+        if (al.alive && al.team === u.team) api.heal(u, al, al.maxHp * healPct);
       }
     }
   },
@@ -620,7 +623,7 @@ export const IMPL: Record<string, Impl> = {
     } else {
       for (const al of api.units) {
         if (al.alive && al.team === u.team) {
-          api.heal(u, al, al.maxHp * (p.value ?? 0.45), 'skill');
+          api.heal(u, al, al.maxHp * (p.value ?? 0.45));
           api.fx('healWave', { cell: al.cell });
         }
       }

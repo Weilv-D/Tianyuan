@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 // 副作用：全局字号缩放必须先于任何场景建字挂载（见 render/view/textScale）
 import '../render/view/textScale';
-import { css, CINNABAR, DANGER, GILT, INK, PAPER, PURE_WHITE, UI } from '../render/view/palette';
+import { css, CINNABAR, DANGER, GILT, INK, PAPER, PURE_WHITE } from '../render/view/palette';
 import { bakedTexture } from '../render/view/bake';
 import { screenToWorld } from '../render/view/viewScale';
 import { audio } from '../audio/AudioEngine';
@@ -416,16 +416,6 @@ export function makeChip(
   return c;
 }
 
-/** 分隔线 */
-export function divider(scene: Phaser.Scene, x: number, y: number, w: number): Phaser.GameObjects.Graphics {
-  const g = scene.add.graphics().setPosition(x, y);
-  g.lineStyle(1, INK[500], 0.8);
-  g.lineBetween(0, 0, w, 0);
-  g.lineStyle(1, GILT.base, 0.12);
-  g.lineBetween(0, 1, w, 1);
-  return g;
-}
-
 /**
  * 场景 SHUTDOWN 时复位自定义光标 + 自持悬停桥接（C6 / P1-1）。
  *
@@ -477,24 +467,6 @@ export function clipToWidth(t: Phaser.GameObjects.Text, s: string, maxW: number)
   return t.text;
 }
 
-export function label(
-  scene: Phaser.Scene,
-  x: number,
-  y: number,
-  text: string,
-  size = 13,
-  color = UI.textSecondary,
-  font: 'title' | 'body' = 'body',
-): Phaser.GameObjects.Text {
-  return scene.add
-    .text(x, y, text, {
-      fontFamily: font === 'title' ? FONT.title : FONT.body,
-      fontSize: `${size}px`,
-      color: typeof color === 'number' ? `#${color.toString(16).padStart(6, '0')}` : color,
-    })
-    .setOrigin(0, 0);
-}
-
 /**
  * 可滚动列表：给容器套几何遮罩并接管滚轮。
  *
@@ -516,6 +488,7 @@ export function enableScroll(
   viewY: number,
   viewW: number,
   viewH: number,
+  onScroll?: () => void,
 ): ScrollHandle {
   const homeY = container.y;
   let max = 0;
@@ -536,6 +509,8 @@ export function enableScroll(
     if (x < viewX || x > viewX + viewW || y < viewY || y > viewY + viewH) return;
     container.y -= dy;
     clamp();
+    // 滚动确实发生了才通知（悬停笺等按行世界位贴附的浮层在此收掉/重贴）
+    if (dy !== 0) onScroll?.();
   };
   scene.input.on('wheel', onWheel);
   return {

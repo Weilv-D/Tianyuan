@@ -24,6 +24,8 @@ export interface SettingsPanelHost {
   onResign?: () => void;
   /** 自动上场开关变化时同步对局设置 */
   onAutoDeploy?: (v: boolean) => void;
+  /** 偏好落盘失败的一次性可见提示（关闭路径；拖动等高频路径保持静默） */
+  onPrefsSaveFailed?: () => void;
 }
 
 export class SettingsPanel {
@@ -51,6 +53,7 @@ export class SettingsPanel {
     // 拖动路径的高频落盘保持静默，只在关闭这一次给提示
     if (!savePrefs(this.host.prefs)) {
       console.warn('[settings] 偏好写入失败（隐私模式或存储配额已满），本次调整在刷新后不会保留');
+      this.host.onPrefsSaveFailed?.();
     }
     this.panel.destroy();
     this.panel = null;

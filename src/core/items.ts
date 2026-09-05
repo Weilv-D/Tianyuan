@@ -99,7 +99,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onKill.push((a, killer) => {
       if (!has(killer, 'executeHeal') || !killer.alive) return;
       const pct = paramOf(killer, 'healPct');
-      a.heal(killer, killer, killer.maxHp * pct, 'item');
+      a.heal(killer, killer, killer.maxHp * pct);
     });
   }
 
@@ -149,7 +149,8 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'healToShield'))) {
     h.onHealOverflow.push((a, target, src, overflow) => {
       if (!src || !has(src, 'healToShield') || !target.alive) return;
-      a.addShield(src, target, overflow * paramOf(src, 'shieldPct'), 6);
+      // 溢出额已在 heal() 内吃过加时窗衰减，alreadySustained 防 0.5×0.5 双重衰减
+      a.addShield(src, target, overflow * paramOf(src, 'shieldPct'), 6, { alreadySustained: true });
     });
   }
 
@@ -311,7 +312,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (!has(u, 'castHeal') || !u.alive) return;
       const t = a.resolveTargets(u, 'allyLowestHp', 1)[0];
       if (!t) return;
-      const healed = a.heal(u, t, u.sp * paramOf(u, 'healSpRatio'), 'item');
+      const healed = a.heal(u, t, u.sp * paramOf(u, 'healSpRatio'));
       if (healed > 0.5) a.fx('healWave', { uid: t.uid });
     });
   }
@@ -361,7 +362,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onAttackHit.push((a, src, _dst, amount) => {
       if (!has(src, 'onHitHeal') || !src.alive) return;
       if ((amount ?? 0) <= 0) return;
-      a.heal(src, src, src.maxHp * paramOf(src, 'healPct'), 'item');
+      a.heal(src, src, src.maxHp * paramOf(src, 'healPct'));
     });
   }
 
@@ -372,8 +373,9 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (src.manaLock > 0) return;
       const before = src.mp;
       src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'mpPerHit'));
-      // 法力变化必须走事件管线：渲染层的蓝条 / 回放校验只认事件流，
-      // 直接改 mp 不发事件会让"蓝已涨、条不动"直到下一次满蓝清空才矫正
+      // 法力变化必须补发 mana 事件：蓝条由渲染层每帧轮询呈现，事件流承担
+      // 回放/归因账本 —— 直接改 mp 不发账，事件流口径（攻击回蓝/施法清空/
+      // 受击回蓝/羁绊回蓝全走账）就在这条通道上开缺口
       if (src.mp !== before) a.emit({ t: 'mana', tick: a.tick, uid: src.uid, mp: src.mp, maxMp: src.maxMp });
     });
   }

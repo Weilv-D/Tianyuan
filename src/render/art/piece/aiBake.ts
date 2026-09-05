@@ -197,6 +197,3 @@ export function aiBodyBounds(
   if (!r) return null;
   return { minX: r.x - SIZE / 2, minY: r.y - FOOT, maxX: r.x + r.w - SIZE / 2, maxY: r.y + r.h - FOOT };
 }
-
-/** 烘焙画布尺寸常量（与 silhouetteFactory 的 SIL_W/H/FOOT 对齐） */
-export const AI_BAKE = { SIZE, FOOT };

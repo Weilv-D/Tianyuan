@@ -39,5 +39,8 @@ const avg = (xs: number[]) => (xs.reduce((s, x) => s + x, 0) / xs.length).toFixe
 const med = times[Math.floor(times.length / 2)].toFixed(1);
 
 console.log(`${PRESET_COMPS[ai].name}  VS  ${PRESET_COMPS[bi].name}`);
+// 固定单向 + 单一种子序列：胜负读数含先手/站位结构偏差，不作强度结论 ——
+// 强度结论看 `npm run balance -- matrix`（CRN 双向取平均）
+console.log('  ⚠ 单向诊断读数（胜负不作强度结论，仅看时长与施法分布）');
 console.log(`  上方 ${w} 胜 / 下方 ${l} 胜 / ${d} 平    时长 中位 ${med}s 最短 ${times[0].toFixed(1)}s 最长 ${times[times.length - 1].toFixed(1)}s`);
 console.log(`  平均施法次数：上方 ${avg(castA)}  下方 ${avg(castB)}`);

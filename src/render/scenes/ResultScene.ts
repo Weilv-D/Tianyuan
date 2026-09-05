@@ -17,6 +17,11 @@ import { shakeFactor } from '../view/fxPrefs';
  * 此前是 GameScene 内的覆盖层 —— 独立成场景后，对局场景可以彻底关闭，
  * "再来一局 / 回主菜单"也不再背负旧场景的残留状态。
  */
+
+/** 结算面板尺寸：版面绘制与冠位印的锚点共用同一常量，改尺寸两处不再分叉 */
+const PANEL_W = 660;
+const PANEL_H = 680;
+
 export class ResultScene extends Phaser.Scene {
   constructor() {
     super({ key: 'Result' });
@@ -65,8 +70,8 @@ export class ResultScene extends Phaser.Scene {
     bg.fillRect(0, 0, W, H);
 
     const panel = this.add.container(W / 2, H / 2).setDepth(800);
-    const bw = 660;
-    const bh = 680;
+    const bw = PANEL_W;
+    const bh = PANEL_H;
     const bx = -bw / 2;
     const by = -bh / 2;
     const g = this.add.graphics();
@@ -221,8 +226,8 @@ export class ResultScene extends Phaser.Scene {
   /** 冠位结算印：110px 朱底方印，竖排楷名「魁首」，盖落 + 微震 */
   private stampChampionSeal(): void {
     const size = 110;
-    const x = W / 2 + 660 / 2 - 72;
-    const y = H / 2 - 680 / 2 + 90; // 印底与第一名行顶保持 6px，不再贴脸
+    const x = W / 2 + PANEL_W / 2 - 72;
+    const y = H / 2 - PANEL_H / 2 + 90; // 印底与第一名行顶保持 6px，不再贴脸
     const seal = this.add.container(x, y).setDepth(820).setScale(2.0).setAlpha(0).setRotation(-0.05);
     const g = this.add.graphics();
     g.fillStyle(CINNABAR.deep, 0.96);

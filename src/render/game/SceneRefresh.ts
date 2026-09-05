@@ -243,6 +243,8 @@ export class SceneRefresh {
         this.railDown = { x: ptr.x, y: ptr.y, id: s.def.id, badgeWorldY: worldY() };
       });
       item.on('pointerup', (ptr: Phaser.Input.Pointer) => {
+        // 拖拽中第二指点徽章：开成员卡会让拖拽在浮层背后继续，与键盘路同一让路口径
+        if (this.scene.inputCtl.dragging) return;
         if (
           this.railDown &&
           this.railDown.id === s.def.id &&
@@ -282,6 +284,13 @@ export class SceneRefresh {
       }
     }
     return false;
+  }
+
+  /** 收掉轨悬停笺（轨滚动时调用）：笺定位取的是 pointerover 瞬间的行世界 y，
+   *  滚动后徽章行移走而笺留在原位，与所见脱钩 —— 滚动即收，下次悬停重弹。 */
+  closeRailPopup(): void {
+    this.railPopup?.destroy();
+    this.railPopup = null;
   }
 
   /** 羁绊悬停详情：轨右侧浮出小笺（名/计数/当前档效果/描述），高度按内容行数自适应。
@@ -552,7 +561,11 @@ export class SceneRefresh {
           hoverBg.setVisible(false);
           this.scene.input.setDefaultCursor('default');
         });
-        row.on('pointerdown', () => this.scene.pauseScout.showOpponentBoard(p.idx));
+        row.on('pointerdown', () => {
+          // 拖拽中第二指点计分板：侦查面板会盖住拖拽现场，先让路
+          if (this.scene.inputCtl.dragging) return;
+          this.scene.pauseScout.showOpponentBoard(p.idx);
+        });
       }
       this.scene.hud.scoreContainer.add(row);
       y += 30;

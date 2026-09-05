@@ -5,7 +5,7 @@
  *  1. 数据完整性：羁绊档位可达、棋子数据自洽、预设造价同带
  *  2. 确定性：同种子事件流逐字节一致，不同种子产生分歧
  *  3. CRN 稳定：同配对同种子重复执行结果逐位一致（配对消噪的前提）
- *  4. 进程池一致：n=4 小矩阵「串行 vs 2 进程池」winRate/矩阵逐位相同
+ *  4. 进程池一致：n=4 小矩阵「串行 vs 2 进程池」胜负矩阵/逐单位聚合逐位相同
  *     （并行 === 串行是整个框架的可信度地基，每次改池子/引擎都要过这道关）
  *  5. 先手公平：随机阵容镜像对局，下方阵营胜率应在 50% 噪声带内
  *
@@ -56,10 +56,16 @@ function auditData(): string[] {
   if (ids.size !== CHAMPIONS.length) issues.push('存在重复的棋子 id');
   const combos = new Set(CHAMPIONS.map((c) => `${c.cost}|${c.origins.join()}|${c.classes.join()}`));
   if (combos.size !== CHAMPIONS.length) issues.push('同费用内存在重复的职业/种族组合');
-  const copies = [0, 1, 3, 9];
+  const copies: Record<number, number> = { 1: 1, 2: 3, 3: 9 };
   for (const comp of PRESET_COMPS) {
+    // 星级先验型后取价：非法星级直接立项，不沿用「下标 undefined → NaN →
+    // NaN 与上下界比较恒 false」的漏检通道
+    for (const [id, star] of Object.entries(comp.units)) {
+      if (!(star in copies)) issues.push(`预设「${comp.name}」棋子 ${id} 星级非法：${String(star)}`);
+      if (!CHAMPION_BY_ID[id]) issues.push(`预设「${comp.name}」引用不存在的棋子 ${id}`);
+    }
     const gold = Object.entries(comp.units).reduce(
-      (sum, [id, star]) => sum + (CHAMPION_BY_ID[id]?.cost ?? 0) * copies[star],
+      (sum, [id, star]) => sum + (CHAMPION_BY_ID[id]?.cost ?? 0) * (copies[star] ?? 0),
       0,
     );
     if (gold < 52 || gold > 58) issues.push(`预设「${comp.name}」造价 ${gold} 金，超出 52~58 金基线`);
@@ -121,9 +127,14 @@ export async function run(argv: string[]): Promise<void> {
   const configs = [{ label: '基准', overrides: {} }];
   const serial = await runConfigs(configs, { comps: PRESET_COMPS, n: 4, seedBase, workers: 0 });
   const pooled = await runConfigs(configs, { comps: PRESET_COMPS, n: 4, seedBase, workers });
+  // 逐位一致覆盖胜负矩阵与逐单位聚合：聚合分发若漂移而胜负恰好相同，
+  // 只比胜率的门禁会漏检 —— 与 tests 的进程池一致断言同口径
+  const unitsSig = (o: (typeof serial)[number]) =>
+    JSON.stringify([...o.units.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
   const poolOk = serial[0].winRate.every((w, i) => w === pooled[0].winRate[i])
     && serial[0].matrix.every((row, i) => row.every((v, j) => v === pooled[0].matrix[i][j]))
-    && serial[0].timeouts === pooled[0].timeouts;
+    && serial[0].timeouts === pooled[0].timeouts
+    && unitsSig(serial[0]) === unitsSig(pooled[0]);
   console.log(poolOk ? '  ✓ 并行结果与串行逐位一致（并行 === 串行可信度地基）' : '  ✗ 并行与串行出现分歧！');
   failed ||= !poolOk;
 

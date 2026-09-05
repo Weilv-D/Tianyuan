@@ -181,4 +181,29 @@ describe('读档单元清洗（fromJSON 坏档容错）', () => {
     expect(restored.pool.remaining('kutong')).toBe(base.pool.remaining('kutong') + 9);
     expect(restored.adventureOffer).toBeNull(); // 未知 kind 的恩赐整体置空，不留无声蒸发的选项
   });
+
+  it('玩家运行时字段清洗：坏形状字段收敛为类型安全缺省，读档后继续对局不再炸', () => {
+    const match = new Match(20260905);
+    match.beginRound();
+    const json = match.toJSON() as Record<string, unknown>;
+    const players = json.players as Record<string, unknown>[];
+    players[1].streak = '连胜'; // 非有限数：不清洗会沿收入算成 NaN 金币
+    players[2].items = null; // 非数组：不清洗会在墨兽掉落 push 时炸
+    players[3].opponents = 'nope'; // 非数组：不清洗会在下回合配对生成时炸
+    players[4].shop = { 0: 'pan' }; // 非数组：商肆渲染/直购炸
+    const restored = Match.fromJSON(json as never);
+    expect(restored.players[1].streak).toBe(0);
+    expect(restored.players[2].items).toEqual([]);
+    expect(restored.players[3].opponents).toEqual([]);
+    expect(restored.players[4].shop).toHaveLength(5);
+    expect(restored.players.every((p) => p.idx === restored.players.indexOf(p))).toBe(true);
+    // 清洗后对局继续可跑：一轮完整结算，金币保持有限值（NaN 即守恒破坏）
+    restored.beginRound();
+    restored.settleRound();
+    restored.endRound();
+    for (const p of restored.players) {
+      expect(Number.isFinite(p.gold)).toBe(true);
+      expect(Number.isFinite(p.streak)).toBe(true);
+    }
+  });
 });

@@ -17,7 +17,7 @@ import { bakeTraitIcons } from '../board/traitIcons';
 import { buildTextures, grainOverlay } from '../view/textures';
 import { playLegendaryStarFx } from '../board/LegendaryFx';
 import { bakeSilhouettes } from '../board/silhouetteFactory';
-import { INK, GILT, CINNABAR, SPIRIT, PAPER, css } from '../view/palette';
+import { INK, GILT, CINNABAR, SPIRIT, PAPER, css, rgbOf } from '../view/palette';
 import { W, H } from '../view/layout';
 import { motion } from '../view/motion';
 import { fadeIn, fadeTo } from '../view/transition';
@@ -424,6 +424,7 @@ export class GameScene extends Phaser.Scene {
 
   onAutoEquip(): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return; // 装备整体重分配：拖拽中同样让路
     if (this.match.human.items.length === 0) {
       this.showToast('器匣是空的', true);
       return;
@@ -506,6 +507,7 @@ export class GameScene extends Phaser.Scene {
 
   onToggleLock(): void {
     if (this.phase !== 'prep' || this.busy) return;
+    if (this.inputCtl.dragging) return; // 与其余动作入口同一第二输入源口径
     this.match.human.shopLocked = !this.match.human.shopLocked;
     audio.play('ui');
     this.afterAction();
@@ -928,14 +930,10 @@ export class GameScene extends Phaser.Scene {
       onRestart: () => this.restart(),
       onResign: () => this.resign(),
       onAutoDeploy: (v) => { this.match.settings.autoDeploy = v; },
+      onPrefsSaveFailed: () => this.showToast('存档失败：浏览器存储已满，偏好设置未能保存', true),
     });
     this.settingsPanel.open();
   }
-}
-
-/** 0xRRGGBB → [r, g, b]。Phaser 的 flash 只吃三个分量，不吃整数色值。 */
-function rgbOf(hex: number): [number, number, number] {
-  return [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];
 }
 
 export const GAME_SCENE_W = W;

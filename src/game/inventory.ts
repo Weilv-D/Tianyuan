@@ -147,20 +147,6 @@ export function stripItems(p: PlayerState, u: UnitInstance): void {
   u.items = [];
 }
 
-/** 一个棋子身上的装备合成路径提示：还差什么能凑成成品 */
-export function recipeHint(u: UnitInstance): string[] {
-  const out: string[] = [];
-  const comps = u.items.filter((id) => ITEM_BY_ID[id]?.tier === 'component');
-  if (comps.length < 1) return out;
-  for (let i = 0; i < comps.length; i++) {
-    for (let j = i + 1; j < comps.length; j++) {
-      const c = combine(comps[i], comps[j]);
-      if (c) out.push(`${ITEM_BY_ID[comps[i]].name}+${ITEM_BY_ID[comps[j]].name}→${ITEM_BY_ID[c].name}`);
-    }
-  }
-  return out;
-}
-
 /**
  * 这件装备装在这个棋子身上值不值。
  *
