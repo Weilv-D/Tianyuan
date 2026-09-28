@@ -16,6 +16,7 @@ var viewer_team := 1
 var views := {}  # uid -> UnitView
 var board_view: BoardView
 var float_layer: Node2D
+var fx_layer: EffectsLayer
 var acc := 0.0
 var speed := 1.0
 var finished := false
@@ -41,6 +42,10 @@ func _ready() -> void:
 	float_layer = Node2D.new()
 	float_layer.z_index = 50
 	add_child(float_layer)
+
+	fx_layer = EffectsLayer.new()
+	fx_layer.z_index = 20
+	board_view.add_child(fx_layer)
 
 	tick_label = _label("", 22, Palette.PAPER[300])
 	tick_label.position = Vector2(Layout.W / 2.0 - 60, 66)
@@ -68,6 +73,14 @@ func _draw_bg() -> void:
 func _process(delta: float) -> void:
 	if finished:
 		return
+	# 震屏：累加器换算位移脉冲（对齐 TS shake(90+shake*90, 0.0022*shake) 的收敛节奏）
+	var shake_v: float = fx_layer.take_shake()
+	if shake_v > 0.0:
+		var amp: float = minf(14.0, 2.0 + shake_v * 3.0)
+		var tw := create_tween()
+		tw.tween_method(func(t: float) -> void:
+			position = Vector2(Layout.W / 2.0, Layout.H / 2.0) + Vector2(randf_range(-amp, amp), randf_range(-amp, amp)) * (1.0 - t), 0.0, 1.0, minf(0.32, 0.09 + shake_v * 0.09))
+		tw.tween_callback(func() -> void: position = Vector2(Layout.W / 2.0, Layout.H / 2.0))
 	acc += minf(0.05, delta) * speed
 	var steps := 0
 	while acc >= DT and steps < 8:
@@ -141,20 +154,97 @@ func _on_event(e: Dictionary) -> void:
 			var v2: UnitView = views.get(int(e.get("targetUid", -1)), null)
 			if v2 != null:
 				v2.play_hit()
-			_float_text(e, e.get("amount", 0.0), _dmg_color(e))
+			var crit := bool(e.get("crit", false))
+			var dmg_kind := String(e.get("kind", ""))
+			var tier: String = "crit" if crit else ("skill" if dmg_kind == "skill" else "normal")
+			var dmg_c := _dmg_color(e)
+			if dmg_kind == "true":
+				tier = "true"
+				dmg_c = Palette.DAMAGE_COLOR["true"]
+			_float_text(e, e.get("amount", 0.0), dmg_c, "", tier)
+			# 命中特效：普攻 impact（crit 参数），法伤走 hue=2
+			var fx_src = _unit_by_uid(int(e.get("uid", -1)))
+			if fx_src != null:
+				var tgt_fx = _unit_by_uid(int(e.get("targetUid", -1)))
+				var fpos: Vector2 = board_view.cell_center(tgt_fx.cell.x, tgt_fx.cell.y) if tgt_fx != null else Vector2.ZERO
+				fx_layer.play({ "kind": "impact", "pos": fpos, "tint": dmg_c,
+					"params": { "crit": 1.0 if crit else 0.0, "hue": 2.0 if String(e.get("type", "")) == "magic" else 0.0 } })
 			Sess.blip("SFX", 300.0 + randf_range(0.0, 40.0), 0.05, 0.12)
 		"heal":
-			_float_text(e, e.get("amount", 0.0), Palette.SPIRIT["light"], "+")
+			_float_text(e, e.get("amount", 0.0), Palette.SPIRIT["light"], "+", "heal")
 		"shield":
-			_float_text(e, e.get("amount", 0.0), Palette.MOON["light"], "+")
+			_float_text(e, e.get("amount", 0.0), Palette.MOON["light"], "+", "heal")
 		"death":
 			var v3: UnitView = views.get(int(e.get("uid", -1)), null)
 			if v3 != null:
 				v3.play_death()
+			if e.has("cell"):
+				fx_layer.play({ "kind": "burst", "pos": _cell_local(e["cell"]), "radius": float(e.get("radius", 1.0)), "tint": Palette.INK[300] })
 			Sess.blip("SFX", 150.0, 0.12, 0.14)
+		"fx":
+			_play_fx(e)
+		"projectile":
+			_play_projectile(e)
 		"end":
 			finished = true
 			_on_battle_end()
+
+
+## fx 事件 → effects_layer（pos = 棋盘层局部；cell/targetUid 二选一）
+func _play_fx(e: Dictionary) -> void:
+	var pos: Vector2
+	if e.has("cell"):
+		var c: Dictionary = e["cell"]
+		pos = _cell_local_xy(int(c.get("c", 0)), int(c.get("r", 0)))
+	elif e.has("targetUid"):
+		var tgt0 = _unit_by_uid(int(e["targetUid"]))
+		if tgt0 == null:
+			return
+		pos = board_view.cell_center(tgt0.cell.x, tgt0.cell.y) + Vector2(0, -26)
+	else:
+		var src0 = _unit_by_uid(int(e.get("uid", -1)))
+		if src0 == null:
+			return
+		pos = board_view.cell_center(src0.cell.x, src0.cell.y) + Vector2(0, -26)
+	var req := { "kind": String(e.get("kind", "")), "pos": pos, "radius": float(e.get("radius", 1.0)), "tint": e.get("tint", null) }
+	var params_in: Dictionary = e.get("params", {})
+	if not params_in.is_empty():
+		req["params"] = params_in
+	fx_layer.play(req)
+
+
+## 弹道（arrow/bolt/orb → 线束/光点推进）
+func _play_projectile(e: Dictionary) -> void:
+	var src = _unit_by_uid(int(e.get("uid", -1)))
+	var tgt = _unit_by_uid(int(e.get("targetUid", -1)))
+	if src == null or tgt == null:
+		return
+	var a := board_view.cell_center(src.cell.x, src.cell.y) + Vector2(0, -30)
+	var b := board_view.cell_center(tgt.cell.x, tgt.cell.y) + Vector2(0, -26)
+	var dur: float = maxf(0.08, float(e.get("dur", 0.2)))
+	var color := Palette.MOON["light"] if String(e.get("kind", "")) == "arrow" else Palette.SPIRIT["light"]
+	var bolt := Node2D.new()
+	bolt.z_index = 55
+	bolt.position = a
+	var dot := EffectsLayer._Fx.new()
+	dot.kind = 1
+	dot.color = Color(color, 0.95)
+	dot.radius = 4.0
+	bolt.add_child(dot)
+	float_layer.add_child(bolt)
+	var tw := bolt.create_tween()
+	tw.tween_method(func(t: float) -> void:
+		bolt.position = a.lerp(b, t), 0.0, 1.0, dur)
+	tw.tween_callback(bolt.queue_free)
+	fx_layer._spark(a, b, 2.0, dur * 1000.0 + 60.0, color, 0.5)
+
+
+func _cell_local(cell: Dictionary) -> Vector2:
+	return _cell_local_xy(int(cell.get("c", 0)), int(cell.get("r", 0)))
+
+
+func _cell_local_xy(c: int, r: int) -> Vector2:
+	return board_view.cell_center(c, r)
 
 
 func _unit(e: Dictionary):
@@ -179,31 +269,65 @@ func _dmg_color(e: Dictionary) -> Color:
 	return Palette.DAMAGE_COLOR["physical"]
 
 
-func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = "") -> void:
+func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = "", tier := "normal") -> void:
 	var u = _unit_by_uid(int(e.get("targetUid", e.get("uid", -1))))
 	if u == null:
 		return
+	# 分级参数（DamageText.ts：size/rise/life/pop；dot 两级 16px）
+	var size := 20
+	var rise := 34.0
+	var life := 0.72
+	var pop := 1.15
+	match tier:
+		"crit":
+			size = 32
+			rise = 46.0
+			life = 0.9
+			pop = 1.7
+		"skill":
+			size = 26
+			rise = 40.0
+			life = 0.82
+			pop = 1.35
+		"true":
+			size = 26
+			rise = 42.0
+			life = 0.86
+			pop = 1.4
+		"heal":
+			size = 22
+			rise = 40.0
+			life = 0.8
+		"dotBurn", "dotBleed":
+			size = 16
+			rise = 26.0
+			life = 0.62
+			pop = 1.05
 	var l := Label.new()
 	l.text = "%s%d" % [prefix, int(amount)]
 	l.add_theme_font_override("font", Sess.body_font)
-	l.add_theme_font_size_override("font_size", 20 if not bool(e.get("crit", false)) else 26)
+	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Palette.INK[950])
 	l.add_theme_constant_override("outline_size", 4)
-	l.position = _cell_pos(u) + Vector2(-10, -90)
+	l.position = _cell_pos(u) + Vector2(-10 + randf_range(-6.0, 6.0), -90)
 	l.z_index = 60
+	l.pivot_offset = Vector2(8, 12)
+	l.scale = Vector2(pop, pop)
 	float_layer.add_child(l)
 	var tw := l.create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(l, "position:y", l.position.y - 34.0, 0.8).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(l, "position:y", l.position.y - rise, life).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, life * 0.45).set_delay(life * 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.chain().tween_callback(l.queue_free)
 
 
 func _on_battle_end() -> void:
-	# 判定已结算（GameScene）；这里只做 endRound + 存档 + 结算面板
+	# 判定已结算（GameScene）；这里只做 endRound + 存档 + 战报统计带回 + 结算面板
 	match_ref.end_round()
 	SaveStore.save_match(match_ref)
+	_dump_battle_stats()
 	await get_tree().create_timer(0.6).timeout
 	var winner_raw: Variant = battle.result.get("winner", null)
 	var winner: int = -1 if winner_raw == null else int(winner_raw)
@@ -238,9 +362,23 @@ func _on_battle_end() -> void:
 	back.add_theme_color_override("font_color", Palette.PAPER[100])
 	back.focus_mode = Control.FOCUS_NONE
 	back.pressed.connect(func() -> void:
-		var pending := match_ref.is_over() or not match_ref.human()["alive"]
+		var pending: bool = match_ref.is_over() or not match_ref.human()["alive"]
 		Sess.go("res://render/result.tscn" if pending else "res://render/game_scene.tscn", { "match": match_ref }))
 	panel.add_child(back)
+
+
+## 战报统计带回：双方每单位的输出三色（物理/法术/真伤）与存活态
+func _dump_battle_stats() -> void:
+	var units_out: Array = []
+	for u in battle.units:
+		units_out.append({
+			"uid": int(u.uid), "defId": u.entry["id"], "name": u.entry["name"],
+			"team": int(u.team), "star": int(u.star), "alive": u.alive,
+			"physical": float(u.dealt_by_type.get("physical", 0.0)),
+			"magic": float(u.dealt_by_type.get("magic", 0.0)),
+			"true": float(u.dealt_by_type.get("true", 0.0)),
+		})
+	Sess.scene_data["battle_stats"] = units_out
 
 
 func _label(text: String, size: int, color: Color, font = null) -> Label:

@@ -21,7 +21,7 @@ func _ready() -> void:
 		{ "label": "继 续 对 局", "enabled": has_save, "cb": func() -> void: _enter("continue") },
 		{ "label": "新 的 对 局", "enabled": true, "cb": func() -> void: _enter("fresh") },
 		{ "label": "每 日 挑 战", "enabled": true, "cb": func() -> void: _enter("daily") },
-		{ "label": "武 库 图 鉴", "enabled": false, "cb": Callable() },
+		{ "label": "武 库 图 鉴", "enabled": true, "cb": func() -> void: Sess.go("res://render/codex.tscn") },
 	]
 	var y := -60.0
 	for e: Dictionary in entries:
@@ -30,6 +30,12 @@ func _ready() -> void:
 			btn.pressed.connect(e["cb"] as Callable)
 		add_child(btn)
 		y += 92.0
+
+	var settings := _menu_button("设 置", y, true)
+	var sp := SettingsPanel.new()
+	add_child(sp)
+	settings.pressed.connect(func() -> void: sp.open())
+	add_child(settings)
 
 	var ver := _body_label("夜宴 · Godot 版 %s" % String(ProjectSettings.get_setting("application/config/version", "2.0.0-m3")), 16, Palette.PAPER[500])
 	ver.position = Vector2(cx - 400, 480)
