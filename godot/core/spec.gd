@@ -9,6 +9,13 @@ static var item_by_id: Dictionary = {}
 static var cfg: Dictionary = {}
 static var trait_tuning: Dictionary = {}
 static var trait_tuning_keys: Dictionary = {}
+## M2 对局层增量：名单原序 / 费用索引 / 配方 / 羁绊定义（含 breakpoints）
+static var champions: Array = []
+static var champion_ids_by_cost: Dictionary = {}
+static var items: Array = []
+static var component_ids: Array = []
+static var recipe_index: Dictionary = {}
+static var traits_by_id: Dictionary = {}
 
 
 static func ensure() -> void:
@@ -25,15 +32,34 @@ static func ensure() -> void:
 		return
 	var p: Dictionary = parsed.get("payload", {})
 	cfg = p.get("config", {})
+	champions = p.get("champions", [])
 	champion_by_id = {}
-	for e: Dictionary in p.get("champions", []):
+	for e: Dictionary in champions:
 		champion_by_id[e["id"]] = e
+	champion_ids_by_cost = p.get("championIdsByCost", {})
+	items = p.get("items", [])
 	item_by_id = {}
-	for e: Dictionary in p.get("items", []):
+	for e: Dictionary in items:
 		item_by_id[e["id"]] = e
+	component_ids = p.get("componentIds", [])
+	recipe_index = p.get("recipeIndex", {})
+	traits_by_id = {}
+	for e: Dictionary in p.get("traits", []):
+		traits_by_id[e["id"]] = e
 	trait_tuning = p.get("traitTuning", {})
 	trait_tuning_keys = p.get("traitTuningKeys", {})
 	_loaded = true
+
+
+## 成品装备池（adventure「丹青成装」与墨兽胜场成品掉落共用；顺序 = ITEMS 原序）
+static var _combined_ids: Array = []
+static func combined_item_ids() -> Array:
+	ensure()
+	if _combined_ids.is_empty():
+		for e: Dictionary in items:
+			if e.get("tier", "") == "combined":
+				_combined_ids.append(e["id"])
+	return _combined_ids
 
 
 ## 数值常量读取（缺键报错返回默认——默认值与冻结仓字面量同源，兜底防 NaN 漏网）

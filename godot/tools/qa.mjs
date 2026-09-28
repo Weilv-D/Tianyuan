@@ -77,6 +77,18 @@ function step(name, ok, detail = '') {
     codec ? `events=${codec.events} fnv1a32=${codec.fnv1a32}` : String(probe.stderr).split('\n')[0] ?? '');
 }
 
+// 7. 整局跨引擎对拍（夹具重生成：TS 跑真实 Match 整局（含人类操作剧本/撤销/存档
+//    轮转/恩赐/每日）→ GDScript 同剧本重放逐状态行比对；--quick 时降为 2 种子）
+{
+  const quick = process.argv.includes('--quick');
+  const seeds = quick ? '2' : '6';
+  const gen = spawnSync(process.execPath, ['--import', 'tsx', 'tools/match_parity.mjs', '--', `--seeds=${seeds}`], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
+  const probe = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/match_probe.gd'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
+  const r = extractTag(probe.stdout, 'MATCH_JSON');
+  step('match 对拍', gen.status === 0 && probe.status === 0 && r?.ok === true,
+    r ? `${r.passed}/${r.passed + r.failed} 整局逐行一致 ${Math.round(r.ms / 100) / 10}s daily=0x${(r.dailySeed?.gd ?? 0).toString(16)}` : String(probe.stderr).split('\n')[0] ?? '');
+}
+
 const failed = steps.filter((s) => !s.ok).length;
 console.log(`[qa] ${steps.length - failed}/${steps.length} 步通过`);
 process.exit(failed === 0 ? 0 : 1);

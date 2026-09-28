@@ -10,8 +10,9 @@ node_modules/
 .tmp/
 .tmp_*
 data/*.tmp.json
-# 战斗对拍夹具（体积随种子数膨胀，随跑随生成）
+# 对拍夹具（体积随种子数膨胀，随跑随生成；match ~3.6MB/7 局）
 data/battle_fixture.json
+data/match_fixture.json
 
 # GdUnit4 报告
 reports/

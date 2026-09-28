@@ -50,9 +50,39 @@ rng → types → grid → unit → items → traits → skills → config → a
 7. **闭包按值捕获标量**：跨回调共享的可变计数（围攻 nowTick 等）必须装箱。
 8. String 没有 `slice`（用 `substr`）；`decode_hex` 不存在（逐字节 `hex_to_int`）。
 
-## M2 对局层移植（src/game 4,107 行）
-match/ai/pool/economy/adventure/undo/replay；save/daily 改 user://；pairings P0 契约复刻。
-验收：整局（快进/读档/回放摘要/每日种子）跨引擎对拍绿。
+## M2 对局层移植（src/game 4,107 行）✅ 2026-09-28 完成
+match/ai/pool/economy/adventure/undo/replay/beast/arrange/comp(computeTraits)/inventory/state/daily/save 全部落地
+（godot/game/ 十四件套）。save/daily 改 user://（独立起档不背 v2）；pairings P0 契约（随档持久化 + sanitize
+整表弃用兜底）复刻；from_json 全量清洗（槽位收敛/名单过滤/超长回池/iid 分域去重）移植，失败协议从 TS throw
+改为返回 null（GDScript 无 try/catch）。
+- [x] 验收：**7 整局（6 随机种子 + 1 每日模式）× 251 状态行跨引擎逐行一致**（qa 第 7 步，66s）——
+      覆盖整局确定性 / 人类操作剧本（买·卖·刷·经验·移动·装备·卸装·恩赐点选与代选·撤销往返·一键布阵·
+      自动装备）/ 交叉读档（GDScript 直接消费 TS 存档 JSON，每局 3 次）/ 每日种子口径（FNV 逐位一致）/
+      终局 rank 结算；daily seed 0x8ad26c12 两引擎同值
+- [x] GdUnit4 契约测试 15 用例（确定性/轮转自洽/级复合成/经济/卡池守恒/撤销/配对覆盖/器匣容量分层）
+- [x] qa 门禁 8 步：import → spec 对账+幂等 → GdUnit4 → rng → battle → codec → **match**
+
+### M2 实机教训（对拍调试方法论 + GDScript 新坑，M3 前必读）
+1. **Dictionary int 键 vs str 键**：build_battle_config 内存构造 traits 用 int 键，battle 构造按
+   `str(team)` 读 → 羁绊**全部静默丢失**（JSON 路径键天然字符串，掩盖了此坑；M1 夹具手填 traits 也测不到）。
+   表现为「战斗面板数值全低一截」——首事件 start 的 hp 即分叉，逐事件对拍一步定位。
+2. **Spec 静态字段直读不触发 ensure()**：CardPool._init 在首次 Spec.c() 之前构造，counts 建在空名单上
+   （商店全 null）。所有直读 Spec.champions/item_by_id/cfg 的入口必须先调幂等 Spec.ensure()。
+3. **`traitGain` 的 `else if (b)` 判存在性而非 tier>=0**：未激活羁绊（tier=-1）的推进也是 +3 —— 我写成
+   `elif bt >= 0` 后 AI 对未激活羁绊的估值系统性偏低，买牌决策翻转 → rng 消费次数变 → 游标分叉但状态巧合
+   一致。定位法：mulberry32 从共同游标逐步推演 next()，数出「多消费 2 步」再反向找消费点。
+4. `String(int)` 构造不存在（用 str()）；`abs()` 返回 Variant（用 absi）——泛型数学内建在 `:=` 推断下
+   触发「Warning treated as error」直接拒绝编译。
+5. GDScript 三元是 `x if cond else y`（JS/Python 直觉会写反 —— state.gd 一轮 14 处全反，靠自查清单纠正）。
+6. **JSON 读回的 number 是 float**：str(1.0)="1.0" 会污染编码行（必须先 int 化）；夹具侧 survivors 键也要
+   int(team) 归一（M1 已知，M2 再证）。
+7. 对拍 probe 的失败报告必须给「差异点 ± 窗口」而非固定前缀截断 —— 前缀相同会掩盖真实分叉位，白跑一轮。
+8. 探针超时先查 SCRIPT ERROR：编译失败 → _initialize 崩 → 主循环空转假挂死（M0 教训 M2 重演一次）。
+9. resolve_merges 每轮 while 只合一个组（break 重扫）：9 张 1★ 是 4 次 events（3×2★+1×3★），不是 2 次。
+10. eventsDigest 的 JSON.stringify 键序是引擎内自洽口径（JS 插入序 vs Godot 字典序）——跨引擎不比该字段，
+    事件流本身走 PARITY_CODEC（M1）/ 状态行（M2）；夹具 record_events=false 恒 '' 天然免疫。
+11. comp.buildTeam / PRESET_COMPS（演示预设+配装注入）属 M4 平衡工具链面，登记延期；prefs 的
+    prefers-reduced-motion 无 Godot 等价查询，calm 首启 false（用户手动开）。
 
 ## M3 表现层与美术升级
 场景树重写（布局沿用）、HUD 契约移植、棋盘/UI 着色器重制、立绘 shader 描边（不烘焙 576 纹理）、
