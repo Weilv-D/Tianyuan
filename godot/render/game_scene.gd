@@ -44,9 +44,11 @@ func _ready() -> void:
 		Sess.go("res://render/menu.tscn")
 		return
 	position = Vector2(Layout.W / 2.0, Layout.H / 2.0)
-	_dbg = DebugConsole.new()
-	add_child(_dbg)
-	_dbg.setup(self)
+	# DebugConsole 仅 DEV：编辑器/调试构建可见，发布 exe 不实例化（TS 同源纪律）
+	if OS.is_debug_build() or OS.has_feature("editor"):
+		_dbg = DebugConsole.new()
+		add_child(_dbg)
+		_dbg.setup(self)
 	_settings = SettingsPanel.new()
 	add_child(_settings)
 	_draw_bg()
@@ -724,7 +726,7 @@ func _unhandled_keyinput(event: InputEvent) -> void:
 		var key := (event as InputEventKey).keycode
 		match key:
 			KEY_QUOTELEFT:
-				if event.ctrl_pressed:
+				if event.ctrl_pressed and _dbg != null:
 					_dbg.toggle()
 			KEY_ESCAPE:
 				if result_panel == null:

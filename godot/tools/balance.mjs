@@ -63,7 +63,7 @@ const seedBase = parseInt(args['seed-base'] ?? String(DEFAULT_SEED_BASE), 10);
 // 单进程默认：M1 实测单进程 ~38 局/s（72 对 × 50 局 ≈ 95s）；多进程冷启动会抢 .godot 缓存锁
 // （4 进程并行实测互相挂死），需要时 --workers=N 错峰拉起
 const maxWorkers = parseInt(args.workers ?? '1', 10);
-const dbPath = args.db ?? 'out/balance-gd.db';  # 相对 godot/（隔离铁律：不得写仓库根）
+const dbPath = args.db ?? 'out/balance-gd.db';  // 相对 godot/（隔离铁律：不得写仓库根）
 
 // 配置组装：TS buildTeam（uid 基与站位推导与金锁工件可比的口径一致）。
 // engine.ts 原口径：i 队 buildTeam(spec, 0, 1)、j 队 buildTeam(spec, 1, 200)——

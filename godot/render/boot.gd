@@ -1,13 +1,17 @@
 extends Node2D
-## 启动序章：黑底「弈」篆体淡入淡出（对应 Phaser 版 boot 序章 1500+1300ms 节奏），
-## 之后进 Menu。字体经 Sess 预载（篆体必先于首笔）。
+## 启动序章：黑底「天」篆体淡入淡出（对应 Phaser 版 boot 序章 1500+1300ms 节奏），
+## 之后进 Menu。字体经 Sess 预载（篆体必先于首笔）。取「天」与 TS 版同源
+## （traitIcons.ts：源字体无「弈」篆形，开屏题字用「天」）。
 
 func _ready() -> void:
 	# 实机冒烟：--autostart 跳过序章直入对局（TS ?autostart=1 先例）
 	if not Sess.scene_data.is_empty():
 		Sess.go.call_deferred("res://render/game_scene.tscn")
 		return
-	# 设计分辨率黑底铺满（夜宴底色 INK 950 深渊）
+	# 设计分辨率黑底铺满（夜宴底色 INK 950 深渊）。根节点居中偏移与 game_scene 同律：
+	# 场景按中心坐标构建，无此偏移时背景只盖左上象限、上排元素出屏（2026-09-28
+	# 序章实测：字形带 -690..-390 全数出屏，此前被「源字体缺字不渲染」掩盖）。
+	position = Vector2(Layout.W / 2.0, Layout.H / 2.0)
 	var bg := ColorRect.new()
 	bg.color = Palette.INK[950]
 	bg.size = Vector2(Layout.W, Layout.H)
@@ -15,11 +19,11 @@ func _ready() -> void:
 	add_child(bg)
 
 	var glyph := Label.new()
-	glyph.text = "弈"
+	glyph.text = "天"
 	glyph.add_theme_font_override("font", Sess.seal_font)
 	glyph.add_theme_font_size_override("font_size", 220)
 	glyph.add_theme_color_override("font_color", Palette.PAPER[100])
-	glyph.position = Vector2(-Layout.W / 2.0, -Layout.H / 2.0 - 150)
+	glyph.position = Vector2(-Layout.W / 2.0, -Layout.H / 2.0 + 150)
 	glyph.size = Vector2(Layout.W, 300)
 	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(glyph)

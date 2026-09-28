@@ -47,7 +47,9 @@ func _run_smoke(spec_txt: String) -> void:
 	for i: int in frames:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	var dir := ProjectSettings.globalize_path("res://../.tmp-shots-godot")
+	# 截图目录随运行体落位：编辑器跑 → 工程内 godot/.tmp-shots-godot；导出 exe 跑 →
+	# exe 旁 out/.tmp-shots-godot。旧写法 res://../ 在编辑器下指到仓库根（污染隔离边界）
+	var dir := ProjectSettings.globalize_path("res://.tmp-shots-godot")
 	DirAccess.make_dir_recursive_absolute(dir)
 	# 布局自检：窗口尺寸 vs 视口可见矩形（canvas_items 生效 = 视口恒 1920x1080 且内容缩放进窗口）
 	var win := get_window()
