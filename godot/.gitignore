@@ -1,0 +1,15 @@
+# Godot 缓存与构建产物
+.godot/
+build/
+*.log
+
+# node 工具链（godot/ 自含，不与根目录混用）
+node_modules/
+
+# 对拍/调试临时产物
+.tmp/
+.tmp_*
+data/*.tmp.json
+
+# GdUnit4 报告
+reports/

@@ -1,0 +1,19 @@
+; 百战天元 · 夜宴（Godot 版）
+; 隔离铁律：本目录与 Phaser 树（../src 等）硬隔离；数据只经 data/spec.json 单向流入。
+; 对拍协议见 docs/PARITY_CODEC.md；里程碑见 docs/MILESTONES.md。
+config_version=5
+
+[application]
+
+config/name="百战天元 · 夜宴"
+config/version="2.0.0-m0"
+run/main_scene="res://render/boot.tscn"
+config/features=PackedStringArray("4.7")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

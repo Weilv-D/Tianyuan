@@ -1,0 +1,73 @@
+// 夜宴 Godot 版质量门禁（qa）：M0 版本 = 导入刷新 → 规格导出幂等 → RNG 对拍 → 编解码往返。
+// 用法：node tools/qa.mjs   （npm run qa）
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { run as runRngParity } from './parity_check.mjs';
+
+const GODOT_EXE = 'C:/WORKSPACE/game/Godot_v4.7.1-stable_win64.exe';
+// 注意：URL('..') 以 / 结尾，dirname 会再剥一层指到仓库根（实机事故根源），必须 resolve
+const GODOT_DIR = path.resolve(fileURLToPath(new URL('..', import.meta.url))).replaceAll('\\', '/');
+
+function extractTag(text, tag) {
+  for (const line of String(text).split(/\r?\n/)) {
+    const i = line.indexOf(`${tag} `);
+    if (i >= 0) return JSON.parse(line.slice(i + tag.length + 1));
+  }
+  return null;
+}
+
+const steps = [];
+function step(name, ok, detail = '') {
+  steps.push({ name, ok, detail });
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' ' + detail : ''}`);
+}
+
+// 1. 刷新全局类缓存（新增/改动 class_name 后 --script 探针依赖它，两轮实机教训）。
+//    个别启动会僵死：限时 + 重试一次，两次超时判 FAIL 而不是挂死整个门禁。
+{
+  let ok = false;
+  for (let attempt = 1; attempt <= 2 && !ok; attempt++) {
+    const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--import'], { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+    ok = r.status === 0;
+  }
+  step('import 刷新', ok);
+}
+
+// 2. 规格导出 + 幂等（同源必同产物）
+{
+  const run1 = spawnSync(process.execPath, ['--import', 'tsx', 'tools/export_spec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  const spec1 = readFileSync(path.join(GODOT_DIR, 'data', 'spec.json'));
+  const run2 = spawnSync(process.execPath, ['--import', 'tsx', 'tools/export_spec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  const spec2 = readFileSync(path.join(GODOT_DIR, 'data', 'spec.json'));
+  step('spec 导出+对账', run1.status === 0 && run2.status === 0, String(run1.stdout).trim());
+  step('spec 幂等', Buffer.compare(spec1, spec2) === 0);
+}
+
+// 3. GdUnit4 单元测试（纯逻辑，无 UI 输入，须 --ignoreHeadlessMode）
+{
+  const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '-s', 'res://addons/gdUnit4/bin/GdUnitCmdTool.gd', '-a', 'tests', '--ignoreHeadlessMode'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 180_000 });
+  const m = String(r.stdout).match(/(\d+) test cases \| (\d+) errors \| (\d+) failures/);
+  step('GdUnit4 单测', r.status === 0, m ? m[0] : String(r.stderr).split('\n')[0] ?? '');
+}
+
+// 4. RNG 跨引擎对拍（默认百万抽样；--quick 时降为十万）
+{
+  const quick = process.argv.includes('--quick');
+  const { rows, failed } = runRngParity(quick ? 100_000 : 1_000_000);
+  step('rng 对拍', failed === 0, `${rows.length - failed}/${rows.length} 组合`);
+}
+
+// 5. 编解码往返（夹具重生成 → GDScript 重编码比对）
+{
+  const gen = spawnSync(process.execPath, ['--import', 'tsx', 'tools/parity_codec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  const probe = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/codec_probe.gd'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  const codec = extractTag(probe.stdout, 'CODEC_JSON');
+  step('codec 往返', gen.status === 0 && probe.status === 0 && codec?.ok === true,
+    codec ? `events=${codec.events} fnv1a32=${codec.fnv1a32}` : String(probe.stderr).split('\n')[0] ?? '');
+}
+
+const failed = steps.filter((s) => !s.ok).length;
+console.log(`[qa] ${steps.length - failed}/${steps.length} 步通过`);
+process.exit(failed === 0 ? 0 : 1);

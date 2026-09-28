@@ -1,0 +1,16 @@
+{
+  "name": "tft-godot-tools",
+  "private": true,
+  "type": "module",
+  "description": "夜宴 Godot 版工具链（规格导出/跨引擎对拍/门禁）。与仓库根工具链硬隔离，对 ../src 只读引用。",
+  "scripts": {
+    "spec": "node --import tsx tools/export_spec.mjs",
+    "parity:rng": "node --import tsx tools/parity_rng.mjs",
+    "parity:codec": "node --import tsx tools/parity_codec.mjs",
+    "parity": "node tools/parity_check.mjs",
+    "qa": "node tools/qa.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

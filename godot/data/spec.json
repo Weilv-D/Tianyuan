@@ -1,0 +1,4344 @@
+{
+ "schema": 1,
+ "gameVersion": "1.20.0",
+ "fnv1a32": "a7d6ee03",
+ "sha256": "1fa428055294cc9b260306984f98ca3168e4e4dd7d00b168178f0e2cde917a18",
+ "counts": {
+  "champions": 64,
+  "items": 44,
+  "traits": 17,
+  "recipes": 36
+ },
+ "payload": {
+  "championIdsByCost": {
+   "1": [
+    "duanyue",
+    "pan",
+    "ajiu",
+    "qinghe",
+    "jingyu",
+    "yeyou",
+    "kutong",
+    "moyan",
+    "yunchu",
+    "zhenfeng",
+    "jinghong",
+    "jiuyuan",
+    "lingque",
+    "hanxing"
+   ],
+   "2": [
+    "lingxiao",
+    "canghao",
+    "yuansu",
+    "yingsha",
+    "muji",
+    "moyu",
+    "bainiang",
+    "chiji",
+    "guicheng",
+    "xijue",
+    "paoche",
+    "yaoguang",
+    "jiaohan",
+    "chaoji"
+   ],
+   "3": [
+    "wujiu",
+    "xuanwu",
+    "chitong",
+    "dasiming",
+    "aoyin",
+    "budong",
+    "xinhuan",
+    "xuanji",
+    "baitao",
+    "guzhen",
+    "zhechong",
+    "wuhuo",
+    "ruijin",
+    "taozhu"
+   ],
+   "4": [
+    "zhenyue",
+    "jiuying",
+    "gongshu",
+    "qingming",
+    "baopu",
+    "zhuyan",
+    "canglan",
+    "yusuan",
+    "moliu",
+    "podu",
+    "jingbo",
+    "shihu"
+   ],
+   "5": [
+    "mozhai",
+    "taibu",
+    "gouchen",
+    "wangxiang",
+    "zhaoye",
+    "muyuan",
+    "shidian",
+    "yinglong",
+    "haotian",
+    "qingqiu"
+   ]
+  },
+  "champions": [
+   {
+    "base": {
+     "armor": 24,
+     "aspd": 0.65,
+     "atk": 60,
+     "critChance": 0.15,
+     "critMult": 1.5,
+     "hp": 700,
+     "maxMp": 60,
+     "moveTime": 0.55,
+     "mr": 20,
+     "range": 1,
+     "sp": 0,
+     "startMp": 20
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 1,
+    "hue": 5661836,
+    "id": "duanyue",
+    "name": "断岳",
+    "origins": [
+     "jianzong"
+    ],
+    "silhouette": "bladeGeneral",
+    "skill": "duanyue_q",
+    "skillSpec": {
+     "desc": "斩出开碑一击，造成 {atk} 攻击力 + {sp} 法强的物理伤害；若目标生命低于 {threshold}，此击造成 {thresholdMult} 伤害。",
+     "kind": "strike",
+     "name": "断岳式",
+     "params": {
+      "atk": 2.8,
+      "flat": 0,
+      "sp": 0.4,
+      "threshold": 0.35,
+      "thresholdMult": 2,
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "墨刀卫"
+   },
+   {
+    "base": {
+     "armor": 34,
+     "aspd": 0.6,
+     "atk": 38,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 820,
+     "maxMp": 65,
+     "moveTime": 0.6,
+     "mr": 32,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 1,
+    "hue": 9076586,
+    "id": "pan",
+    "name": "磐",
+    "origins": [
+     "jiguan"
+    ],
+    "silhouette": "stoneGuard",
+    "skill": "pan_q",
+    "skillSpec": {
+     "desc": "获得 {value} 最大生命的护盾与 {statusFlat} 点护甲，持续 {statusDur} 秒；期间每次受击，反弹所受伤害的 {reflect}。",
+     "kind": "selfBuff",
+     "name": "岩心",
+     "params": {
+      "dur": 6,
+      "reflect": 0.25,
+      "status": {
+       "dur": 6,
+       "kind": "armorUp",
+       "value": 40
+      },
+      "value": 0.18
+     },
+     "target": "self"
+    },
+    "title": "石灵"
+   },
+   {
+    "base": {
+     "armor": 18,
+     "aspd": 0.8,
+     "atk": 56,
+     "critChance": 0.2,
+     "critMult": 1.75,
+     "hp": 520,
+     "maxMp": 55,
+     "moveTime": 0.45,
+     "mr": 18,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 1,
+    "hue": 13209954,
+    "id": "ajiu",
+    "name": "阿玖",
+    "origins": [
+     "yaozu"
+    ],
+    "silhouette": "shadowHood",
+    "skill": "ajiu_q",
+    "skillSpec": {
+     "desc": "瞬移至生命最低的敌人身侧，造成 {atk} 攻击力的物理伤害，本次必定暴击。",
+     "kind": "dashStrike",
+     "name": "狐影闪",
+     "params": {
+      "atk": 2.2,
+      "forceCrit": true,
+      "type": "physical"
+     },
+     "target": "enemyLowestHp"
+    },
+    "title": "灵狐"
+   },
+   {
+    "base": {
+     "armor": 16,
+     "aspd": 0.6,
+     "atk": 32,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 560,
+     "maxMp": 55,
+     "moveTime": 0.6,
+     "mr": 26,
+     "range": 3,
+     "sp": 48,
+     "startMp": 15
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 1,
+    "hue": 6195824,
+    "id": "qinghe",
+    "name": "青禾",
+    "origins": [
+     "danding"
+    ],
+    "silhouette": "gourdHealer",
+    "skill": "qinghe_q",
+    "skillSpec": {
+     "desc": "为生命最低的 {shots} 名友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 {statusDur} 秒 {statusValue} 攻速。",
+     "kind": "healBurst",
+     "name": "春风化雨",
+     "params": {
+      "shots": 2,
+      "sp": 0.6,
+      "status": {
+       "dur": 5,
+       "kind": "aspdUp",
+       "value": 20
+      },
+      "value": 0.18
+     },
+     "target": "allyLowestHp"
+    },
+    "title": "药童"
+   },
+   {
+    "base": {
+     "armor": 16,
+     "aspd": 0.7,
+     "atk": 58,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 500,
+     "maxMp": 50,
+     "moveTime": 0.6,
+     "mr": 16,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 1,
+    "hue": 7640458,
+    "id": "jingyu",
+    "name": "惊羽",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "bowSniper",
+    "skill": "jingyu_q",
+    "skillSpec": {
+     "desc": "{volleySpan} 秒内连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，最后一箭造成 {finalMult} 伤害。",
+     "kind": "volley",
+     "name": "连珠箭",
+     "params": {
+      "atk": 0.7,
+      "finalMult": 2,
+      "interval": 0.6,
+      "shots": 5,
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "弓手"
+   },
+   {
+    "base": {
+     "armor": 18,
+     "aspd": 0.65,
+     "atk": 38,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 540,
+     "maxMp": 55,
+     "moveTime": 0.58,
+     "mr": 26,
+     "range": 3,
+     "sp": 58,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 1,
+    "hue": 4478074,
+    "id": "yeyou",
+    "name": "夜游",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "bonePuppet",
+    "skill": "yeyou_q",
+    "skillSpec": {
+     "desc": "锁拿魂魄，造成 {sp} 法强的真实伤害，并沉默目标 {dur} 秒。",
+     "kind": "strike",
+     "name": "勾魂索",
+     "params": {
+      "sp": 1.7,
+      "status": {
+       "dur": 1.8,
+       "kind": "silence",
+       "value": 0
+      },
+      "type": "true"
+     },
+     "target": "enemyHighestAtk"
+    },
+    "title": "鬼差"
+   },
+   {
+    "base": {
+     "armor": 26,
+     "aspd": 0.6,
+     "atk": 46,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 740,
+     "maxMp": 60,
+     "moveTime": 0.55,
+     "mr": 26,
+     "range": 1,
+     "sp": 42,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 1,
+    "hue": 9410425,
+    "id": "kutong",
+    "name": "苦童",
+    "origins": [
+     "danding"
+    ],
+    "silhouette": "ironBull",
+    "skill": "kutong_q",
+    "skillSpec": {
+     "desc": "向周围 {radius} 格释放毒瘴，造成 {sp} 法强的法术伤害，并使其中敌人受到的治疗降低 {statusValue}，持续 {statusDur} 秒。",
+     "kind": "nova",
+     "name": "毒瘴",
+     "params": {
+      "radius": 1,
+      "sp": 1.1,
+      "status": {
+       "dur": 4,
+       "kind": "wound",
+       "value": 50
+      },
+      "type": "magic"
+     },
+     "target": "self"
+    },
+    "title": "药奴"
+   },
+   {
+    "base": {
+     "armor": 32,
+     "aspd": 0.6,
+     "atk": 90,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 900,
+     "maxMp": 70,
+     "moveTime": 0.58,
+     "mr": 32,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 2,
+    "hue": 11044159,
+    "id": "lingxiao",
+    "name": "凌霄",
+    "origins": [
+     "tian"
+    ],
+    "silhouette": "spearVanguard",
+    "skill": "lingxiao_q",
+    "skillSpec": {
+     "desc": "挺枪突进，贯穿直线 {length} 格，造成 {atk} 攻击力的物理伤害，击退 {knockback} 格并眩晕 {dur} 秒。",
+     "kind": "line",
+     "name": "奔雷枪",
+     "params": {
+      "atk": 2.2,
+      "knockback": 1,
+      "length": 4,
+      "status": {
+       "dur": 1,
+       "kind": "stun",
+       "value": 0
+      },
+      "type": "physical"
+     },
+     "target": "enemyLongestLine"
+    },
+    "title": "天兵"
+   },
+   {
+    "base": {
+     "armor": 30,
+     "aspd": 0.65,
+     "atk": 70,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 800,
+     "maxMp": 60,
+     "moveTime": 0.5,
+     "mr": 22,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 2,
+    "hue": 10251082,
+    "id": "canghao",
+    "name": "苍嗥",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "ironBull",
+    "skill": "canghao_q",
+    "skillSpec": {
+     "desc": "进入狂血状态 {dur} 秒：攻速 +{statusValue}、攻击力 +{extraStatusValue}；期间每次击杀，狂血时长刷新至满。",
+     "kind": "selfBuff",
+     "name": "狂血",
+     "params": {
+      "dur": 8,
+      "extraStatus": {
+       "kind": "atkUp",
+       "value": 45
+      },
+      "killRenew": true,
+      "status": {
+       "dur": 8,
+       "kind": "aspdUp",
+       "value": 50
+      }
+     },
+     "target": "self"
+    },
+    "title": "荒狼"
+   },
+   {
+    "base": {
+     "armor": 18,
+     "aspd": 0.65,
+     "atk": 36,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 640,
+     "maxMp": 56,
+     "moveTime": 0.6,
+     "mr": 30,
+     "range": 3,
+     "sp": 70,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 2,
+    "hue": 7505581,
+    "id": "yuansu",
+    "name": "元素",
+    "origins": [
+     "longyuan"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "yuansu_q",
+    "skillSpec": {
+     "desc": "在最密集处降下雷罚，{radius} 格内造成 {sp} 法强的法术伤害并眩晕 {dur} 秒。",
+     "kind": "aoe",
+     "name": "五雷符",
+     "params": {
+      "radius": 1,
+      "sp": 2.7,
+      "status": {
+       "dur": 1.2,
+       "kind": "stun",
+       "value": 0
+      },
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "符师"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.85,
+     "atk": 65,
+     "critChance": 0.25,
+     "critMult": 1.8,
+     "hp": 560,
+     "maxMp": 60,
+     "moveTime": 0.45,
+     "mr": 20,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 2,
+    "hue": 5003896,
+    "id": "yingsha",
+    "name": "影刹",
+    "origins": [
+     "jianzong"
+    ],
+    "silhouette": "twinDagger",
+    "skill": "yingsha_q",
+    "skillSpec": {
+     "desc": "瞬杀生命最低的敌人，造成 {atk} 攻击力的物理伤害；若击杀，立即恢复 {resetOnKill} 法力。",
+     "kind": "dashStrike",
+     "name": "影袭",
+     "params": {
+      "atk": 3.1,
+      "resetOnKill": 0.6,
+      "type": "physical"
+     },
+     "target": "enemyLowestHp"
+    },
+    "title": "双刃"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.75,
+     "atk": 62,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 540,
+     "maxMp": 60,
+     "moveTime": 0.6,
+     "mr": 18,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 2,
+    "hue": 11045212,
+    "id": "muji",
+    "name": "木机",
+    "origins": [
+     "jiguan"
+    ],
+    "silhouette": "crossbowGunner",
+    "skill": "muji_q",
+    "skillSpec": {
+     "desc": "倾泻 {shots} 发弩矢，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（至多 {maxStacks} 层，持续 {statusDur} 秒）。",
+     "kind": "volley",
+     "name": "连弩齐射",
+     "params": {
+      "atk": 0.7,
+      "finalMult": 2,
+      "interval": 0.4,
+      "maxStacks": 8,
+      "shots": 8,
+      "status": {
+       "dur": 5,
+       "kind": "aspdUp",
+       "value": 6
+      },
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "傀儡"
+   },
+   {
+    "base": {
+     "armor": 18,
+     "aspd": 0.65,
+     "atk": 38,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 560,
+     "maxMp": 70,
+     "moveTime": 0.6,
+     "mr": 30,
+     "range": 3,
+     "sp": 70,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 2,
+    "hue": 3819108,
+    "id": "moyu",
+    "name": "墨羽",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "hexWarlock",
+    "skill": "moyu_q",
+    "skillSpec": {
+     "desc": "在敌人最密集处泼洒墨池，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害，并降低其中敌人 {statusValue} 攻速与移速。",
+     "kind": "field",
+     "name": "墨狱",
+     "params": {
+      "dpsSp": 0.62,
+      "dur": 5,
+      "radius": 1,
+      "status": {
+       "dur": 5,
+       "kind": "slow",
+       "value": 30
+      },
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "冥鸦"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.6,
+     "atk": 36,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 620,
+     "maxMp": 65,
+     "moveTime": 0.6,
+     "mr": 32,
+     "range": 3,
+     "sp": 58,
+     "startMp": 20
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 2,
+    "hue": 9416342,
+    "id": "bainiang",
+    "name": "白娘",
+    "origins": [
+     "danding"
+    ],
+    "silhouette": "foxSpirit",
+    "skill": "bainiang_q",
+    "skillSpec": {
+     "desc": "为全体友军回复 {value} 最大生命 + {sp} 法强的生命；同时对 {shots} 名随机敌人施加 {statusDur} 秒重伤（受治疗降低 {statusValue}）。",
+     "kind": "healBurst",
+     "name": "蛇涎回春",
+     "params": {
+      "shots": 3,
+      "sp": 0.5,
+      "status": {
+       "dur": 3,
+       "kind": "wound",
+       "value": 40
+      },
+      "value": 0.12
+     },
+     "target": "allAllies"
+    },
+    "title": "蛇姬"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.7,
+     "atk": 72,
+     "critChance": 0.2,
+     "critMult": 1.7,
+     "hp": 860,
+     "maxMp": 78,
+     "moveTime": 0.5,
+     "mr": 26,
+     "range": 1,
+     "sp": 20,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 3,
+    "hue": 10465450,
+    "id": "wujiu",
+    "name": "无咎",
+    "origins": [
+     "jianzong"
+    ],
+    "silhouette": "bladeGeneral",
+    "skill": "wujiu_q",
+    "skillSpec": {
+     "desc": "剑气纵横，对目标及其周围 {radius} 格造成 {atk} 攻击力 + {sp} 法强的物理伤害；每命中一名敌人，永久 +{stackAtkOnHit} 攻击力。",
+     "kind": "strike",
+     "name": "无咎剑域",
+     "params": {
+      "atk": 2.4,
+      "radius": 1,
+      "sp": 0.6,
+      "stackAtkOnHit": 0.06,
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "剑修"
+   },
+   {
+    "base": {
+     "armor": 42,
+     "aspd": 0.55,
+     "atk": 42,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1150,
+     "maxMp": 110,
+     "moveTime": 0.65,
+     "mr": 42,
+     "range": 1,
+     "sp": 32,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 3,
+    "hue": 5208682,
+    "id": "xuanwu",
+    "name": "玄武",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "stoneGuard",
+    "skill": "xuanwu_q",
+    "skillSpec": {
+     "desc": "为全体友军提供相当于自身 {value} 最大生命的护盾，持续 {shieldDur} 秒；护盾生效期间受到伤害降低 {damageReduction}。",
+     "kind": "shieldAll",
+     "name": "玄冥之护",
+     "params": {
+      "damageReduction": 0.12,
+      "shieldDur": 8,
+      "value": 0.1
+     },
+     "target": "allAllies"
+    },
+    "title": "玄龟"
+   },
+   {
+    "base": {
+     "armor": 30,
+     "aspd": 0.65,
+     "atk": 82,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 960,
+     "maxMp": 65,
+     "moveTime": 0.5,
+     "mr": 26,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 3,
+    "hue": 11550762,
+    "id": "chitong",
+    "name": "赤瞳",
+    "origins": [
+     "yaozu"
+    ],
+    "silhouette": "ironBull",
+    "skill": "chitong_q",
+    "skillSpec": {
+     "desc": "横扫周围 {radius} 格，造成 {atk} 攻击力的物理伤害；每命中一名敌人回复 {healOnHit} 最大生命，并获得 {statusDur} 秒 {statusValue} 攻击力。",
+     "kind": "nova",
+     "name": "血怒",
+     "params": {
+      "atk": 2.1,
+      "healOnHit": 0.08,
+      "radius": 1,
+      "status": {
+       "dur": 6,
+       "kind": "atkUp",
+       "value": 25
+      },
+      "type": "physical"
+     },
+     "target": "self"
+    },
+    "title": "妖将"
+   },
+   {
+    "base": {
+     "armor": 22,
+     "aspd": 0.6,
+     "atk": 40,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 720,
+     "maxMp": 70,
+     "moveTime": 0.6,
+     "mr": 36,
+     "range": 3,
+     "sp": 62,
+     "startMp": 10
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 3,
+    "hue": 11034229,
+    "id": "dasiming",
+    "name": "大司命",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "bannerSupport",
+    "skill": "dasiming_q",
+    "skillSpec": {
+     "desc": "复活一名阵亡友军，恢复 {value} 最大生命与满额法力；若无阵亡友军，则改为全体回复 {value} 最大生命。",
+     "kind": "resurrect",
+     "name": "招魂",
+     "params": {
+      "value": 0.45
+     },
+     "target": "deadAlly"
+    },
+    "title": "巫祝"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.65,
+     "atk": 38,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 700,
+     "maxMp": 70,
+     "moveTime": 0.6,
+     "mr": 32,
+     "range": 3,
+     "sp": 86,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 3,
+    "hue": 6260630,
+    "id": "aoyin",
+    "name": "敖姻",
+    "origins": [
+     "longyuan"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "aoyin_q",
+    "skillSpec": {
+     "desc": "水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}），并降低 {statusValue} 攻速与移速 {statusDur} 秒。",
+     "kind": "chain",
+     "name": "潮生链",
+     "params": {
+      "falloff": 0.15,
+      "jumps": 4,
+      "sp": 1.75,
+      "status": {
+       "dur": 3,
+       "kind": "slow",
+       "value": 25
+      },
+      "type": "magic"
+     },
+     "target": "enemyNearest"
+    },
+    "title": "龙女"
+   },
+   {
+    "base": {
+     "armor": 48,
+     "aspd": 0.55,
+     "atk": 48,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1080,
+     "maxMp": 85,
+     "moveTime": 0.65,
+     "mr": 46,
+     "range": 1,
+     "sp": 52,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 3,
+    "hue": 11570519,
+    "id": "budong",
+    "name": "不动",
+    "origins": [
+     "jiguan"
+    ],
+    "silhouette": "stoneGuard",
+    "skill": "budong_q",
+    "skillSpec": {
+     "desc": "结不动印 {dur} 秒：免疫所有伤害与控制，并每秒对周围 {radius} 格造成 {dpsSp} 法强的法术伤害。",
+     "kind": "selfBuff",
+     "name": "不动明王",
+     "params": {
+      "dpsSp": 0.5,
+      "dur": 4,
+      "invulnWhileCasting": true,
+      "radius": 1,
+      "type": "magic"
+     },
+     "target": "self"
+    },
+    "title": "铜人"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.65,
+     "atk": 36,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 690,
+     "maxMp": 72,
+     "moveTime": 0.6,
+     "mr": 32,
+     "range": 4,
+     "sp": 160,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 3,
+    "hue": 13216106,
+    "id": "xinhuan",
+    "name": "辛环",
+    "origins": [
+     "tian"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "xinhuan_q",
+    "skillSpec": {
+     "desc": "引动天雷，{delay} 秒后劈向最密集处，{radius} 格内造成 {sp} 法强的法术伤害并眩晕 {dur} 秒。",
+     "kind": "aoe",
+     "name": "天雷引",
+     "params": {
+      "delay": 1.2,
+      "radius": 1,
+      "sp": 3,
+      "status": {
+       "dur": 1.5,
+       "kind": "stun",
+       "value": 0
+      },
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "雷部"
+   },
+   {
+    "base": {
+     "armor": 44,
+     "aspd": 0.6,
+     "atk": 110,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1180,
+     "maxMp": 90,
+     "moveTime": 0.55,
+     "mr": 42,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 4,
+    "hue": 7033652,
+    "id": "zhenyue",
+    "name": "镇岳",
+    "origins": [
+     "tian"
+    ],
+    "silhouette": "spearVanguard",
+    "skill": "zhenyue_q",
+    "skillSpec": {
+     "desc": "跃向敌阵最密集处并砸落：{radius} 格内造成 {atk} 攻击力的物理伤害并眩晕 {statusDur} 秒，自身获得 {shieldOnHit} 最大生命的护盾。",
+     "kind": "nova",
+     "name": "镇岳",
+     "params": {
+      "atk": 2.6,
+      "radius": 2,
+      "shieldOnHit": 0.18,
+      "status": {
+       "dur": 1.8,
+       "kind": "stun",
+       "value": 0
+      },
+      "type": "physical"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "天王"
+   },
+   {
+    "base": {
+     "armor": 30,
+     "aspd": 0.65,
+     "atk": 50,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 920,
+     "maxMp": 90,
+     "moveTime": 0.55,
+     "mr": 36,
+     "range": 3,
+     "sp": 112,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 4,
+    "hue": 9124410,
+    "id": "jiuying",
+    "name": "九婴",
+    "origins": [
+     "yaozu"
+    ],
+    "silhouette": "hexWarlock",
+    "skill": "jiuying_q",
+    "skillSpec": {
+     "desc": "九首齐噬：{radius} 格内造成 {sp} 法强的法术伤害；每命中一名敌人回复 {healOnHit} 最大生命。",
+     "kind": "aoe",
+     "name": "九首吞天",
+     "params": {
+      "healOnHit": 0.08,
+      "radius": 2,
+      "sp": 3.8,
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "大妖"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.8,
+     "atk": 92,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 720,
+     "maxMp": 85,
+     "moveTime": 0.6,
+     "mr": 26,
+     "range": 5,
+     "sp": 20,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 4,
+    "hue": 10128239,
+    "id": "gongshu",
+    "name": "公输",
+    "origins": [
+     "jiguan"
+    ],
+    "silhouette": "crossbowGunner",
+    "skill": "gongshu_q",
+    "skillSpec": {
+     "desc": "召唤 {count} 只机关傀儡参战（继承 {hpPct} 生命与 {atkPct} 攻击力）；召唤时全体友军获得 {statusDur} 秒 {statusValue} 攻速。",
+     "kind": "summon",
+     "name": "机关兽",
+     "params": {
+      "status": {
+       "dur": 6,
+       "kind": "aspdUp",
+       "value": 25
+      },
+      "summon": {
+       "atkPct": 0.75,
+       "count": 2,
+       "hpPct": 0.55
+      }
+     },
+     "target": "self"
+    },
+    "title": "机巧"
+   },
+   {
+    "base": {
+     "armor": 26,
+     "aspd": 0.9,
+     "atk": 84,
+     "critChance": 0.35,
+     "critMult": 1.9,
+     "hp": 740,
+     "maxMp": 80,
+     "moveTime": 0.45,
+     "mr": 26,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 4,
+    "hue": 10991316,
+    "id": "qingming",
+    "name": "青冥",
+    "origins": [
+     "jianzong"
+    ],
+    "silhouette": "twinDagger",
+    "skill": "qingming_q",
+    "skillSpec": {
+     "desc": "瞬入敌方后排，对 {radius} 格内所有敌人造成 {atk} 攻击力、必定暴击的物理伤害；若造成击杀则回满法力并可再次施放（至多 {maxRepeats} 次）。",
+     "kind": "dashStrike",
+     "name": "一剑霜寒",
+     "params": {
+      "atk": 2.7,
+      "forceCrit": true,
+      "maxRepeats": 2,
+      "radius": 1,
+      "resetOnKill": 1,
+      "type": "physical"
+     },
+     "target": "enemyFarthest"
+    },
+    "title": "剑仙"
+   },
+   {
+    "base": {
+     "armor": 26,
+     "aspd": 0.6,
+     "atk": 40,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 800,
+     "maxMp": 85,
+     "moveTime": 0.6,
+     "mr": 42,
+     "range": 3,
+     "sp": 98,
+     "startMp": 15
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 4,
+    "hue": 13677171,
+    "id": "baopu",
+    "name": "抱朴",
+    "origins": [
+     "danding"
+    ],
+    "silhouette": "lanternSage",
+    "skill": "baopu_q",
+    "skillSpec": {
+     "desc": "为全体友军回复 {value} 最大生命 + {sp} 法强的生命，并赋予 {statusDur} 秒 {damageReduction} 减伤与 {statusFlat} 点护甲。",
+     "kind": "healBurst",
+     "name": "金丹济世",
+     "params": {
+      "damageReduction": 0.3,
+      "sp": 0.9,
+      "status": {
+       "dur": 6,
+       "kind": "armorUp",
+       "value": 30
+      },
+      "value": 0.25
+     },
+     "target": "allAllies"
+    },
+    "title": "丹王"
+   },
+   {
+    "base": {
+     "armor": 26,
+     "aspd": 0.65,
+     "atk": 44,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 780,
+     "maxMp": 78,
+     "moveTime": 0.6,
+     "mr": 34,
+     "range": 4,
+     "sp": 105,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 4,
+    "hue": 13595220,
+    "id": "zhuyan",
+    "name": "朱炎",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "zhuyan_q",
+    "skillSpec": {
+     "desc": "喷吐贯穿 {length} 格的焚天火羽，沿途造成 {sp} 法强的法术伤害，并附加 {statusDur} 秒灼烧（每秒 {dpsSp} 法强）。",
+     "kind": "beam",
+     "name": "焚天羽",
+     "params": {
+      "dpsSp": 0.35,
+      "length": 5,
+      "sp": 3.2,
+      "status": {
+       "dur": 4,
+       "kind": "burn",
+       "value": 0
+      },
+      "type": "magic"
+     },
+     "target": "enemyLongestLine"
+    },
+    "title": "毕方"
+   },
+   {
+    "base": {
+     "armor": 42,
+     "aspd": 0.6,
+     "atk": 52,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1160,
+     "maxMp": 90,
+     "moveTime": 0.6,
+     "mr": 46,
+     "range": 2,
+     "sp": 84,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 4,
+    "hue": 4879250,
+    "id": "canglan",
+    "name": "沧澜",
+    "origins": [
+     "longyuan"
+    ],
+    "silhouette": "dragonSovereign",
+    "skill": "canglan_q",
+    "skillSpec": {
+     "desc": "在敌方半场涌起潮汐，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害并降低 {statusValue} 移速与攻速；自身获得 {damageReduction} 减伤。",
+     "kind": "field",
+     "name": "沧海潮汐",
+     "params": {
+      "damageReduction": 0.25,
+      "dpsSp": 0.92,
+      "dur": 6,
+      "radius": 2,
+      "status": {
+       "dur": 6,
+       "kind": "slow",
+       "value": 25
+      },
+      "type": "magic"
+     },
+     "target": "enemyHalfBoard"
+    },
+    "title": "龙王"
+   },
+   {
+    "base": {
+     "armor": 36,
+     "aspd": 0.55,
+     "atk": 75,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 880,
+     "maxMp": 65,
+     "moveTime": 0.62,
+     "mr": 34,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 1,
+    "hue": 7233874,
+    "id": "moyan",
+    "name": "墨岩",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "stoneGuard",
+    "skill": "moyan_q",
+    "skillSpec": {
+     "desc": "凿墨为壁：获得 {value} 最大生命的护盾与 {statusFlat} 点护甲，持续 {statusDur} 秒，期间反弹所受伤害的 {reflect}。",
+     "kind": "selfBuff",
+     "name": "墨壁",
+     "params": {
+      "dur": 6,
+      "reflect": 0.2,
+      "status": {
+       "dur": 6,
+       "kind": "armorUp",
+       "value": 36
+      },
+      "value": 0.16
+     },
+     "target": "self"
+    },
+    "title": "石匠"
+   },
+   {
+    "base": {
+     "armor": 16,
+     "aspd": 0.6,
+     "atk": 34,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 560,
+     "maxMp": 55,
+     "moveTime": 0.6,
+     "mr": 28,
+     "range": 3,
+     "sp": 120,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 1,
+    "hue": 7774364,
+    "id": "yunchu",
+    "name": "云杼",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "yunchu_q",
+    "skillSpec": {
+     "desc": "掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}）并降低 {statusValue} 攻速与移速 {statusDur} 秒。",
+     "kind": "chain",
+     "name": "飞杼",
+     "params": {
+      "falloff": 0.15,
+      "jumps": 3,
+      "sp": 1.5,
+      "status": {
+       "dur": 2,
+       "kind": "slow",
+       "value": 20
+      },
+      "type": "magic"
+     },
+     "target": "enemyNearest"
+    },
+    "title": "织机师"
+   },
+   {
+    "base": {
+     "armor": 24,
+     "aspd": 0.65,
+     "atk": 62,
+     "critChance": 0.15,
+     "critMult": 1.55,
+     "hp": 720,
+     "maxMp": 60,
+     "moveTime": 0.55,
+     "mr": 20,
+     "range": 1,
+     "sp": 0,
+     "startMp": 15
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 1,
+    "hue": 9863775,
+    "id": "zhenfeng",
+    "name": "砺锋",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "bladeGeneral",
+    "skill": "zhenfeng_q",
+    "skillSpec": {
+     "desc": "新发于硎：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 {thresholdMult} 伤害。",
+     "kind": "strike",
+     "name": "开锋",
+     "params": {
+      "atk": 2.5,
+      "threshold": 0.3,
+      "thresholdMult": 2,
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "磨刀叟"
+   },
+   {
+    "base": {
+     "armor": 16,
+     "aspd": 0.72,
+     "atk": 56,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 510,
+     "maxMp": 50,
+     "moveTime": 0.6,
+     "mr": 16,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 1,
+    "hue": 10521186,
+    "id": "jinghong",
+    "name": "惊鸿",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "bowSniper",
+    "skill": "jinghong_q",
+    "skillSpec": {
+     "desc": "连射 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害。",
+     "kind": "volley",
+     "name": "逐羽",
+     "params": {
+      "atk": 0.65,
+      "finalMult": 2,
+      "interval": 0.5,
+      "shots": 4,
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "猎手"
+   },
+   {
+    "base": {
+     "armor": 18,
+     "aspd": 0.65,
+     "atk": 36,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 560,
+     "maxMp": 55,
+     "moveTime": 0.6,
+     "mr": 26,
+     "range": 3,
+     "sp": 56,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 1,
+    "hue": 4478074,
+    "id": "jiuyuan",
+    "name": "九原",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "hexWarlock",
+    "skill": "jiuyuan_q",
+    "skillSpec": {
+     "desc": "酹酒祭地：对攻击最高的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速与移速 {statusDur} 秒。",
+     "kind": "strike",
+     "name": "酹祭",
+     "params": {
+      "sp": 1.5,
+      "status": {
+       "dur": 3,
+       "kind": "slow",
+       "value": 25
+      },
+      "type": "magic"
+     },
+     "target": "enemyHighestAtk"
+    },
+    "title": "巫祝"
+   },
+   {
+    "base": {
+     "armor": 16,
+     "aspd": 0.75,
+     "atk": 54,
+     "critChance": 0.2,
+     "critMult": 1.7,
+     "hp": 520,
+     "maxMp": 50,
+     "moveTime": 0.55,
+     "mr": 16,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 1,
+    "hue": 9416342,
+    "id": "lingque",
+    "name": "灵雀",
+    "origins": [
+     "yaozu"
+    ],
+    "silhouette": "bowSniper",
+    "skill": "lingque_q",
+    "skillSpec": {
+     "desc": "连珠雀鸣：{shots} 箭连射，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；每箭命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。",
+     "kind": "volley",
+     "name": "雀鸣",
+     "params": {
+      "atk": 0.5,
+      "finalMult": 2,
+      "interval": 0.4,
+      "shots": 5,
+      "status": {
+       "dur": 5,
+       "kind": "aspdUp",
+       "value": 5
+      },
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "雀衣"
+   },
+   {
+    "base": {
+     "armor": 16,
+     "aspd": 0.65,
+     "atk": 34,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 540,
+     "maxMp": 52,
+     "moveTime": 0.6,
+     "mr": 28,
+     "range": 4,
+     "sp": 54,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 1,
+    "hue": 10465450,
+    "id": "hanxing",
+    "name": "寒星",
+    "origins": [
+     "longyuan"
+    ],
+    "silhouette": "bowSniper",
+    "skill": "hanxing_q",
+    "skillSpec": {
+     "desc": "引寒星坠落：对生命最低的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速与移速 {statusDur} 秒。",
+     "kind": "strike",
+     "name": "坠星",
+     "params": {
+      "sp": 1.9,
+      "status": {
+       "dur": 2,
+       "kind": "slow",
+       "value": 20
+      },
+      "type": "magic"
+     },
+     "target": "enemyLowestHp"
+    },
+    "title": "星官"
+   },
+   {
+    "base": {
+     "armor": 30,
+     "aspd": 0.65,
+     "atk": 105,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 820,
+     "maxMp": 60,
+     "moveTime": 0.5,
+     "mr": 24,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 2,
+    "hue": 8030880,
+    "id": "chiji",
+    "name": "驰机",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "spearVanguard",
+    "skill": "chiji_q",
+    "skillSpec": {
+     "desc": "持戟驰突：贯穿直线 {length} 格，造成 {atk} 攻击力的物理伤害并击退 {knockback} 格。",
+     "kind": "line",
+     "name": "驰突",
+     "params": {
+      "atk": 2,
+      "knockback": 1,
+      "length": 4,
+      "type": "physical"
+     },
+     "target": "enemyLongestLine"
+    },
+    "title": "机士"
+   },
+   {
+    "base": {
+     "armor": 34,
+     "aspd": 0.55,
+     "atk": 85,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 940,
+     "maxMp": 70,
+     "moveTime": 0.62,
+     "mr": 34,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 2,
+    "hue": 8155745,
+    "id": "guicheng",
+    "name": "圭城",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "stoneGuard",
+    "skill": "guicheng_q",
+    "skillSpec": {
+     "desc": "筑起城垣：全体友军获得 {value} 最大生命的护盾与 {damageReduction} 减伤，持续 {shieldDur} 秒。",
+     "kind": "shieldAll",
+     "name": "城垣",
+     "params": {
+      "damageReduction": 0.1,
+      "shieldDur": 6,
+      "value": 0.09
+     },
+     "target": "allAllies"
+    },
+    "title": "筑城吏"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.85,
+     "atk": 68,
+     "critChance": 0.25,
+     "critMult": 1.8,
+     "hp": 580,
+     "maxMp": 60,
+     "moveTime": 0.45,
+     "mr": 20,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 2,
+    "hue": 11901546,
+    "id": "xijue",
+    "name": "袭爵",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "twinDagger",
+    "skill": "xijue_q",
+    "skillSpec": {
+     "desc": "袭杀生命最低的敌人，造成 {atk} 攻击力的物理伤害；若击杀，立即恢复 {resetOnKill} 法力。",
+     "kind": "dashStrike",
+     "name": "夺嫡",
+     "params": {
+      "atk": 2.9,
+      "resetOnKill": 0.5,
+      "type": "physical"
+     },
+     "target": "enemyLowestHp"
+    },
+    "title": "袭位者"
+   },
+   {
+    "base": {
+     "armor": 22,
+     "aspd": 0.7,
+     "atk": 64,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 600,
+     "maxMp": 60,
+     "moveTime": 0.6,
+     "mr": 18,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 2,
+    "hue": 9075292,
+    "id": "paoche",
+    "name": "抛车",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "crossbowGunner",
+    "skill": "paoche_q",
+    "skillSpec": {
+     "desc": "抛射巨石 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。",
+     "kind": "volley",
+     "name": "石弩",
+     "params": {
+      "atk": 0.62,
+      "finalMult": 2,
+      "interval": 0.55,
+      "shots": 4,
+      "status": {
+       "dur": 3,
+       "kind": "aspdUp",
+       "value": 8
+      },
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "车兵"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.65,
+     "atk": 36,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 620,
+     "maxMp": 56,
+     "moveTime": 0.6,
+     "mr": 30,
+     "range": 3,
+     "sp": 120,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 2,
+    "hue": 13348960,
+    "id": "yaoguang",
+    "name": "瑶光",
+    "origins": [
+     "tian"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "yaoguang_q",
+    "skillSpec": {
+     "desc": "瑶光坠地：{radius} 格内造成 {sp} 法强的法术伤害并降低 {statusValue} 攻速与移速 {statusDur} 秒。",
+     "kind": "aoe",
+     "name": "星坠",
+     "params": {
+      "radius": 1,
+      "sp": 2.1,
+      "status": {
+       "dur": 2,
+       "kind": "slow",
+       "value": 25
+      },
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "星使"
+   },
+   {
+    "base": {
+     "armor": 30,
+     "aspd": 0.6,
+     "atk": 60,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 860,
+     "maxMp": 60,
+     "moveTime": 0.55,
+     "mr": 24,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 2,
+    "hue": 5215364,
+    "id": "jiaohan",
+    "name": "蛟翰",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "ironBull",
+    "skill": "jiaohan_q",
+    "skillSpec": {
+     "desc": "横扫周围 {radius} 格造成 {atk} 攻击力的物理伤害，并获得 {statusDur} 秒 {statusValue} 攻速。",
+     "kind": "nova",
+     "name": "翻江",
+     "params": {
+      "atk": 1.9,
+      "radius": 1,
+      "status": {
+       "dur": 6,
+       "kind": "aspdUp",
+       "value": 20
+      },
+      "type": "physical"
+     },
+     "target": "self"
+    },
+    "title": "蛟卒"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.75,
+     "atk": 64,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 560,
+     "maxMp": 60,
+     "moveTime": 0.6,
+     "mr": 18,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 2,
+    "hue": 9083514,
+    "id": "chaoji",
+    "name": "潮机",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "crossbowGunner",
+    "skill": "chaoji_q",
+    "skillSpec": {
+     "desc": "海潮连弩 {shots} 发，每发造成 {atk} 攻击力的物理伤害，末发造成 {finalMult} 伤害；每发命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。",
+     "kind": "volley",
+     "name": "潮弩",
+     "params": {
+      "atk": 0.5,
+      "finalMult": 2,
+      "interval": 0.4,
+      "shots": 6,
+      "status": {
+       "dur": 5,
+       "kind": "aspdUp",
+       "value": 6
+      },
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "海弩手"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.65,
+     "atk": 36,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 680,
+     "maxMp": 70,
+     "moveTime": 0.6,
+     "mr": 32,
+     "range": 3,
+     "sp": 160,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 3,
+    "hue": 5661836,
+    "id": "xuanji",
+    "name": "璇玑",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "xuanji_q",
+    "skillSpec": {
+     "desc": "璇玑引雷：{delay} 秒后劈向最密集处，{radius} 格内造成 {sp} 法强的法术伤害并眩晕 {dur} 秒。",
+     "kind": "aoe",
+     "name": "衡雷",
+     "params": {
+      "delay": 0.6,
+      "radius": 1,
+      "sp": 2.6,
+      "status": {
+       "dur": 1.2,
+       "kind": "stun",
+       "value": 0
+      },
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "玑衡师"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.6,
+     "atk": 34,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 640,
+     "maxMp": 60,
+     "moveTime": 0.6,
+     "mr": 30,
+     "range": 3,
+     "sp": 130,
+     "startMp": 15
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 3,
+    "hue": 14075556,
+    "id": "baitao",
+    "name": "白陶",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "gourdHealer",
+    "skill": "baitao_q",
+    "skillSpec": {
+     "desc": "为全体友军回复 {value} 最大生命 + {sp} 法强的生命，并获得 {dur} 秒 {damageReduction} 减伤。",
+     "kind": "healBurst",
+     "name": "陶钧",
+     "params": {
+      "damageReduction": 0.15,
+      "dur": 6,
+      "sp": 0.45,
+      "value": 0.1
+     },
+     "target": "allAllies"
+    },
+    "title": "陶正"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.65,
+     "atk": 74,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 880,
+     "maxMp": 65,
+     "moveTime": 0.5,
+     "mr": 26,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 3,
+    "hue": 11034180,
+    "id": "guzhen",
+    "name": "鼓震",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "ironBull",
+    "skill": "guzhen_q",
+    "skillSpec": {
+     "desc": "擂鼓进军：攻速 +{statusValue}，持续 {dur} 秒。",
+     "kind": "selfBuff",
+     "name": "擂鼓",
+     "params": {
+      "dur": 7,
+      "status": {
+       "dur": 7,
+       "kind": "aspdUp",
+       "value": 45
+      }
+     },
+     "target": "self"
+    },
+    "title": "鼓吏"
+   },
+   {
+    "base": {
+     "armor": 42,
+     "aspd": 0.55,
+     "atk": 50,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1000,
+     "maxMp": 80,
+     "moveTime": 0.62,
+     "mr": 40,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 3,
+    "hue": 9075290,
+    "id": "zhechong",
+    "name": "折冲",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "spearVanguard",
+    "skill": "zhechong_q",
+    "skillSpec": {
+     "desc": "折冲御侮：贯穿直线 {length} 格，造成 {atk} 攻击力的物理伤害，击退 {knockback} 格并眩晕 {dur} 秒。",
+     "kind": "line",
+     "name": "折冲",
+     "params": {
+      "atk": 2,
+      "knockback": 1,
+      "length": 4,
+      "status": {
+       "dur": 1,
+       "kind": "stun",
+       "value": 0
+      },
+      "type": "physical"
+     },
+     "target": "enemyLongestLine"
+    },
+    "title": "折冲郎"
+   },
+   {
+    "base": {
+     "armor": 20,
+     "aspd": 0.65,
+     "atk": 40,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 600,
+     "maxMp": 65,
+     "moveTime": 0.58,
+     "mr": 30,
+     "range": 3,
+     "sp": 72,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 3,
+    "hue": 6240824,
+    "id": "wuhuo",
+    "name": "巫火",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "bonePuppet",
+    "skill": "wuhuo_q",
+    "skillSpec": {
+     "desc": "以火焚祭：对攻击最高的敌人造成 {sp} 法强的真实伤害，并附加 {dur} 秒灼烧（每秒 {statusFlat} 伤害）。",
+     "kind": "strike",
+     "name": "焚祭",
+     "params": {
+      "sp": 1.6,
+      "status": {
+       "dur": 3,
+       "kind": "burn",
+       "value": 40
+      },
+      "type": "true"
+     },
+     "target": "enemyHighestAtk"
+    },
+    "title": "火祝"
+   },
+   {
+    "base": {
+     "armor": 24,
+     "aspd": 0.85,
+     "atk": 74,
+     "critChance": 0.3,
+     "critMult": 1.85,
+     "hp": 660,
+     "maxMp": 65,
+     "moveTime": 0.45,
+     "mr": 24,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 3,
+    "hue": 9348792,
+    "id": "ruijin",
+    "name": "锐金",
+    "origins": [
+     "jianzong"
+    ],
+    "silhouette": "twinDagger",
+    "skill": "ruijin_q",
+    "skillSpec": {
+     "desc": "错金一闪：袭杀生命最低的敌人，造成 {atk} 攻击力的物理伤害；若击杀，立即恢复 {resetOnKill} 法力。",
+     "kind": "dashStrike",
+     "name": "金错刀",
+     "params": {
+      "atk": 2.4,
+      "resetOnKill": 0.4,
+      "type": "physical"
+     },
+     "target": "enemyLowestHp"
+    },
+    "title": "金锋"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.6,
+     "atk": 66,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 840,
+     "maxMp": 60,
+     "moveTime": 0.55,
+     "mr": 28,
+     "range": 1,
+     "sp": 30,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 3,
+    "hue": 11900495,
+    "id": "taozhu",
+    "name": "陶朱",
+    "origins": [
+     "danding"
+    ],
+    "silhouette": "ironBull",
+    "skill": "taozhu_q",
+    "skillSpec": {
+     "desc": "散金惑敌：周围 {radius} 格内造成 {sp} 法强的法术伤害，并使其受到的治疗降低 {statusValue}，持续 {statusDur} 秒。",
+     "kind": "nova",
+     "name": "散金",
+     "params": {
+      "radius": 1,
+      "sp": 1.3,
+      "status": {
+       "dur": 3,
+       "kind": "wound",
+       "value": 40
+      },
+      "type": "magic"
+     },
+     "target": "self"
+    },
+    "title": "货殖翁"
+   },
+   {
+    "base": {
+     "armor": 26,
+     "aspd": 0.65,
+     "atk": 44,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 760,
+     "maxMp": 85,
+     "moveTime": 0.6,
+     "mr": 34,
+     "range": 3,
+     "sp": 100,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 4,
+    "hue": 7311262,
+    "id": "yusuan",
+    "name": "玉算",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "hexWarlock",
+    "skill": "yusuan_q",
+    "skillSpec": {
+     "desc": "运筹百步：水算在 {jumps} 名敌人间流转，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}），并使命中者受到的伤害提高 {statusValue}，持续 {statusDur} 秒。",
+     "kind": "chain",
+     "name": "筹策",
+     "params": {
+      "falloff": 0.12,
+      "jumps": 5,
+      "sp": 2.4,
+      "status": {
+       "dur": 3,
+       "kind": "vulnerability",
+       "value": 15
+      },
+      "type": "magic"
+     },
+     "target": "enemyNearest"
+    },
+    "title": "算家"
+   },
+   {
+    "base": {
+     "armor": 32,
+     "aspd": 0.7,
+     "atk": 84,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1020,
+     "maxMp": 70,
+     "moveTime": 0.45,
+     "mr": 28,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 4,
+    "hue": 5524030,
+    "id": "moliu",
+    "name": "墨骝",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "ironBull",
+    "skill": "moliu_q",
+    "skillSpec": {
+     "desc": "踏破敌阵：横扫周围 {radius} 格造成 {atk} 攻击力的物理伤害；每命中一名敌人回复 {healOnHit} 最大生命，并获得 {statusDur} 秒 {statusValue} 攻击力。",
+     "kind": "nova",
+     "name": "踏阵",
+     "params": {
+      "atk": 2.3,
+      "healOnHit": 0.07,
+      "radius": 1,
+      "status": {
+       "dur": 6,
+       "kind": "atkUp",
+       "value": 20
+      },
+      "type": "physical"
+     },
+     "target": "self"
+    },
+    "title": "墨骑"
+   },
+   {
+    "base": {
+     "armor": 26,
+     "aspd": 0.9,
+     "atk": 80,
+     "critChance": 0.35,
+     "critMult": 1.9,
+     "hp": 760,
+     "maxMp": 75,
+     "moveTime": 0.42,
+     "mr": 26,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 4,
+    "hue": 9067076,
+    "id": "podu",
+    "name": "破度",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "shadowHood",
+    "skill": "podu_q",
+    "skillSpec": {
+     "desc": "破军袭杀生命最低的敌人，造成 {atk} 攻击力的物理伤害，必定暴击；若击杀，立即恢复 {resetOnKill} 法力。",
+     "kind": "dashStrike",
+     "name": "破军",
+     "params": {
+      "atk": 2.6,
+      "forceCrit": true,
+      "resetOnKill": 0.8,
+      "type": "physical"
+     },
+     "target": "enemyLowestHp"
+    },
+    "title": "度朔"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.65,
+     "atk": 46,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 860,
+     "maxMp": 88,
+     "moveTime": 0.55,
+     "mr": 36,
+     "range": 3,
+     "sp": 106,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 4,
+    "hue": 6262650,
+    "id": "jingbo",
+    "name": "鲸波",
+    "origins": [
+     "shanhai"
+    ],
+    "silhouette": "hexWarlock",
+    "skill": "jingbo_q",
+    "skillSpec": {
+     "desc": "鲸落成渊：持续 {dur} 秒，{radius} 格内每秒受到 {dpsSp} 法强的法术伤害并降低 {statusValue} 攻速与移速。",
+     "kind": "field",
+     "name": "鲸落",
+     "params": {
+      "dpsSp": 0.55,
+      "dur": 5,
+      "radius": 2,
+      "status": {
+       "dur": 5,
+       "kind": "slow",
+       "value": 30
+      },
+      "type": "magic"
+     },
+     "target": "enemyDensest"
+    },
+    "title": "鲸巫"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.8,
+     "atk": 88,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 760,
+     "maxMp": 80,
+     "moveTime": 0.6,
+     "mr": 26,
+     "range": 4,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "marksman"
+    ],
+    "cls": "marksman",
+    "cost": 4,
+    "hue": 10122064,
+    "id": "shihu",
+    "name": "啸虎",
+    "origins": [
+     "yaozu"
+    ],
+    "silhouette": "bowSniper",
+    "skill": "shihu_q",
+    "skillSpec": {
+     "desc": "啸弓连珠 {shots} 箭，每箭造成 {atk} 攻击力的物理伤害，末箭造成 {finalMult} 伤害；每箭命中提升自身 {statusValue} 攻速（可叠加，持续 {statusDur} 秒）。",
+     "kind": "volley",
+     "name": "虎啸",
+     "params": {
+      "atk": 0.75,
+      "finalMult": 2,
+      "interval": 0.5,
+      "shots": 4,
+      "status": {
+       "dur": 5,
+       "kind": "aspdUp",
+       "value": 10
+      },
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "虎贲"
+   },
+   {
+    "base": {
+     "armor": 46,
+     "aspd": 0.6,
+     "atk": 120,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1220,
+     "maxMp": 95,
+     "moveTime": 0.6,
+     "mr": 46,
+     "range": 1,
+     "sp": 60,
+     "startMp": 0
+    },
+    "classes": [
+     "guardian"
+    ],
+    "cls": "guardian",
+    "cost": 5,
+    "hue": 4998720,
+    "id": "mozhai",
+    "name": "墨翟",
+    "origins": [
+     "momen"
+    ],
+    "silhouette": "bannerSupport",
+    "skill": "mozhai_q",
+    "skillSpec": {
+     "desc": "举兼爱之旗：全体友军获得 {value} 最大生命的护盾（持续 {shieldDur} 秒）与 {damageReduction} 减伤。",
+     "kind": "shieldAll",
+     "name": "兼爱",
+     "params": {
+      "damageReduction": 0.18,
+      "shieldDur": 8,
+      "value": 0.14
+     },
+     "target": "allAllies"
+    },
+    "title": "巨子"
+   },
+   {
+    "base": {
+     "armor": 32,
+     "aspd": 0.7,
+     "atk": 54,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 960,
+     "maxMp": 95,
+     "moveTime": 0.55,
+     "mr": 40,
+     "range": 3,
+     "sp": 138,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 5,
+    "hue": 5267594,
+    "id": "taibu",
+    "name": "太卜",
+    "origins": [
+     "bingjia"
+    ],
+    "silhouette": "hexWarlock",
+    "skill": "taibu_q",
+    "skillSpec": {
+     "desc": "卜敌凶期：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 最大生命。",
+     "kind": "execute",
+     "name": "卜凶",
+     "params": {
+      "healPerExecute": 0.1,
+      "sp": 1.7,
+      "threshold": 0.2,
+      "type": "true"
+     },
+     "target": "allEnemies"
+    },
+    "title": "卜帅"
+   },
+   {
+    "base": {
+     "armor": 36,
+     "aspd": 0.7,
+     "atk": 52,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1020,
+     "maxMp": 90,
+     "moveTime": 0.55,
+     "mr": 44,
+     "range": 4,
+     "sp": 240,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 5,
+    "hue": 6715548,
+    "id": "gouchen",
+    "name": "勾陈",
+    "origins": [
+     "tian"
+    ],
+    "silhouette": "talismanMage",
+    "skill": "gouchen_q",
+    "skillSpec": {
+     "desc": "勾陈六星贯穿 {length} 格，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusFlat}（持续 {statusDur} 秒）。",
+     "kind": "beam",
+     "name": "勾陈垣",
+     "params": {
+      "length": 6,
+      "sp": 4.2,
+      "status": {
+       "dur": 6,
+       "kind": "mrShred",
+       "value": 30
+      },
+      "type": "magic"
+     },
+     "target": "enemyLongestLine"
+    },
+    "title": "勾陈帝"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.65,
+     "atk": 48,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 880,
+     "maxMp": 100,
+     "moveTime": 0.55,
+     "mr": 46,
+     "range": 3,
+     "sp": 118,
+     "startMp": 20
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 5,
+    "hue": 9405812,
+    "id": "wangxiang",
+    "name": "望乡",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "lanternSage",
+    "skill": "wangxiang_q",
+    "skillSpec": {
+     "desc": "提灯引魂：复活一名阵亡友军，恢复 {value} 最大生命与满额法力；若无阵亡友军，则改为全体回复 {value} 最大生命。",
+     "kind": "resurrect",
+     "name": "引魂",
+     "params": {
+      "value": 0.5
+     },
+     "target": "deadAlly"
+    },
+    "title": "望乡人"
+   },
+   {
+    "base": {
+     "armor": 30,
+     "aspd": 0.9,
+     "atk": 96,
+     "critChance": 0.4,
+     "critMult": 2,
+     "hp": 980,
+     "maxMp": 85,
+     "moveTime": 0.42,
+     "mr": 30,
+     "range": 1,
+     "sp": 0,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 5,
+    "hue": 12569048,
+    "id": "zhaoye",
+    "name": "照夜",
+    "origins": [
+     "jianzong"
+    ],
+    "silhouette": "twinDagger",
+    "skill": "zhaoye_q",
+    "skillSpec": {
+     "desc": "照夜入敌阵：对 {radius} 格内所有敌人造成 {atk} 攻击力的物理伤害，必定暴击；若造成击杀可再次施放（至多 {maxRepeats} 次）。",
+     "kind": "dashStrike",
+     "name": "照夜",
+     "params": {
+      "atk": 2.9,
+      "forceCrit": true,
+      "maxRepeats": 2,
+      "radius": 1,
+      "resetOnKill": 1,
+      "type": "physical"
+     },
+     "target": "enemyFarthest"
+    },
+    "title": "照夜白"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.95,
+     "atk": 90,
+     "critChance": 0.35,
+     "critMult": 1.85,
+     "hp": 860,
+     "maxMp": 80,
+     "moveTime": 0.4,
+     "mr": 28,
+     "range": 1,
+     "sp": 40,
+     "startMp": 0
+    },
+    "classes": [
+     "assassin"
+    ],
+    "cls": "assassin",
+    "cost": 5,
+    "hue": 11575408,
+    "id": "muyuan",
+    "name": "木鸢",
+    "origins": [
+     "jiguan"
+    ],
+    "silhouette": "shadowHood",
+    "skill": "muyuan_q",
+    "skillSpec": {
+     "desc": "木鸢俯击：造成 {atk} 攻击力的物理伤害；目标生命低于 {threshold} 时造成 {thresholdMult} 伤害。",
+     "kind": "strike",
+     "name": "鸢喙",
+     "params": {
+      "atk": 3.1,
+      "threshold": 0.28,
+      "thresholdMult": 2,
+      "type": "physical"
+     },
+     "target": "currentTarget"
+    },
+    "title": "木鸢"
+   },
+   {
+    "base": {
+     "armor": 36,
+     "aspd": 0.7,
+     "atk": 60,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1020,
+     "maxMp": 95,
+     "moveTime": 0.55,
+     "mr": 42,
+     "range": 3,
+     "sp": 150,
+     "startMp": 0
+    },
+    "classes": [
+     "warlock"
+    ],
+    "cls": "warlock",
+    "cost": 5,
+    "hue": 7225146,
+    "id": "shidian",
+    "name": "十殿",
+    "origins": [
+     "youming"
+    ],
+    "silhouette": "bonePuppet",
+    "skill": "shidian_q",
+    "skillSpec": {
+     "desc": "审判全场：对所有敌人造成 {sp} 法强的真实伤害；生命低于 {threshold} 者立即处决。每处决一人，全体友军回复 {healPerExecute} 最大生命。",
+     "kind": "execute",
+     "name": "十殿审判",
+     "params": {
+      "healPerExecute": 0.15,
+      "sp": 2.1,
+      "threshold": 0.2,
+      "type": "true"
+     },
+     "target": "allEnemies"
+    },
+    "title": "阎君"
+   },
+   {
+    "base": {
+     "armor": 34,
+     "aspd": 0.7,
+     "atk": 56,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 1080,
+     "maxMp": 88,
+     "moveTime": 0.55,
+     "mr": 44,
+     "range": 4,
+     "sp": 140,
+     "startMp": 0
+    },
+    "classes": [
+     "mage"
+    ],
+    "cls": "mage",
+    "cost": 5,
+    "hue": 5215364,
+    "id": "yinglong",
+    "name": "应龙",
+    "origins": [
+     "longyuan"
+    ],
+    "silhouette": "dragonSovereign",
+    "skill": "yinglong_q",
+    "skillSpec": {
+     "desc": "蓄力后喷吐贯穿 {length} 格的祖龙之息，蓄力期间免疫控制，沿途造成 {sp} 法强的法术伤害，并使命中者魔抗 -{statusFlat}（持续 {statusDur} 秒）。",
+     "kind": "beam",
+     "name": "祖龙吐息",
+     "params": {
+      "ccImmuneWhileCasting": true,
+      "length": 8,
+      "sp": 4.7,
+      "status": {
+       "dur": 6,
+       "kind": "mrShred",
+       "value": 35
+      },
+      "type": "magic"
+     },
+     "target": "enemyLongestLine"
+    },
+    "title": "祖龙"
+   },
+   {
+    "base": {
+     "armor": 40,
+     "aspd": 0.8,
+     "atk": 190,
+     "critChance": 0.25,
+     "critMult": 1.6,
+     "hp": 1180,
+     "maxMp": 110,
+     "moveTime": 0.5,
+     "mr": 42,
+     "range": 1,
+     "sp": 64,
+     "startMp": 0
+    },
+    "classes": [
+     "warrior"
+    ],
+    "cls": "warrior",
+    "cost": 5,
+    "hue": 13348960,
+    "id": "haotian",
+    "name": "昊天",
+    "origins": [
+     "tian"
+    ],
+    "silhouette": "bladeGeneral",
+    "skill": "haotian_q",
+    "skillSpec": {
+     "desc": "召来剑雨：{shots} 波、每波对周围 {radius} 格造成 {atk} 攻击力 + {sp} 法强的物理伤害；期间自身无敌且攻速 +{statusValue}。",
+     "kind": "nova",
+     "name": "天子剑",
+     "params": {
+      "atk": 1.1,
+      "interval": 0.4,
+      "invulnWhileCasting": true,
+      "radius": 2,
+      "shots": 5,
+      "sp": 0.5,
+      "status": {
+       "dur": 3,
+       "kind": "aspdUp",
+       "value": 50
+      },
+      "type": "physical"
+     },
+     "target": "self"
+    },
+    "title": "天帝"
+   },
+   {
+    "base": {
+     "armor": 28,
+     "aspd": 0.65,
+     "atk": 52,
+     "critChance": 0.12,
+     "critMult": 1.5,
+     "hp": 840,
+     "maxMp": 100,
+     "moveTime": 0.55,
+     "mr": 46,
+     "range": 3,
+     "sp": 124,
+     "startMp": 0
+    },
+    "classes": [
+     "support"
+    ],
+    "cls": "support",
+    "cost": 5,
+    "hue": 12618394,
+    "id": "qingqiu",
+    "name": "青丘",
+    "origins": [
+     "yaozu"
+    ],
+    "silhouette": "foxSpirit",
+    "skill": "qingqiu_q",
+    "skillSpec": {
+     "desc": "全体友军获得 {value} 最大生命的护盾与 {statusDur} 秒 {statusValue} 攻速；同时魅惑全体敌人 {dur} 秒（无法行动），并使其受伤加深 {vulnerability}，持续 {vulnDur} 秒。",
+     "kind": "shieldAll",
+     "name": "九尾庇佑",
+     "params": {
+      "dur": 2.5,
+      "shieldDur": 8,
+      "status": {
+       "dur": 8,
+       "kind": "aspdUp",
+       "value": 40
+      },
+      "value": 0.35,
+      "vulnDur": 4.5,
+      "vulnerability": 0.2
+     },
+     "target": "allAllies"
+    },
+    "title": "狐仙"
+   }
+  ],
+  "componentIds": [
+   "moren",
+   "xuanjia",
+   "lingzhu",
+   "yunlv",
+   "xueyu",
+   "fafu",
+   "quantao",
+   "doupeng"
+  ],
+  "config": {
+   "ASSASSIN_LEAP_DELAY": 1,
+   "ASSASSIN_SMOKE_DURATION": 0.7,
+   "ATTACK_WINDUP_RATIO": 0.38,
+   "BENCH_SLOTS": 9,
+   "BOARD_COLS": 8,
+   "BOARD_ROWS": 8,
+   "CAST_WINDUP_SECONDS": 0.35,
+   "DOT_TICKS_PER_SEC": 2,
+   "DT": 0.03333333333333333,
+   "GLOBAL_HP_SCALE": 1,
+   "INCOME_BASE": 5,
+   "INCOME_INTEREST_MAX": 5,
+   "INCOME_INTEREST_TIER": 10,
+   "ITEM_BAR_SLOTS": 10,
+   "MANA_FROM_DAMAGE_CAP": 15,
+   "MANA_FROM_DAMAGE_RATIO": 32,
+   "MANA_LOCK_AFTER_CAST": 0.5,
+   "MANA_PER_ATTACK": 10,
+   "MANA_REGEN_PER_SEC": 2,
+   "MAX_LEVEL": 9,
+   "OVERTIME_START_TICK": 900,
+   "PLAYER_START_HP": 110,
+   "REROLL_COST": 2,
+   "RESIST_BASE": 100,
+   "RESIST_CAP": 220,
+   "RETARGET_INTERVAL": 0.4,
+   "ROWS_PER_SIDE": 4,
+   "SHIELD_CAP_RATIO": 0.45,
+   "SHOP_SLOTS": 5,
+   "TICK_RATE": 30,
+   "TIMEOUT_WIN_RATIO": 0.02,
+   "XP_BUY_AMOUNT": 4,
+   "XP_BUY_COST": 4,
+   "XP_PER_ROUND": 4
+  },
+  "items": [
+   {
+    "bonus": {
+     "atk": 12
+    },
+    "desc": "攻击力 +12",
+    "glyph": "blade",
+    "id": "moren",
+    "name": "翠玦",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "armor": 16
+    },
+    "desc": "护甲 +16",
+    "glyph": "armor",
+    "id": "xuanjia",
+    "name": "金锭",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "sp": 16
+    },
+    "desc": "法强 +16",
+    "glyph": "orb",
+    "id": "lingzhu",
+    "name": "灵珠",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "aspd": 0.12
+    },
+    "desc": "攻速 +12%",
+    "glyph": "boot",
+    "id": "yunlv",
+    "name": "轻羽",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "hp": 160
+    },
+    "desc": "生命 +160",
+    "glyph": "jade",
+    "id": "xueyu",
+    "name": "青莲",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "hp": 60,
+     "sp": 34,
+     "startMp": 8
+    },
+    "desc": "法强 +34，生命 +60。初始法力 +8，每秒回蓝 +1。",
+    "glyph": "talisman",
+    "id": "fafu",
+    "mods": {
+     "manaPerSec": 1
+    },
+    "name": "法符",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "atk": 8,
+     "critChance": 0.12
+    },
+    "desc": "暴击率 +12%，攻击力 +8。",
+    "glyph": "gauntlet",
+    "id": "quantao",
+    "name": "紫晶",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "hp": 90,
+     "mr": 12
+    },
+    "desc": "魔抗 +12，生命 +90",
+    "glyph": "cloak",
+    "id": "doupeng",
+    "name": "赤绳",
+    "tier": "component"
+   },
+   {
+    "bonus": {
+     "atk": 30
+    },
+    "desc": "攻击力 +30。击杀敌人后回复 18% 最大生命。",
+    "glyph": "soulblade",
+    "hooks": [
+     "executeHeal"
+    ],
+    "id": "duanhun",
+    "name": "断魂刃",
+    "params": {
+     "healPct": 0.18
+    },
+    "recipe": [
+     "moren",
+     "moren"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 10,
+     "atk": 20
+    },
+    "desc": "攻击力 +20，护甲 +10。攻击无视目标 35% 护甲。",
+    "glyph": "lance",
+    "id": "pojia",
+    "mods": {
+     "armorPen": 0.35
+    },
+    "name": "破甲杖",
+    "recipe": [
+     "moren",
+     "xuanjia"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 24,
+     "critChance": 0.12,
+     "omnivamp": 0.18
+    },
+    "desc": "攻击力 +24，暴击率 +12%。获得 18% 全能吸血。",
+    "glyph": "bloodfang",
+    "id": "xueyin",
+    "name": "血饮",
+    "recipe": [
+     "moren",
+     "quantao"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 28
+    },
+    "desc": "护甲 +28。受到的物理伤害降低 15%，所有伤害降低 8%。",
+    "glyph": "stupa",
+    "id": "budong",
+    "mods": {
+     "allDr": 0.08,
+     "physicalDr": 0.15
+    },
+    "name": "不动明王",
+    "recipe": [
+     "xuanjia",
+     "xuanjia"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 16,
+     "hp": 300
+    },
+    "desc": "生命 +300，护甲 +16。受到物理伤害时反弹其中 20%。",
+    "glyph": "turtle",
+    "hooks": [
+     "thorns"
+    ],
+    "id": "xuanwu",
+    "name": "玄武甲",
+    "params": {
+     "reflectPct": 0.2
+    },
+    "recipe": [
+     "xuanjia",
+     "xueyu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "sp": 56
+    },
+    "desc": "法强 +56。",
+    "glyph": "chaosorb",
+    "id": "hunyuan",
+    "name": "混元珠",
+    "recipe": [
+     "lingzhu",
+     "lingzhu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 90,
+     "sp": 64
+    },
+    "desc": "法强 +64，生命 +90。技能伤害 +18%。",
+    "glyph": "voidpearl",
+    "id": "taixu",
+    "mods": {
+     "skillAmp": 0.18
+    },
+    "name": "太虚经",
+    "recipe": [
+     "lingzhu",
+     "fafu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 260,
+     "omnivamp": 0.22,
+     "sp": 26
+    },
+    "desc": "法强 +26，生命 +260。获得 22% 全能吸血。",
+    "glyph": "bloodpearl",
+    "id": "xuehun",
+    "name": "血魂珠",
+    "recipe": [
+     "lingzhu",
+     "xueyu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.2
+    },
+    "desc": "攻速 +20%。每次普攻命中叠加 7% 攻速，最多 5 层。",
+    "glyph": "gale",
+    "hooks": [
+     "momentum"
+    ],
+    "id": "jifeng",
+    "name": "疾风弓",
+    "params": {
+     "aspdPerStack": 0.07,
+     "maxStacks": 5
+    },
+    "recipe": [
+     "yunlv",
+     "yunlv"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.14,
+     "critChance": 0.18,
+     "critMult": 0.28
+    },
+    "desc": "攻速 +14%，暴击率 +18%，暴击伤害 +28%。攻击无视目标 25% 护甲。",
+    "glyph": "shadow",
+    "id": "yingxi",
+    "mods": {
+     "armorPen": 0.25
+    },
+    "name": "影袭",
+    "recipe": [
+     "yunlv",
+     "quantao"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 16,
+     "hp": 180,
+     "mr": 26
+    },
+    "desc": "生命 +180，魔抗 +26，护甲 +16。受到的所有伤害降低 12%。",
+    "glyph": "darkrobe",
+    "id": "xuanming",
+    "mods": {
+     "allDr": 0.12
+    },
+    "name": "玄冥衣",
+    "recipe": [
+     "doupeng",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 260,
+     "mr": 14
+    },
+    "desc": "生命 +260，魔抗 +14。首次阵亡 2 秒后，以 15% 生命原地爬起。",
+    "glyph": "undying",
+    "hooks": [
+     "immortal"
+    ],
+    "id": "buxiu",
+    "name": "鹤龄镜",
+    "params": {
+     "hpPct": 0.15,
+     "reviveDelay": 2
+    },
+    "recipe": [
+     "doupeng",
+     "xueyu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "sp": 25,
+     "startMp": 24
+    },
+    "desc": "法强 +25，初始法力 +24，每秒回蓝 +4，治疗提升 90%。其治疗若溢出，溢出量全额转为护盾。",
+    "glyph": "rebirth",
+    "hooks": [
+     "healToShield"
+    ],
+    "id": "huitian",
+    "mods": {
+     "healAmp": 0.9,
+     "manaPerSec": 4
+    },
+    "name": "回天灯",
+    "params": {
+     "shieldPct": 1
+    },
+    "recipe": [
+     "fafu",
+     "fafu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 520
+    },
+    "desc": "生命 +520。每秒回复 1.5% 最大生命。",
+    "glyph": "titan",
+    "id": "juling",
+    "mods": {
+     "hpRegenPctPerSec": 0.015
+    },
+    "name": "巨灵冠",
+    "recipe": [
+     "xueyu",
+     "xueyu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 18,
+     "sp": 20
+    },
+    "desc": "攻击力 +18，法强 +20。普攻命中追加 40% 法强的法术伤害。",
+    "glyph": "lance",
+    "hooks": [
+     "sunSpear"
+    ],
+    "id": "guanri",
+    "name": "贯日枪",
+    "params": {
+     "spRatio": 0.4
+    },
+    "recipe": [
+     "moren",
+     "lingzhu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 18,
+     "sp": 20
+    },
+    "desc": "护甲 +18，法强 +20，技能伤害 +10%。施法后获得 10% 最大生命的护盾，持续 4 秒。",
+    "glyph": "voidpearl",
+    "hooks": [
+     "castShield"
+    ],
+    "id": "qinggui",
+    "mods": {
+     "skillAmp": 0.1
+    },
+    "name": "青圭杖",
+    "params": {
+     "shieldDur": 4,
+     "shieldPct": 0.1
+    },
+    "recipe": [
+     "xuanjia",
+     "lingzhu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.16,
+     "atk": 16
+    },
+    "desc": "攻击力 +16，攻速 +16%。普攻使命中目标减速 20%（攻速与移速），持续 2 秒。",
+    "glyph": "soulblade",
+    "hooks": [
+     "frost"
+    ],
+    "id": "hanyuan",
+    "name": "寒渊镰",
+    "params": {
+     "slowDur": 2,
+     "slowPct": 20
+    },
+    "recipe": [
+     "moren",
+     "yunlv"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 6,
+     "critChance": 0.1,
+     "sp": 26
+    },
+    "desc": "法强 +26，暴击率 +10%，攻击力 +6。技能伤害可暴击（30% 概率，1.4 倍）。",
+    "glyph": "chaosorb",
+    "id": "jinglei",
+    "mods": {
+     "skillCritChance": 0.3,
+     "skillCritMult": 1.4
+    },
+    "name": "惊雷锤",
+    "recipe": [
+     "lingzhu",
+     "quantao"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 14,
+     "hp": 100,
+     "mr": 14
+    },
+    "desc": "攻击力 +14，魔抗 +14，生命 +100。普攻使命中目标受伤加深 12%，持续 3 秒。",
+    "glyph": "bloodfang",
+    "hooks": [
+     "venom"
+    ],
+    "id": "chilian",
+    "name": "赤练鞭",
+    "params": {
+     "vulnDur": 3,
+     "vulnPct": 12
+    },
+    "recipe": [
+     "moren",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.12,
+     "atk": 30,
+     "startMp": 12
+    },
+    "desc": "攻速 +12%，攻击力 +30，初始法力 +12。击杀后获得 5 秒 50% 攻速（至多 2 层）。",
+    "glyph": "gale",
+    "hooks": [
+     "killFrenzy"
+    ],
+    "id": "liuxing",
+    "name": "流星弩",
+    "params": {
+     "aspdPct": 50,
+     "dur": 5,
+     "maxStacks": 2
+    },
+    "recipe": [
+     "moren",
+     "fafu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.14,
+     "hp": 100,
+     "mr": 14
+    },
+    "desc": "攻速 +14%，魔抗 +14，生命 +100。每第 4 次普攻缴械目标 1.2 秒。",
+    "glyph": "gale",
+    "hooks": [
+     "disarmSwat"
+    ],
+    "id": "fuchen",
+    "name": "拂尘扇",
+    "params": {
+     "disarmDur": 1.2,
+     "everyHits": 4
+    },
+    "recipe": [
+     "yunlv",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.16,
+     "sp": 24
+    },
+    "desc": "法强 +24，攻速 +16%。施法后获得 5 秒 45% 攻速（至多 2 层）。",
+    "glyph": "shadow",
+    "hooks": [
+     "castAspd"
+    ],
+    "id": "zidian",
+    "name": "紫电镰",
+    "params": {
+     "aspdPct": 45,
+     "dur": 5,
+     "maxStacks": 2
+    },
+    "recipe": [
+     "lingzhu",
+     "yunlv"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 8,
+     "critChance": 0.12,
+     "hp": 200
+    },
+    "desc": "生命 +200，暴击率 +12%，攻击力 +8。普攻命中回复 1.5% 最大生命。",
+    "glyph": "chaosorb",
+    "hooks": [
+     "onHitHeal"
+    ],
+    "id": "shuangling",
+    "name": "霜翎环",
+    "params": {
+     "healPct": 0.015
+    },
+    "recipe": [
+     "xueyu",
+     "quantao"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 26,
+     "atk": 8,
+     "critChance": 0.12
+    },
+    "desc": "护甲 +26，暴击率 +12%，攻击力 +8。承受伤害转化的法力提高 40%。",
+    "glyph": "stupa",
+    "id": "shixin",
+    "mods": {
+     "manaFromDamageMult": 1.4
+    },
+    "name": "狮心盾",
+    "recipe": [
+     "xuanjia",
+     "quantao"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 100,
+     "mr": 14,
+     "sp": 22
+    },
+    "desc": "法强 +22，魔抗 +14，生命 +100。施法后为生命最低的友军回复 70% 法强的生命。",
+    "glyph": "rebirth",
+    "hooks": [
+     "castHeal"
+    ],
+    "id": "yinhun",
+    "name": "引魂灯",
+    "params": {
+     "healSpRatio": 0.7
+    },
+    "recipe": [
+     "lingzhu",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 8,
+     "critChance": 0.12,
+     "hp": 160,
+     "mr": 18
+    },
+    "desc": "暴击率 +12%，攻击力 +8，魔抗 +18，生命 +160。受到普攻时 30% 概率眩晕攻击者 1 秒（每 2 秒至多触发一次）。",
+    "glyph": "undying",
+    "hooks": [
+     "bellStun"
+    ],
+    "id": "shehun",
+    "name": "摄魂铃",
+    "params": {
+     "cdTicks": 60,
+     "chance": 0.3,
+     "stunDur": 1
+    },
+    "recipe": [
+     "quantao",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 8,
+     "critChance": 0.18,
+     "startMp": 12
+    },
+    "desc": "初始法力 +12，暴击率 +18%，攻击力 +8。普攻命中额外回复 6 点法力。",
+    "glyph": "voidpearl",
+    "hooks": [
+     "onHitMana"
+    ],
+    "id": "zijin",
+    "name": "紫金炉",
+    "params": {
+     "mpPerHit": 6
+    },
+    "recipe": [
+     "fafu",
+     "quantao"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 26,
+     "startMp": 18
+    },
+    "desc": "护甲 +26，初始法力 +18，每秒回蓝 +6。",
+    "glyph": "talisman",
+    "id": "jiaowei",
+    "mods": {
+     "manaPerSec": 6
+    },
+    "name": "焦尾琴",
+    "recipe": [
+     "xuanjia",
+     "fafu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 100,
+     "mr": 14,
+     "startMp": 16
+    },
+    "desc": "初始法力 +16，魔抗 +14，生命 +100。开战时全体友军获得 8 秒 22% 减伤。",
+    "glyph": "darkrobe",
+    "hooks": [
+     "warBanner"
+    ],
+    "id": "molongqi",
+    "name": "墨龙旗",
+    "params": {
+     "drPct": 22,
+     "dur": 8
+    },
+    "recipe": [
+     "fafu",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.2,
+     "startMp": 14
+    },
+    "desc": "攻速 +20%，初始法力 +14。施法后，下一次普攻必定暴击并追加 300% 法强的法术伤害。",
+    "glyph": "shadow",
+    "hooks": [
+     "foxReady"
+    ],
+    "id": "jiuwei",
+    "name": "九尾面",
+    "params": {
+     "bonusSpRatio": 3
+    },
+    "recipe": [
+     "yunlv",
+     "fafu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "aspd": 0.16,
+     "hp": 200
+    },
+    "desc": "攻速 +16%，生命 +200。开战时获得 8 秒 30% 攻速。",
+    "glyph": "cloak",
+    "hooks": [
+     "wingStart"
+    ],
+    "id": "chuitian",
+    "name": "垂天翼",
+    "params": {
+     "aspdPct": 30,
+     "dur": 8
+    },
+    "recipe": [
+     "yunlv",
+     "xueyu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 24,
+     "hp": 150,
+     "mr": 18
+    },
+    "desc": "护甲 +24，魔抗 +18，生命 +150。每 5 秒净化自身的一个减益状态。",
+    "glyph": "turtle",
+    "hooks": [
+     "ironPurge"
+    ],
+    "id": "xuantie",
+    "name": "玄铁重甲",
+    "params": {
+     "everyTicks": 150
+    },
+    "recipe": [
+     "xuanjia",
+     "doupeng"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "atk": 16,
+     "hp": 200
+    },
+    "desc": "攻击力 +16，生命 +200。生命每损失 10%，攻击力 +4%（至多 +32%）。",
+    "glyph": "gauntlet",
+    "hooks": [
+     "berserk"
+    ],
+    "id": "fulong",
+    "name": "缚龙爪",
+    "params": {
+     "atkPerStep": 4,
+     "capPct": 0.32,
+     "stepPct": 0.1
+    },
+    "recipe": [
+     "moren",
+     "xueyu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "armor": 16,
+     "aspd": 0.16
+    },
+    "desc": "护甲 +16，攻速 +16%。开战后每秒获得 1.5% 攻速，至多 +24%。",
+    "glyph": "boot",
+    "hooks": [
+     "windRunner"
+    ],
+    "id": "zhuifeng",
+    "name": "追风履",
+    "params": {
+     "aspdPerSec": 1.5,
+     "capPct": 24
+    },
+    "recipe": [
+     "xuanjia",
+     "yunlv"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "hp": 400,
+     "startMp": 16
+    },
+    "desc": "生命 +400，初始法力 +16，每秒回蓝 +2，治疗提升 60%。",
+    "glyph": "jade",
+    "id": "cuidai",
+    "mods": {
+     "healAmp": 0.6,
+     "manaPerSec": 2
+    },
+    "name": "翠玉带",
+    "recipe": [
+     "xueyu",
+     "fafu"
+    ],
+    "tier": "combined"
+   },
+   {
+    "bonus": {
+     "critChance": 0.3,
+     "critMult": 0.5
+    },
+    "desc": "暴击率 +30%，暴击伤害 +50%。",
+    "glyph": "chaosorb",
+    "id": "zixiaozhu",
+    "name": "紫霄珠",
+    "recipe": [
+     "quantao",
+     "quantao"
+    ],
+    "tier": "combined"
+   }
+  ],
+  "recipeIndex": {
+   "doupeng+doupeng": "xuanming",
+   "doupeng+fafu": "molongqi",
+   "doupeng+lingzhu": "yinhun",
+   "doupeng+moren": "chilian",
+   "doupeng+quantao": "shehun",
+   "doupeng+xuanjia": "xuantie",
+   "doupeng+xueyu": "buxiu",
+   "doupeng+yunlv": "fuchen",
+   "fafu+fafu": "huitian",
+   "fafu+lingzhu": "taixu",
+   "fafu+moren": "liuxing",
+   "fafu+quantao": "zijin",
+   "fafu+xuanjia": "jiaowei",
+   "fafu+xueyu": "cuidai",
+   "fafu+yunlv": "jiuwei",
+   "lingzhu+lingzhu": "hunyuan",
+   "lingzhu+moren": "guanri",
+   "lingzhu+quantao": "jinglei",
+   "lingzhu+xuanjia": "qinggui",
+   "lingzhu+xueyu": "xuehun",
+   "lingzhu+yunlv": "zidian",
+   "moren+moren": "duanhun",
+   "moren+quantao": "xueyin",
+   "moren+xuanjia": "pojia",
+   "moren+xueyu": "fulong",
+   "moren+yunlv": "hanyuan",
+   "quantao+quantao": "zixiaozhu",
+   "quantao+xuanjia": "shixin",
+   "quantao+xueyu": "shuangling",
+   "quantao+yunlv": "yingxi",
+   "xuanjia+xuanjia": "budong",
+   "xuanjia+xueyu": "xuanwu",
+   "xuanjia+yunlv": "zhuifeng",
+   "xueyu+xueyu": "juling",
+   "xueyu+yunlv": "chuitian",
+   "yunlv+yunlv": "jifeng"
+  },
+  "traitTuneKeys": {
+   "assassin": [
+    "crit",
+    "critMult",
+    "breakerPct",
+    "openerPct",
+    "leapAspd"
+   ],
+   "bingjia": [
+    "teamAtk",
+    "teamAspd",
+    "growAtk",
+    "growAspd",
+    "atkUp",
+    "siegeAtk",
+    "siegeArmor"
+   ],
+   "danding": [
+    "manaPerSec",
+    "regen"
+   ],
+   "guardian": [
+    "hp0",
+    "hp1",
+    "hp2",
+    "armor0",
+    "armor1",
+    "armor2",
+    "allyShield",
+    "shieldRegen",
+    "thornsArmorRatio",
+    "t2ThornsHpPct",
+    "t2ArmorCut",
+    "t2HpGain",
+    "guard6Atk"
+   ],
+   "jianzong": [
+    "crit",
+    "critMult",
+    "armorPen",
+    "penBase",
+    "penStep",
+    "penCap",
+    "killMana"
+   ],
+   "jiguan": [
+    "armor",
+    "pen",
+    "stackAspd",
+    "tickAspd",
+    "fourthHitAtk",
+    "fourthHitCrush",
+    "fourthHitGiant",
+    "gangAtk",
+    "gangWindow",
+    "gangTargetT2",
+    "gangMinArmor",
+    "constructMr",
+    "thornResist"
+   ],
+   "longyuan": [
+    "skillAmp",
+    "spFlat",
+    "spellChargeSp",
+    "teamAmp",
+    "teamSp"
+   ],
+   "mage": [
+    "sp0",
+    "sp1",
+    "sp2",
+    "shield",
+    "shield2",
+    "shred",
+    "splash",
+    "teamAmp",
+    "teamAmp2",
+    "teamSp",
+    "teamSp2"
+   ],
+   "marksman": [
+    "critMult",
+    "atk"
+   ],
+   "momen": [
+    "drLow",
+    "drHigh",
+    "hpUp",
+    "teamDr",
+    "regen",
+    "sharePct"
+   ],
+   "shanhai": [
+    "bleed0",
+    "bleed1",
+    "wound"
+   ],
+   "support": [
+    "healAmp",
+    "shieldAmp",
+    "regen",
+    "deathAspd"
+   ],
+   "tian": [
+    "shield0",
+    "shield1",
+    "novaSp"
+   ],
+   "warlock": [
+    "true0",
+    "true1",
+    "wound"
+   ],
+   "warrior": [
+    "atk0",
+    "atk1",
+    "atk2",
+    "physDr",
+    "stackAtk"
+   ],
+   "yaozu": [
+    "transformHeal",
+    "transformDr",
+    "transformAtk",
+    "transformAspd",
+    "transformAt",
+    "vamp0",
+    "vamp1"
+   ],
+   "youming": [
+    "reviveHp",
+    "reviveFragilePct",
+    "reviveFragileDur",
+    "reviveAspd",
+    "deathHeal"
+   ]
+  },
+  "traitTuning": {},
+  "traitTuningKeys": {},
+  "traits": [
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "受天命护佑，开阵即披金光。",
+    "effectText": [
+     "战斗开始时，天庭棋子获得 8% 最大生命的护盾。",
+     "战斗开始时，天庭棋子获得 24% 最大生命的护盾；护盾被打破时对周围 1 格敌人造成 160% 法强的法术伤害。"
+    ],
+    "id": "tian",
+    "name": "天庭"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "生死簿上无名，亡者亦可再战。",
+    "effectText": [
+     "友军阵亡时，为最近的友军回复阵亡棋子 6% 的最大生命。",
+     "友军阵亡时，为最近的友军回复阵亡棋子 6% 的最大生命；幽冥棋子首次阵亡时以 10% 生命复活，并获得 30% 攻速加成直至战斗结束，复活后 4 秒内受到的伤害增加 35%。"
+    ],
+    "id": "youming",
+    "name": "幽冥"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "荒古巨兽之血，撕咬不止。",
+    "effectText": [
+     "普攻附加【流血】：3 秒内共造成 8% 目标最大生命的真实伤害。",
+     "普攻附加【流血】：3 秒内共造成 16% 目标最大生命的真实伤害，并使其受到的治疗效果降低 40%，持续 3 秒。"
+    ],
+    "id": "shanhai",
+    "name": "山海"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "一剑断岳，剑意不绝。",
+    "effectText": [
+     "暴击率 +20%。",
+     "暴击率 +20%；暴击伤害 +20%，剑宗无视目标 18% 护甲，全队无视 20% 护甲；击杀敌人后立即回复 20 点法力。"
+    ],
+    "id": "jianzong",
+    "name": "剑宗"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "嗜血而生，绝境化形。",
+    "effectText": [
+     "全能吸血 +15%（技能伤害同样吸血）。",
+     "全能吸血 +36%；生命首次低于 60% 时化形：回复 24% 最大生命，清除控制效果，获得 35% 攻速、15% 攻击力与 35% 减伤，持续 6 秒。"
+    ],
+    "id": "yaozu",
+    "name": "妖族"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "齿轮咬合，愈战愈疾。",
+    "effectText": [
+     "护甲 +22，木石之躯：受到的反弹伤害降低 65%；每 5 秒永久获得 10% 攻速（可叠加）。",
+     "护甲 +22，木石之躯：受到的反弹伤害降低 65%；构装体魔抗 +10；每次攻击叠加 12% 攻速（最多 8 层）；每第 4 次攻击额外造成 180% 攻击力的物理伤害；围攻·破阵：0.75 秒内已有友军攻击过的目标，机关棋子跟进攻击时额外造成 6×护甲/(100+护甲) 倍攻击力的物理伤害（仅对护卫羁绊达二档的队伍生效）。"
+    ],
+    "id": "jiguan",
+    "name": "机关"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "炉火不熄，金丹续命。",
+    "effectText": [
+     "丹鼎棋子每秒回复 1.5% 最大生命。",
+     "丹鼎棋子每秒回复 1.5% 最大生命和 3 点法力；治疗溢出的部分转化为等量护盾。"
+    ],
+    "id": "danding",
+    "name": "丹鼎"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "origin",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "吞吐云雾，法力如渊。",
+    "effectText": [
+     "龙渊棋子法强 +30。",
+     "龙渊棋子法强 +30，技能伤害 +32%；全队法强 +18、技能伤害 +9%；施法后 4 秒内，下一次普攻额外造成 80% 法强的法术伤害。"
+    ],
+    "id": "longyuan",
+    "name": "龙渊"
+   },
+   {
+    "breakpoints": [
+     3,
+     6,
+     9
+    ],
+    "category": "origin",
+    "colors": [
+     0,
+     1,
+     2
+    ],
+    "description": "兼爱非攻，九守如城。",
+    "effectText": [
+     "墨门棋子获得 10% 全伤害减免与 10% 最大生命。",
+     "墨门棋子获得 10% 全伤害减免与 10% 最大生命；所有友军获得 8% 全伤害减免；墨门棋子每秒回复 1.8% 最大生命。",
+     "墨门棋子获得 20% 全伤害减免与 10% 最大生命；所有友军获得 8% 全伤害减免；墨门棋子每秒回复 1.8% 最大生命；兼爱：友军受到的伤害有 30% 转由全体墨门棋子均摊。"
+    ],
+    "id": "momen",
+    "name": "墨门"
+   },
+   {
+    "breakpoints": [
+     2,
+     5,
+     8
+    ],
+    "category": "origin",
+    "colors": [
+     0,
+     1,
+     2
+    ],
+    "description": "百战之师，愈杀愈奋。",
+    "effectText": [
+     "兵家棋子攻击力 +20%。",
+     "兵家棋子攻击力 +20%；所有友军攻击力 +22%、攻速 +17%；攻击护甲 55 以上的目标时，附带 15% 攻击力的额外物理伤害。",
+     "兵家棋子攻击力 +20%；所有友军攻击力 +22%、攻速 +17%；攻击护甲 55 以上的目标时，附带 15% 攻击力的额外物理伤害；百战：任意友军击杀敌人时，全体友军永久 +26% 攻击力与 +18% 攻速，兵家棋子完成击杀时永久 +52% 攻击力与 +36% 攻速。"
+    ],
+    "id": "bingjia",
+    "name": "兵家"
+   },
+   {
+    "breakpoints": [
+     2,
+     4,
+     6
+    ],
+    "category": "class",
+    "colors": [
+     0,
+     1,
+     2
+    ],
+    "description": "陷阵之志，有死无生。",
+    "effectText": [
+     "攻击力 +20%。",
+     "攻击力 +45%；每次攻击命中叠加 2.5% 攻击力（最多 10 层）。",
+     "攻击力 +75%；每次攻击命中叠加 2.5% 攻击力（最多 10 层）；受到的物理伤害降低 18%。"
+    ],
+    "id": "warrior",
+    "name": "武将"
+   },
+   {
+    "breakpoints": [
+     2,
+     4,
+     6
+    ],
+    "category": "class",
+    "colors": [
+     0,
+     1,
+     2
+    ],
+    "description": "立如磐石，以身护道。",
+    "effectText": [
+     "生命 +14%，护甲 +16。",
+     "生命 +24%，护甲 +26；战斗开始时为相邻友军提供 12% 最大生命护盾。",
+     "生命 +28%，护甲 +32，攻击力 +15%；战斗开始时为相邻友军提供 12% 最大生命护盾；每 3 秒为自身提供 1.4% 最大生命护盾，受到物理伤害时反弹 52% 基础护甲值的伤害。"
+    ],
+    "id": "guardian",
+    "name": "护卫"
+   },
+   {
+    "breakpoints": [
+     2,
+     3
+    ],
+    "category": "class",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "影落无声，取首于万军。",
+    "effectText": [
+     "战斗开始 1 秒后跃入敌方最后排，落地后获得 0.7 秒无敌；暴击率 +20%。",
+     "战斗开始 1 秒后跃入敌方最后排，落地后获得 0.7 秒无敌；暴击率 +20%、暴击伤害 +35%，跃入后 5 秒内获得 35% 攻速；跃入落定后立即突袭最近的敌人，造成其 12% 最大生命的物理伤害（不受伤害分摊）；对持有护盾的目标，攻击附带其 5% 最大生命的物理伤害。"
+    ],
+    "id": "assassin",
+    "name": "刺客"
+   },
+   {
+    "breakpoints": [
+     2,
+     3
+    ],
+    "category": "class",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "百步穿杨，箭无虚发。",
+    "effectText": [
+     "攻击距离 +1；攻击力 +15%。",
+     "攻击距离 +1；攻击力 +15%；每第 3 次攻击必定暴击，且暴击伤害 +30%。"
+    ],
+    "id": "marksman",
+    "name": "神射"
+   },
+   {
+    "breakpoints": [
+     2,
+     4,
+     6
+    ],
+    "category": "class",
+    "colors": [
+     0,
+     1,
+     2
+    ],
+    "description": "符箓通神，术法无涯。",
+    "effectText": [
+     "法强 +24。",
+     "法强 +46；技能命中使目标魔抗 -20（4 秒）；全队法强 +14、技能伤害 +6%；开战全体获得 16% 最大生命护盾。",
+     "法强 +78；技能命中使目标魔抗 -20（4 秒）；对目标周围 1 格造成 55% 溅射伤害；全队法强 +24、技能伤害 +11%；开战全体获得 22% 最大生命护盾。"
+    ],
+    "id": "mage",
+    "name": "方士"
+   },
+   {
+    "breakpoints": [
+     2,
+     3
+    ],
+    "category": "class",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "以咒蚀骨，伤入魂魄。",
+    "effectText": [
+     "技能伤害的 15% 转化为无法减免的真实伤害。",
+     "技能伤害的 30% 转化为无法减免的真实伤害；技能命中使目标受到的治疗降低 30%，持续 3 秒。"
+    ],
+    "id": "warlock",
+    "name": "术士"
+   },
+   {
+    "breakpoints": [
+     2,
+     4
+    ],
+    "category": "class",
+    "colors": [
+     1,
+     2
+    ],
+    "description": "悬壶济世，妙手回春。",
+    "effectText": [
+     "全体友军每秒回复 1.2% 最大生命。",
+     "全体友军每秒回复 1.2% 最大生命；丹师棋子的治疗与护盾效果 +80%；友军阵亡时，其余友军获得 20% 攻速，持续 8 秒（每人至多 5 层）。"
+    ],
+    "id": "support",
+    "name": "丹师"
+   }
+  ]
+ }
+}
