@@ -59,7 +59,16 @@ function step(name, ok, detail = '') {
   step('rng 对拍', failed === 0, `${rows.length - failed}/${rows.length} 组合`);
 }
 
-// 5. 编解码往返（夹具重生成 → GDScript 重编码比对）
+// 5. 战斗跨引擎对拍（夹具重生成 → GDScript 逐事件重演比对）
+{
+  const gen = spawnSync(process.execPath, ['--import', 'tsx', 'tools/battle_parity.mjs', '--', '--n=6'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 300_000 });
+  const probe = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/battle_probe.gd'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 300_000 });
+  const r = extractTag(probe.stdout, 'BATTLE_JSON');
+  step('battle 对拍', gen.status === 0 && probe.status === 0 && r?.ok === true,
+    r ? `${r.passed}/${r.cases} 局逐事件一致` : String(probe.stderr).split('\n')[0] ?? '');
+}
+
+// 6. 编解码往返（夹具重生成 → GDScript 重编码比对）
 {
   const gen = spawnSync(process.execPath, ['--import', 'tsx', 'tools/parity_codec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
   const probe = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/codec_probe.gd'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });

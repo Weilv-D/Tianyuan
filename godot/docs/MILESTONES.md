@@ -33,10 +33,22 @@
 6. GdUnit4 浮点断言有精度口径差异：浮点一律断言 f64 位型 hex；断言失败会中止该套件后续用例（先修先跑）。
 7. `String.match` 是 glob 不是正则（字符集校验须用 RegEx）；`String.decode_hex` 在 4.7 不存在（用 hex_to_int 逐字节）。
 
-## M1 战斗内核移植（src/core 4,698 行）
-rng → types → grid → unit → items → traits → skills → config → api → battle；
-hooks 注册顺序（羁绊 id 字典序 → 装备固定序）、BattleApi 表面、settle-then-replay、
-30Hz 固定 tick 必须 1:1。验收：≥1,000 种子单场逐事件对拍绿 + conservation/determinism 契约 GdUnit4 化。
+## M1 战斗内核移植（src/core 4,698 行）✅ 2026-09-28 完成
+rng → types → grid → unit → items → traits → skills → config → api → battle 全部落地（core/*.gd 九件套 + spec.gd 数据加载器）。
+- [x] hooks 注册顺序契约（羁绊 id 字典序 → 装备固定序）、BattleApi 表面、settle-then-replay、30Hz 固定 tick 1:1 复刻
+- [x] 验收：**1,023 局 × 370,474 事件跨引擎逐位一致**（3 阵容×340 种子 + 天命/墨兽 powMult/maxTicks 三特殊案；GDScript 38 局/秒）
+- [x] conservation/determinism 契约 GdUnit4 化（tests/battle_test.gd：同种子同摘要/事件首尾契约/守恒不变量）
+- [x] qa 门禁 7 步：import → spec 对账+幂等 → GdUnit4 → rng 对拍 → battle 对拍 → codec 往返
+
+### M1 实机教训（GDScript 移植纪律，M2 前必读）
+1. **`trait` 是 GDScript 保留字**（为未来特性预留）——Unit 的羁绊态字段更名 `tstate`。
+2. **class_name 循环引用直接炸解析器且不报具体行**（unit↔items_core）：运行时 `load()` 打破编译期环。
+3. **钩子 lambda 元数必须齐**：JS 惯用 `() => {}` 省参挂 onBattleStart；GDScript 严格元数，全部补占位参数。
+4. **`var x: Dictionary = dict.get(k, null)` 在 null 时运行期报错**——可空取值一律无类型标注。
+5. **`sort_custom` 方向曾写反**（true ≈ TS cmp<0 ≈ a 在前）：降序应写 `a.k > b.k` 而非 `b.k > a.k`——resurrect 选人与超时裁定两处中招，靠终局快照差分定位（事件四舍五入掩蔽了无 hp 漂移的纯结构分歧）。
+6. **局部 lambda 不能自引用**（nova 连波/volley 自排程/连斩递归）：装箱进字典后经 `state["fn"]` 取自身。
+7. **闭包按值捕获标量**：跨回调共享的可变计数（围攻 nowTick 等）必须装箱。
+8. String 没有 `slice`（用 `substr`）；`decode_hex` 不存在（逐字节 `hex_to_int`）。
 
 ## M2 对局层移植（src/game 4,107 行）
 match/ai/pool/economy/adventure/undo/replay；save/daily 改 user://；pairings P0 契约复刻。

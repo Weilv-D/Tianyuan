@@ -45,3 +45,46 @@ static func sha256_hex(s: String) -> String:
 ## bool → "1"/"0"（对拍行内布尔编码）
 static func b01(v: bool) -> String:
 	return "1" if v else "0"
+
+
+## JS Math.round 语义（.5 向 +∞，即 floor(x+0.5)）——Godot round() 是远离零舍入，
+## 负半数处两语言不一致。全内核的取整一律走这里，禁直接 round()。
+static func js_round(v: float) -> float:
+	return floor(v + 0.5)
+
+
+## JS 稳定排序等价：key 为 float，并列按原索引。JS Array.sort 稳定而 Godot
+## sort_custom 不保证 —— 目标选择/落点排序的跨引擎一致依赖本函数（units 构造即
+## uid 升序，索引序 = JS 稳定序）。
+static func stable_sort_by(arr: Array, key_fn: Callable) -> Array:
+	var pairs := []
+	pairs.resize(arr.size())
+	for i: int in arr.size():
+		pairs[i] = {"v": arr[i], "i": i, "k": float(key_fn.call(arr[i]))}
+	pairs.sort_custom(func(a, b):
+		if a["k"] != b["k"]:
+			return a["k"] < b["k"]
+		return a["i"] < b["i"])
+	var out := []
+	out.resize(pairs.size())
+	for i: int in pairs.size():
+		out[i] = pairs[i]["v"]
+	return out
+
+
+## JS Number.isFinite 等价（true/false；Godot 4 的 is_finite 只吃 float）
+static func js_finite(v) -> bool:
+	if v is int:
+		return true
+	if v is float:
+		return is_finite(v)
+	return false
+
+
+## JS Number.isInteger 等价（JSON 解析出的 3.0 视为整数 3）
+static func js_is_int(v) -> bool:
+	if v is int:
+		return true
+	if v is float:
+		return is_finite(v) and v == floor(v)
+	return false

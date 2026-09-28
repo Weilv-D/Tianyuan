@@ -7,6 +7,7 @@
     "spec": "node --import tsx tools/export_spec.mjs",
     "parity:rng": "node --import tsx tools/parity_rng.mjs",
     "parity:codec": "node --import tsx tools/parity_codec.mjs",
+    "parity:battle": "node --import tsx tools/battle_parity.mjs",
     "parity": "node tools/parity_check.mjs",
     "qa": "node tools/qa.mjs"
   },

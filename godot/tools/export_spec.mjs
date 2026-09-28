@@ -30,8 +30,12 @@ function fnv1a32(str) {
   return h >>> 0;
 }
 
+// 常量全量导出：标量与嵌套对象/数组（MECH/LEGEND_T3/MATCH_TUNING/星级与经济数组）都要，
+// 只排除函数。M0 版只收 typeof number，星级缩放表与 MECH 整体漏发（M1 移植时发现）。
 const config = {};
-for (const [k, v] of Object.entries(CFG)) if (typeof v === 'number') config[k] = v;
+for (const [k, v] of Object.entries(CFG)) {
+  if (typeof v === 'number' || (v !== null && typeof v === 'object')) config[k] = v;
+}
 
 const payload = stable({
   config,

@@ -3,7 +3,7 @@
 class_name Codec
 extends RefCounted
 
-const SAFE_STRING := "^[A-Za-z0-9_.|-]*$"
+const SAFE_STRING := "^[A-Za-z0-9_.|:-]*$"
 
 ## String.match 是 glob 不是正则；字符集校验必须走 RegEx（与 TS 侧 /…/test 同语义，空串合法）
 static var _safe_re: RegEx = RegEx.create_from_string(SAFE_STRING)
@@ -37,7 +37,7 @@ static func opt_cell(e: Dictionary, k: String) -> PackedStringArray:
 	if not has(e, k):
 		return ["-"]
 	var c: Dictionary = e[k]
-	return ["1", num(c.get("x")), num(c.get("y"))]
+	return ["1", num(c.get("c")), num(c.get("r"))]
 
 
 static func opt_str(e: Dictionary, k: String) -> PackedStringArray:
@@ -67,8 +67,8 @@ static func units_of(us: Array) -> PackedStringArray:
 		out.append(str_tok(u.get("defId")))
 		out.append(num(u.get("team")))
 		out.append(num(u.get("star")))
-		out.append(num(c.get("x")))
-		out.append(num(c.get("y")))
+		out.append(num(c.get("c")))
+		out.append(num(c.get("r")))
 		out.append(num(u.get("maxHp")))
 		out.append(num(u.get("hp")))
 	return out
@@ -103,7 +103,7 @@ static func encode_event(e: Dictionary) -> String:
 			var f: Dictionary = e.get("from")
 			var to: Dictionary = e.get("to")
 			toks = [str_tok(t), num(e.get("tick")), num(e.get("uid")), num(e.get("targetUid")),
-				num(f.get("x")), num(f.get("y")), num(to.get("x")), num(to.get("y")),
+				num(f.get("c")), num(f.get("r")), num(to.get("c")), num(to.get("r")),
 				num(e.get("dur")), str_tok(e.get("kind"))]
 		"damage":
 			toks = [str_tok(t), num(e.get("tick")), num(e.get("srcUid")), num(e.get("dstUid")),
@@ -118,7 +118,7 @@ static func encode_event(e: Dictionary) -> String:
 			var mf: Dictionary = e.get("from")
 			var mt: Dictionary = e.get("to")
 			toks = [str_tok(t), num(e.get("tick")), num(e.get("uid")),
-				num(mf.get("x")), num(mf.get("y")), num(mt.get("x")), num(mt.get("y")), num(e.get("dur"))]
+				num(mf.get("c")), num(mf.get("r")), num(mt.get("c")), num(mt.get("r")), num(e.get("dur"))]
 		"status":
 			toks.append(str_tok(t))
 			toks.append(num(e.get("tick")))

@@ -1,8 +1,8 @@
 {
  "schema": 1,
  "gameVersion": "1.20.0",
- "fnv1a32": "a7d6ee03",
- "sha256": "1fa428055294cc9b260306984f98ca3168e4e4dd7d00b168178f0e2cde917a18",
+ "fnv1a32": "b586ca3c",
+ "sha256": "54b179baeb51e293b1f1fd532439cd556e2cf63382462cde5c970cdff91f998d",
  "counts": {
   "champions": 64,
   "items": 44,
@@ -2990,26 +2990,211 @@
    "INCOME_INTEREST_MAX": 5,
    "INCOME_INTEREST_TIER": 10,
    "ITEM_BAR_SLOTS": 10,
+   "LEGEND_T3": {
+    "ccImmune": true,
+    "hpMult": 2,
+    "omnivamp": 0.2,
+    "powerMult": 2,
+    "sizeMult": 1.2,
+    "skillMult": 1.25,
+    "startShieldPct": 0.35
+   },
+   "LOSE_STREAK_GOLD": [
+    0,
+    0,
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
    "MANA_FROM_DAMAGE_CAP": 15,
    "MANA_FROM_DAMAGE_RATIO": 32,
    "MANA_LOCK_AFTER_CAST": 0.5,
    "MANA_PER_ATTACK": 10,
    "MANA_REGEN_PER_SEC": 2,
+   "MATCH_TUNING": {
+    "damagePerStar": 1,
+    "damagePerSurvivor": 2,
+    "lateDamageCurveFromRound": 16,
+    "lateDamageCurveScale": 0.75,
+    "playerDamageScale": 0.5
+   },
    "MAX_LEVEL": 9,
+   "MECH": {
+    "battleTimeoutTicks": 1500,
+    "overtimeAmpPerSec": 0.5,
+    "overtimeSustainFactor": 0.5,
+    "thornDecayPerHit": 1,
+    "thornSecCapHpRatio": 0,
+    "trueHitCapRatio": 0
+   },
    "OVERTIME_START_TICK": 900,
    "PLAYER_START_HP": 110,
+   "POOL_COUNTS": {
+    "1": 44,
+    "2": 34,
+    "3": 26,
+    "4": 18,
+    "5": 14
+   },
    "REROLL_COST": 2,
    "RESIST_BASE": 100,
    "RESIST_CAP": 220,
    "RETARGET_INTERVAL": 0.4,
+   "ROUND_BASE_DAMAGE": [
+    0,
+    0,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    4,
+    5,
+    5,
+    6,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    16,
+    18,
+    20,
+    22,
+    24,
+    26,
+    28,
+    30,
+    32,
+    34,
+    36,
+    38,
+    40,
+    44,
+    48,
+    52,
+    56,
+    60
+   ],
    "ROWS_PER_SIDE": 4,
    "SHIELD_CAP_RATIO": 0.45,
+   "SHOP_ODDS": [
+    [
+     100,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     100,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     75,
+     25,
+     0,
+     0,
+     0
+    ],
+    [
+     55,
+     30,
+     15,
+     0,
+     0
+    ],
+    [
+     45,
+     33,
+     20,
+     2,
+     0
+    ],
+    [
+     30,
+     40,
+     25,
+     5,
+     0
+    ],
+    [
+     19,
+     30,
+     35,
+     15,
+     1
+    ],
+    [
+     15,
+     20,
+     35,
+     25,
+     5
+    ],
+    [
+     5,
+     10,
+     25,
+     40,
+     20
+    ]
+   ],
    "SHOP_SLOTS": 5,
+   "STAR_HP_SCALE": [
+    1,
+    1.8,
+    3.24
+   ],
+   "STAR_POWER_SCALE": [
+    1,
+    1.45,
+    2.1
+   ],
+   "STAR_SKILL_SCALE": [
+    1,
+    1.5,
+    2.25
+   ],
+   "T3_ELITE_COST4": {
+    "hpMult": 1.15,
+    "powerMult": 1.15
+   },
    "TICK_RATE": 30,
    "TIMEOUT_WIN_RATIO": 0.02,
+   "WIN_STREAK_GOLD": [
+    0,
+    0,
+    1,
+    1,
+    2,
+    3,
+    4
+   ],
    "XP_BUY_AMOUNT": 4,
    "XP_BUY_COST": 4,
-   "XP_PER_ROUND": 4
+   "XP_PER_ROUND": 4,
+   "XP_TO_NEXT": [
+    2,
+    2,
+    6,
+    10,
+    20,
+    36,
+    56,
+    80
+   ]
   },
   "items": [
    {

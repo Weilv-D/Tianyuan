@@ -1,7 +1,7 @@
 // 对拍编解码器 TS 侧（规格：docs/PARITY_CODEC.md）。纯 JS，无冻结仓依赖。
 // 数值一律编码为 float64 大端位型 hex；可选字段判据是 !== undefined 且 !== null。
 
-const SAFE_STRING = /^[A-Za-z0-9_.|-]*$/;
+const SAFE_STRING = /^[A-Za-z0-9_.|:-]*$/;
 
 export function num(v) {
   const buf = new ArrayBuffer(8);
@@ -32,7 +32,7 @@ function optStr(v) {
 }
 
 function optCell(c) {
-  return c === undefined ? ['-'] : ['1', num(c.x), num(c.y)];
+  return c === undefined ? ['-'] : ['1', num(c.c), num(c.r)];
 }
 
 function params(p) {
@@ -48,7 +48,7 @@ function params(p) {
 function units(us) {
   const out = [num(us.length)];
   for (const u of us) {
-    out.push(num(u.uid), str(u.defId), num(u.team), num(u.star), num(u.cell.x), num(u.cell.y), num(u.maxHp), num(u.hp));
+    out.push(num(u.uid), str(u.defId), num(u.team), num(u.star), num(u.cell.c), num(u.cell.r), num(u.maxHp), num(u.hp));
   }
   return out;
 }
@@ -70,7 +70,7 @@ export function encodeEvent(e) {
       t.push(str(e.t), num(e.tick), num(e.uid), num(e.targetUid), num(e.windup), bool01(e.isRanged));
       break;
     case 'projectile':
-      t.push(str(e.t), num(e.tick), num(e.uid), num(e.targetUid), num(e.from.x), num(e.from.y), num(e.to.x), num(e.to.y), num(e.dur), str(e.kind));
+      t.push(str(e.t), num(e.tick), num(e.uid), num(e.targetUid), num(e.from.c), num(e.from.r), num(e.to.c), num(e.to.r), num(e.dur), str(e.kind));
       break;
     case 'damage':
       t.push(str(e.t), num(e.tick), num(e.srcUid), num(e.dstUid), num(e.amount), str(e.type), bool01(e.crit), bool01(e.kill), str(e.source));
@@ -86,7 +86,7 @@ export function encodeEvent(e) {
       break;
     case 'move':
     case 'blink':
-      t.push(str(e.t), num(e.tick), num(e.uid), num(e.from.x), num(e.from.y), num(e.to.x), num(e.to.y), num(e.dur));
+      t.push(str(e.t), num(e.tick), num(e.uid), num(e.from.c), num(e.from.r), num(e.to.c), num(e.to.r), num(e.dur));
       break;
     case 'status':
       t.push(str(e.t), num(e.tick), num(e.uid), str(e.kind), num(e.dur), num(e.value), bool01(e.added), ...optStr(e.src));
