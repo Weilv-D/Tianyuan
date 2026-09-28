@@ -1,6 +1,6 @@
 extends CanvasLayer
-## 设置面板（SettingsPanel.ts 对齐版 · M3 次批紧凑面）：三总线音量 / 静观 / 自动上场 /
-## 典藏音乐开关。prefs 读写走 SaveStore（user://prefs.json）。加挂在任意场景下。
+## 设置面板（SettingsPanel.ts 对齐版 · M3 次批紧凑面）：三总线音量 / 静观 / 自动上场
+## + 音乐出处脚注（原版 musicCreditLine 同行）。prefs 走 SaveStore（user://prefs.json）。
 class_name SettingsPanel
 
 var _on_changed: Callable
@@ -60,6 +60,9 @@ func open(on_changed: Callable = Callable()) -> void:
 	var note := _lbl("改动即时生效并随面板关闭落盘", 14, Palette.PAPER[500])
 	note.position = Vector2(40, y + 8)
 	panel.add_child(note)
+	var credit := _lbl(MusicTracks.credit_line(), 13, Palette.PAPER[500])
+	credit.position = Vector2(40, y + 30)
+	panel.add_child(credit)
 	var done := Button.new()
 	done.text = "完 成"
 	done.position = Vector2(180, 396)

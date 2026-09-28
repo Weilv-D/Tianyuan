@@ -36,6 +36,7 @@ var _settings: SettingsPanel
 var rail_popup: PanelContainer = null
 var trait_members_card: PanelContainer = null
 var badges_visible: Array = []  # [{id,count,tier,def,i,worldHit}] 每回合 refresh 后重建
+var scout_layer: CanvasLayer = null  # 侦查覆盖层（只读快照；原版 ScoutOverlay）
 
 
 func _ready() -> void:
@@ -251,6 +252,10 @@ func _build_side_panels() -> void:
 	intel_label = _label("", 17, Palette.PAPER[100])
 	intel_label.position = Vector2(Layout.REPORT_X, 160)
 	intel_label.size = Vector2(Layout.SIDE_W, 24)
+	intel_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	intel_label.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			_open_scout_for_intel())
 	add_child(intel_label)
 	# 八方诸侯（计分板）
 	var sb_cap := _label("八 方 诸 侯", 13, Palette.INK[300])
@@ -260,6 +265,11 @@ func _build_side_panels() -> void:
 		var l := _label("", 15, Palette.PAPER[300])
 		l.position = Vector2(Layout.REPORT_X, 338 + i * 30)
 		l.size = Vector2(Layout.SIDE_W, 24)
+		l.mouse_filter = Control.MOUSE_FILTER_STOP
+		var row_i := i
+		l.gui_input.connect(func(ev: InputEvent) -> void:
+			if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+				_open_scout_for_row(row_i))
 		score_rows.append(l)
 		add_child(l)
 	# 记事（左下）
@@ -473,10 +483,10 @@ func _check_adventure() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		var idx := i
 		b.pressed.connect(func() -> void:
-			match_ref.resolve_adventure(idx)
-			layer.queue_free()
-			Sess.blip("UI", 660.0)
-			refresh_all())
+				match_ref.resolve_adventure(idx)
+				layer.queue_free()
+				Sess.sfx.play("uiBig")
+				refresh_all())
 		panel.add_child(b)
 
 
@@ -499,12 +509,14 @@ func _after_action() -> void:
 
 func _on_buy(slot: int) -> void:
 	_push_undo()
+	var stars_before := _stars_snapshot()
 	var r: Dictionary = match_ref.buy(match_ref.human(), slot)
 	if not r["ok"]:
 		undo_stack.pop_back()
-		Sess.blip("UI", 180.0, 0.08)
+		Sess.sfx.play("warn")
 		return
-	Sess.blip("UI", 520.0)
+	Sess.sfx.play("coin")
+	_detect_merge_sound(stars_before)
 	_after_action()
 
 
@@ -512,23 +524,30 @@ func _on_reroll() -> void:
 	_push_undo()
 	if not match_ref.reroll(match_ref.human()):
 		undo_stack.pop_back()
+		Sess.sfx.play("warn")
 		return
-	Sess.blip("UI", 392.0)
+	Sess.sfx.play("ui")
 	_after_action()
 
 
 func _on_buy_exp() -> void:
 	_push_undo()
+	var lv_before := int(match_ref.human()["level"])
 	if not match_ref.buy_exp(match_ref.human()):
 		undo_stack.pop_back()
+		Sess.sfx.play("warn")
 		return
-	Sess.blip("UI", 587.0)
+	if int(match_ref.human()["level"]) > lv_before:
+		Sess.sfx.play("levelup")
+	else:
+		Sess.sfx.play("coin")
 	_after_action()
 
 
 func _on_auto_arrange() -> void:
 	_push_undo()
 	Arrange.auto_arrange(match_ref.human(), match_ref.pool)
+	Sess.sfx.play("uiBig")
 	_after_action()
 
 
@@ -538,6 +557,7 @@ func _on_undo() -> void:
 	var e: Dictionary = undo_stack.pop_back()
 	Undo.restore_player(match_ref.human(), match_ref.pool, e["snap"], match_ref)
 	match_ref.rng.state = int(e["rng"])
+	Sess.sfx.play("ui")
 	_after_action()
 
 
@@ -671,13 +691,14 @@ func _on_toggle_unload() -> void:
 func _on_auto_equip() -> void:
 	_push_undo()
 	Inventory.auto_equip(match_ref.human())
+	Sess.sfx.play("ui")
 	_after_action()
 
 
 func _on_toggle_lock() -> void:
 	var p := match_ref.human()
 	p["shopLocked"] = not p["shopLocked"]
-	Sess.blip("UI", 440.0, 0.05)
+	Sess.sfx.play("ui")
 	refresh_all()
 
 
@@ -701,7 +722,7 @@ func _try_unit_action(world: Vector2) -> bool:
 	if unload_mode:
 		var r: Dictionary = Inventory.unequip_all(p, target_iid)
 		if r["ok"]:
-			Sess.blip("UI", 350.0)
+			Sess.sfx.play("ui")
 			unload_mode = false
 			_after_action()
 		return true
@@ -711,10 +732,11 @@ func _try_unit_action(world: Vector2) -> bool:
 		var er: Dictionary = Inventory.equip_item(p, target_iid, item_id)
 		if er["ok"]:
 			selected_item_idx = -1
-			Sess.blip("UI", 587.0)
+			Sess.sfx.play("ui")
 			_after_action()
 		else:
 			undo_stack.pop_back()
+			Sess.sfx.play("warn")
 		return true
 	return false
 
@@ -922,7 +944,7 @@ func _drop(world: Vector2) -> void:
 	# 出售印
 	if world.x >= Layout.SELL_X and world.x <= Layout.SELL_X + Layout.SELL_SIZE and world.y >= Layout.SELL_Y and world.y <= Layout.SELL_Y + Layout.SELL_SIZE:
 		if match_ref.sell(p, drag_iid):
-			Sess.blip("SFX", 240.0, 0.1)
+			Sess.sfx.play("coin")
 			undo_stack.clear()
 			SaveStore.save_match(match_ref)
 			refresh_all()
@@ -934,10 +956,14 @@ func _drop(world: Vector2) -> void:
 		var slot := (cell.y - 4) * 8 + cell.x
 		if GameState.can_place(p, drag_iid, "board", slot)["ok"]:
 			GameState.move_to_slot(p, drag_iid, "board", slot)
+			Sess.sfx.play("ui")
+		else:
+			Sess.sfx.play("warn")
 	elif world.y >= Layout.BENCH_Y - 10 and world.y <= Layout.BENCH_Y + Layout.BENCH_CELL + 10:
 		var bi := int((world.x - Layout.BENCH_X) / Layout.BENCH_CELL)
 		if bi >= 0 and bi < 9 and GameState.can_place(p, drag_iid, "bench", bi)["ok"]:
 			GameState.move_to_slot(p, drag_iid, "bench", bi)
+			Sess.sfx.play("ui")
 	drag_iid = -1
 	drag_ghost = null
 	SaveStore.save_match(match_ref)
@@ -963,7 +989,7 @@ func _start_battle_phase() -> void:
 	for q: Dictionary in match_ref.pairings:
 		if int(q["a"]) == 0 or int(q["b"]) == 0:
 			me_pair = q
-	Sess.blip("SFX", 196.0, 0.2)
+	Sess.sfx.play_pluck(196.0)  # 徵音起手：开战的弦响（原版 GameScene:803 同款）
 	if me_pair.is_empty():
 		# 轮空（人类不参战）——直接推进
 		match_ref.settle_round()
@@ -1007,9 +1033,11 @@ func _show_round_result() -> void:
 		"win":
 			outcome_txt = "胜 —— 敌阵尽墨"
 			outcome_c = Palette.SPIRIT["light"]
+			Sess.sfx.play("uiBig")  # 回合胜负是常态：高光留给三星/终局（原版口径）
 		"loss":
 			outcome_txt = "败 —— 折损 %d 生命" % int(p["lastDamage"])
 			outcome_c = Palette.CINNABAR["light"]
+			Sess.sfx.play("warn")
 		"draw":
 			outcome_txt = "同归于尽"
 		"bye":
@@ -1034,12 +1062,245 @@ func _show_round_result() -> void:
 	cont.pressed.connect(func() -> void:
 		result_panel.queue_free()
 		result_panel = null
-		if match_ref.is_over() or not match_ref.human()["alive"]:
+		if match_ref.is_over():
 			Sess.go("res://render/result.tscn", { "match": match_ref })
+			return
+		if not match_ref.human()["alive"]:
+			_show_eliminated()
 			return
 		match_ref.begin_round()
 		refresh_all())
 	panel.add_child(cont)
+
+
+# ── 侦查覆盖层（原版 ScoutOverlay 对齐）：点击计分板行/敌情查看对手阵地快照 ──
+
+func _open_scout_for_row(row_i: int) -> void:
+	var standings: Array = match_ref.standings()
+	if row_i >= standings.size() or result_panel != null:
+		return
+	var pl: Dictionary = standings[row_i]
+	var idx := int(pl["idx"])
+	var pl2: Dictionary = match_ref.players[idx]
+	_open_scout(String(pl2["name"]), "生命 %d　等级 %d" % [int(pl2["hp"]), int(pl2["level"])], pl2["board"] as Array)
+
+
+func _open_scout_for_intel() -> void:
+	if result_panel != null:
+		return
+	for q: Dictionary in match_ref.pairings:
+		var other := -2
+		if int(q["a"]) == 0:
+			other = int(q["b"])
+		elif int(q["b"]) == 0:
+			other = int(q["a"])
+		if other >= 0:
+			var pl: Dictionary = match_ref.players[other]
+			_open_scout(String(pl["name"]), "生命 %d　等级 %d" % [int(pl["hp"]), int(pl["level"])], pl["board"] as Array)
+		elif int(q["ghost"]) >= 0:
+			_open_scout("墨 影", "沿用〔%s〕出局阵容" % String(match_ref.players[int(q["ghost"])]["name"]), match_ref.board_of_opponent(q))
+		return
+
+
+func _open_scout(title: String, sub: String, board: Array) -> void:
+	_close_scout()
+	scout_layer = CanvasLayer.new()
+	scout_layer.layer = 94
+	add_child(scout_layer)
+	var dim := ColorRect.new()
+	dim.color = Color(Palette.SHADE, 0.66)
+	dim.size = Vector2(Layout.W, Layout.H)
+	dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed:
+			_close_scout())
+	scout_layer.add_child(dim)
+	var bw := 780
+	var bh := 600
+	var panel := Panel.new()
+	panel.size = Vector2(bw, bh)
+	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
+	dim.add_child(panel)
+	var ttl := _label("%s 的阵地" % title, 22, Palette.PAPER[100], Sess.seal_font)
+	ttl.position = Vector2(28, 18)
+	panel.add_child(ttl)
+	var subl := _label(sub, 13, Palette.PAPER[400])
+	subl.position = Vector2(bw - 300, 28)
+	subl.size = Vector2(272, 20)
+	subl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	panel.add_child(subl)
+	# 棋盘快照（8×4 上半场，原版口径）
+	var cell := 80.0
+	var gx := (bw - cell * 8.0) / 2.0
+	var gy := 66.0
+	for i: int in mini(32, board.size()):
+		var u = board[i]
+		if u == null:
+			continue
+		var col := i % 8
+		var row := i / 8
+		var tex := TextureRect.new()
+		tex.texture = UnitView.piece_texture(String(u["defId"]))
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex.custom_minimum_size = Vector2(cell - 8, cell - 24)
+		tex.position = Vector2(gx + col * cell, gy + row * cell)
+		panel.add_child(tex)
+		var st := _label("★".repeat(clampi(int(u["star"]), 1, 3)), 13, Palette.GILT["light"])
+		st.position = Vector2(gx + col * cell, gy + row * cell + cell - 24)
+		st.size = Vector2(cell, 16)
+		st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		panel.add_child(st)
+		for ii: int in mini(3, (u.get("items", []) as Array).size()):
+			var icon := TextureRect.new()
+			icon.texture = load("res://assets/items/%s.png" % String(u["items"][ii]))
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.custom_minimum_size = Vector2(16, 16)
+			icon.position = Vector2(gx + col * cell + 2 + ii * 18, gy + row * cell + 2)
+			panel.add_child(icon)
+	# 羁绊行（激活档按 tier 降序）
+	var ty := gy + cell * 4.0 + 16.0
+	var cap := _label("羁 绊", 15, Palette.PAPER[300], Sess.seal_font)
+	cap.position = Vector2(28, ty)
+	panel.add_child(cap)
+	var active: Array = []
+	for t: Dictionary in match_ref._traits_of(board):
+		if int(t["tier"]) >= 0:
+			active.append(t)
+	active.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["tier"]) > int(b["tier"]))
+	var parts: Array = []
+	for t: Dictionary in active:
+		parts.append("%s %d" % [String(Spec.traits_by_id[String(t["id"])].get("name", t["id"])), int(t["count"])])
+	var tr := _label(" · ".join(parts) if parts.size() > 0 else "（未激活任何羁绊）", 13, Palette.PAPER[200])
+	tr.position = Vector2(90, ty + 2)
+	tr.size = Vector2(bw - 130, 60)
+	tr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_child(tr)
+	var close := Button.new()
+	close.text = "关 闭"
+	close.position = Vector2(bw - 150, bh - 58)
+	close.custom_minimum_size = Vector2(110, 42)
+	close.add_theme_font_override("font", Sess.body_font)
+	close.add_theme_font_size_override("font_size", 18)
+	close.add_theme_color_override("font_color", Palette.PAPER[100])
+	close.focus_mode = Control.FOCUS_NONE
+	close.pressed.connect(_close_scout)
+	panel.add_child(close)
+	Sess.sfx.play("ui")
+
+
+func _close_scout() -> void:
+	if scout_layer != null:
+		scout_layer.queue_free()
+		scout_layer = null
+
+
+# ── 玩家淘汰（原版 EliminatedOverlay「道 消」对齐）：名次/战绩 + 两出口 ──
+
+func _show_eliminated() -> void:
+	var p := match_ref.human()
+	result_panel = CanvasLayer.new()
+	result_panel.layer = 95
+	add_child(result_panel)
+	var dim := ColorRect.new()
+	dim.color = Color(Palette.SHADE, 0.78)
+	dim.size = Vector2(Layout.W, Layout.H)
+	result_panel.add_child(dim)
+	var panel := Panel.new()
+	panel.size = Vector2(560, 420)
+	panel.position = Vector2((Layout.W - 560) / 2.0, (Layout.H - 420) / 2.0)
+	dim.add_child(panel)
+	var title := _label("道 消", 52, Palette.CINNABAR["light"], Sess.seal_font)
+	title.position = Vector2(0, 40)
+	title.size = Vector2(560, 76)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	panel.add_child(title)
+	var rank := int(p["rank"]) if int(p["rank"]) != 0 else 8
+	var sub := _label("第 %d 名出局 · 第 %d 回合 · 战绩 %d胜%d败" % [rank, match_ref.round, int(p["wins"]), int(p["losses"])], 20, Palette.PAPER[200])
+	sub.position = Vector2(0, 130)
+	sub.size = Vector2(560, 32)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	panel.add_child(sub)
+	var ff := Button.new()
+	ff.text = "快 进 到 终 局"
+	ff.position = Vector2(50, 240)
+	ff.custom_minimum_size = Vector2(210, 52)
+	_style_action_button(ff)
+	ff.pressed.connect(func() -> void: _fast_forward_after_death())
+	panel.add_child(ff)
+	var re := Button.new()
+	re.text = "再 来 一 局"
+	re.position = Vector2(300, 240)
+	re.custom_minimum_size = Vector2(210, 52)
+	_style_action_button(re)
+	re.pressed.connect(func() -> void: _restart_after_death())
+	panel.add_child(re)
+	Sess.sfx.play("defeat")
+
+
+func _style_action_button(b: Button) -> void:
+	b.add_theme_font_override("font", Sess.body_font)
+	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_color_override("font_color", Palette.PAPER[100])
+	b.focus_mode = Control.FOCUS_NONE
+
+
+## 玩家淘汰后把剩下的回合快进完，给出最终名次（原版 fastForward 同回路）
+func _fast_forward_after_death() -> void:
+	var guard := 0
+	while not match_ref.is_over() and guard < 60:
+		match_ref.begin_round()
+		if match_ref.is_over():
+			break
+		match_ref.settle_round()
+		match_ref.end_round()
+		guard += 1
+	Sess.go("res://render/result.tscn", { "match": match_ref })
+
+
+func _restart_after_death() -> void:
+	SaveStore.clear_save(String(match_ref.mode))
+	var seed_val := int(Time.get_unix_time_from_system()) & 0x7FFFFFFF
+	Sess.go("res://render/game_scene.tscn", { "match": Match.new(seed_val, "你", String(match_ref.mode)) })
+
+
+# ── 买入合并高光音（原版 celebrate/detectThreeStar 口径） ──
+
+func _stars_snapshot() -> Dictionary:
+	var m := {}
+	var p := match_ref.human()
+	for u in p["board"]:
+		if u != null:
+			m[int(u["iid"])] = int(u["star"])
+	for u in p["bench"]:
+		if u != null:
+			m[int(u["iid"])] = int(u["star"])
+	return m
+
+
+## 二星→levelup、三星→star3；五费三星追加 skillBig（全屏演出登记后续增强）
+func _detect_merge_sound(before: Dictionary) -> void:
+	var after := _stars_snapshot()
+	for iid_v in after:
+		var iid := int(iid_v)
+		var star := int(after[iid_v])
+		if star > int(before.get(iid, 0)):
+			if star >= 3:
+				var u = GameState.find_unit(match_ref.human(), iid)
+				var cost := 0
+				if u != null:
+					var def: Variant = Spec.champion_by_id.get(String(u["defId"]), null)
+					if def != null:
+						cost = int(def["cost"])
+				if cost >= 5:
+					Sess.sfx.play("star3")
+					Sess.sfx.play("skillBig")
+				else:
+					Sess.sfx.play("star3")
+			else:
+				Sess.sfx.play("levelup")
+			return  # 一次买入至多一串合并，只鸣一次（原版 celebrate 单次口径）
 
 
 ## 战报双列（v1.12.0 图表口径）：我方（viewer=0 视角按 stats team 记录）左、敌方右；

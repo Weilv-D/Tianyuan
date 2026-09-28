@@ -14,6 +14,7 @@ var body_font: SystemFont
 ## 音频三总线（bgm / sfx / ui —— 夜宴音频设计的 Godot 落地骨架）
 var bus_ready := false
 var bgm
+var sfx
 
 
 func _ready() -> void:
@@ -24,6 +25,9 @@ func _ready() -> void:
 	bgm = load("res://audio/bgm.gd").new()
 	bgm.name = "Bgm"
 	add_child(bgm)
+	sfx = load("res://audio/sfx.gd").new()
+	sfx.name = "Sfx"
+	add_child(sfx)
 
 
 ## 实机冒烟钩子（__qa 精神的 Godot 版）：--smoke=<tag>,<frames> —— 跑 N 帧后截图
@@ -90,33 +94,6 @@ func _setup_audio_buses() -> void:
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(0.75))
 	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("UI"), linear_to_db(0.6))
 	bus_ready = true
-
-
-## 极简合成音占位（新音乐样曲过审前的 UI 反馈；夜宴禁荧光原则下取短促低吟）
-func blip(bus_name: String, freq: float = 440.0, dur: float = 0.06, gain: float = 0.18) -> void:
-	var idx := AudioServer.get_bus_index(bus_name)
-	if idx < 0:
-		return
-	var player := AudioStreamPlayer.new()
-	player.bus = bus_name
-	var buf := AudioStreamWAV.new()
-	var rate := 22050
-	var n := int(dur * rate)
-	var data := PackedByteArray()
-	data.resize(n * 2)
-	for i: int in n:
-		var t := float(i) / float(rate)
-		var env := (1.0 - float(i) / float(n)) * gain
-		var v := int(sin(TAU * freq * t) * env * 32767.0)
-		data.encode_s16(i * 2, v)
-	buf.format = AudioStreamWAV.FORMAT_16_BITS
-	buf.mix_rate = rate
-	buf.stereo = false
-	buf.data = data
-	player.stream = buf
-	player.finished.connect(player.queue_free)
-	add_child(player)
-	player.play()
 
 
 ## 场景切换（带数据；对应 Phaser fadeTo）。BGM 心境随场景自动路由

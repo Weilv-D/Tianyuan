@@ -44,7 +44,7 @@ func _ready() -> void:
 
 
 func _detail(c: Dictionary) -> void:
-	Sess.blip("UI", 500.0, 0.05)
+	Sess.sfx.play("ui")
 	var layer := CanvasLayer.new()
 	layer.layer = 95
 	add_child(layer)

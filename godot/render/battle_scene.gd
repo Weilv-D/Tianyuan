@@ -59,6 +59,8 @@ func _ready() -> void:
 		_spawn_view(u)
 	# start 事件在构造期已发 —— 视图血条立即同步一轮
 	_sync_all()
+	# 开战低吟（原版 BattleScene 交战瞬间 warn；BGM battle 心境已由 Sess.go 路由）
+	Sess.sfx.play("warn")
 
 
 func _draw_bg() -> void:
@@ -91,6 +93,7 @@ func _process(delta: float) -> void:
 	tick_label.text = "%.1f" % (float(battle.tick) / 30.0)
 	if Input.is_action_just_pressed("ui_accept"):
 		speed = 1.0 if speed > 1.0 else 4.0
+		Sess.sfx.play("ui")
 
 
 func _cell_pos(u) -> Vector2:
@@ -150,6 +153,12 @@ func _on_event(e: Dictionary) -> void:
 					if dir == 0.0:
 						dir = 1.0
 				v1.play_attack(dir, float(e.get("windup", 0.2)))
+				# 弹道音贴「命中瞬间」（原版口径）：起手后 windup 秒触发；倍速排水期不响
+				if bool(e.get("isRanged", false)) and speed <= 1.0:
+					var windup := float(e.get("windup", 0.2))
+					get_tree().create_timer(maxf(0.0, windup)).timeout.connect(func() -> void:
+						if is_inside_tree() and not finished and speed <= 1.0:
+							Sess.sfx.play("shoot"))
 		"damage":
 			var v2: UnitView = views.get(int(e.get("targetUid", -1)), null)
 			if v2 != null:
@@ -169,18 +178,34 @@ func _on_event(e: Dictionary) -> void:
 				var fpos: Vector2 = board_view.cell_center(tgt_fx.cell.x, tgt_fx.cell.y) if tgt_fx != null else Vector2.ZERO
 				fx_layer.play({ "kind": "impact", "pos": fpos, "tint": dmg_c,
 					"params": { "crit": 1.0 if crit else 0.0, "hue": 2.0 if String(e.get("type", "")) == "magic" else 0.0 } })
-			Sess.blip("SFX", 300.0 + randf_range(0.0, 40.0), 0.05, 0.12)
 		"heal":
 			_float_text(e, e.get("amount", 0.0), Palette.SPIRIT["light"], "+", "heal")
+			if speed <= 1.0:
+				Sess.sfx.play("heal")
 		"shield":
 			_float_text(e, e.get("amount", 0.0), Palette.MOON["light"], "+", "heal")
+			if speed <= 1.0:
+				Sess.sfx.play("shield")
+		"castStart":
+			# 施法起手音（演出本体走 fx 事件；此处对齐原版 castStart 的 cast 音）
+			if speed <= 1.0:
+				Sess.sfx.play("cast")
+		"cast":
+			# 五费大招走 skillBig，其余 cast（原版同档）
+			if speed <= 1.0:
+				var cu = _unit_by_uid(int(e.get("uid", -1)))
+				if cu != null and int(cu.entry["cost"]) >= 5:
+					Sess.sfx.play("skillBig")
+				else:
+					Sess.sfx.play("cast")
 		"death":
 			var v3: UnitView = views.get(int(e.get("uid", -1)), null)
 			if v3 != null:
 				v3.play_death()
 			if e.has("cell"):
 				fx_layer.play({ "kind": "burst", "pos": _cell_local(e["cell"]), "radius": float(e.get("radius", 1.0)), "tint": Palette.INK[300] })
-			Sess.blip("SFX", 150.0, 0.12, 0.14)
+			if speed <= 1.0:
+				Sess.sfx.play("death")
 		"fx":
 			_play_fx(e)
 		"projectile":

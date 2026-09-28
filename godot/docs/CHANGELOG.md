@@ -17,9 +17,26 @@
 - balance.mjs `#` 注释语法错（上一提交收尾改 db 路径时引入、改后未回归，本次门禁抓回）
 - smoke 截图目录 res://../ → res://.tmp-shots-godot（编辑器跑时不再写仓库根）
 
+### 对等补全（同日第二轮：原版资产/功能面复查，扫出即修）
+- **典藏音乐四曲移植**：原版选定的 CC0-1.0 四曲（Kevin MacLeod，freepd.com）按四心境
+  循环（audio/music_tracks.gd 单一真源 + bgm.gd 授权曲路径，同心境不重启、0.45s/0.7s
+  淡切）；menu.ogg 从 Theora 封装无损转出纯 Vorbis；程序化五声音阶占位整体移除
+  （用户裁决：不留合成兜底）；设置面板与读我带「音乐 4 曲 · Kevin MacLeod · CC0」出处行
+- **具名音效层**（audio/sfx.gd）：原版 SfxName 16 名 + playPluck 配方逐参数移植
+  （tone/noise/sweep 三基元 + RBJ biquad + 等功率声像，立体声现渲染）；全挂点接线——
+  买 coin/warn、经验 levelup、合并二星 levelup/三星 star3、五费三星 star3+skillBig、
+  开战 pluck 徵音 196Hz、战斗 heal/shield/cast/skillBig/shoot（贴命中瞬间）/death、
+  回合结算 uiBig/warn、淘汰 defeat、终局冠军 victory、菜单/图鉴/倍速 ui；
+  伤害事件保持无声（原版同口径）；倍速排水期不出战斗音
+- **侦查覆盖层**（原版 ScoutOverlay）：点击计分板行/敌情查看对手阵地只读快照
+  （8×4 立绘+星级+装备图标+激活羁绊行；墨影走 boardOfOpponent 出局阵容）
+- **道消淘汰层**（原版 EliminatedOverlay）：玩家出局不再直跳终局——「道 消」面板
+  （名次/回合/战绩 + defeat）+「快进到终局」（begin/settle/end ≤60 回路与原版同构）
+  +「再来一局」（弃档新种开normal/daily 同模式）
+
 ### 已知事项
-- BGM 为五声音阶 pad 占位，正式曲目样曲过审后热替换
 - 平衡模拟吞吐 ~9 局/s（工具链侧，不影响游玩）
+- 五费三星 LegendaryFx 全屏演出未随 skillBig 移植（登记后续增强）
 
 ## 2.0.0-m4（2026-09-28，M4 进行中）
 

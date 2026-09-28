@@ -45,7 +45,7 @@ func _ready() -> void:
 
 
 func _enter(kind: String) -> void:
-	Sess.blip("UI", 523.0, 0.05)
+	Sess.sfx.play("ui")
 	match kind:
 		"continue":
 			var m: Variant = SaveStore.load_match("normal")

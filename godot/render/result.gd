@@ -20,6 +20,8 @@ func _ready() -> void:
 	for p: Dictionary in standings:
 		if int(p["idx"]) == 0:
 			human_rank = int(p["rank"])
+	if human_rank == 1:
+		Sess.sfx.play("victory")  # 冠位号角（原版 ResultScene champion 口径）
 
 	var title := _label("终 局", 64, Palette.GILT["light"] if human_rank <= 3 else Palette.PAPER[100], Sess.seal_font)
 	title.position = Vector2(-400, -420)
