@@ -16,24 +16,33 @@ balance/
     report.ts            控制台报告渲染
     runctx.ts / args.ts  公共旗标解析
     comp-random.ts       随机阵容生成（先手公平检验用）
-  commands/              命令层（matrix/sweep/ab/traits/items/units/trend/bench/selftest + 迁移专项）
+  commands/              命令层（matrix/sweep/ab/traits/items/units/trend/bench/selftest
+                         + 迁移专项 match/shop/legend/beast/bigorigins/audit/roster/gold/diag/probe）
   specs/                 扫描 spec（OAT 轴定义）
   out/                   工件输出（balance.db + 导出；gitignored）
 ```
 
 ## 命令速查
 
+全部命令以 `npm run balance -- <command>` 为唯一入口（`--help` 列出全部 19 条）。**带旗标的调用必须写第二个 `--`**：`npm run balance -- -- matrix 200 --seed 20260902 --no-save` —— npm 会把 `--seed/--n/--no-save` 当成自己的配置吃掉，只把数值透给脚本，命令照常跑完但参数从未生效；工具链对多余位置参数直接报错并给出该写法，`--flag=value` 与空格形态均受支持。
+
 | 维度 | 命令 | 回答的问题 |
 |---|---|---|
 | 阵容 | `matrix [n]` | 九套预设（或 --comps 自定义）的综合胜率、极差、位置公平、超时率 |
 | 阵容 | `sweep <spec> \| --set k=v` | 某参数动一动，断面怎么动（Δ/噪声带/边际斜率） |
-| 阵容 | `ab --set k=v [--pairs 4]` | 这个改动把机关相关的克制边移动了多少（定向高精度） |
-| 棋子 | `units [--sort dealt\|taken]` | 每颗棋子的场均伤害/承伤/类型构成/施法/生存率（随 matrix 入库） |
+| 阵容 | `ab --set k=v [--pairs 4]` | 这个改动把某条克制边移动了多少（定向高精度） |
+| 阵容 | `bigorigins [n]` | 墨门/兵家天花板探针（人数堆叠的上限形态） |
+| 棋子 | `units [--run <id>] [--sort dealt\|taken]` | 每颗棋子的场均伤害/承伤/类型构成/施法/生存率（随 matrix 入库） |
 | 羁绊 | `traits [n]` | 每条羁绊的数值给它的阵容贡献多少胜率（scale=0 压制 vs 基线） |
-| 装备 | `items [n]` | 单件边际、合成增益、同件堆叠递减、异件协同（logit 口径） |
-| 趋势 | `trend [k]` | 跨版本断面移动（读库，按阵容名对齐） |
+| 装备 | `items [n] [--ids=a,b]` | 单件边际、合成增益、同件堆叠递减、异件协同（logit 口径） |
+| 整局 | `match [n] [--set k=v]` | 局长、AI 原型分化、冠军等级（整局经济与节奏的读数面） |
+| 商店 | `shop [--t<级>=…] [--match=N]` | 概率表期望、刷店成本 Monte Carlo、可选整局配对臂 |
+| 天命 | `legend [n]` | 三星五费「天命护持」的镜像升级价值与包贡献 |
+| 墨兽 | `beast` | 墨兽轮自检（阵容成长 / 全员同敌 / 掉落与掉血） |
+| 趋势 | `trend [k] [--command matrix\|sweep]` | 跨版本断面移动（读库，按阵容名对齐） |
 | 门禁 | `selftest` | 数据自检/确定性/CRN/进程池一致/先手公平（战役前必过） |
 | 算力 | `bench [n] --scaling` | 单进程吞吐 + 进程池实测加速比 |
+| 速查 | `audit` / `roster` / `gold` / `diag` / `probe` | 数据速查与单场诊断（诊断输出不作强度结论） |
 
 通用旗标：`--seed S`（默认 20260829，历史可比口径）`--workers W` / `--serial` `--comps <file.json>` `--no-save`。
 

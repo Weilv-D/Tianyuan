@@ -100,49 +100,110 @@ function sourceFiles(directory) {
   return out;
 }
 
-function withoutComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '))
-    .replace(/\/\/[^\n]*/g, (comment) => ' '.repeat(comment.length));
-}
-
-function blankExceptNewlines(text) {
-  return text.replace(/[^\n]/g, ' ');
-}
-
-// 模板字面量的 ${…} 插值是活代码而不是文本：整体抹空会让
-// `x${Math.random()}` 这类写法逃过确定性/浏览器 API 扫描（假阴性）。
-// 先按配对花括号抽出插值表达式原样保留，再抹掉其余字符。
-function keepTemplateInterpolations(literal) {
-  let out = '';
-  for (let i = 0; i < literal.length; i++) {
-    if (literal[i] === '$' && literal[i + 1] === '{') {
-      out += ' ';
-      let depth = 1;
-      i += 2;
-      while (i < literal.length && depth > 0) {
-        const ch = literal[i];
-        if (ch === '{') depth++;
-        else if (ch === '}') {
-          depth--;
-          if (depth === 0) break;
-        }
-        out += ch;
-        i++;
+/**
+ * 单趟词法扫描，产出两份等长文本（行号与原文件对齐，可互换定位）：
+ *   code —— 注释抹空、字符串与模板原样（导入说明符扫描需要字面量）；
+ *   api  —— 注释与字符串/模板内容都抹空，但 `${…}` 插值原样保留（活代码）。
+ *
+ * 为什么必须单趟：分两步（先去注释再去字符串）会被字符串里的 `//` 骗过 ——
+ * 其后同行代码被整体抹空，`Math.random()` 之类的扫描项静默逃逸；反过来先去
+ * 字符串又会被注释里的引号骗过（`/* don't *​/` 的撇号会吞掉后续整段代码）。
+ * 一个字符一个状态地走，两种骗法都不成立。
+ */
+function stripSource(source) {
+  const n = source.length;
+  let code = '';
+  let api = '';
+  const stack = [];
+  const top = () => stack[stack.length - 1];
+  const inTemplate = () => top()?.kind === 'template';
+  let i = 0;
+  while (i < n) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (inTemplate()) {
+      if (ch === '\\') {
+        code += source.slice(i, i + 2);
+        api += '  ';
+        i += 2;
+        continue;
       }
-      out += ' ';
-    } else if (literal[i] === '\n') {
-      out += '\n';
+      if (ch === '`') {
+        stack.pop();
+        code += '`';
+        api += ' ';
+        i++;
+        continue;
+      }
+      if (ch === '$' && next === '{') {
+        stack.push({ kind: 'interp', depth: 1 });
+        code += '${';
+        api += '${';
+        i += 2;
+        continue;
+      }
+      code += ch;
+      api += ch === '\n' ? '\n' : ' ';
+      i++;
+      continue;
     }
+    // ── 代码态（含模板插值内部）──
+    if (ch === '/' && next === '/') {
+      const end = source.indexOf('\n', i);
+      const stop = end < 0 ? n : end;
+      const blank = source.slice(i, stop).replace(/[^\n]/g, ' ');
+      code += blank;
+      api += blank;
+      i = stop;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      const end = source.indexOf('*/', i + 2);
+      const stop = end < 0 ? n : end + 2;
+      const blank = source.slice(i, stop).replace(/[^\n]/g, ' ');
+      code += blank;
+      api += blank;
+      i = stop;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      let j = i + 1;
+      while (j < n) {
+        const cj = source[j];
+        if (cj === '\\') {
+          j += 2;
+          continue;
+        }
+        if (cj === ch) {
+          j++;
+          break;
+        }
+        // 未闭合字面量（截断的源码）：到行尾为止，避免吞掉后续真实代码
+        if (cj === '\n') break;
+        j++;
+      }
+      code += source.slice(i, j);
+      api += source.slice(i, j).replace(/[^\n]/g, ' ');
+      i = j;
+      continue;
+    }
+    if (ch === '`') {
+      stack.push({ kind: 'template' });
+      code += '`';
+      api += ' ';
+      i++;
+      continue;
+    }
+    if (ch === '{' && top()?.kind === 'interp') top().depth++;
+    else if (ch === '}' && top()?.kind === 'interp') {
+      top().depth--;
+      if (top().depth === 0) stack.pop();
+    }
+    code += ch;
+    api += ch;
+    i++;
   }
-  return out;
-}
-
-function withoutStrings(source) {
-  return source.replace(
-    /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g,
-    (literal) => (literal.startsWith('`') ? keepTemplateInterpolations(literal) : blankExceptNewlines(literal)),
-  );
+  return { code, api };
 }
 
 function lineNumber(source, index) {
@@ -170,8 +231,7 @@ let checkedFiles = 0;
 function checkLayerFile(file, layer) {
   checkedFiles += 1;
   const source = readFileSync(file, 'utf8');
-  const code = withoutComments(source);
-  const apiCode = withoutStrings(code);
+  const { code, api: apiCode } = stripSource(source);
   const displayPath = relative(root, file).split(sep).join('/');
 
   for (const imported of importedSpecifiers(code)) {

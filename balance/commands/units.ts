@@ -9,30 +9,37 @@
  */
 import { PRESET_COMPS, type CompSpec } from '../../src/game/comp';
 import { loadComps } from '../lib/comps';
+import { requireValue } from '../lib/args';
 import { printUnitBoard } from '../lib/report';
 import { Store } from '../lib/store';
 
 export async function run(argv: string[]): Promise<void> {
-  const runIdx = argv.indexOf('--run');
-  const labelIdx = argv.indexOf('--label');
-  const sortIdx = argv.indexOf('--sort');
-  const compsIdx = argv.indexOf('--comps');
-  const label = labelIdx >= 0 ? argv[labelIdx + 1] : '基准（无覆盖）';
-  const sort = sortIdx >= 0 && argv[sortIdx + 1] === 'taken' ? 'taken' : 'dealt';
+  // 空格与 `=` 两种写法都要认：只认 `--run <id>` 时 `--run=5` 会静默落进位置参数、
+  // 于是回落到"最近一次 run"并打印别人的断面 —— 用户看不出自己指定的 run 没生效。
+  const flag = (name: string): string | undefined => {
+    const eq = argv.find((a) => a.startsWith(`--${name}=`));
+    if (eq !== undefined) return eq.slice(name.length + 3);
+    const i = argv.indexOf(`--${name}`);
+    return i >= 0 ? requireValue(argv, i + 1, name) : undefined;
+  };
+  const runArg = flag('run');
+  const label = flag('label') ?? '基准（无覆盖）';
+  const sort = flag('sort') === 'taken' ? 'taken' : 'dealt';
+  const compsArg = flag('comps');
   let comps: CompSpec[] = [...PRESET_COMPS];
-  if (compsIdx >= 0) {
+  if (compsArg !== undefined) {
     // 走 loadComps 统一校验（棋子存在/星级合法），裸 JSON.parse 会在排行打印时
     // 才以 undefined.name 崩出来，或静默错位
-    comps = loadComps(argv[compsIdx + 1]).comps;
+    comps = loadComps(compsArg).comps;
   }
 
   const store = new Store();
   try {
-    let runId: number | null = runIdx >= 0 ? Number(argv[runIdx + 1]) : null;
+    let runId: number | null = runArg !== undefined ? Number(runArg) : null;
     // 显式传 --run 而解析失败 → 立即抛错：静默回落「最近一次 run」会让用户
     // 看着别人的断面而不自知（与 loadComps 引用不存在即抛的 fail-fast 同口径）
-    if (runIdx >= 0 && (runId === null || !Number.isInteger(runId))) {
-      throw new Error(`--run 需要整数 run id，收到：${argv[runIdx + 1] ?? '（缺值）'}`);
+    if (runArg !== undefined && (runId === null || !Number.isInteger(runId))) {
+      throw new Error(`--run 需要整数 run id，收到：${runArg || '（空值）'}`);
     }
     if (runId === null) {
       // 最近一次有 unit 数据的 matrix/sweep run

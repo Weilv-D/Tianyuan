@@ -68,6 +68,14 @@ export const VOID = {
   glow: 0xb8c8e2,
 } as const;
 
+/**
+ * 墨兽罩染：PvE 单位的青黛色罩（`aiBake` 的 source-atop 单色叠加）。
+ * 单独成项而非复用 VOID 阶——它是**叠加色**不是描边色，改了会连带影响
+ * 全部墨兽的辨识度，必须与普通棋子的蓝族拉开可见差异。
+ */
+export const MONSTER_WASH = 0x3a5686;
+export const MONSTER_WASH_ALPHA = 0.38;
+
 // ── 酡橙：灼烧 / 熔炼。朱砂与旧金之间的火色，哑光 ──
 export const EMBER = {
   deep: 0x7a4520,

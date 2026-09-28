@@ -15,11 +15,13 @@ const SEED = 20260829;
 
 function run(round: number): void {
   const m = new Match(SEED);
-  // 快进到目标回合
+  // 快进到目标回合。配对一律取 beginRound 的产物（this.pairings）：
+  // 回合开始的原生成已把本轮交手写入双方 opponents 并消费过洗牌流，
+  // 再调一次 makePairings() 会双记交手史、二次消费 rng（见 match.ts 该函数注释）。
   while (m.round < round - 1) {
     m.beginRound();
     if (m.isBeastRound()) {
-      for (const pair of m.makePairings()) {
+      for (const pair of m.pairings) {
         m.applyBattleResult(pair, m.runBattleHeadless(pair));
       }
     }
@@ -28,7 +30,7 @@ function run(round: number): void {
   }
   m.beginRound();
 
-  const pairings = m.makePairings();
+  const pairings = m.pairings;
   const isBeast = m.isBeastRound();
   console.log(`\n── 回合 ${m.round}　${isBeast ? '墨獸輪' : 'PvP 輪'}　配对 ${pairings.length} 场`);
 

@@ -149,8 +149,9 @@ const S = (
 
 /**
  * 64 名棋子。费用分布 14/14/14/12/10。
- * 每个棋子同时归属 1 条地域羁绊 + 1 条职业羁绊；地域×职业组合允许复用
- * （70 个组合摊 64 张卡，复用是扩军后刻意的构筑冗余），唯一性由 id 保证。
+ * 每个棋子同时归属 1 条地域羁绊 + 1 条职业羁绊；地域×职业组合允许复用 ——
+ * 64 张卡实际落在 35 个组合上（29 次复用、35 个组合空置），复用是扩军后
+ * 刻意的构筑冗余，唯一性由 id 保证。
  */
 export const CHAMPIONS: readonly ChampionEntry[] = [
   // ───────────── 一费 ─────────────
@@ -313,7 +314,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'moyu_q',
     skillSpec: {
       kind: 'field', name: '墨狱', target: 'enemyDensest',
-      desc: '在敌人最密集处泼洒墨池，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害，并降低其中敌人 {statusValue} 攻速。',
+      desc: '在敌人最密集处泼洒墨池，持续 {dur} 秒：每秒造成 {dpsSp} 法强的法术伤害，并降低其中敌人 {statusValue} 攻速与移速。',
       params: { dur: 5, dpsSp: 0.62, radius: 1, type: 'magic', status: { kind: 'slow', dur: 5, value: 30 } },
     },
   },
@@ -390,7 +391,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'aoyin_q',
     skillSpec: {
       kind: 'chain', name: '潮生链', target: 'enemyNearest',
-      desc: '水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}），并降低 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '水链在 {jumps} 名敌人间跳跃，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}），并降低 {statusValue} 攻速与移速 {statusDur} 秒。',
       params: { sp: 1.75, jumps: 4, falloff: 0.15, type: 'magic', status: { kind: 'slow', dur: 3, value: 25 } },
     },
   },
@@ -402,8 +403,13 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'budong_q',
     skillSpec: {
       kind: 'selfBuff', name: '不动明王', target: 'self',
-      desc: '结不动印 {dur} 秒：免疫所有伤害与控制，反弹所受伤害的 {reflect}，并每秒对周围 {radius} 格造成 {dpsSp} 法强的法术伤害。',
-      params: { dur: 4, reflect: 0.3, radius: 1, dpsSp: 0.5, type: 'magic', invulnWhileCasting: true },
+      desc: '结不动印 {dur} 秒：免疫所有伤害与控制，并每秒对周围 {radius} 格造成 {dpsSp} 法强的法术伤害。',
+      // 原参数含 reflect: 0.3（"反弹所受伤害的 30%"）—— 该机制与免疫互为否定
+      //（免疫分支在 onDamageTaken 之前短路，锚点又取 invuln），自 v1.9 落地起
+      // 从未触发过一次。以"反弹 30% 原始伤害"接通它会让 6 护卫线 +3.6p、全表
+      // 极差 12.5%→16%，超出 11~13% 验收带；故按"删掉做不到的承诺"收口，
+      // 与假计时条同一裁决口径。要恢复需连带一次全表重平衡。
+      params: { dur: 4, radius: 1, dpsSp: 0.5, type: 'magic', invulnWhileCasting: true },
     },
   },
   {
@@ -466,7 +472,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'qingming_q',
     skillSpec: {
       kind: 'dashStrike', name: '一剑霜寒', target: 'enemyFarthest',
-      desc: '瞬入敌方后排，对 {radius} 格内所有敌人造成 {atk} 攻击力、必定暴击的物理伤害；若造成击杀可再次施放（至多 {maxRepeats} 次）。',
+      desc: '瞬入敌方后排，对 {radius} 格内所有敌人造成 {atk} 攻击力、必定暴击的物理伤害；若造成击杀则回满法力并可再次施放（至多 {maxRepeats} 次）。',
       params: { atk: 2.7, radius: 1, type: 'physical', forceCrit: true, resetOnKill: 1, maxRepeats: 2 },
     },
   },
@@ -529,7 +535,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yunchu_q',
     skillSpec: {
       kind: 'chain', name: '飞杼', target: 'enemyNearest',
-      desc: '掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}）并降低 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '掷出飞杼，在 {jumps} 名敌人间穿引，每次造成 {sp} 法强的法术伤害（每跳衰减 {falloff}）并降低 {statusValue} 攻速与移速 {statusDur} 秒。',
       params: { sp: 1.5, jumps: 3, falloff: 0.15, type: 'magic', status: { kind: 'slow', dur: 2, value: 20 } },
     },
   },
@@ -567,7 +573,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jiuyuan_q',
     skillSpec: {
       kind: 'strike', name: '酹祭', target: 'enemyHighestAtk',
-      desc: '酹酒祭地：对攻击最高的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '酹酒祭地：对攻击最高的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速与移速 {statusDur} 秒。',
       params: { sp: 1.5, type: 'magic', status: { kind: 'slow', dur: 3, value: 25 } },
     },
   },
@@ -591,7 +597,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'hanxing_q',
     skillSpec: {
       kind: 'strike', name: '坠星', target: 'enemyLowestHp',
-      desc: '引寒星坠落：对生命最低的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '引寒星坠落：对生命最低的敌人造成 {sp} 法强的法术伤害，并降低其 {statusValue} 攻速与移速 {statusDur} 秒。',
       params: { sp: 1.9, type: 'magic', status: { kind: 'slow', dur: 2, value: 20 } },
     },
   },
@@ -653,7 +659,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'yaoguang_q',
     skillSpec: {
       kind: 'aoe', name: '星坠', target: 'enemyDensest',
-      desc: '瑶光坠地：{radius} 格内造成 {sp} 法强的法术伤害并降低 {statusValue} 攻速 {statusDur} 秒。',
+      desc: '瑶光坠地：{radius} 格内造成 {sp} 法强的法术伤害并降低 {statusValue} 攻速与移速 {statusDur} 秒。',
       params: { sp: 2.1, radius: 1, type: 'magic', status: { kind: 'slow', dur: 2, value: 25 } },
     },
   },
@@ -816,7 +822,7 @@ export const CHAMPIONS: readonly ChampionEntry[] = [
     skill: 'jingbo_q',
     skillSpec: {
       kind: 'field', name: '鲸落', target: 'enemyDensest',
-      desc: '鲸落成渊：持续 {dur} 秒，{radius} 格内每秒受到 {dpsSp} 法强的法术伤害并降低 {statusValue} 攻速。',
+      desc: '鲸落成渊：持续 {dur} 秒，{radius} 格内每秒受到 {dpsSp} 法强的法术伤害并降低 {statusValue} 攻速与移速。',
       params: { dur: 5, dpsSp: 0.55, radius: 2, type: 'magic', status: { kind: 'slow', dur: 5, value: 30 } },
     },
   },

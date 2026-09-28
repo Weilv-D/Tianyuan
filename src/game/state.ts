@@ -118,12 +118,6 @@ export function localToGlobalRow(team: 0 | 1, localRow: number): number {
   return team === 0 ? ROWS_PER_SIDE - 1 - localRow : ROWS_PER_SIDE + localRow;
 }
 
-/** 全局行号 → 本地行。不属于该半场时返回 -1 */
-export function globalToLocalRow(team: 0 | 1, globalRow: number): number {
-  if (team === 0) return globalRow >= 0 && globalRow < ROWS_PER_SIDE ? ROWS_PER_SIDE - 1 - globalRow : -1;
-  return globalRow >= ROWS_PER_SIDE && globalRow < ROWS_PER_SIDE * 2 ? globalRow - ROWS_PER_SIDE : -1;
-}
-
 export function boardIdx(col: number, localRow: number): number {
   return localRow * BOARD_COLS + col;
 }
@@ -270,24 +264,6 @@ export function addToBench(p: PlayerState, u: UnitInstance): number {
     }
   }
   return -1;
-}
-
-export function removeUnit(p: PlayerState, iid: number): UnitInstance | null {
-  for (let i = 0; i < p.board.length; i++) {
-    if (p.board[i] && p.board[i]!.iid === iid) {
-      const u = p.board[i];
-      p.board[i] = null;
-      return u;
-    }
-  }
-  for (let i = 0; i < p.bench.length; i++) {
-    if (p.bench[i] && p.bench[i]!.iid === iid) {
-      const u = p.bench[i];
-      p.bench[i] = null;
-      return u;
-    }
-  }
-  return null;
 }
 
 export function findUnit(p: PlayerState, iid: number): UnitInstance | null {

@@ -19,7 +19,6 @@ function playedMatch(): Match {
   match.beginRound();
   match.human.gold = 42;
   match.human.hp = 66;
-  match.humanRank = 3;
   match.human.board[0] = createUnit('pan');
   return match;
 }

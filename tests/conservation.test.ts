@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BENCH_SLOTS } from '../src/core/config';
 import { CHAMPIONS } from '../src/data/champions';
 import { autoArrange } from '../src/game/arrange';
-import { unequipItem } from '../src/game/inventory';
+import { equipItem, unequipItem } from '../src/game/inventory';
 import { Match } from '../src/game/match';
 import { CardPool } from '../src/game/pool';
 import {
@@ -295,5 +295,58 @@ describe('玩家资产守恒', () => {
     expect(r3.ok).toBe(true);
     expect(player.items).toHaveLength(10);
     expect(player.bench[0]?.items).toEqual([]);
+  });
+
+  it('拖拽装配：组件遇身上组件即自动合成，两件变一件且器匣同步少一件', () => {
+    const match = new Match(20260905, '测试', 'normal');
+    const player = match.human;
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    const u = createUnit('pan');
+    player.bench[0] = u;
+    player.items = ['lingzhu', 'moren'];
+
+    // 先装灵珠，再拖墨刃上去 → 自动合成贯日枪
+    expect(equipItem(player, u.iid, 'lingzhu').ok).toBe(true);
+    const r = equipItem(player, u.iid, 'moren');
+
+    expect(r.ok).toBe(true);
+    expect(r.combined).toBe('guanri');
+    expect(u.items).toEqual(['guanri']); // 两件变一件，不是并存
+    expect(player.items).toEqual([]); // 两件都从器匣扣除，不凭空多发
+  });
+
+  it('拖拽装配：单棋子至多 3 件，第 4 件被拒绝且器匣不变', () => {
+    const match = new Match(20260905, '测试', 'normal');
+    const player = match.human;
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    const u = createUnit('pan');
+    player.bench[0] = u;
+    // 三件互不相同的成品（不会再触发自动合成）
+    u.items = ['duanhun', 'pojia', 'xueyin'];
+    player.items = ['hunyuan'];
+
+    const r = equipItem(player, u.iid, 'hunyuan');
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/装满/);
+    expect(u.items).toHaveLength(3);
+    expect(player.items).toEqual(['hunyuan']); // 拒绝路径不吞装备
+  });
+
+  it('拖拽装配：墨兽不吃装备，未知装备与不在器匣的装备一律拒绝', () => {
+    const match = new Match(20260905, '测试', 'normal');
+    const player = match.human;
+    player.board = emptyBoard();
+    player.bench = emptyBench();
+    const beast = createUnit('pan');
+    beast.isBeast = true;
+    player.bench[0] = beast;
+    player.items = ['moren'];
+
+    expect(equipItem(player, beast.iid, 'moren').ok).toBe(false);
+    expect(equipItem(player, beast.iid, 'not-an-item').ok).toBe(false);
+    expect(player.items).toEqual(['moren']);
   });
 });

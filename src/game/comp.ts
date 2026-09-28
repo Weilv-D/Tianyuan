@@ -1,8 +1,8 @@
-import { BOARD_COLS } from '../core/config';
+import { BOARD_COLS, ROWS_PER_SIDE } from '../core/config';
 import { CHAMPION_BY_ID } from '../data/champions';
 import { TRAIT_BY_ID } from '../data/traits';
 import { assignItems } from './inventory';
-import { UNIT_DEPTH, centerOutColumns } from './state';
+import { BOARD_CELLS, UNIT_DEPTH, centerOutColumns, localToGlobalRow } from './state';
 import type { BattleUnitInput, Cell, Star } from '../core/types';
 
 /**
@@ -38,11 +38,13 @@ export function computeTraits(defIds: readonly string[]): { id: string; count: n
  * @param team 0 = 上半场（前排在第 3 行），1 = 下半场（前排在第 4 行）
  */
 export function autoPlace(defIds: readonly string[], team: 0 | 1): Map<string, Cell> {
-  const rows = team === 0 ? [3, 2, 1, 0] : [4, 5, 6, 7];
+  // 全局行号由 state.localToGlobalRow 推导（半场行数的唯一真源），
+  // 不再本地硬编码 [3,2,1,0]/[4,5,6,7] —— 半场行数一改，两处必然分叉
+  const rows = Array.from({ length: ROWS_PER_SIDE }, (_, i) => localToGlobalRow(team, i));
   // 容量钳制：棋盘只有 4×8=32 格。合法调用方（预设 7~9 人、玩家场上上限）
   // 远够不着；此前超发（如调试注入）会走到行尾 throw —— 异常直接进 Phaser
   // 帧回调，页面冻结。截断到容量，超出的棋子由调用方的兜底落格处理。
-  const CAP = 4 * BOARD_COLS;
+  const CAP = BOARD_CELLS;
   const sorted = [...defIds].sort((a, b) => {
     const ea = CHAMPION_BY_ID[a];
     const eb = CHAMPION_BY_ID[b];

@@ -29,7 +29,7 @@ import { BoardBake } from '../game/BoardBake';
 import { SceneRefresh } from '../game/SceneRefresh';
 import { absoluteItemIndex, clampItemPage } from '../game/itemPaging';
 import { AdventurePanel } from '../game/AdventurePanel';
-import { PauseScoutOverlay } from '../game/PauseScoutOverlay';
+import { ScoutOverlay } from '../game/ScoutOverlay';
 import { TraitMembersCard } from '../game/TraitMembersCard';
 import { RoundResultOverlay } from '../game/RoundResultOverlay';
 import { EliminatedOverlay } from '../game/EliminatedOverlay';
@@ -85,7 +85,7 @@ export class GameScene extends Phaser.Scene {
   boardBake!: BoardBake;
   refresher!: SceneRefresh;
   adventure!: AdventurePanel;
-  pauseScout!: PauseScoutOverlay;
+  scout!: ScoutOverlay;
   /** 点击左轨徽章钉住的羁绊成员卡（悬停效果笺之外的第二交互层） */
   traitMembers!: TraitMembersCard;
   roundResult!: RoundResultOverlay;
@@ -95,8 +95,6 @@ export class GameScene extends Phaser.Scene {
   match!: Match;
   phase: 'prep' | 'battle' | 'over' = 'prep';
   busy = false;
-  /** 准备阶段暂停（只冻结倒计时，操作仍可用：给玩家无限思考时间） */
-  paused = false;
   undoStack: UndoEntry[] = [];
   lastReport = '';
   /** 器匣里点选中的装备（点一下选中，再点棋子装上） */
@@ -144,7 +142,6 @@ export class GameScene extends Phaser.Scene {
     // （UI 控件/签名守卫/奇遇/拖拽状态随下方模块按局重建，等价于原先的逐字段复位。）
     this.undoStack = [];
     this.toast = null;
-    this.paused = false;
     this.selectedItem = null;
     this.itemPage = 0;
     this.unloadMode = false;
@@ -160,7 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.boardBake = new BoardBake(this);
     this.refresher = new SceneRefresh(this);
     this.adventure = new AdventurePanel(this);
-    this.pauseScout = new PauseScoutOverlay(this);
+    this.scout = new ScoutOverlay(this);
     this.traitMembers = new TraitMembersCard(this);
     this.roundResult = new RoundResultOverlay(this);
     this.eliminated = new EliminatedOverlay(this);
@@ -265,12 +262,9 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  override update(_time: number, delta: number): void {
-    void _time;
-    void delta;
-    // 备战不设倒计时（玩家公测反馈）：思考时间无限，开战完全由玩家手动
-    // （「开战」按钮 / 空格）。update 无每帧工作，保留空实现以备后续需求。
-  }
+  // 备战阶段无每帧工作（无倒计时、开战完全由玩家手动），因此不重写 update() ——
+  // Phaser 的 Scene.update 是可选钩子，留一个每帧被调用的空实现只会让读者以为
+  // 主循环里藏着状态推进（并掩盖"没有可冻结对象"这一事实）。
 
   // ══════════════ 器匣点选 ══════════════
 
@@ -725,8 +719,7 @@ export class GameScene extends Phaser.Scene {
   startBattlePhase(): void {
     if (this.busy || this.phase !== 'prep') return;
     this.exitUnloadMode();
-    this.pauseScout.setPaused(false);
-    this.pauseScout.closeScout();
+    this.scout.closeScout();
     this.traitMembers.close(); // 成员卡/悬停笺在战斗演出页无意义，随开战收起
     this.inputCtl.cancelDrag(); // 阵容锁定：拖拽残影与选中态随开战一并中止
     this.busy = true;

@@ -148,5 +148,7 @@ console.log(`\n  包贡献均值 ${(avg(pkgRows) * 100).toFixed(1)}p（>0 = 天�
 console.log(`  当前包：hp ×${LEGEND_T3.hpMult} · power ×${LEGEND_T3.powerMult} · skill ×${LEGEND_T3.skillMult} · 盾 ${(LEGEND_T3.startShieldPct * 100).toFixed(0)}% · 吸血 ${(LEGEND_T3.omnivamp * 100).toFixed(0)}%`);
 
 const dt = (Date.now() - t0) / 1000;
-const games = (PRESET_COMPS.length * 2 + pkgRows.length * 2) * N * 2;
+// 口径 1：每套预设各一次 pairedWinRate；口径 2：只有含五费的预设各两次（包开/包关）。
+// 每次调用 = N 种子 × 2 局镜像 —— 此前把口径 1 又乘了一次 2，总数虚高 N*2*2 局
+const games = (PRESET_COMPS.length + pkgRows.length * 2) * N * 2;
 console.log(`\n共约 ${games} 局，耗时 ${dt.toFixed(1)}s（${Math.round(games / dt)} 局/秒）`);

@@ -715,7 +715,7 @@ export const TRAIT_IMPL: Record<string, TraitImpl> = {
   support: ({ api, members, teamUnits }) => {
     const t = tuner('support');
     const tier = members[0].trait.tier['support'] ?? 0;
-    // 二档起全队受益 —— 这是丹师作为"团队支援职业"的定位
+    // 一档起全队受益（regen 对 teamUnits 全体生效，与 effectText 首档文案一致）
     for (const u of teamUnits) u.trait.hpRegenPctPerSec += t('regen', 0.012);
     if (tier >= 1) {
       for (const u of members) {

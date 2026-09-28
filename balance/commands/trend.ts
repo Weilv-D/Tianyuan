@@ -8,7 +8,7 @@
  * 用法：balance trend [k] [--command matrix|sweep]   （k = 看最近几次 run，默认 8）
  */
 import { Store } from '../lib/store';
-import { requirePositiveInt } from '../lib/args';
+import { requirePositiveInt, requireValue } from '../lib/args';
 
 interface Summary {
   comps?: string[];
@@ -19,8 +19,12 @@ interface Summary {
 
 export async function run(argv: string[]): Promise<void> {
   const cmdIdx = argv.indexOf('--command');
-  const command = cmdIdx >= 0 ? (argv[cmdIdx + 1] ?? 'matrix') : 'matrix';
-  const posN = argv.find((a) => !a.startsWith('--') && /^\d+$/.test(a));
+  const command = cmdIdx >= 0 ? requireValue(argv, cmdIdx + 1, 'command') : 'matrix';
+  // 位置参数（看最近几次 run）同样要排除 --command 的取值，否则 `--command matrix 5`
+  // 会把 'matrix' 当次数解析失败，或把 5 当命令名去查库
+  const valuedIdx = new Set<number>();
+  if (cmdIdx >= 0) valuedIdx.add(cmdIdx + 1);
+  const posN = argv.find((a, i) => !valuedIdx.has(i) && !a.startsWith('--') && /^\d+$/.test(a));
   const k = requirePositiveInt(posN, '次数', 8);
 
   const store = new Store();
@@ -60,7 +64,9 @@ export async function run(argv: string[]): Promise<void> {
       for (const name of roster) {
         const ia = (a.comps ?? []).indexOf(name);
         const ib = (b.comps ?? []).indexOf(name);
-        if (ia < 0 || ib < 0 || !a.winRate?.[ia] || b.winRate?.[ib] === undefined) continue;
+        // 0 是合法胜率（全负），只有 undefined 才算缺席：用真值判断会把 0%
+        // 那一行静默漏掉，读者以为该阵容不存在
+        if (ia < 0 || ib < 0 || a.winRate?.[ia] === undefined || b.winRate?.[ib] === undefined) continue;
         const d = b.winRate[ib] - a.winRate[ia];
         console.log(`  ${short(name).padEnd(8)} ${(a.winRate[ia] * 100).toFixed(1)}% → ${(b.winRate[ib] * 100).toFixed(1)}%   Δ${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}p`);
       }

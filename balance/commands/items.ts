@@ -17,7 +17,7 @@ import { ITEMS } from '../../src/data/items';
 import { PRESET_COMPS } from '../../src/game/comp';
 import { pairedItemsDelta } from '../lib/engine';
 import { runPool, defaultWorkers, WORKERS_CAP } from '../lib/pool';
-import { requirePositiveInt } from '../lib/args';
+import { requirePositiveInt, requireValue } from '../lib/args';
 import { Store } from '../lib/store';
 
 const CURVE_ITEMS = ['duanhun', 'pojia', 'xueyin'];
@@ -32,10 +32,20 @@ export async function run(argv: string[]): Promise<void> {
     const unknown = ONLY.filter((id) => !ITEMS.some((it) => it.id === id));
     if (unknown.length > 0) throw new Error(`--ids 引用不存在的装备：${unknown.join('、')}`);
   }
-  const posN = argv.find((a) => !a.startsWith('--') && /^\d+$/.test(a));
+  // 位置参数（每格种子数）必须排除「有值旗标的取值」：`--workers 8` 的 `8` 同样
+  // 是"非 -- 开头且全数字"，按裸 find 抓取会把采样量从 16 悄悄改成 8
+  //（总局数腰斩、噪声带放宽，且入库的 nPerPair 也随之失真）。
+  const valuedIdx = new Set<number>();
+  for (const [name, takesValue] of [['workers', true], ['comps', true]] as const) {
+    const i = argv.indexOf(`--${name}`);
+    if (takesValue && i >= 0) valuedIdx.add(i + 1);
+  }
+  const posN = argv.find((a, i) => !valuedIdx.has(i) && !a.startsWith('--') && /^\d+$/.test(a));
   const n = requirePositiveInt(posN, '每格种子数', 16);
   const workersIdx = argv.indexOf('--workers');
-  const workers = argv.includes('--serial') ? 0 : Math.min(requirePositiveInt(workersIdx >= 0 ? argv[workersIdx + 1] : undefined, '并行度', defaultWorkers()), WORKERS_CAP);
+  const workers = argv.includes('--serial')
+    ? 0
+    : Math.min(requirePositiveInt(workersIdx >= 0 ? requireValue(argv, workersIdx + 1, 'workers') : undefined, '并行度', defaultWorkers()), WORKERS_CAP);
   const save = !argv.includes('--no-save');
 
   const COMPS = PRESET_COMPS.length;

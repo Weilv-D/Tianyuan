@@ -484,7 +484,9 @@ export class Battle implements BattleApi {
     if (raw <= 0) return 0;
     const source = opts.source ?? 'skill';
 
-    // 无敌
+    // 无敌：在数值与随机结算之前短路（不掷暴击骰、不进抗性/减伤链）。
+    // 注意短路早于一切钩子 —— onDamageTaken / onIncomingDamage 在免疫窗内都不会
+    // 触发，因此"免疫期间按所受伤害反弹"这类机制在此窗口内不可实现。
     if (dst.statuses.some((s) => s.kind === 'invuln')) {
       if (!opts.silent) {
         this.emit({
@@ -1278,6 +1280,10 @@ export class Battle implements BattleApi {
       if (z.status) {
         const src = this.unitByUid(z.srcUid);
         if (src) {
+          // 每 0.5 秒对范围内敌人**重施整段时长**（不是按剩余寿命截断）：领域内
+          // 的减速/减益因此会延续到领域消失之后（最多 status.dur），这是自
+          // v1.9 起的既定口径 —— 全表平衡断面按此调平，截断会让法爆/幽冥
+          // 两条阵容线整体塌 3~6 个百分点（实测 极差 12.5%→20.9%）。
           for (const e of this.unitsInRadius(z.cell, z.radius)) {
             if (e.team === z.team) continue;
             this.addStatus(src, e, z.status.kind, z.status.dur, z.status.value);

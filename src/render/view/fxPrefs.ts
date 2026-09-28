@@ -34,11 +34,14 @@ function load(): FxPrefs {
   }
 }
 
-function persist(): void {
+function persist(): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(current));
+    return true;
   } catch {
-    /* 忽略 */
+    // 隐私模式 / 配额满：偏好只在内存里生效，刷新即丢。返回值交给设置面板提示 ——
+    // 与 game/save.savePrefs 的契约一致（面板里 7 个开关的失败可见性不能分两套）
+    return false;
   }
 }
 
@@ -49,10 +52,10 @@ export const fxPrefs = {
   get shake(): ShakeStrength {
     return current.shake;
   },
-  /** 逐项设置并立即落盘（设置面板点击即生效） */
-  set(patch: Partial<FxPrefs>): void {
+  /** 逐项设置并立即落盘（设置面板点击即生效）；返回是否写入成功 */
+  set(patch: Partial<FxPrefs>): boolean {
     current = { ...current, ...patch };
-    persist();
+    return persist();
   },
 };
 

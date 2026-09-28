@@ -31,11 +31,26 @@ export interface SettingsPanelHost {
 export class SettingsPanel {
   private panel: Phaser.GameObjects.Container | null = null;
   private resignArmed = false;
+  /** fx 偏好落盘失败已提示过（同一面板会话只喊一次，避免连点刷屏） */
+  private fxWarned = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly host: SettingsPanelHost,
   ) {}
+
+  /**
+   * 演出偏好（独立键 inkarena.fx.v1）落盘。失败必须与主偏好档同口径喊出来 ——
+   * 此前静默吞错：隐私模式/配额满时点「伤害数字 关」，面板文案立刻变、刷新后
+   * 又变回开，玩家无从得知调整没保存。
+   */
+  private persistFx(patch: { damageText?: boolean; shake?: ShakeStrength }): void {
+    if (fxPrefs.set(patch)) return;
+    if (this.fxWarned) return;
+    this.fxWarned = true;
+    console.warn('[settings] 演出偏好写入失败（隐私模式或存储配额已满），本次调整在刷新后不会保留');
+    this.host.onPrefsSaveFailed?.();
+  }
 
   get isOpen(): boolean {
     return this.panel !== null;
@@ -69,31 +84,18 @@ export class SettingsPanel {
     const { prefs } = this.host;
     const panel = scene.add.container(0, 0).setDepth(900);
     this.panel = panel;
-    const shade = scene.add.graphics();
-    shade.fillStyle(SHADE, 0.7);
-    shade.fillRect(0, 0, W, H);
-    shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
-    shade.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      const { x: wx, y: wy } = screenToWorld(p.x, p.y, scene.cameras.main.zoom);
-      if (wx < bxForShade || wx > bxForShade + bw || wy < byForShade || wy > byForShade + bhForShade) this.close();
-    });
-    panel.add(shade);
 
-    // 面板高度由内容行推导（行高表：标题带 76 + 三滑杆 66×3 + 三个开关行 60×3
-    // + 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 20）。页脚贴着内容流排布，
-    // 不再用 bh 固定偏移 —— 此前「关闭」钮与快捷键/署名两行重叠的根源就是两者
-    // 各算各的坐标，行数一变就撞车。
-    const bw = 440;
-    const inMatch = !!this.host.inMatch;
-    const bhForShade = 76 + 66 * 3 + 60 * 5 + (inMatch ? 58 : 0) + 42 + 14 + 22 + 34;
-    const bxForShade = (W - bw) / 2;
-    const byForShade = (H - bhForShade) / 2;
+    // 面板几何：**一次推导、两处消费**（遮罩命中区与绘制框）。此前遮罩侧另写
+    // 一份 bhForShade 公式（且注释还停在"三个开关行"），新增一行只改一侧就会
+    // 让"点面板外关闭"的矩形与实际面板错位：内侧一条带误关、外侧一条带点不动。
     // 行高表：标题带 76 + 三滑杆 66×3 + 五个开关行 60×5（静音与自动上场同占一行）
     // + 对局行 58 + 关闭钮 42 + 页脚 58 + 底衬 34。
     // 页脚贴着内容流排布，不再用 bh 固定偏移 —— 此前「关闭」钮与快捷键/署名两行
     // 重叠的根源就是两者各算各的坐标，行数一变就撞车。
     // 历史事故：此处曾按 60×6 计（静音/自动被当成两行），页脚与面板底比实际内容
     // 低挂 60px，面板底部长出一段空档。
+    const bw = 440;
+    const inMatch = !!this.host.inMatch;
     const closeRel = 76 + 66 * 3 + 60 * 5 + (inMatch ? 58 : 0);
     const hotkeyRel = closeRel + 42 + 14;
     const creditRel = hotkeyRel + 22;
@@ -102,6 +104,16 @@ export class SettingsPanel {
     const bh = creditRel + 34;
     const bx = (W - bw) / 2;
     const by = (H - bh) / 2;
+
+    const shade = scene.add.graphics();
+    shade.fillStyle(SHADE, 0.7);
+    shade.fillRect(0, 0, W, H);
+    shade.setInteractive(new Phaser.Geom.Rectangle(0, 0, W, H), Phaser.Geom.Rectangle.Contains);
+    shade.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      const { x: wx, y: wy } = screenToWorld(p.x, p.y, scene.cameras.main.zoom);
+      if (wx < bx || wx > bx + bw || wy < by || wy > by + bh) this.close();
+    });
+    panel.add(shade);
 
     const g = scene.add.graphics();
     g.fillStyle(INK[800], 0.98);
@@ -258,7 +270,7 @@ export class SettingsPanel {
 
     // 演出偏好（独立 fxPrefs 键，与对局偏好档分离）：伤害飘字开关
     const dmgBtn = new Button(scene, bx + 34, y + 6, fxPrefs.damageText ? '伤害数字 开' : '伤害数字 关', () => {
-      fxPrefs.set({ damageText: !fxPrefs.damageText });
+      this.persistFx({ damageText: !fxPrefs.damageText });
       dmgBtn.setText(fxPrefs.damageText ? '伤害数字 开' : '伤害数字 关');
     }, { width: 150, height: 40 });
     panel.add(dmgBtn);
@@ -283,7 +295,7 @@ export class SettingsPanel {
     let shakeIdx = shakeOrder.indexOf(fxPrefs.shake);
     const shakeBtn = new Button(scene, bx + 34, y + 6, shakeLabels[fxPrefs.shake], () => {
       shakeIdx = (shakeIdx + 1) % shakeOrder.length;
-      fxPrefs.set({ shake: shakeOrder[shakeIdx] });
+      this.persistFx({ shake: shakeOrder[shakeIdx] });
       shakeBtn.setText(shakeLabels[shakeOrder[shakeIdx]]);
     }, { width: 150, height: 40 });
     panel.add(shakeBtn);

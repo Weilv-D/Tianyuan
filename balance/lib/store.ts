@@ -161,14 +161,22 @@ export class Store {
     // 崩掉会留下永远不进 recentRuns 的孤儿行。查询面已过滤（读数不受污染），
     // 这里负责不让死行只进不出地堆积。外键无级联（旧库 DDL 已定型），
     // 按子表 → configs → runs 顺序显式删除。
+    //
+    // 年龄阈值是并发安全的前提：summary_json 为空**不能**证明进程已死 ——
+    // 一个正在跑的 matrix（分钟级）在 finishRun 之前始终是空 summary，
+    // 若在此被清理，另一条会话的 addPairs 会撞外键（数分钟算力作废），
+    // 或 finishRun 命中 0 行而静默"入库成功"。超过阈值仍未收尾的 run 只可能
+    // 是崩掉的进程（现役最慢命令为分钟级），此时清理才是安全的。
+    const ORPHAN_AGE_MS = 6 * 60 * 60 * 1000;
+    const cutoff = new Date(Date.now() - ORPHAN_AGE_MS).toISOString();
     try {
       this.db.exec(`
-        DELETE FROM pair_results  WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
-        DELETE FROM unit_stats    WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
-        DELETE FROM item_results  WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
-        DELETE FROM trait_results WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
-        DELETE FROM configs       WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL);
-        DELETE FROM runs          WHERE summary_json IS NULL;
+        DELETE FROM pair_results  WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL AND started_at < '${cutoff}');
+        DELETE FROM unit_stats    WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL AND started_at < '${cutoff}');
+        DELETE FROM item_results  WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL AND started_at < '${cutoff}');
+        DELETE FROM trait_results WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL AND started_at < '${cutoff}');
+        DELETE FROM configs       WHERE run_id IN (SELECT id FROM runs WHERE summary_json IS NULL AND started_at < '${cutoff}');
+        DELETE FROM runs          WHERE summary_json IS NULL AND started_at < '${cutoff}';
       `);
     } catch {
       // 清理失败不阻塞使用（只读路径本就过滤孤儿行）
@@ -242,8 +250,14 @@ export class Store {
   }
 
   finishRun(runId: number, summary: unknown): void {
-    this.db.prepare('UPDATE runs SET finished_at = ?, summary_json = ? WHERE id = ?')
-      .run(new Date().toISOString(), JSON.stringify(summary ?? {}), runId);
+    const info = this.db
+      .prepare('UPDATE runs SET finished_at = ?, summary_json = ? WHERE id = ?')
+      .run(new Date().toISOString(), JSON.stringify(summary ?? {}), runId) as { changes: number | bigint };
+    // 影响行数为 0 = 这条 run 已不存在（被并发清理或 id 传错）。此前静默成功，
+    // 命令照常打印「已入库 run #N」，而库里根本没有它 —— 数据静默丢失。
+    if (Number(info.changes) !== 1) {
+      throw new Error(`工件库写入失败：run #${runId} 不存在（可能被并发清理），本次结果未入库`);
+    }
   }
 
   // ── 查询面 ────────────────────────────────────────────

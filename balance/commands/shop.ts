@@ -28,6 +28,9 @@ for (const a of args) {
   const m = /^--t(\d)=(.+)$/.exec(a);
   if (m) {
     const lv = Number(m[1]);
+    // 等级越界（0 或 >9）此前恒不命中 `i === lv - 1` 且不报错：改动被静默丢弃，
+    // 用户据此得出"概率表改动无感"的结论
+    if (lv < 1 || lv > table.length) throw new Error(`--t<等级> 的等级须在 1~${table.length}，收到：${a}`);
     const row = m[2].split(',').map(Number);
     if (row.length !== 5 || row.some((x) => !Number.isFinite(x) || x < 0) || row.reduce((sum, x) => sum + x, 0) !== 100) {
       throw new Error(`行格式错误（需要 5 个非负数且合计 100）：${a}`);
@@ -114,9 +117,18 @@ for (const g of GOALS) {
 
 // ── 3. 可选：整局配对臂（与 sim:match 同种子调度）──────
 if (args.some((a) => a.startsWith('--match'))) {
+  // 只认 `--match=N` 且必须验型：`--match=abc` 会让 N=NaN、循环一次不跑、
+  // 全程打印 NaN 却以退出码 0 结束；`--match 500`（空格形态）此前静默按 200 跑。
+  // 两种写法都收，值不合法即抛 —— 与同文件 `--n` 的严格口径一致。
+  const withEq = args.find((a) => a.startsWith('--match='));
+  const spaceIdx = args.indexOf('--match');
+  const raw = withEq !== undefined ? withEq.slice('--match='.length) : spaceIdx >= 0 ? args[spaceIdx + 1] : undefined;
+  const N = Number(raw ?? 200);
+  if (!Number.isInteger(N) || N <= 0) {
+    throw new Error(`--match 必须是正整数（写法 --match=N），收到：${raw ?? '（缺值）'}`);
+  }
   const { Match } = await import('../../src/game/match');
   const { aiTakeTurn, chooseAdventureIndex, makeProfile } = await import('../../src/game/ai');
-  const N = Number(args.find((a) => a.startsWith('--match='))?.slice(8) ?? 200);
   // AI 档位在线覆盖：--prof=hyperroll:rollFloor=12,mergeBias=3.2（可多次出现）。
   // 只允许数字档位键 —— 名单/偏好是数组，不属于 A/B 通道。
   const PROF_KEYS = new Set(['rollFloor', 'aggression', 'levelPace', 'levelCap', 'mergeBias', 'noise']);

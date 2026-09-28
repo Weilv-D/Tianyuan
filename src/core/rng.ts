@@ -121,12 +121,3 @@ export function hashSeed(str: string): number {
   }
   return h >>> 0;
 }
-
-/** 快速非加密哈希，用于校验战斗事件流是否一致 */
-export function hashNumbers(nums: readonly number[]): number {
-  let h = 17 >>> 0;
-  for (let i = 0; i < nums.length; i++) {
-    h = (h * 31 + (nums[i] | 0)) >>> 0;
-  }
-  return h >>> 0;
-}

@@ -26,8 +26,8 @@
 | `package.json` | `version` | 发布脚本（zip 命名、使用说明） |
 | `docs/CHANGELOG.md` | 顶部条目 | 人类可读的发布历史 |
 
-`npm run release` 在构建前自动校验前两者的字面一致，避免界面与压缩包错版；发布者同时确认
-CHANGELOG 顶部条目记录相同版本。只有三者齐备才是锁版状态，不宣称脚本自动理解发布文案。
+`npm run release` 在构建前自动校验**三处**的字面一致（`src/version.ts` / `package.json` /
+CHANGELOG 顶部条目），避免界面与压缩包错版；只有三者齐备才是锁版状态，脚本不理解发布文案本身。
 
 ## 3. 发布流程
 
@@ -43,8 +43,9 @@ npm run release          # 2. 重跑关键门禁 + 依赖/资源审计 + 双形�
 2. **确定性回归**：任何影响战斗内核的改动（`core/`、`data/`、涉及 rng 消费顺序的
    `game/` 改动）落地后跑 `npm test`，确认真实阵容同 seed 可重演；不维护会随正常
    平衡调整整体漂移的逐字段金快照。
-3. **平衡断面**：改了 `data/` 数值或超时/裁定口径，必须重跑 `npm run sim` 并把
-   新极差/先手写回 DESIGN §十二（README 不承载平衡断面，真源唯一在 DESIGN）。
+3. **平衡断面**：改了 `data/` 数值或超时/裁定口径，必须重跑 `npm run balance -- matrix`
+   并把新极差/先手写回 DESIGN §十二（README 不承载平衡断面，真源唯一在 DESIGN）。
+   带旗标时写 `npm run balance -- -- matrix 200 --seed S`（第二个 `--` 不可省）。
 4. **文档同步先于锁版**：CHANGELOG 新条目与本次变化涉及的设计、操作、视觉或发布真源
    一次改齐，不把实时测试数和包体复制到多个活文档。
 5. `npm run release -- --skip-typecheck` 是并行线未收敛时的逃生门：跳过整仓类型检查
@@ -70,7 +71,7 @@ npm run release          # 2. 重跑关键门禁 + 依赖/资源审计 + 双形�
 | 版本号 | `src/version.ts` + `package.json` + CHANGELOG 顶部 |
 | 测试策略/风险覆盖 | QA.md §5 |
 | 数值与平衡 | DESIGN §十二 |
-| 视觉/布局规格 | ART_BIBLE（代码镜像：`palette.ts` / `kit.ts`） |
+| 视觉/布局规格 | ART_BIBLE（代码镜像：`palette.ts` / `kit.ts` / `hudLayout.ts` / `unitLayout.ts`） |
 | 操作/打包/产物 | README 对应节 |
 | 发布流程变更 | 本文（VERSIONING.md） |
 

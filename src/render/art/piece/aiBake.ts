@@ -1,4 +1,4 @@
-import { GILT, MOON, css } from '../../view/palette';
+import { GILT, MONSTER_WASH, MONSTER_WASH_ALPHA, MOON, css } from '../../view/palette';
 import { AI_PIECE_URL as AI_PIECE_URL_MAP } from './aiSource';
 
 /**
@@ -151,7 +151,7 @@ export function drawAiPiece(
     if (tc) {
       tc.drawImage(img, sx, sy, sw, sh, 0, 0, t.width, t.height);
       tc.globalCompositeOperation = 'source-atop';
-      tc.fillStyle = 'rgba(58,86,134,0.38)';
+      tc.fillStyle = css(MONSTER_WASH, MONSTER_WASH_ALPHA);
       tc.fillRect(0, 0, t.width, t.height);
       art = t;
       ax = 0;

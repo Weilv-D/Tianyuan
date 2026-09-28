@@ -86,7 +86,7 @@ export class InputController {
       s.settingsPanel?.isOpen ||
       s.debug.isOpen ||
       s.hud.traitModalOpen ||
-      s.pauseScout.scoutPanel ||
+      s.scout.scoutPanel ||
       s.traitMembers.isOpen ||
       // 回合结算 / 淘汰两块模态：不进集合的话，遮罩下的 pointermove 仍会
       // 刷出装备提示卡与棋子详情卡，空格也会同时触发场景级快捷键
@@ -403,8 +403,8 @@ export class InputController {
         this.scene.traitMembers.close();
         return;
       }
-      if (this.scene.pauseScout.scoutPanel) {
-        this.scene.pauseScout.closeScout();
+      if (this.scene.scout.scoutPanel) {
+        this.scene.scout.closeScout();
         return;
       }
       if (this.selectedSlot || this.scene.selectedItem || this.scene.unloadMode) {
@@ -414,7 +414,6 @@ export class InputController {
         this.scene.refreshAll();
         return;
       }
-      if (this.scene.phase === 'prep' && !this.scene.busy) this.scene.pauseScout.togglePause();
     });
   }
 

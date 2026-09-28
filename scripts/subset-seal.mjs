@@ -35,6 +35,12 @@ for (const ch of CHARS) {
 // 单字子集小于 ~200 字节视为无该字形（空 cmap）
 const missing = probe.filter(([, n]) => n < 200).map(([c]) => c);
 const present = [...CHARS].filter((c) => !missing.includes(c));
+// 空集必须中止：subsetFont(ttf, '') 会产出一个无字形的字体并原子覆盖掉仓库里
+// 可用的 seal.woff2，开屏「天」与全部羁绊小篆图标集体空字，而脚本仍以 0 退出
+if (present.length === 0) {
+  console.error(`✗ 源字体不含任何用字（全部 ${CHARS.length} 字缺失）—— 拒绝写出空字体覆盖 ${OUT}`);
+  process.exit(1);
+}
 console.log('字体缺失字形：', missing.length ? missing.join(' ') : `（无，${present.length} 字全覆盖）`);
 console.log('可用字形：', present.join(' '));
 

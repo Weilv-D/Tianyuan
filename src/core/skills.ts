@@ -529,13 +529,18 @@ export const IMPL: Record<string, Impl> = {
   selfBuff: (api, u, spec) => {
     const p = spec.params;
     const dur = p.dur ?? 6;
+    // 本源标识：killRenew 只刷本技能施加的层，不碰外来状态（流星弩 5 秒的
+    // 攻速层、妖族化形 6 秒的 atkUp 曾被狂血的击杀续期一并刷到 8 秒）。
+    const srcTag = `skill:${u.entry.id}`;
     if (p.value) api.addShield(u, u, u.maxHp * p.value, dur);
-    if (p.status) api.addStatus(u, u, p.status.kind as StatusKind, p.status.dur ?? dur, p.status.value ?? 0);
+    if (p.status) api.addStatus(u, u, p.status.kind as StatusKind, p.status.dur ?? dur, p.status.value ?? 0, srcTag);
     // 双增益（数值随 data 走：p.extraStatus 声明第二段自身状态，如苍嗥的攻击力）
     if (p.extraStatus) {
-      api.addStatus(u, u, p.extraStatus.kind as StatusKind, p.extraStatus.dur ?? dur, p.extraStatus.value ?? 0);
+      api.addStatus(u, u, p.extraStatus.kind as StatusKind, p.extraStatus.dur ?? dur, p.extraStatus.value ?? 0, srcTag);
     }
-    // 击杀续期（data 声明 killRenew 才启用）：把本技能施加的自身状态刷新至满时长。
+    // 击杀续期（data 声明 killRenew 才启用）：把**本技能施加的**自身状态刷新至满时长。
+    // 只刷本源层是硬契约：公输召唤与青禾治疗的"全队攻速"落在同一单位上（src 为空），
+    // 旧实现按 kind 遍历会把它们一并刷到 8 秒 —— 狂血的击杀在替别人的增益续期。
     // 此前按 entry.id === 'canghao' 硬编码，tuning/扫描器覆盖不到。续期回调只注册
     // 一次：闭包体只依赖 u 与 dur，与"第几次施放"无关，注册一次即等价。
     if (p.killRenew && !u.traitStacks['selfBuffKillRenew']) {
@@ -543,7 +548,7 @@ export const IMPL: Record<string, Impl> = {
       u.killHandlers.push((a) => {
         if (!hasStatus(u, 'aspdUp')) return;
         for (const s of u.statuses) {
-          if (s.kind === 'aspdUp' || s.kind === 'atkUp') s.ticks = Math.round(dur * TICK_RATE);
+          if ((s.kind === 'aspdUp' || s.kind === 'atkUp') && s.src === srcTag) s.ticks = Math.round(dur * TICK_RATE);
         }
         a.fx('buffAura', { uid: u.uid, params: { hue: 1 } });
       });
@@ -566,17 +571,20 @@ export const IMPL: Record<string, Impl> = {
         fx: 'groundMark',
       });
     }
-    // 磐 / 不动：反弹所受伤害（noReflect 阻断"反弹的伤害再被反弹"）。
-    // 锚定本次施放附带的增益（不动→免疫 / 磐→护甲）：增益消失后反弹一并结束，"期间反弹"才名副其实
+    // 磐：反弹所受伤害（noReflect 阻断"反弹的伤害再被反弹"）。
+    // 锚定本次施放附带的增益（磐→护甲）：增益消失后反弹一并结束，"期间反弹"才名副其实
     if (p.reflect) {
-      const anchor: StatusKind | undefined = p.invulnWhileCasting
-        ? 'invuln'
-        : (p.status?.kind as StatusKind | undefined);
+      const anchor: StatusKind | undefined = p.status?.kind as StatusKind | undefined;
       // 反弹钩子只注册一次。
       // onDamageTaken 是全场最热的钩子（每一次受击都会遍历），此前每次施放都往
       // 上面追加一个新闭包：过期增益对应的历史闭包虽然会立刻 return，但仍要被
       // 逐个调用，热路径成本随施放次数线性上升。窗口判定本来就由 anchor 状态
       // 在运行时完成（增益过期即 return），与"注册了几份"无关 —— 注册一次即等价。
+      //
+      // 免疫窗（invulnWhileCasting）不走这条：dealDamage 在无敌判定处先于任何结算
+      // 短路返回，onDamageTaken 在免疫窗内永不触发。不动明王曾按此配出"免疫期间
+      // 反弹 30%"，自 v1.9 起 100% 不触发（实测整场 skill 来源输出恒为 0）——
+      // 现按"删掉做不到的承诺"收口（见 champions.ts 该条注释）。
       if (!u.traitStacks['reflectHooked']) {
         u.traitStacks['reflectHooked'] = 1;
         api.hooksOf(u.team).onDamageTaken.push((a, dst, src, amt, type, opts) => {

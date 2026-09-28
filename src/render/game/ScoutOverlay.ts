@@ -1,21 +1,24 @@
-/** 职责：准备阶段的暂停遮罩（冻结倒计时、操作不受限）与对手侦查面板（只读快照）两块覆盖层。 */
+/** 职责：对手侦查覆盖层（只读快照）。 */
 import Phaser from 'phaser';
 import { TRAIT_BY_ID } from '../../data/traits';
 import type { Pairing } from '../../game/match';
 import { FONT, Button } from '../../ui/kit';
 import { UnitPortrait } from '../../ui/cards';
 import { audio } from '../../audio/AudioEngine';
-import { INK, CINNABAR, GILT, PAPER, SHADE, css } from '../view/palette';
+import { INK, CINNABAR, PAPER, SHADE, css } from '../view/palette';
 import { W, H } from '../view/layout';
 import { screenToWorld } from '../view/viewScale';
 import type { GameScene } from '../scenes/GameScene';
 
 /**
- * 暂停/侦查覆盖层（原 GameScene.togglePause/setPaused/showOpponentBoard/closeScout 原样搬移）。
- * paused 标志仍归场景所有（update 主循环读它），本模块经 scene.paused 读写。
+ * 侦查覆盖层（原 PauseScoutOverlay 的侦查半部）。
+ *
+ * 备战阶段没有倒计时，也就没有任何"暂停"语义可冻结 —— 原「暂停」遮罩既不冻结
+ * 逻辑（无计时器可停）、遮罩也不吃指针（棋子照拖、商店照买），却在屏幕上写
+ * 「已暂停」，是恒满计时条同款的假仪表（见 HudPanels 的同类裁决）。因此整块
+ * 暂停功能随本文件移除，只保留真正有内容的对手侦查面板。
  */
-export class PauseScoutOverlay {
-  private pauseOverlay: Phaser.GameObjects.Container | null = null;
+export class ScoutOverlay {
   /** 侦查对手的覆盖层 */
   scoutPanel: Phaser.GameObjects.Container | null = null;
 
@@ -23,45 +26,8 @@ export class PauseScoutOverlay {
     // 容器随场景销毁；模块字段若还指着死引用，overlayOpen 等守卫会被骗。
     // 与 TraitMembersCard/DebugConsole 同款 SHUTDOWN 复位（create 重入前清空）
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.pauseOverlay = null;
       this.scoutPanel = null;
     });
-  }
-
-  /** 准备阶段暂停：只冻结倒计时，操作不受限（单机对 AI，给玩家无限思考时间是纯收益） */
-  togglePause(): void {
-    this.setPaused(!this.scene.paused);
-    audio.play('ui');
-  }
-
-  setPaused(v: boolean): void {
-    this.scene.paused = v;
-    if (this.pauseOverlay) {
-      this.pauseOverlay.destroy();
-      this.pauseOverlay = null;
-    }
-    if (!v) return;
-    const c = this.scene.add.container(0, 0).setDepth(880);
-    const shade = this.scene.add.graphics();
-    shade.fillStyle(SHADE, 0.55);
-    shade.fillRect(0, 0, W, H);
-    c.add(shade);
-    c.add(
-      this.scene.add
-        .text(W / 2, H / 2 - 30, '暂 停', { fontFamily: FONT.title, fontSize: '64px', color: css(PAPER[100]) })
-        .setOrigin(0.5)
-        .setShadow(0, 0, css(GILT.base), 26, false, true)
-    );
-    c.add(
-      this.scene.add
-        .text(W / 2, H / 2 + 40, '已暂停 · ESC 继续', {
-          fontFamily: FONT.body,
-          fontSize: '15px',
-          color: css(PAPER[400]),
-        })
-        .setOrigin(0.5)
-    );
-    this.pauseOverlay = c;
   }
 
   /** 侦查对手：点击计分板行查看其当前棋盘与羁绊（只读快照，不影响任何判定） */

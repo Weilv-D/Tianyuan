@@ -144,14 +144,16 @@ export class SceneRefresh {
 
   private refreshItems(): void {
     const p = this.scene.match.human;
+    const n = p.items.length;
+    // 溢出分页：**先**按当前总数钳页（撤销/合成/卖出后页码可能越界），再按钳后的
+    // 页码渲染芯片。顺序反了会留下"芯片按旧页取件（越界页全空）、控件按新页驱动"
+    // 的错位：器匣看起来是空的，而命中检测已用新页 —— 点那个空槽仍会拖出
+    // items[0] 的真实装备。无溢出时整套控件隐藏（分页只在确有看不见的装备时出现）。
+    this.scene.itemPage = clampItemPage(this.scene.itemPage, n);
     for (let i = 0; i < ITEM_BAR_SLOTS; i++) {
       this.scene.hud.itemChips[i].setItem(this.scene.itemAt(i));
       this.scene.hud.itemChips[i].setAlpha(this.scene.selectedItem && this.scene.selectedItem !== this.scene.itemAt(i) ? 0.55 : 1);
     }
-    const n = p.items.length;
-    // 溢出分页：先按当前总数钳页（撤销/合成/卖出后页码可能越界），再驱动控件。
-    // 无溢出时整套控件隐藏 —— 分页只在"确有看不见的装备"时出现。
-    this.scene.itemPage = clampItemPage(this.scene.itemPage, n);
     // 选中件若已被合成/卖出/撤销消耗（器匣里再无同名 id），就地回落中性态，
     // 避免残留选中让下一次点棋子走进"装上失败"toast
     if (this.scene.selectedItem && !p.items.includes(this.scene.selectedItem)) {
@@ -564,7 +566,7 @@ export class SceneRefresh {
         row.on('pointerdown', () => {
           // 拖拽中第二指点计分板：侦查面板会盖住拖拽现场，先让路
           if (this.scene.inputCtl.dragging) return;
-          this.scene.pauseScout.showOpponentBoard(p.idx);
+          this.scene.scout.showOpponentBoard(p.idx);
         });
       }
       this.scene.hud.scoreContainer.add(row);

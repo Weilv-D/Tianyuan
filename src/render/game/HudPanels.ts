@@ -758,10 +758,10 @@ export class HudPanels {
     const other = pr.a === 0 ? pr.b : pr.a;
     if (other < 0) {
       // 墨影（奇数存活轮的落单对手）：阵容快照可侦查；轮空无对手
-      if (pr.ghost >= 0) this.scene.pauseScout.showGhostBoard(pr);
+      if (pr.ghost >= 0) this.scene.scout.showGhostBoard(pr);
       else this.scene.showToast('本轮轮空 · 无对手');
       return;
     }
-    this.scene.pauseScout.showOpponentBoard(other);
+    this.scene.scout.showOpponentBoard(other);
   }
 }

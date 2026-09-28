@@ -140,6 +140,21 @@ if (!failed) {
     '转码：ffmpeg -af "apad=pad_dur=0.01" -c:a libvorbis -b:a 160k -ar 44100 -ac 2',
     '完整说明见仓库 design/music/CREDITS.md。',
     '',
+    '三、打包的图像与字体资产',
+    '',
+    '本包另含以下随构建打包的媒体资产（DEVELOPMENT §5 要求授权清单覆盖全部打包面）。',
+    '前两类为项目自有资产，篆体子集的源包未附授权文书 —— 如实记录，不以"未记录"代替"已授权"。',
+    '',
+    '资产：64 张棋子立绘（src/render/art/piece/ai/*.png）',
+    '来源：项目自有（AI 生成，切片脚本 scripts/slice-sheet.mjs 从 design/pieces/sheet-8x8.png 产出）',
+    '',
+    '资产：44 张装备立绘（src/render/art/item/ai/*.png）',
+    '来源：项目自有（AI 生成，切片脚本 scripts/slice-item-sheet-v3.mjs 从 design/items/item-sheet-v2.png 产出）',
+    '',
+    '资产：小篆字库子集（src/assets/fonts/seal.woff2，22 字）',
+    '来源字体：YiShanBeiZhuanTi.ttf（项目所有者提供，源包未附授权文书）',
+    '再生脚本：scripts/subset-seal.mjs；说明见 design/fonts/README.md',
+    '',
   ];
   mkdirSync(dirname(outPath), { recursive: true });
   // 原子落盘：中断不留半截清单 —— 半截文件会被同一发布链的 zip 原样打进分发包

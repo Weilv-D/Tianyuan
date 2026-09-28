@@ -57,6 +57,10 @@ export function xpToNext(level: number): number {
  * @returns 实际升到的等级
  */
 export function gainXp(p: PlayerState, amount: number): number {
+  // 非有限值即数据污染：`p.xp < need` 对 NaN 恒 false，循环会把玩家一路顶到
+  // MAX_LEVEL（实测 level 9、经验清零）且不报错 —— 与 core 侧全部数值入口
+  // （addStatus/addShield/schedule/addZone/createUnit）同口径：边界即抛。
+  if (!Number.isFinite(amount)) throw new Error(`非法经验值: ${amount}`);
   p.xp += amount;
   while (p.level < MAX_LEVEL) {
     const need = xpToNext(p.level);

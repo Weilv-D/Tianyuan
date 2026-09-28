@@ -13,13 +13,14 @@
  * 4. 溢出（人口+席位都满）才卖：卖是最后手段，不是整理手段。
  */
 
-import { BOARD_COLS, BENCH_SLOTS } from '../core/config';
+import { BOARD_COLS, BENCH_SLOTS, ROWS_PER_SIDE } from '../core/config';
 import { stripItems } from './inventory';
 import { CHAMPION_BY_ID } from '../data/champions';
 import type { CardPool } from './pool';
 import {
   allUnits,
   boardCap,
+  BOARD_CELLS,
   UNIT_DEPTH,
   centerOutColumns,
   powerScore,
@@ -36,7 +37,10 @@ function depthOf(defId: string): number {
 /** 由中心向两侧的列填充顺序（规范实现见 state.centerOutColumns） */
 const COL_ORDER: number[] = centerOutColumns();
 
-const ROWS = 4;
+// 行数与半场格数一律读真源（config.ROWS_PER_SIDE / state.BOARD_CELLS）：
+// 本地字面量 4 曾在 comp.autoPlace 的行表里各写一份，改半场行数时只有
+// state.localToGlobalRow 会跟随，布阵侧会把棋子放进内核眼中的对手半场
+const ROWS = ROWS_PER_SIDE;
 
 /**
  * 重新布阵。会就地修改 p.board / p.bench，溢出的棋子自动卖出并返还金币。
@@ -80,7 +84,7 @@ export function autoArrange(p: PlayerState, pool: CardPool): number {
     return powerScore(b) - powerScore(a);
   });
 
-  const newBoard: (UnitInstance | null)[] = new Array(BOARD_COLS * ROWS).fill(null);
+  const newBoard: (UnitInstance | null)[] = new Array(BOARD_CELLS).fill(null);
   const rowUsed: boolean[][] = Array.from({ length: ROWS }, () => new Array(BOARD_COLS).fill(false));
   for (const u of chosen) {
     const preferred = Math.min(ROWS - 1, Math.floor(depthOf(u.defId) * ROWS));

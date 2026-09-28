@@ -753,8 +753,11 @@ export class BattleScene extends Phaser.Scene {
         const v = this.views.get(e.uid);
         if (!a || !t || !v) break;
         v.playAttack(t.x - a.x, t.y - a.y, e.windup);
-        if (e.isRanged) {
-          // 弹道音贴着"命中瞬间"而不是"起手瞬间"，打击感才成立
+        if (e.isRanged && !this.ff) {
+          // 弹道音贴着"命中瞬间"而不是"起手瞬间"，打击感才成立。
+          // 真快进期间不排程：ff 每帧可排水数十秒逻辑时间，一次快进会为全部远程
+          // 攻击排出数百个存续到 windup 到期的计时器（只在回调触发时才判 ff，
+          // 排程本身已经发生）—— 与弹道/飘字/特效一律 `if (this.ff) break` 同纪律。
           this.after(Math.max(0, e.windup * 1000), () => {
             if (v.scene && this.running && !this.ff) audio.play('shoot');
           });
@@ -806,7 +809,7 @@ export class BattleScene extends Phaser.Scene {
         if (e.amount > 0 && !this.ff) {
           // 快进排水期不生成飘字/音效：数千事件压缩在数帧内，瞬态演出只会
           // 积压到结算面板之下制造 jank（与弹道同口径；战斗结果与结算不变）
-          this.dmgText.spawn(t.x, t.y, e.amount, tier, e.crit ? '' : '');
+          this.dmgText.spawn(t.x, t.y, e.amount, tier);
           audio.play(e.crit && e.source === 'attack' ? 'crit' : 'hit');
         }
         break;

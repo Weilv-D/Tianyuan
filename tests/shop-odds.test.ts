@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_LEVEL, SHOP_ODDS } from '../src/core/config';
+import { MAX_LEVEL, POOL_COUNTS, SHOP_ODDS, SHOP_SLOTS } from '../src/core/config';
 import { Rng } from '../src/core/rng';
+import { CHAMPION_BY_ID, CHAMPION_IDS_BY_COST } from '../src/data/champions';
 import { CardPool, rollShop } from '../src/game/pool';
 
 /**
@@ -43,14 +44,35 @@ describe('商店概率表结构', () => {
 });
 
 describe('rollShop 行为契约', () => {
-  it('满池任意等级刷店五格全为有效棋子 id，不出现空格', () => {
+  it('满池任意等级刷店恒 5 格且全为有效棋子 id', () => {
     const pool = new CardPool();
     const rng = new Rng(20260901);
     for (let i = 0; i < 100; i++) {
       const level = (i % MAX_LEVEL) + 1;
-      for (const id of rollShop(pool, rng, level)) {
+      const ids = rollShop(pool, rng, level);
+      // 长度也要断言：只查"非空"在满池下恒真，返回长度缩水不会被发现
+      expect(ids).toHaveLength(SHOP_SLOTS);
+      for (const id of ids) {
         expect(id).not.toBeNull();
+        expect(CHAMPION_BY_ID[id as string], `名单外棋子 ${id}`).toBeTruthy();
       }
+    }
+  });
+
+  it('某费用档被抽空：退化为全池加权，仍出满 5 格而非空格', () => {
+    const pool = new CardPool();
+    const rng = new Rng(4242);
+    // 抽空全部 5 费（9 级才有 20% 概率，退化分支只在整档为空时可达）
+    for (const id of CHAMPION_IDS_BY_COST[5]) {
+      let left = POOL_COUNTS[5];
+      while (left > 0 && pool.take(id)) left--;
+    }
+    const ids = rollShop(pool, rng, 9);
+    expect(ids).toHaveLength(SHOP_SLOTS);
+    for (const id of ids) {
+      expect(id).not.toBeNull();
+      expect(CHAMPION_BY_ID[id as string]).toBeTruthy();
+      expect(CHAMPION_BY_ID[id as string].cost, '5 费档已抽空，不应再出 5 费').not.toBe(5);
     }
   });
 });

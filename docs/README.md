@@ -12,17 +12,20 @@
 | [UPGRADE.md](./UPGRADE.md) | 五阶段重构升级计划（v3 定稿，2026-08-30 全部执行完毕的归档记录） |
 | [VERSIONING.md](./VERSIONING.md) | 版本迭代规范：编号口径、锁版状态、正式发布与回退 |
 | [CHANGELOG.md](./CHANGELOG.md) | 更新日志（1.0.0 起按版本归档，含里程碑 0/F/R/M1 的说明） |
+| [plans/](./plans/) | 一次性执行计划的归档（进行中/已完成的审计与重构计划，不承载现行规则） |
 | [screenshots/](./screenshots/) | 实拍截图：主菜单 / 备战 / 交战 |
 
 ## 文档间关系
 
 - **DEVELOPMENT.md** 回答「一次改动怎么完成」，**DESIGN.md** 回答「为什么这么设计」，
   **QA.md** 回答「怎么证明它没坏」。
-- **ART_BIBLE.md** 是视觉唯一真源，代码镜像在 `src/render/view/palette.ts` 与 `src/ui/kit.ts`，二者必须保持同步。
-- **UPGRADE.md** 是 v3 升级的执行记录（决策 → 阶段 → 验证门），已全部完成；
+- **ART_BIBLE.md** 是视觉唯一真源，代码镜像在 `src/render/view/palette.ts`、`src/ui/kit.ts`、
+  `src/render/view/hudLayout.ts` 与 `src/render/board/unitLayout.ts`，必须保持同步。
+- **UPGRADE.md** 是 8 个阶段（0 / F / R / M1 / M2 / M3 / M4 / M5）升级的执行记录，已全部完成；
   发布历史以 **CHANGELOG.md** 为准，迭代纪律以 **VERSIONING.md** 为准。
+- **plans/** 与 **adr/** 的边界：ADR 记录长期有效的架构决策，plans 记录一次性执行计划。
 
 ## 版本契约
 
-运行时展示版本在 `src/version.ts`，分发版本在 `package.json`；发布脚本自动校验两者一致。
-`CHANGELOG.md` 顶部条目记录同一版本，由发布者在锁版时确认。
+运行时展示版本在 `src/version.ts`，分发版本在 `package.json`；`npm run release` 自动校验
+两者与 CHANGELOG 顶部条目三处一致。

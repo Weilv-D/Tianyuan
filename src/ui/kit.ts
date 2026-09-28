@@ -162,6 +162,9 @@ export class Button extends Phaser.GameObjects.Container {
   private disabled = false;
   private hovered = false;
   private pressed = false;
+  /** 按下回弹补间句柄：连点时先停旧补间再起新的，否则两个 yoyo 并行互拉，
+   *  按钮可能停在 0.975 缩放（与 ShopCard 悬停补间的「换向先停旧」同纪律）。 */
+  private pressTween: Phaser.Tweens.Tween | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -205,6 +208,8 @@ export class Button extends Phaser.GameObjects.Container {
     this.on('pointerout', () => {
       this.hovered = false;
       this.pressed = false;
+      this.pressTween?.remove();
+      this.pressTween = null;
       this.setScale(1);
       this.redraw();
       scene.input.setDefaultCursor('default');
@@ -212,14 +217,27 @@ export class Button extends Phaser.GameObjects.Container {
     this.on('pointerdown', () => {
       if (this.disabled) return;
       this.pressed = true;
-      // 按下 0.96 / 70ms 弹回：触觉反馈交给形变，不靠发光
-      scene.tweens.add({ targets: this, scale: 0.96, duration: 70, yoyo: true });
+      // 按下 0.96 / 70ms 弹回：触觉反馈交给形变，不靠发光。
+      // 先停旧补间：70ms 内连点两次会留下两个 yoyo 并行写 scaleX/scaleY，
+      // 后起的那个从 0.975 起跳并回到 0.975，指针不离开就长期偏小 2.5%。
+      this.pressTween?.remove();
+      this.pressTween = scene.tweens.add({
+        targets: this,
+        scale: 0.96,
+        duration: 70,
+        yoyo: true,
+        onComplete: () => {
+          this.pressTween = null;
+        },
+      });
       this.redraw();
       audio.play('ui');
     });
     this.on('pointerup', () => {
       if (this.disabled) return;
       this.pressed = false;
+      this.pressTween?.remove();
+      this.pressTween = null;
       this.setScale(1);
       this.redraw();
       onClick();

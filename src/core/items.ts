@@ -98,7 +98,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'executeHeal'))) {
     h.onKill.push((a, killer) => {
       if (!has(killer, 'executeHeal') || !killer.alive) return;
-      const pct = paramOf(killer, 'healPct');
+      const pct = paramOf(killer, 'executeHeal', 'healPct');
       a.heal(killer, killer, killer.maxHp * pct);
     });
   }
@@ -111,7 +111,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onDamageTaken.push((a, dst, src, amount, type, opts) => {
       if (type !== 'physical' || opts.noReflect) return;
       if (!has(dst, 'thorns') || !dst.alive || !src || !src.alive) return;
-      const reflect = paramOf(dst, 'reflectPct');
+      const reflect = paramOf(dst, 'thorns', 'reflectPct');
       if (reflect <= 0) return;
       a.dealDamage(dst, src, amount * reflect, 'physical', {
         source: 'item',
@@ -127,8 +127,8 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onAttackHit.push((a, src, _dst, _amount) => {
       if (!has(src, 'momentum') || !src.alive) return;
       if (src.itemUsed.has('momentum')) return; // 满层后不再重复计算
-      const per = paramOf(src, 'aspdPerStack');
-      const max = paramOf(src, 'maxStacks');
+      const per = paramOf(src, 'momentum', 'aspdPerStack');
+      const max = paramOf(src, 'momentum', 'maxStacks');
       const prev = src.traitStacks['momentum'] ?? 0;
       const n = Math.min(max, prev + 1);
       src.traitStacks['momentum'] = n;
@@ -150,7 +150,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onHealOverflow.push((a, target, src, overflow) => {
       if (!src || !has(src, 'healToShield') || !target.alive) return;
       // 溢出额已在 heal() 内吃过加时窗衰减，alreadySustained 防 0.5×0.5 双重衰减
-      a.addShield(src, target, overflow * paramOf(src, 'shieldPct'), 6, { alreadySustained: true });
+      a.addShield(src, target, overflow * paramOf(src, 'healToShield', 'shieldPct'), 6, { alreadySustained: true });
     });
   }
 
@@ -173,12 +173,12 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       // 不朽衣保留到下次阵亡，避免“同死双耗”的浪费。
       if (victim.alive) return;
       victim.itemUsed.add('immortal');
-      const delay = paramOf(victim, 'reviveDelay');
+      const delay = paramOf(victim, 'immortal', 'reviveDelay');
       // 延迟复活必须走 scheduleRevive 专用通道：checkEnd 在本队全灭时
       // 会即时判胜负，普通 schedule 的复活窗会被提前终局吞掉
       //（持有者恰在最该复活的"最后单位阵亡"场合拿到一件哑装备）。
-      if (delay > 0) a.scheduleRevive(victim, delay, paramOf(victim, 'hpPct'));
-      else if (!victim.alive) a.revive(victim, paramOf(victim, 'hpPct'), victim);
+      if (delay > 0) a.scheduleRevive(victim, delay, paramOf(victim, 'immortal', 'hpPct'));
+      else if (!victim.alive) a.revive(victim, paramOf(victim, 'immortal', 'hpPct'), victim);
       a.emit({
         t: 'fx',
         tick: a.tick,
@@ -198,7 +198,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'sunSpear'))) {
     h.onAttackHit.push((a, src, dst) => {
       if (!has(src, 'sunSpear') || !src.alive || !dst.alive) return;
-      const ratio = paramOf(src, 'spRatio');
+      const ratio = paramOf(src, 'sunSpear', 'spRatio');
       if (ratio <= 0) return;
       a.dealDamage(src, dst, src.sp * ratio, 'magic', { source: 'item' });
     });
@@ -208,7 +208,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'frost'))) {
     h.onAttackHit.push((a, src, dst) => {
       if (!has(src, 'frost') || !src.alive || !dst.alive) return;
-      a.addStatus(src, dst, 'slow', paramOf(src, 'slowDur'), paramOf(src, 'slowPct'));
+      a.addStatus(src, dst, 'slow', paramOf(src, 'frost', 'slowDur'), paramOf(src, 'frost', 'slowPct'));
     });
   }
 
@@ -218,9 +218,9 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (tick % 6 !== 0) return;
       for (const u of a.units) {
         if (u.team !== team || !u.alive || !has(u, 'berserk')) continue;
-        const per = paramOf(u, 'atkPerStep');
-        const step = paramOf(u, 'stepPct');
-        const cap = paramOf(u, 'capPct') * 100;
+        const per = paramOf(u, 'berserk', 'atkPerStep');
+        const step = paramOf(u, 'berserk', 'stepPct');
+        const cap = paramOf(u, 'berserk', 'capPct') * 100;
         const steps = Math.floor((1 - u.hp / u.maxHp) / Math.max(0.01, step));
         const v = Math.min(cap, steps * per);
         const prev = u.traitStacks['fulongPrev'] ?? 0;
@@ -237,8 +237,8 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onKill.push((a, killer) => {
       if (!has(killer, 'killFrenzy') || !killer.alive) return;
       const stacks = killer.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'killFrenzy').length;
-      if (stacks >= paramOf(killer, 'maxStacks')) return;
-      a.addStatus(killer, killer, 'aspdUp', paramOf(killer, 'dur'), paramOf(killer, 'aspdPct'), 'killFrenzy');
+      if (stacks >= paramOf(killer, 'killFrenzy', 'maxStacks')) return;
+      a.addStatus(killer, killer, 'aspdUp', paramOf(killer, 'killFrenzy', 'dur'), paramOf(killer, 'killFrenzy', 'aspdPct'), 'killFrenzy');
       a.fx('buffAura', { uid: killer.uid, params: { hue: 0 } });
     });
   }
@@ -247,7 +247,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'venom'))) {
     h.onAttackHit.push((a, src, dst) => {
       if (!has(src, 'venom') || !src.alive || !dst.alive) return;
-      a.addStatus(src, dst, 'vulnerability', paramOf(src, 'vulnDur'), paramOf(src, 'vulnPct'));
+      a.addStatus(src, dst, 'vulnerability', paramOf(src, 'venom', 'vulnDur'), paramOf(src, 'venom', 'vulnPct'));
     });
   }
 
@@ -255,7 +255,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'castShield'))) {
     h.onCast.push((a, u) => {
       if (!has(u, 'castShield') || !u.alive) return;
-      a.addShield(u, u, u.maxHp * paramOf(u, 'shieldPct'), paramOf(u, 'shieldDur'));
+      a.addShield(u, u, u.maxHp * paramOf(u, 'castShield', 'shieldPct'), paramOf(u, 'castShield', 'shieldDur'));
     });
   }
 
@@ -265,8 +265,8 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (tick % 30 !== 0) return;
       for (const u of a.units) {
         if (u.team !== team || !u.alive || !has(u, 'windRunner')) continue;
-        const per = paramOf(u, 'aspdPerSec');
-        const maxStacks = Math.floor(paramOf(u, 'capPct') / Math.max(0.01, per));
+        const per = paramOf(u, 'windRunner', 'aspdPerSec');
+        const maxStacks = Math.floor(paramOf(u, 'windRunner', 'capPct') / Math.max(0.01, per));
         const prev = u.traitStacks['zhuifengStacks'] ?? 0;
         if (prev >= maxStacks) continue;
         u.traitStacks['zhuifengStacks'] = prev + 1;
@@ -284,7 +284,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onTick.push((a, team, tick) => {
       for (const u of a.units) {
         if (u.team !== team || !u.alive || !has(u, 'ironPurge')) continue;
-        if (tick % Math.max(1, Math.round(paramOf(u, 'everyTicks'))) !== 0) continue;
+        if (tick % Math.max(1, Math.round(paramOf(u, 'ironPurge', 'everyTicks'))) !== 0) continue;
         for (const kind of PURGE_ORDER) {
           if (!u.statuses.some((s) => s.kind === kind)) continue;
           a.removeOneStatus(u, kind);
@@ -300,8 +300,8 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onCast.push((a, u) => {
       if (!has(u, 'castAspd') || !u.alive) return;
       const stacks = u.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'castAspd').length;
-      if (stacks >= paramOf(u, 'maxStacks')) return;
-      a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'), 'castAspd');
+      if (stacks >= paramOf(u, 'castAspd', 'maxStacks')) return;
+      a.addStatus(u, u, 'aspdUp', paramOf(u, 'castAspd', 'dur'), paramOf(u, 'castAspd', 'aspdPct'), 'castAspd');
       a.fx('buffAura', { uid: u.uid, params: { hue: 2 } });
     });
   }
@@ -312,7 +312,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (!has(u, 'castHeal') || !u.alive) return;
       const t = a.resolveTargets(u, 'allyLowestHp', 1)[0];
       if (!t) return;
-      const healed = a.heal(u, t, u.sp * paramOf(u, 'healSpRatio'));
+      const healed = a.heal(u, t, u.sp * paramOf(u, 'castHeal', 'healSpRatio'));
       if (healed > 0.5) a.fx('healWave', { uid: t.uid });
     });
   }
@@ -323,7 +323,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onBattleStart.push((a, team) => {
       for (const u of a.units) {
         if (u.team !== team || !u.alive || !has(u, 'wingStart')) continue;
-        a.addStatus(u, u, 'aspdUp', paramOf(u, 'dur'), paramOf(u, 'aspdPct'), 'wingStart');
+        a.addStatus(u, u, 'aspdUp', paramOf(u, 'wingStart', 'dur'), paramOf(u, 'wingStart', 'aspdPct'), 'wingStart');
       }
     });
   }
@@ -337,7 +337,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (!has(src, 'foxReady') || !src.traitStacks['jiuweiReady']) return;
       src.traitStacks['jiuweiReady'] = 0;
       mod.forceCrit = true;
-      mod.bonusMagic += src.sp * paramOf(src, 'bonusSpRatio');
+      mod.bonusMagic += src.sp * paramOf(src, 'foxReady', 'bonusSpRatio');
       mod.bonusMagicSource = 'item';
     });
   }
@@ -346,14 +346,14 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
   if (units.some((u) => has(u, 'disarmSwat'))) {
     h.onAttackHit.push((a, src, dst) => {
       if (!has(src, 'disarmSwat') || !src.alive || !dst.alive) return;
-      const every = Math.max(2, Math.round(paramOf(src, 'everyHits')));
+      const every = Math.max(2, Math.round(paramOf(src, 'disarmSwat', 'everyHits')));
       const n = ((src.traitStacks['fuchenHits'] ?? 0) as number) + 1;
       if (n < every) {
         src.traitStacks['fuchenHits'] = n;
         return;
       }
       src.traitStacks['fuchenHits'] = 0;
-      a.addStatus(src, dst, 'disarm', paramOf(src, 'disarmDur'), 0);
+      a.addStatus(src, dst, 'disarm', paramOf(src, 'disarmSwat', 'disarmDur'), 0);
     });
   }
 
@@ -362,7 +362,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
     h.onAttackHit.push((a, src, _dst, amount) => {
       if (!has(src, 'onHitHeal') || !src.alive) return;
       if ((amount ?? 0) <= 0) return;
-      a.heal(src, src, src.maxHp * paramOf(src, 'healPct'));
+      a.heal(src, src, src.maxHp * paramOf(src, 'onHitHeal', 'healPct'));
     });
   }
 
@@ -372,7 +372,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (!has(src, 'onHitMana') || !src.alive || src.isMinion) return;
       if (src.manaLock > 0) return;
       const before = src.mp;
-      src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'mpPerHit'));
+      src.mp = Math.min(src.maxMp, src.mp + paramOf(src, 'onHitMana', 'mpPerHit'));
       // 法力变化必须补发 mana 事件：蓝条由渲染层每帧轮询呈现，事件流承担
       // 回放/归因账本 —— 直接改 mp 不发账，事件流口径（攻击回蓝/施法清空/
       // 受击回蓝/羁绊回蓝全走账）就在这条通道上开缺口
@@ -387,7 +387,7 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (!holder) return;
       for (const al of a.units) {
         if (al.team !== team || !al.alive) continue;
-        a.addStatus(holder, al, 'dr', paramOf(holder, 'dur'), paramOf(holder, 'drPct'));
+        a.addStatus(holder, al, 'dr', paramOf(holder, 'warBanner', 'dur'), paramOf(holder, 'warBanner', 'drPct'));
       }
       a.fx('shieldWall', { team });
     });
@@ -400,22 +400,33 @@ export function applyItemHooks(api: BattleApi, team: number, units: readonly Uni
       if (opts.source !== 'attack') return;
       const next = dst.traitStacks['shehunNextTick'] ?? 0;
       if (a.tick < next) return;
-      if (!a.rng.chance(paramOf(dst, 'chance'))) return;
-      dst.traitStacks['shehunNextTick'] = a.tick + paramOf(dst, 'cdTicks');
-      a.addStatus(dst, src, 'stun', paramOf(dst, 'stunDur'), 0);
+      if (!a.rng.chance(paramOf(dst, 'bellStun', 'chance'))) return;
+      dst.traitStacks['shehunNextTick'] = a.tick + paramOf(dst, 'bellStun', 'cdTicks');
+      a.addStatus(dst, src, 'stun', paramOf(dst, 'bellStun', 'stunDur'), 0);
       a.fx('debuffMark', { uid: src.uid });
     });
   }
 }
 
-function paramOf(u: Unit, key: string): number {
-  // 与 itemEffects 的 params 聚合同一口径：多件同类钩子取最大值。
-  // 取"首个命中件"会在双持同钩装备时钩子实参小于聚合面（momentum 提前封顶等）。
-  // ⚠ 实现与 itemEffects 的 Math.max 聚合并行存在（热路径避免为每次钩子查询
-  // 重建 ItemEffects）—— 改口径必须两处同改，勿单边漂移。
+/**
+ * 取某件装备**本钩子**的参数值。
+ *
+ * 必须带 hook：`params` 的键名是全局命名空间，不同钩子会共用同名键
+ *（healPct：断魂刃 0.18 / 霜翎环 0.015；shieldPct：回天灯 1 / 青圭杖 0.1；
+ * maxStacks：疾风弓 5 / 流星弩与紫电镰 2；capPct：缚龙爪 0.32 / 追风履 24）。
+ * 只按键名取 max 会让**另一件装备**改写本钩子的数值 —— 实测霜翎环的
+ * 每次普攻回血从 1.5% 变成 18%（12 倍）、青圭杖的施法盾从 10% 变成 45%
+ *（被 SHIELD_CAP_RATIO 截顶）、流星弩的「至多 2 层」变成 5 层。
+ *
+ * 聚合口径与 itemEffects 的 params 一致：**同钩**多件取最大
+ *（两件流星弩只结算一件的数值），改口径必须两处同改。
+ */
+function paramOf(u: Unit, hook: ItemHookId, key: string): number {
   let m = 0;
   for (const id of u.itemIds) {
-    const v = ITEM_BY_ID[id]?.params?.[key];
+    const def = ITEM_BY_ID[id];
+    if (!def?.hooks?.includes(hook)) continue;
+    const v = def.params?.[key];
     if (v !== undefined) m = Math.max(m, v);
   }
   return m;

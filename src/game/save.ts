@@ -42,8 +42,9 @@ function loadData(raw: string, expectV: number): ReturnType<Match['toJSON']> | n
     if (typeof d.rngState !== 'number' || typeof d.round !== 'number') return null;
     if (typeof d.phase !== 'string' || typeof d.pool !== 'object' || d.pool === null) return null;
     if (!Array.isArray(d.ghosts)) return null;
-    // 注意：mode/battleSnapshots/humanRank 等是 v3 增量字段，v2 旧档合法地
-    // 缺失、由 fromJSON 兜底 —— 校验只钉 v2/v3 共有的骨架字段
+    // 注意：mode/battleSnapshots 等是 v3 增量字段，v2 旧档合法地缺失、由
+    // fromJSON 兜底（humanRank 曾是 v3 字段，1.20.0 起已随死状态清理移除，
+    // 旧档多出的该字段被 fromJSON 直接忽略）—— 校验只钉 v2/v3 共有的骨架字段
     return d;
   } catch {
     return null;
@@ -115,10 +116,13 @@ export function loadMatch(mode: Match['mode'] = 'normal'): Match | null {
       if (data) {
         try {
           return Match.fromJSON(data);
-        } catch {
+        } catch (e) {
           // 骨架字段通过但深层结构损坏（beastBoard/players[i].board 类型错、
           // 幽灵快照坏元素等）：fromJSON 抛错。与"损坏即无档"同口径 ——
           // 清掉坏键，避免"继续"入口亮着却永远点不进（坏档自愈）。
+          // 整档作废是最重的处置，必须喊出来：元素级清洗有 warn 汇总，这条
+          // 路径此前静默返回 null，玩家点「继续」直接开新局、进度无声消失。
+          console.warn(`[save] 存档结构损坏，已作废并清除（模式 ${mode}）：${e instanceof Error ? e.message : String(e)}`);
           try {
             localStorage.removeItem(key);
           } catch {

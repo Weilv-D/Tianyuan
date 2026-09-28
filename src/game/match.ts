@@ -47,7 +47,7 @@ import {
 } from './adventure';
 import type { BattleSnapshot } from './replay';
 import { generateBeastBoard, BEAST_NAME } from './beast';
-import { addItem, autoEquip, stripItems, MAX_ITEMS_PER_UNIT } from './inventory';
+import { addItem, stripItems, MAX_ITEMS_PER_UNIT } from './inventory';
 import { COMPONENT_IDS, ITEM_BY_ID } from '../data/items';
 import {
   allUnits,
@@ -73,7 +73,7 @@ import {
   type UnitInstance,
   type AiArchetype,
 } from './state';
-import type { ActiveTrait, BattleConfig, BattleResult, BattleUnitInput } from '../core/types';
+import type { ActiveTrait, BattleConfig, BattleResult, BattleUnitInput, Star } from '../core/types';
 
 /** 把一个半场棋盘展开成入场单位。uid 从 1（team 0）或 101（team 1）开始顺序分配。 */
 function pushBoard(
@@ -204,8 +204,6 @@ export class Match implements AiWorld {
   round = 0;
   phase: Phase = 'prep';
   pairings: Pairing[] = [];
-  /** 玩家的最终名次（0 = 游戏中）。非 AI 玩家的结局写在这里。 */
-  humanRank = 0;
   /** 淘汰玩家留下的阵容快照，用于奇数人时的「墨影」对战 */
   private ghosts = new Map<number, (UnitInstance | null)[]>();
   /** 本回合的墨兽阵容（全体玩家面对同一只） */
@@ -1111,11 +1109,6 @@ export class Match implements AiWorld {
     return { items, gold };
   }
 
-  /** AI 分配装备：把装备栏里的东西装到最合适的棋子上 */
-  equipItemsFor(p: PlayerState): void {
-    autoEquip(p);
-  }
-
   private applyStreak(p: PlayerState, won: boolean): void {
     if (won) {
       p.streak = p.streak > 0 ? p.streak + 1 : 1;
@@ -1137,7 +1130,6 @@ export class Match implements AiWorld {
     }
     p.board = emptyBoard();
     p.bench = emptyBench();
-    if (p.isHuman) this.humanRank = p.rank;
     this.log.push(`${p.name} 被淘汰 · 第 ${p.rank} 名`);
   }
 
@@ -1171,7 +1163,6 @@ export class Match implements AiWorld {
       const last = this.alivePlayers()[0];
       if (last) {
         last.rank = 1;
-        if (last.isHuman) this.humanRank = 1;
         this.log.push(`${last.name} 获得胜利 · 第 1 名`);
       }
     } else {
@@ -1195,8 +1186,6 @@ export class Match implements AiWorld {
     mode: 'normal' | 'daily';
     battleSnapshots: BattleSnapshot[];
     adventureOffer: AdventureOffer | null;
-    /** 人类玩家最终名次（淘汰时写入）；旧档缺省 0 = 未定名次 */
-    humanRank: number;
     /**
      * 本回合配对（beginRound 末尾已生成并写入双方交手史）。不入档的话读档后
      * 开战会重新 makePairings —— rng 流自此分叉、交手史双记、侦查对手改变，
@@ -1220,7 +1209,6 @@ export class Match implements AiWorld {
       mode: this.mode,
       battleSnapshots: structuredClone(this.battleSnapshots),
       adventureOffer: structuredClone(this.adventureOffer),
-      humanRank: this.humanRank,
       pairings: this.pairings.map((q) => ({ ...q })),
     };
   }
@@ -1232,6 +1220,13 @@ export class Match implements AiWorld {
     // 置位 —— 坏档里出现即拒收，不给"绕过读档推进语义"的残档留门。
     if (data.phase && !['prep', 'result', 'over'].includes(data.phase)) throw new Error('invalid phase in save');
     const seed = Number.isFinite(data.seed) ? data.seed : 0;
+    // mode 必须白名单验型：save.ts 的 KEY_BY_MODE[mode] 对未知键返回 undefined，
+    // 之后每次写盘都会落到 localStorage 键 "undefined"（"继续对局"永久读不到、
+    // clearSave 也清不掉）；错值则触发 v3.1 已修的跨模式覆盖。与 phase 同口径：
+    // 名单外即拒收，只认两个合法值。
+    if (data.mode !== undefined && data.mode !== 'normal' && data.mode !== 'daily') {
+      throw new Error('invalid mode in save');
+    }
     const m = new Match(seed, '你', data.mode ?? 'normal');
     m.rng.state = data.rngState;
     m.round = data.round;
@@ -1326,16 +1321,17 @@ export class Match implements AiWorld {
       // 单格损坏不清空整档，条数汇总后一次性 warn。玩家条目剥墨兽标记（玩家棋子
       // 带上 isBeast 会被渲染成墨兽、还不吃天命/登峰判定），墨影与墨兽不受影响。
       let unitCleaned = 0;
-      (pl as any).board = ((pl as any).board as unknown[]).map((cell) => {
+      const keepOrRefund = (cell: unknown): UnitInstance | null => {
         const r = sanitizeUnitEntry(cell, true);
+        // 已知 defId 的整格丢弃必须回池（与 repairSlots 的超长截断同口径：
+        // 卡可以坏，但不能凭空蒸发）—— 否则一条 iid/star 损坏的 3★ 会让
+        // 该棋子整局少 9 张牌
+        if (r.refund) m.pool.giveUnit(r.refund.defId, r.refund.star);
         unitCleaned += r.cleaned ? 1 : 0;
         return r.unit;
-      });
-      (pl as any).bench = ((pl as any).bench as unknown[]).map((cell) => {
-        const r = sanitizeUnitEntry(cell, true);
-        unitCleaned += r.cleaned ? 1 : 0;
-        return r.unit;
-      });
+      };
+      (pl as any).board = ((pl as any).board as unknown[]).map(keepOrRefund);
+      (pl as any).bench = ((pl as any).bench as unknown[]).map(keepOrRefund);
       totalUnitCleaned += unitCleaned;
     }
     m.players = data.players;
@@ -1403,7 +1399,11 @@ export class Match implements AiWorld {
     if (totalUnitCleaned > 0) {
       console.warn(`[save] 存档内容与本版名单/口径不一致，已清洗 ${totalUnitCleaned} 处（丢弃/钳制/回池），其余保留`);
     }
-    m.settings = data.settings ?? { autoDeploy: true };
+    m.settings = {
+      // 只认布尔：`?? { autoDeploy: true }` 只挡 null/undefined，字符串真值会
+      // 让"自动上场"开关与行为脱钩（面板点不动、行为恒开）
+      autoDeploy: data.settings?.autoDeploy !== false,
+    };
     // 快照载荷验型 + 窗口收敛：坏条目丢弃，超窗裁最旧（与写入侧同一窗口）——
     // 旧版无界档读入即收敛，坏 shape 也不再直进 verifyReplay 的重跑面
     m.battleSnapshots = (Array.isArray(data.battleSnapshots) ? data.battleSnapshots : [])
@@ -1427,7 +1427,6 @@ export class Match implements AiWorld {
       m.adventureOffer = null;
     }
     if (data.adventureOffer && !m.adventureOffer) totalUnitCleaned++;
-    m.humanRank = data.humanRank ?? 0;
     // 本回合配对（v3.2 起）：逐条验型 + 全表自洽，任何违例即整表弃用 —— 半可用
     // 的配对表比空表更危险（空表回落开战时重掷，行为与旧版一致；残缺表则会
     // 让一部分玩家被静默跳过结算）。非数组与逐条非法同一容错粒度，不放大成整档作废。
@@ -1483,14 +1482,21 @@ function sanitizeOffer(raw: unknown): AdventureOffer | null {
  *  - stripBeast：玩家棋盘条目上的墨兽标记剥除 —— isBeast 驱动墨色剪影与
  *    天命排除，玩家棋子带上它会被渲染成墨兽还不吃登峰/天命判定；墨影快照
  *    与墨兽阵容（stripBeast=false）原样保留。
- *  返回 cleaned 供调用方汇总 warn，不逐格刷屏。 */
-function sanitizeUnitEntry(raw: unknown, stripBeast = false): { unit: UnitInstance | null; cleaned: boolean } {
+ *  返回 cleaned 供调用方汇总 warn，不逐格刷屏；`refund` 是"已知 defId 但条目
+ *  损坏"时该回的池（iid/star 非法），调用方据此做守恒补偿。 */
+function sanitizeUnitEntry(raw: unknown, stripBeast = false): { unit: UnitInstance | null; cleaned: boolean; refund?: { defId: string; star: Star } } {
   if (raw === null || raw === undefined) return { unit: null, cleaned: false };
   if (typeof raw !== 'object') return { unit: null, cleaned: true };
   const u = raw as UnitInstance;
   if (typeof u.defId !== 'string' || !CHAMPION_BY_ID[u.defId]) return { unit: null, cleaned: true };
-  if (!Number.isFinite(u.iid as number)) return { unit: null, cleaned: true };
-  if (!Number.isFinite(u.star as number)) return { unit: null, cleaned: true };
+  const refund = (): { defId: string; star: Star } => ({
+    defId: u.defId,
+    star: Number.isFinite(u.star as number)
+      ? (Math.min(3, Math.max(1, Math.round(u.star as number))) as Star)
+      : 1,
+  });
+  if (!Number.isFinite(u.iid as number)) return { unit: null, cleaned: true, refund: refund() };
+  if (!Number.isFinite(u.star as number)) return { unit: null, cleaned: true, refund: refund() };
   let cleaned = false;
   if (u.powMult !== undefined && !Number.isFinite(u.powMult)) {
     delete u.powMult;

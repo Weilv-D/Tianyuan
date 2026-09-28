@@ -140,6 +140,26 @@ describe('玩家可感知的战斗规则', () => {
       traits: { 0: [], 1: [] },
     })).toThrow();
   });
+
+  it('非整数 uid / 非整数格 / 越界格一律在开战前拒绝', () => {
+    // 小数 uid 入 Int16Array 会被截断（unitByUid 错位）；小数格下标让 occ 占位表
+    // 读写静默失效（重叠检查虚过、寻路与命中全盘错位）；越界格 cellIndex(8,4)=40
+    // 仍在表内 —— 三者都不报错，只在战场上演，必须边界即抛。
+    const one = (cell: { c: number; r: number }, uid = 1): Battle => new Battle({
+      seed: 1,
+      units: [
+        { uid, defId: 'pan', team: 0, star: 1, cell },
+        { uid: uid + 10, defId: 'ajiu', team: 1, star: 1, cell: { c: 7, r: 7 } },
+      ],
+      traits: { 0: [], 1: [] },
+    });
+    expect(() => one({ c: 0, r: 0 }, 1.5)).toThrow(/uid/);
+    expect(() => one({ c: 0.5, r: 0 })).toThrow(/格/);
+    expect(() => one({ c: 0, r: 0.5 })).toThrow(/格/);
+    expect(() => one({ c: 8, r: 4 })).toThrow(/越界/);
+    expect(() => one({ c: 0, r: 8 })).toThrow(/越界/);
+    expect(() => one({ c: -1, r: 0 })).toThrow(/越界/);
+  });
 });
 
 describe('治疗与暴击的记账口径', () => {

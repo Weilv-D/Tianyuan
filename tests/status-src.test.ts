@@ -95,6 +95,26 @@ describe('叠层按源分计（StatusEffect.src）', () => {
     expect(maxKf).toBe(2); // 三杀只叠 2 层
   });
 
+  it('castAspd 端到端：真实施法打标入表，「至多 2 层」由钩子兑现', () => {
+    // 与 killFrenzy 同型：紫电镰此前只有"合成入表"覆盖，tag 拼错或过滤条件
+    // 写成不分来源时套件仍绿，而混合构筑下该件会静默哑火。
+    const battle = mkBattle(
+      [unitInput('pan', 0, { c: 0, r: 4 }, { star: 2, items: ['zidian'] }), unitInput('jingyu', 1, { c: 0, r: 3 })],
+      777,
+      900,
+    );
+    const pan = byDef(battle, 'pan');
+    let maxLayers = 0;
+    for (let i = 0; i < 30 * 30 && !battle.finished; i++) {
+      // 强制满蓝，制造多次施法（磐的自然回蓝在 30 秒内只够一次）
+      if (pan.manaLock <= 0) pan.mp = pan.maxMp;
+      battle.step();
+      maxLayers = Math.max(maxLayers, pan.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'castAspd').length);
+    }
+    expect(pan.castCount).toBeGreaterThan(1);
+    expect(maxLayers).toBe(2); // 多次施法也只叠 2 层
+  });
+
   it('addStatus 拒绝非有限数值：NaN/Infinity 在入表前即抛', () => {
     const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }), unitInput('jingyu', 1, { c: 7, r: 1 })]);
     const a = byDef(battle, 'pan');
@@ -180,6 +200,37 @@ describe('读档单元清洗（fromJSON 坏档容错）', () => {
     // 超长截断不蒸发资产：名单内棋子按星级拆张回池（3★ = 9 张）
     expect(restored.pool.remaining('kutong')).toBe(base.pool.remaining('kutong') + 9);
     expect(restored.adventureOffer).toBeNull(); // 未知 kind 的恩赐整体置空，不留无声蒸发的选项
+  });
+
+  it('损坏条目整格丢弃时按 defId 回池：卡可以坏，但不能凭空蒸发', () => {
+    const match = new Match(20260905);
+    match.beginRound();
+    const base = Match.fromJSON(match.toJSON() as never);
+    const json = match.toJSON() as Record<string, unknown>;
+    const players = json.players as { board: (Record<string, unknown> | null)[] }[];
+    const board = players[0].board;
+    const slots = board.map((c, i) => (c === null ? i : -1)).filter((i) => i >= 0);
+    expect(slots.length).toBeGreaterThanOrEqual(2);
+    // iid / star 非有限：条目整格丢弃，但 defId 已知 —— 必须按星级折张回池
+    board[slots[0]] = { iid: Number.NaN, defId: 'pan', star: 2, items: [] };
+    board[slots[1]] = { iid: 92001, defId: 'kutong', star: Number.NaN, items: [] };
+
+    const restored = Match.fromJSON(json as never);
+
+    expect(restored.human.board[slots[0]]).toBeNull();
+    expect(restored.human.board[slots[1]]).toBeNull();
+    expect(restored.pool.remaining('pan')).toBe(base.pool.remaining('pan') + 3); // 2★ = 3 张
+    expect(restored.pool.remaining('kutong')).toBe(base.pool.remaining('kutong') + 1); // 星级不可知 → 1 张
+  });
+
+  it('存档 mode 白名单：未知值拒收（否则写盘会落到 localStorage 键 "undefined"）', () => {
+    const match = new Match(20260905);
+    match.beginRound();
+    const json = match.toJSON() as Record<string, unknown>;
+    json.mode = 'hardcore';
+    expect(() => Match.fromJSON(json as never)).toThrow(/mode/);
+    json.mode = 'daily';
+    expect(Match.fromJSON(json as never).mode).toBe('daily');
   });
 
   it('玩家运行时字段清洗：坏形状字段收敛为类型安全缺省，读档后继续对局不再炸', () => {

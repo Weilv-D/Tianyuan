@@ -145,6 +145,116 @@ describe('装备钩子回归（v1.9 新件）', () => {
     expect(shields.length).toBeGreaterThan(0);
   });
 
+  it('钩子参数按「本钩子」取值：另一件装备的同名参数不得改写本件数值', () => {
+    // params 的键名是全局命名空间（healPct：断魂刃 0.18 / 霜翎环 0.015），
+    // 只按键名取 max 会让共持的另一件装备把本件的每次回血放大 12 倍 ——
+    // 三个高倍差组合各钉一条，防止「按钩子隔离」被改回按名聚合。
+    const healPerHit = (items: string[]) => {
+      // 敌方用 3★ 玄武（3726 血、42 甲）保证窗口内不被击杀 —— 断魂刃的
+      // 击杀回血不参与，测的纯粹是「每次普攻的回复量」
+      const battle = mkBattle(
+        [unitInput('pan', 0, { c: 0, r: 0 }, { items }), unitInput('xuanwu', 1, { c: 0, r: 2 }, { star: 3 })],
+        4242,
+      );
+      const a = byDef(battle, 'pan');
+      // 压到 25% 血：治疗量按「实际回血」记账，满血时溢出不计入 a.healed，
+      // 会把每次普攻的回复量稀释成看似偏小的值
+      a.hp = Math.round(a.maxHp * 0.25);
+      for (let i = 0; i < 300 && !battle.finished; i++) battle.step();
+      const hits = battle.events.filter((e) => e.t === 'damage' && e.srcUid === a.uid && e.source === 'attack').length;
+      return { perHit: a.healed / Math.max(1, hits), maxHp: a.maxHp, hits };
+    };
+    const alone = healPerHit(['shuangling']);
+    const mixed = healPerHit(['shuangling', 'duanhun']);
+    expect(alone.hits).toBeGreaterThan(2);
+    expect(alone.perHit).toBeCloseTo(alone.maxHp * 0.015, 1);
+    expect(mixed.perHit).toBeCloseTo(mixed.maxHp * 0.015, 1);
+
+    // 青圭杖的施法盾 10% 最大生命；串味时会取回天灯的 100%（被 0.45 截顶）。
+    // 持有者用断岳（技能不产盾），把盾量完全归因到装备钩子。
+    const shield = (items: string[]) => {
+      const battle = mkBattle(
+        [unitInput('duanyue', 0, { c: 0, r: 6 }, { items }), unitInput('jingyu', 1, { c: 7, r: 1 })],
+        777,
+        600,
+      );
+      const a = byDef(battle, 'duanyue');
+      a.mp = a.maxMp;
+      for (let i = 0; i < 90 && !battle.finished; i++) battle.step();
+      return { total: battle.events.filter((e) => e.t === 'shield' && e.uid === a.uid && e.amount > 0).reduce((s, e) => s + (e as { amount: number }).amount, 0), maxHp: a.maxHp };
+    };
+    const qingguiAlone = shield(['qinggui']);
+    const qingguiMixed = shield(['qinggui', 'huitian']);
+    expect(qingguiAlone.total).toBeLessThanOrEqual(qingguiAlone.maxHp * 0.12);
+    expect(qingguiMixed.total).toBeLessThanOrEqual(qingguiMixed.maxHp * 0.12);
+
+    // 流星弩「至多 2 层」不得被疾风弓的 maxStacks=5 改写
+    const battle = mkBattle(
+      [
+        unitInput('pan', 0, { c: 0, r: 6 }, { items: ['liuxing', 'jifeng'] }),
+        unitInput('jingyu', 1, { c: 7, r: 1 }),
+        unitInput('jingyu', 1, { c: 7, r: 2 }),
+        unitInput('jingyu', 1, { c: 7, r: 3 }),
+      ],
+    );
+    const a = byDef(battle, 'pan');
+    for (const foe of battle.units.filter((x) => x.entry.id === 'jingyu')) {
+      foe.hp = 1;
+      battle.dealDamage(a, foe, 10 ** 6, 'true');
+    }
+    const stacks = a.statuses.filter((s) => s.kind === 'aspdUp' && s.src === 'killFrenzy');
+    expect(stacks.length).toBe(2);
+  });
+
+  it('不动明王：免疫窗内不产生反弹（该机制与免疫互为否定，已按"删掉做不到的承诺"收口）', () => {
+    // 免疫分支在 dealDamage 的数值/随机结算之前短路，onDamageTaken 在该窗口内
+    // 永不触发 —— 曾配出的"免疫期间反弹 30%"因此自落地起从未触发过一次。
+    // 本用例把这个口径钉住：不动整场不产生 skill 来源输出，而磐（armorUp 锚点）
+    // 的同类反弹照常可达。
+    const battle = mkBattle(
+      [
+        unitInput('budong', 0, { c: 0, r: 0 }, { star: 3 }),
+        unitInput('duanyue', 1, { c: 0, r: 3 }),
+        unitInput('duanyue', 1, { c: 1, r: 3 }),
+        unitInput('duanyue', 1, { c: 2, r: 3 }),
+      ],
+      12345,
+    );
+    const hero = byDef(battle, 'budong');
+    for (let i = 0; i < 900 && !battle.finished; i++) battle.step();
+    expect(hero.castCount).toBeGreaterThan(0); // 技能确实放了（免疫 + 环伤）
+    expect(battle.events.filter((e) => e.t === 'damage' && e.srcUid === hero.uid && e.source === 'skill').length).toBe(0);
+
+    const control = mkBattle(
+      [unitInput('pan', 0, { c: 0, r: 0 }, { star: 3 }), unitInput('duanyue', 1, { c: 0, r: 3 })],
+      999,
+    );
+    for (let i = 0; i < 900 && !control.finished; i++) control.step();
+    const pan = byDef(control, 'pan');
+    expect(control.events.filter((e) => e.t === 'damage' && e.srcUid === pan.uid && e.source === 'skill').length).toBeGreaterThan(0);
+  });
+
+  it('领域状态沿用整段时长：离开领域后减速仍持续（v1.9 起的既定口径）', () => {
+    // 领域每 0.5 秒重施整段时长，故状态寿命等于 status.dur 而非"领域剩余寿命"。
+    // 按剩余寿命截断会实测把法爆/幽冥两条线整体压低 3~6p（极差 12.5%→20.9%），
+    // 故维持原口径并以本断言钉死，防止被当成"顺手修一下"改回去。
+    const battle = mkBattle(
+      [unitInput('moyu', 0, { c: 0, r: 0 }, { star: 2 }), unitInput('duanyue', 1, { c: 0, r: 2 })],
+      777,
+      900,
+    );
+    const hero = byDef(battle, 'moyu');
+    hero.mp = hero.maxMp;
+    let maxSlowTicks = 0;
+    for (let i = 0; i < 900 && !battle.finished; i++) {
+      battle.step();
+      const foe = byDef(battle, 'duanyue');
+      for (const s of foe.statuses) if (s.kind === 'slow') maxSlowTicks = Math.max(maxSlowTicks, s.ticks);
+    }
+    // 墨羽的减速声明 5 秒 = 150 tick：状态寿命不得被截断到领域剩余寿命以下
+    expect(maxSlowTicks).toBeGreaterThan(100);
+  });
+
   it('追风履：每秒成长攻速，增量累加（不覆盖羁绊成长）', () => {
     const battle = mkBattle([unitInput('pan', 0, { c: 0, r: 6 }, { items: ['zhuifeng'] }), unitInput('jingyu', 1, { c: 7, r: 1 })]);
     const a = byDef(battle, 'pan');

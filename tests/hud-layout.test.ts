@@ -26,7 +26,7 @@ import {
   traitMemberCell,
   traitMemberClampY,
 } from '../src/render/view/hudLayout';
-import { LOG_Y, RAIL_X, RAIL_Y, SIDE_W } from '../src/render/view/layout';
+import { ITEM_BAR_W, ITEM_BAR_X, ITEM_BAR_Y, LOG_W, LOG_X, LOG_Y, RAIL_PITCH, RAIL_X, RAIL_Y, SIDE_W, UNLOAD_BTN_DY } from '../src/render/view/layout';
 
 /**
  * HUD 几何契约 —— hudLayout 纯函数的遮挡不变量。
@@ -54,7 +54,9 @@ describe('羁绊轨几何', () => {
 
   it('相邻徽章命中区上下不叠压（环心距 ≥ 命中高）', () => {
     const hit = railBadgeHit();
-    expect(44).toBeGreaterThanOrEqual(hit.h);
+    // 用真源常量而非字面量：环距改小时断言必须跟着变红，否则"改真源 → 无关断言红、
+    // 真正的叠压不变量静默通过"
+    expect(RAIL_PITCH).toBeGreaterThanOrEqual(hit.h);
   });
 
   it('悬浮笺左缘与计数串右缘保持净距，且钳位后不越屏底', () => {
@@ -115,6 +117,31 @@ describe('计分板行几何', () => {
     const r = reportRowRects(12); // 超长名：截断到 nameMaxW
     expect(r.name.w).toBeLessThanOrEqual(REPORT_ROW.nameMaxW);
     expect(r.streak.x + r.streak.w).toBeLessThanOrEqual(SIDE_W);
+  });
+});
+
+describe('器匣 / 卸载钮 / 记事栏的相互不重叠（1.7.0 修复回归）', () => {
+  // 卸载钮挂在器匣框顶上方一行（UNLOAD_BTN_DY），命中区由 kit.Button 向四周外扩
+  // 5px；器匣框顶 = ITEM_BAR_Y − 24。三条不变量曾在测试大清理中丢失，
+  // 而现役余量只剩 1px —— 按钮高度或 DY 一动就会重新压进首行格。
+  const BTN_H = 26;
+  const BTN_HIT_PAD = 5;
+  const UNLOAD_BTN_W = 84;
+  const FRAME_TOP_PAD = 24;
+
+  it('卸载钮命中区底缘不触器匣框顶（净距 ≥ 1px）', () => {
+    const hitBottom = ITEM_BAR_Y + UNLOAD_BTN_DY + BTN_H + BTN_HIT_PAD;
+    expect(ITEM_BAR_Y - FRAME_TOP_PAD - hitBottom).toBeGreaterThanOrEqual(1);
+  });
+
+  it('卸载钮落在器匣框的横向范围内', () => {
+    const btnLeft = ITEM_BAR_X + ITEM_BAR_W - UNLOAD_BTN_W;
+    expect(btnLeft).toBeGreaterThanOrEqual(ITEM_BAR_X);
+    expect(btnLeft + UNLOAD_BTN_W).toBeLessThanOrEqual(ITEM_BAR_X + ITEM_BAR_W);
+  });
+
+  it('器匣框左缘与记事栏右缘保持净距（≥ 4px）', () => {
+    expect(ITEM_BAR_X - 10 - (LOG_X + LOG_W)).toBeGreaterThanOrEqual(4);
   });
 });
 

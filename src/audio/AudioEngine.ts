@@ -37,6 +37,9 @@ export class AudioEngine {
   /** 已解码的授权曲目（按 mood 键控）；解码失败/缺失的 mood 不入表 → 自动回落 */
   private licensedBufs = new Map<MusicMood, AudioBuffer>();
   private licensedSrc: AudioBufferSourceNode | null = null;
+  /** 授权源自有的增益节点：淡出必须作用在源上 —— 共享总线的 ramp 是「下沉再
+   *  抬升」而非淡到零，在满增益处 stop() 会露一个爆点（切心境/关开关两条路径）。 */
+  private licensedGain: GainNode | null = null;
   /** 代际计数：慢解码完成后据此丢弃过期接管（用户已切歌/已停） */
   private licensedGen = 0;
   private licensedEnabled = true;
@@ -129,10 +132,6 @@ export class AudioEngine {
     if (this.ctx) this.buses[bus].gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
   }
 
-  getVolume(bus: Bus): number {
-    return this.volumes[bus];
-  }
-
   setMuted(m: boolean): void {
     this.muted = m;
     this.applyGain();
@@ -145,11 +144,6 @@ export class AudioEngine {
     if (!this.autoMuted && !this.muted && this.ctx && this.ctx.state === 'suspended' && !document.hidden) {
       void this.ctx.resume().catch(() => {});
     }
-  }
-
-  /** 实际是否处于静音（用户静音或自动静音任一成立） */
-  isEffectivelyMuted(): boolean {
-    return this.muted || this.autoMuted;
   }
 
   isMuted(): boolean {
@@ -175,11 +169,6 @@ export class AudioEngine {
 
   isLicensedMusicEnabled(): boolean {
     return this.licensedEnabled;
-  }
-
-  /** 当前是否由授权曲目驱动（设置面板/调试显示用） */
-  isLicensedPlaying(): boolean {
-    return this.licensedSrc !== null;
   }
 
   /** 后台抓取并解码全部授权曲目；并行抓取、统一代际，失败即静默回落程序化 */
@@ -230,29 +219,48 @@ export class AudioEngine {
 
   /** 启动某心境的授权曲目循环；曲目不可用返回 false（调用方回落程序化） */
   private startLicensed(mood: MusicMood): boolean {
-    if (!this.ctx || !this.licensedEnabled) return false;
+    // 无论新曲是否可用，先停掉旧源：目标心境缺曲（单曲 fetch/decode 失败后
+    // 该心境永久缺曲、无重抓路径）时若直接 return，前一心境的授权曲会一直响，
+    // 与刚启动的程序化 BGM 双源叠放（错心境），且 maybeTakeover 见 licensedSrc
+    // 非空永不再接管 —— 整场战斗都自愈不了。
+    if (!this.ctx || !this.licensedEnabled) {
+      this.stopLicensed(0);
+      return false;
+    }
     const buf = this.licensedBufs.get(mood);
-    if (!buf) return false;
-    this.stopLicensed(0);
+    if (!buf) {
+      this.stopLicensed(0);
+      return false;
+    }
+    // 切心境：旧源走 160ms 源级淡出（与新源构成交叉淡入淡出），不再硬切
+    this.stopLicensed(160);
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
-    src.connect(this.buses.bgm);
+    const gain = this.ctx.createGain();
+    gain.gain.value = 1;
+    src.connect(gain);
+    gain.connect(this.buses.bgm);
     const gen = this.licensedGen;
     src.onended = () => {
-      if (gen === this.licensedGen) this.licensedSrc = null;
+      if (gen === this.licensedGen) {
+        this.licensedSrc = null;
+        this.licensedGain = null;
+      }
     };
     src.start();
     this.licensedSrc = src;
+    this.licensedGain = gain;
     this.stopProcedural();
     return true;
   }
 
-  /** 停掉授权曲目源。fadeMs>0 时延迟物理停止（总线淡出先行，避免硬切）。
-   *  引用保持到物理 stop 才清空：淡出窗口内 maybeTakeover 见到非空即不再
-   *  起新源 —— 否则切心境时旧源还响着、新源已起，两个源叠 260ms。 */
+  /** 停掉授权曲目源。fadeMs>0 时先对**源自身增益**做线性淡出，淡完再物理停止
+   *  （共享总线只在下沉、不淡到零，直接 stop 会露爆点）。引用保持到物理 stop
+   *  才清空：淡出窗口内 maybeTakeover 见到非空即不再起新源。 */
   private stopLicensed(fadeMs: number): void {
     const src = this.licensedSrc;
+    const gain = this.licensedGain;
     // 无源在播时不递增代际：代际拦的是"旧源迟到的 onended/接管"，不是加载批次 ——
     // 解锁后 ~1s 的加载窗口内 stopBgm 若白白递增，全部在途解码会被判过期丢弃，
     // licensedBufs 永久缺曲且无重抓路径，此后整个会话只能回落程序化
@@ -261,10 +269,23 @@ export class AudioEngine {
     const kill = () => {
       try { src.stop(); } catch { /* 已自然结束 */ }
       try { src.disconnect(); } catch { /* 已断开 */ }
-      if (this.licensedSrc === src) this.licensedSrc = null;
+      try { gain?.disconnect(); } catch { /* 已断开 */ }
+      if (this.licensedSrc === src) {
+        this.licensedSrc = null;
+        this.licensedGain = null;
+      }
     };
-    if (fadeMs > 0) window.setTimeout(kill, fadeMs);
-    else kill();
+    if (fadeMs > 0 && gain && this.ctx) {
+      try {
+        const now = this.now();
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
+        gain.gain.linearRampToValueAtTime(0.0001, now + fadeMs / 1000);
+      } catch { /* 参数异常时退化为硬停 */ }
+      window.setTimeout(kill, fadeMs + 20);
+    } else {
+      kill();
+    }
   }
 
   /** 停掉程序化调度循环（不清 mood） */

@@ -2,10 +2,15 @@
 node_modules/
 dist/
 release/
+# 发布脚本的临时目录：构建全程写这里、成功后才原子替换。中断时它们会残留，
+# 而 release 的第一步是「干净树」门禁（含未跟踪文件）—— 不入 ignore 的话，
+# 一次失败就会让下一次发布在门禁处被自己造的残留挡下。保留残留供定位，
+# 不清空（步骤 5 的失败现场需要它们来手工恢复）。
+dist.tmp/
+release.tmp/
 
-# 平衡工具链工件（balance/out 是 SQLite 工件库与导出的输出目录，保留目录本身）
+# 平衡工具链工件（balance/out 是 SQLite 工件库与导出的输出目录，由 Store 建目录）
 balance/out/
-!balance/out/.gitkeep
 
 # 旧扫描工件目录已由 balance/out 取代（历史 JSON 仍可被 sweep --compare <path> 直读）
 sweep-out/
@@ -29,6 +34,11 @@ sweep-out/
 
 # Python 隔离环境（uv 管理，Python 仅用于一次性辅助脚本，非项目运行时依赖）
 .venv/
+
+# 3D 场景工程工作目录（Blender .blend / 构建脚本 / __pycache__，游戏本体为
+# 2D Canvas 渲染、代码零引用）：保留在工作区供美术流程使用，但不入库 ——
+# 84MB 二进制会撑爆仓库，未跟踪状态也会挡发布的「干净树」门禁
+artifacts/
 
 # 系统杂项
 Thumbs.db

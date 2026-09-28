@@ -226,8 +226,7 @@ export function createMinion(uid: number, src: Unit, cell: Cell, hpPct: number, 
   if (!Number.isFinite(hpPct) || !Number.isFinite(atkPct)) {
     throw new Error(`createMinion: invalid scaling percentages hpPct=${hpPct}, atkPct=${atkPct}`);
   }
-  const m: Unit = { ...createUnit({ uid, defId: src.entry.id, team: src.team, star: 1, cell, isMinion: true }) };
-  m.isMinion = true;
+  const m: Unit = createUnit({ uid, defId: src.entry.id, team: src.team, star: 1, cell, isMinion: true });
   m.maxHp = Math.max(1, Math.round(src.maxHp * Math.max(0, hpPct)));
   m.hp = m.maxHp;
   m.atk = Math.max(1, Math.round(src.atk * Math.max(0, atkPct)));
