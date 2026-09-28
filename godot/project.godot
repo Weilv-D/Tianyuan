@@ -17,3 +17,7 @@ enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
 [rendering]
 
 renderer/rendering_method="forward_plus"
+
+[autoload]
+
+Sess="*res://render/session.gd"

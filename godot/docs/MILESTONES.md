@@ -84,7 +84,30 @@ match/ai/pool/economy/adventure/undo/replay/beast/arrange/comp(computeTraits)/in
 11. comp.buildTeam / PRESET_COMPS（演示预设+配装注入）属 M4 平衡工具链面，登记延期；prefs 的
     prefers-reduced-motion 无 Godot 等价查询，calm 首启 false（用户手动开）。
 
-## M3 表现层与美术升级
+## M3 表现层与美术升级（首批落地 2026-09-28，次批进行中）
+首批：资产迁移（64 立绘 PNG / 44 物品图标 / 怡山北篆体 ttf / 印章 woff2 → godot/assets/）；
+ui/palette.gd（夜宴五色唯一色源镜像）+ render/layout.gd + render/hud_layout.gd（几何真源）；
+HUD 布局契约 **20 用例 GdUnit4 化全绿**（hud-layout.test.ts 十组不变量移植）；
+场景树闭环 Boot→Menu→Game→Battle→Result（render/ 六场景）：大漆盘 _draw 程序化版、
+UnitView（星级 shader 描边 + 墨兽罩染——不烘焙 576 张派生纹理，PNG 原样复用）、
+拖拽布阵/买/卖/刷新/经验/一键布阵/撤销/开战 settle-then-replay 重演（事件→视图/飘字/音）；
+音频三总线（BGM/SFX/UI + SFX 混响）与合成 blip 占位；实机截图冒烟钩子
+（--smoke=<tag>,<frames> / --autostart，存 .tmp-shots-godot/ 不入库）。
+- [x] 字体分级裁决（用户实机看图）：篆体只用于题字/印章/徽章单字，按钮与句子级文本宋体
+- [ ] 次批：FxKind 17 类粒子体系 / 弹道与震屏 / 战报双列图表 / 记事栏 / 侦查 / 羁绊成员卡 /
+      器匣分页 / 设置面板 / DebugConsole / 图鉴场景 / 漆纹噪声着色器版棋盘 / 新音乐样曲过审
+
+### M3 首批实机教训
+1. GDScript const 字典裸键不可跨 const 点引用（.key 折叠失败）——键一律字符串化 + 下标引用。
+2.  是保留字（字典键 true 字符串化）；const 里不能调函数（LV_BUDGET 硬算）。
+3. Camera2D 无 ANCHOR_MODE_CENTER；场景以中心坐标构建时用「根节点 position=(W/2,H/2)」最稳。
+4. CanvasLayer 不随相机/根变换 —— 面板坐标必须用屏幕系（(W-x)/2 居中），与场景系区分。
+5. GdUnit4 assert_float 不吃 int —— dict 取值一律 float() 包裹。
+6. change_scene_to_file 在 autoload _ready 期需 call_deferred；autostart 走 boot 场景入口防 tween 竞态。
+7. （非 get_datetime_dict）。
+8. 截图前 await RenderingServer.frame_post_draw；viewport 截图目录用 res:// 相对 globalize。
+
+### （原计划条目如下，逐项并入上表勾选）
 场景树重写（布局沿用）、HUD 契约移植、棋盘/UI 着色器重制、立绘 shader 描边（不烘焙 576 纹理）、
 17 类 FxKind 墨迹粒子、音频三总线+新音乐样曲过审、DebugConsole DEV 对等、UX_DELTAS.md 清单制。
 
