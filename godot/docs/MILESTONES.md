@@ -104,6 +104,15 @@ UnitView（星级 shader 描边 + 墨兽罩染——不烘焙 576 张派生纹�
 - [ ] 下批：漆纹噪声着色器版棋盘 / DebugConsole 命令面 / 侦查覆盖层细化 / 新音乐样曲过审（3 首先审再铺） /
       BGM 连续播放与场景路由
 
+### M3 下批补记（2026-09-28）
+- 漆纹着色器棋盘（lacquer.gdshader：笔触 fbm + 宣纸颗粒 + 清漆高光带 + 盘沿沉夜）；
+  DebugConsole 命令面九命令（TS 同源纪律：作弊用 randi() 非对局随机流；满袋按 MAX_ITEMS_PER_UNIT 分发）；
+  BGM 路由（四心境 menu/prep/battle/final，五声音阶 pad 占位——新音乐样曲过审前）。
+- **实机事故：窗口拉伸没配 → 画面只剩右下角一小块**。场景按 1920×1080 中心坐标构建，
+  缺 stretch 时默认窗口下中心点落在屏幕外。修复 = project.godot [display]：
+  viewport 1920×1080 + stretch/mode="canvas_items" + aspect="keep" + 启动最大化
+  （Phaser Scale.FIT+CENTER_BOTH 的 Godot 等价物）。新建工程第一步就该配。
+
 ### M3 首批实机教训
 1. GDScript const 字典裸键不可跨 const 点引用（.key 折叠失败）——键一律字符串化 + 下标引用。
 2.  是保留字（字典键 true 字符串化）；const 里不能调函数（LV_BUDGET 硬算）。
@@ -117,6 +126,34 @@ UnitView（星级 shader 描边 + 墨兽罩染——不烘焙 576 张派生纹�
 ### （原计划条目如下，逐项并入上表勾选）
 场景树重写（布局沿用）、HUD 契约移植、棋盘/UI 着色器重制、立绘 shader 描边（不烘焙 576 纹理）、
 17 类 FxKind 墨迹粒子、音频三总线+新音乐样曲过审、DebugConsole DEV 对等、UX_DELTAS.md 清单制。
+
+## M4 对等验收 + 平衡工具链 + 发行（2026-09-28 完成主体）
+- [x] 平衡工具链（tools/balance.mjs + headless/balance_worker.gd）：CRN 金锁种子
+      （seedBase + pairIdx×104729 + k×7919，DEFAULT_SEED_BASE=20260829 原值）；
+      PRESET 九套 × 72 配对全量 **3,600 局 400s（9 局/s）**，胜率榜 57%~38%（极差 19%），
+      SQLite 四表同结构入库（node:sqlite）。**设计变更**：stdin 常驻 IPC → 批次包模式
+      （Godot 4.7 子进程侧无 stdin 读取 API）；Node 异步管道下 godot print 永不 flush →
+      spawnSync 同步批跑（shell 直跑与 spawn 行为差异实锤）
+- [x] Windows 绿色单 exe 导出（out/BaiZhanTianYuan.exe 120MB 自含 PCK）+ 实机窗口冒烟
+- [x] 功能对等核查：奇遇/天命/每日/回放快照/撤销/商肆/器匣分页/复活/墨兽/引导轮/快进
+      /存档/图鉴/设置/DebugConsole 全在位；verify_replay API 补 GdUnit4 用例（16 用例）
+- [x] **[display] 假写入事故修复**：viewport 1920×1080 + canvas_items + keep（首写因脚本
+      锚点不存在静默落空、验证打印误导——教训：配置写入必须回读 grep 验证；导出 exe 前确认
+      project.godot 实际内容）。引擎自报验证：窗口 2560×1369 时视口恒 1920×1080
+- [x] qa 门禁 9 步（+balance 冒烟 --pairs=6 --n=2）
+- [ ] 发布前遗留（2.0.0 正式出口）：新音乐样曲过审（BGM 占位中）/ 长局性能优化
+      （超时局配对 9 局/s，M4 平衡全量 6.6 分钟可接受）/ zip 分发打包
+
+### M4 实机教训
+1. **node 异步 spawn + godot：print 到管道不 flush**（shell 直跑正常）→ 工具链一律 spawnSync
+   + 退出后全量取 stdout；worker 加 stderr 心跳定位慢点。
+2. **Battle config 必须深拷贝**：run() 改写 units 条目（monster 标记），浅拷贝跨局数据污染
+   → 超时局风暴（500 局 31s → 挂死）。M1「构造只读」结论只覆盖构造，不含 run。
+3. **buildTeam 两队必须各自构建**（i 队 (0,1)/j 队 (1,200)）：复用同一份（全 team=0）→
+   team1 空阵 avg_ticks=1 秒判 —— 670 局/s 的假吞吐是空局信号。
+4. python -c 内联写 JS 的 
+ 在 bash 双引号中被提前解释成真换行（两连爆）——写多行脚本
+   一律走临时 .py 文件（M0 教训的又一次重演）。
 
 ## M4 对等验收 + 平衡工具链 + 发行
 功能清单对齐、tools/balance Node 编排 + headless 常驻池 + SQLite 同表结构（CRN 公式原值）、

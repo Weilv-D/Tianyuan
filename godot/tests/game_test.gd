@@ -230,3 +230,17 @@ func test_unequip_all_rejects_when_bar_full() -> void:
 	var res: Dictionary = Inventory.unequip_all(p, int(u["iid"]))
 	assert_bool(res["ok"]).is_false()
 	assert_int(int((u["items"] as Array).size())).is_equal(1)
+
+
+# ── 回放校验 API 面（对等 TS verifyReplay：自录自校口径） ──
+
+func test_verify_replay_self_consistent() -> void:
+	var m := _make(314)
+	m.begin_round()
+	var snaps: Array = []
+	for q: Dictionary in m.pairings:
+		m.run_battle_headless(q, bool(q["swap"]), false)
+		snaps = m.battle_snapshots
+	var report: Dictionary = Replay.verify_replay(snaps)
+	assert_int(int(report["checked"])).is_greater_equal(1)
+	assert_int(int(report["failed"])).is_equal(0)

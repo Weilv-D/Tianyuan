@@ -13,6 +13,7 @@ var body_font: SystemFont
 
 ## 音频三总线（bgm / sfx / ui —— 夜宴音频设计的 Godot 落地骨架）
 var bus_ready := false
+var bgm
 
 
 func _ready() -> void:
@@ -20,6 +21,9 @@ func _ready() -> void:
 	_load_fonts()
 	_setup_audio_buses()
 	_setup_smoke()
+	bgm = load("res://audio/bgm.gd").new()
+	bgm.name = "Bgm"
+	add_child(bgm)
 
 
 ## 实机冒烟钩子（__qa 精神的 Godot 版）：--smoke=<tag>,<frames> —— 跑 N 帧后截图
@@ -45,6 +49,12 @@ func _run_smoke(spec_txt: String) -> void:
 	await RenderingServer.frame_post_draw
 	var dir := ProjectSettings.globalize_path("res://../.tmp-shots-godot")
 	DirAccess.make_dir_recursive_absolute(dir)
+	# 布局自检：窗口尺寸 vs 视口可见矩形（canvas_items 生效 = 视口恒 1920x1080 且内容缩放进窗口）
+	var win := get_window()
+	var vis := get_viewport().get_visible_rect()
+	print('SMOKE_LAYOUT win=%dx%d visible_rect=%dx%d origin=%s content_scale=%s' % [
+		win.size.x, win.size.y, vis.size.x, vis.size.y, vis.position,
+		get_viewport().content_scale_factor])
 	var img := get_viewport().get_texture().get_image()
 	img.save_png("%s/%s.png" % [dir, tag])
 	print("SMOKE_SHOT ", tag)
@@ -107,7 +117,16 @@ func blip(bus_name: String, freq: float = 440.0, dur: float = 0.06, gain: float 
 	player.play()
 
 
-## 场景切换（带数据；对应 Phaser fadeTo）
+## 场景切换（带数据；对应 Phaser fadeTo）。BGM 心境随场景自动路由
+## （menu→menu；game_scene→prep；battle→battle；result→final）。
 func go(path: String, data: Dictionary = {}) -> void:
 	scene_data = data
+	var mood := "menu"
+	if path.contains("game_scene"):
+		mood = "prep"
+	elif path.contains("battle"):
+		mood = "battle"
+	elif path.contains("result"):
+		mood = "final"
+	bgm.set_mood(mood)
 	get_tree().change_scene_to_file(path)

@@ -16,3 +16,6 @@ data/match_fixture.json
 
 # GdUnit4 报告
 reports/
+
+# 构建产物与平衡工件（exe/SQLite，随跑随生成）
+out/

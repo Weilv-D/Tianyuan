@@ -5,7 +5,7 @@ extends Node2D
 func _ready() -> void:
 	# 实机冒烟：--autostart 跳过序章直入对局（TS ?autostart=1 先例）
 	if not Sess.scene_data.is_empty():
-		Sess.go("res://render/game_scene.tscn")
+		Sess.go.call_deferred("res://render/game_scene.tscn")
 		return
 	# 设计分辨率黑底铺满（夜宴底色 INK 950 深渊）
 	var bg := ColorRect.new()

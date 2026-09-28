@@ -13,6 +13,19 @@ var placeable_cells := {}  # Vector2i -> true（拖拽落点染色）
 var battle_mode := false   # true = 8×8 全域观战；false = 准备（下半 4 行可放）
 
 
+func _ready() -> void:
+	# 漆纹层：着色器生成的笔触漆纹叠在 _draw 底座之上（z=-1 在格线内容之下）
+	var lacquer := ColorRect.new()
+	lacquer.color = Color.WHITE
+	lacquer.position = Vector2(0, 0)
+	lacquer.size = Vector2(Layout.BOARD_SIZE, Layout.BOARD_SIZE)
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://render/lacquer.gdshader")
+	lacquer.material = mat
+	lacquer.z_index = -1
+	add_child(lacquer)
+
+
 func _draw() -> void:
 	var pad := float(Layout.BOARD_PAD)
 	var size := float(Layout.BOARD_SIZE)

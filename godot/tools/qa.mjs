@@ -89,6 +89,16 @@ function step(name, ok, detail = '') {
     r ? `${r.passed}/${r.passed + r.failed} 整局逐行一致 ${Math.round(r.ms / 100) / 10}s daily=0x${(r.dailySeed?.gd ?? 0).toString(16)}` : String(probe.stderr).split('\n')[0] ?? '');
 }
 
+// 8. 平衡工具链冒烟（M4：CRN 配对矩阵 n=2 → worker 执行 → SQLite 四表入库）
+{
+  const quick = process.argv.includes('--quick');
+  const r = spawnSync(process.execPath, ['--import', 'tsx', 'tools/balance.mjs', '--', '--pairs=6', '--n=2', '--db=out/balance-qa.db'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
+  const ok = r.status === 0 && /配对=6 局=12/.test(String(r.stdout));
+  const m = String(r.stdout).match(/极差 [0-9.]+%/);
+  const detail = m ? m[0] : (String(r.stderr).split('\n')[0] ?? '');
+  step('balance 冒烟', ok, detail);
+}
+
 const failed = steps.filter((s) => !s.ok).length;
 console.log(`[qa] ${steps.length - failed}/${steps.length} 步通过`);
 process.exit(failed === 0 ? 0 : 1);
