@@ -203,14 +203,21 @@ func _mix_layer(l: Array, left: Array, right: Array) -> void:
 	var ln := int(dur * RATE)
 	if ln <= 0 or start >= left.size():
 		return
-	# RBJ biquad 系数（tone 的 cutoff 低通 / noise 的 highpass·bandpass 恒定峰值）
+	# RBJ biquad 系数 —— 滤波频率按层型取值：tone 用 cutoff（低通），
+	# noise 用其滤波中心频率（highpass/bandpass）。曾误用 tone 的基频当滤波频率，
+	# 全部 tone 被压成近纯基频、亮部尽失（2026-09-29 深查修复）
+	var filter_hz := 0.0
+	if kind == "tone":
+		filter_hz = cutoff
+	elif kind == "noise":
+		filter_hz = tone_hz
 	var b0 := 1.0
 	var b1 := 0.0
 	var b2 := 0.0
 	var a1 := 0.0
 	var a2 := 0.0
-	if ftype != "" and tone_hz > 0.0 and tone_hz < RATE * 0.49:
-		var w0 := TAU * tone_hz / RATE
+	if ftype != "" and filter_hz > 0.0 and filter_hz < RATE * 0.49:
+		var w0 := TAU * filter_hz / RATE
 		var cos_w := cos(w0)
 		var alpha := sin(w0) / (2.0 * maxf(0.1, fq))
 		var a0 := 1.0 + alpha

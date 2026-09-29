@@ -142,11 +142,12 @@ func _process(delta: float) -> void:
 
 
 func _soft_circle(r: float, color: Color) -> Node2D:
+	# _FxShape 是 Node2D：没有 Control 式 size 属性（曾误赋值即炸，setup 中途中断
+	# → 立绘/血条/星标全不建，棋盘空壳——2026-09-29 战斗路径首跑实证修复）
 	var n := _FxShape.new()
 	n.kind = 0
 	n.radius = r
 	n.color = color
-	n.size = Vector2(r * 2, r * 2.6)
 	n.position = Vector2(-r, -r * 1.3)
 	return n
 
@@ -156,7 +157,6 @@ func _soft_ring(r: float, color: Color, alpha: float) -> Node2D:
 	n.kind = 1
 	n.radius = r
 	n.color = Color(color, alpha)
-	n.size = Vector2(r * 2, r * 2)
 	n.position = Vector2(-r, -r)
 	return n
 

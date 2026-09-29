@@ -3,6 +3,9 @@ extends Node2D
 ## 存档入口与 has_save 同口径（坏档自愈在 SaveStore 内）。
 
 func _ready() -> void:
+	# 子元素为中心基制坐标（负偏移）：根必须居中，否则只渲染左上象限
+	# （2026-09-29 排查实证；与 boot/result/codex 同律）
+	position = Vector2(Layout.W / 2.0, Layout.H / 2.0)
 	_draw_bg()
 	var cx := 0.0
 

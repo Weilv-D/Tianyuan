@@ -4,9 +4,12 @@ extends Node2D
 ## （traitIcons.ts：源字体无「弈」篆形，开屏题字用「天」）。
 
 func _ready() -> void:
-	# 实机冒烟：--autostart 跳过序章直入对局（TS ?autostart=1 先例）
+	# 实机冒烟：--autostart 跳过序章直入对局（TS ?autostart=1 先例）。
+	# 必须转发既有 scene_data —— Sess.go 的 data 参数默认空字典，不传会把
+	# _setup_smoke 放进去的 match 清空，game_scene 拿不到对局弹回菜单
+	# （2026-09-29 排查实证：此前所有 autostart 冒烟截的都是菜单，假阳性）
 	if not Sess.scene_data.is_empty():
-		Sess.go.call_deferred("res://render/game_scene.tscn")
+		Sess.go.call_deferred("res://render/game_scene.tscn", Sess.scene_data)
 		return
 	# 设计分辨率黑底铺满（夜宴底色 INK 950 深渊）。根节点居中偏移与 game_scene 同律：
 	# 场景按中心坐标构建，无此偏移时背景只盖左上象限、上排元素出屏（2026-09-28

@@ -44,7 +44,9 @@ func _ready() -> void:
 	if match_ref == null:
 		Sess.go("res://render/menu.tscn")
 		return
-	position = Vector2(Layout.W / 2.0, Layout.H / 2.0)
+	# 根在原点：全部子元素用设计绝对坐标（0..1920/0..1080），鼠标命中测试
+	# （出售印/拖放/徽章）与 e.position 同基制。曾误设 position=(W/2,H/2)（M3 首批
+	# 从中心基制模板抄来）——内容整体偏移出屏且输入全错位，2026-09-29 排查实证修复。
 	# DebugConsole 仅 DEV：编辑器/调试构建可见，发布 exe 不实例化（TS 同源纪律）
 	if OS.is_debug_build() or OS.has_feature("editor"):
 		_dbg = DebugConsole.new()
@@ -74,7 +76,7 @@ func _ready() -> void:
 func _draw_bg() -> void:
 	var bg := ColorRect.new()
 	bg.color = Palette.INK[950]
-	bg.position = Vector2(-Layout.W, -Layout.H) / 2.0
+	bg.position = Vector2.ZERO
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.z_index = -10
 	add_child(bg)
@@ -92,18 +94,18 @@ func _label(text: String, size: int, color: Color, font = null) -> Label:
 func _build_top_bar() -> void:
 	var bar := ColorRect.new()
 	bar.color = Color(Palette.INK[900], 0.92)
-	bar.position = Vector2(-Layout.W / 2.0, -Layout.H / 2.0)
+	bar.position = Vector2.ZERO
 	bar.size = Vector2(Layout.W, Layout.HEADER_H)
 	bar.z_index = -5
 	add_child(bar)
 	var title := _label("百 战 天 元", 34, Palette.PAPER[100], Sess.seal_font)
-	title.position = Vector2(-Layout.W / 2.0 + 400, -Layout.H / 2.0 + 24)
+	title.position = Vector2(400, 24)
 	title.size = Vector2(800, 50)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
-	for pair: Array in [["round", -360], ["hp", -180], ["gold", -20], ["level", 160], ["streak", 330]]:
+	for pair: Array in [["round", 600], ["hp", 780], ["gold", 940], ["level", 1120], ["streak", 1290]]:
 		var l := _label("", 26, Palette.PAPER[100])
-		l.position = Vector2(pair[1], -Layout.H / 2.0 + 28)
+		l.position = Vector2(pair[1], 28)
 		l.size = Vector2(200, 36)
 		labels[pair[0]] = l
 		add_child(l)
@@ -252,10 +254,6 @@ func _build_side_panels() -> void:
 	intel_label = _label("", 17, Palette.PAPER[100])
 	intel_label.position = Vector2(Layout.REPORT_X, 160)
 	intel_label.size = Vector2(Layout.SIDE_W, 24)
-	intel_label.mouse_filter = Control.MOUSE_FILTER_STOP
-	intel_label.gui_input.connect(func(ev: InputEvent) -> void:
-		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-			_open_scout_for_intel())
 	add_child(intel_label)
 	# 八方诸侯（计分板）
 	var sb_cap := _label("八 方 诸 侯", 13, Palette.INK[300])
@@ -265,11 +263,6 @@ func _build_side_panels() -> void:
 		var l := _label("", 15, Palette.PAPER[300])
 		l.position = Vector2(Layout.REPORT_X, 338 + i * 30)
 		l.size = Vector2(Layout.SIDE_W, 24)
-		l.mouse_filter = Control.MOUSE_FILTER_STOP
-		var row_i := i
-		l.gui_input.connect(func(ev: InputEvent) -> void:
-			if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-				_open_scout_for_row(row_i))
 		score_rows.append(l)
 		add_child(l)
 	# 记事（左下）
@@ -650,7 +643,10 @@ func _refresh_side_panels() -> void:
 	# 战报：上回合人类结果 + 计分板最近变动（简版；双列图表登记 UX_DELTAS P1 次批强化）
 	var h := match_ref.human()
 	var rep_lines: Array = []
-	match String(h["lastOutcome"]):
+	# lastOutcome 首回合为 null（TS 同口径）——String() 构造不接受 null，必须空串化
+	var outcome_v: Variant = h.get("lastOutcome", null)
+	var outcome_s := "" if outcome_v == null else String(outcome_v)
+	match outcome_s:
 		"win":
 			rep_lines.append("你击败了 %s" % opp_name)
 		"loss":
@@ -672,6 +668,8 @@ func _on_item_chip(slot: int) -> void:
 	var gi := item_page * int(Spec.c("ITEM_BAR_SLOTS")) + slot
 	if unload_mode:
 		return
+	if selected_item_idx != gi:
+		Sess.sfx.play("ui")  # 选中才鸣，取消不鸣（原版同口径）
 	selected_item_idx = gi if selected_item_idx != gi else -1
 	_refresh_item_bar()
 
@@ -679,12 +677,14 @@ func _on_item_chip(slot: int) -> void:
 func _on_item_page(dir: int) -> void:
 	item_page = clampi(item_page + dir, 0, 99)
 	selected_item_idx = -1
+	Sess.sfx.play("ui")
 	_refresh_item_bar()
 
 
 func _on_toggle_unload() -> void:
 	unload_mode = not unload_mode
 	selected_item_idx = -1
+	Sess.sfx.play("ui")
 	_refresh_item_bar()
 
 
@@ -774,6 +774,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				var badge_i := _trait_badge_at(e.position)
 				if badge_i >= 0:
 					_open_trait_members(badge_i)
+					get_viewport().set_input_as_handled()
+					return
+				# 侦查入口：计分板行 / 敌情（与徽章同走 _unhandled_input 命中测试——
+				# 本场景输入统一架构，Control gui_input 挂 Node2D 子树不可靠）
+				var row_i := _score_row_at(e.position)
+				if row_i >= 0:
+					_open_scout_for_row(row_i)
+					get_viewport().set_input_as_handled()
+					return
+				if _intel_hit(e.position):
+					_open_scout_for_intel()
 					get_viewport().set_input_as_handled()
 					return
 				_try_pick(e.position)
@@ -1075,6 +1086,23 @@ func _show_round_result() -> void:
 
 # ── 侦查覆盖层（原版 ScoutOverlay 对齐）：点击计分板行/敌情查看对手阵地快照 ──
 
+## 计分板行命中（338 + i×30 起点，含 6px 容差；与侧栏构建几何同源）
+func _score_row_at(world: Vector2) -> int:
+	if world.x < Layout.REPORT_X - 6.0 or world.x > Layout.REPORT_X + Layout.SIDE_W + 6.0:
+		return -1
+	for i: int in score_rows.size():
+		var y0 := 338.0 + i * 30.0 - 6.0
+		if world.y >= y0 and world.y <= y0 + 36.0:
+			return i
+	return -1
+
+
+## 敌情行命中（y 160..184 带）
+func _intel_hit(world: Vector2) -> bool:
+	return world.x >= Layout.REPORT_X - 6.0 and world.x <= Layout.REPORT_X + Layout.SIDE_W + 6.0 \
+		and world.y >= 154.0 and world.y <= 190.0
+
+
 func _open_scout_for_row(row_i: int) -> void:
 	var standings: Array = match_ref.standings()
 	if row_i >= standings.size() or result_panel != null:
@@ -1285,7 +1313,9 @@ func _detect_merge_sound(before: Dictionary) -> void:
 	for iid_v in after:
 		var iid := int(iid_v)
 		var star := int(after[iid_v])
-		if star > int(before.get(iid, 0)):
+		# 只有「此前已有同 iid 棋子」的升星才算合成 —— 首次买入（before 无此 iid）
+		# 不鸣（曾误判每次首买都 levelup，与 coin 叠声）
+		if before.has(iid) and star > int(before[iid]):
 			if star >= 3:
 				var u = GameState.find_unit(match_ref.human(), iid)
 				var cost := 0

@@ -30,7 +30,8 @@ func _ready() -> void:
 	if match_ref == null or config.is_empty():
 		Sess.go("res://render/menu.tscn")
 		return
-	position = Vector2(Layout.W / 2.0, Layout.H / 2.0)
+	# 根在原点：子元素用设计绝对坐标（棋盘 BATTLE_BOARD_LX=(1920-800)/2 等），与
+	# game_scene 同律（曾误设根居中致整体偏移，2026-09-29 排查实证修复）
 	_draw_bg()
 
 	board_view = BoardView.new()
@@ -66,7 +67,7 @@ func _ready() -> void:
 func _draw_bg() -> void:
 	var bg := ColorRect.new()
 	bg.color = Palette.INK[950]
-	bg.position = Vector2(-Layout.W, -Layout.H) / 2.0
+	bg.position = Vector2.ZERO
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.z_index = -10
 	add_child(bg)
@@ -81,8 +82,8 @@ func _process(delta: float) -> void:
 		var amp: float = minf(14.0, 2.0 + shake_v * 3.0)
 		var tw := create_tween()
 		tw.tween_method(func(t: float) -> void:
-			position = Vector2(Layout.W / 2.0, Layout.H / 2.0) + Vector2(randf_range(-amp, amp), randf_range(-amp, amp)) * (1.0 - t), 0.0, 1.0, minf(0.32, 0.09 + shake_v * 0.09))
-		tw.tween_callback(func() -> void: position = Vector2(Layout.W / 2.0, Layout.H / 2.0))
+			position = Vector2(randf_range(-amp, amp), randf_range(-amp, amp)) * (1.0 - t), 0.0, 1.0, minf(0.32, 0.09 + shake_v * 0.09))
+		tw.tween_callback(func() -> void: position = Vector2.ZERO)
 	acc += minf(0.05, delta) * speed
 	var steps := 0
 	while acc >= DT and steps < 8:
