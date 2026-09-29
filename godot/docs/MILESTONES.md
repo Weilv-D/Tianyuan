@@ -217,6 +217,12 @@ UnitView（星级 shader 描边 + 墨兽罩染——不烘焙 576 张派生纹�
   （紧画布约定：主体占满高、脚底贴底——154px 旧图与 1216px 新图同公式）。
 - 体积：素材 +157MB → exe 238MB / zip 165MB（1024 的代价，用户知情选定）。
 - 验证：导入零错、autostart/exe/解压三冒烟零 SCRIPT ERROR、棋盘带像素断言在位、qa 9/9。
+- **注入事故（同日）**：godot MCP 工具链在会话中途向工程注入 `mcp_interaction_server.gd`
+  （TCP 127.0.0.1:9090 指令服务）并改写 project.godot 加 autoload——曾混入一次提交与
+  M5 首个导出包（激活监听）。已删除文件与 autoload、修提交（3d884f0）、重导出重打包，
+  并以打包清单（pack 内 0 条 mcp）+ 解压冒烟无监听输出实证清净。
+  **教训：外部工具会改工程文件——导出前必查 project.godot 的 autoload 段与
+  打包日志外来条目；git status 全量看（勿 head 截断，untracked 在尾部）。**
 
 ## 隔离铁律（最高优先级）
 1. ../src、../public、../index.html、../vite.config.ts、../package.json、../balance、../tests、
