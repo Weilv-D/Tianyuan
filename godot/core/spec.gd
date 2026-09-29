@@ -74,12 +74,20 @@ static func c(k: String, def: float = 0.0) -> float:
 
 static func mech(k: String) -> float:
 	ensure()
-	return float(cfg.get("MECH", {}).get(k, 0.0))
+	var v: Variant = cfg.get("MECH", {}).get(k, null)
+	if v == null:
+		push_error("Spec: MECH 常量缺失 %s（真伤上限/加时衰减等机制将静默失效）" % k)
+		return 0.0
+	return float(v)
 
 
 static func legend(k: String) -> float:
 	ensure()
-	return float(cfg.get("LEGEND_T3", {}).get(k, 0.0))
+	var v: Variant = cfg.get("LEGEND_T3", {}).get(k, null)
+	if v == null:
+		push_error("Spec: LEGEND_T3 常量缺失 %s（天命乘区/免控将静默失效）" % k)
+		return 0.0
+	return float(v)
 
 
 ## 星级缩放表（索引 = star-1）
@@ -87,7 +95,7 @@ static func star_scale(table: String, si: int) -> float:
 	ensure()
 	var arr: Array = cfg.get(table, [])
 	if si < 0 or si >= arr.size():
-		push_error("Spec: 星级索引越近 %s[%d]" % [table, si])
+		push_error("Spec: 星级索引越界 %s[%d]" % [table, si])
 		return 1.0
 	return float(arr[si])
 

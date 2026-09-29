@@ -3,6 +3,8 @@ extends Node2D
 ## 布局沿用：中央面板 + 网格；美术用现役立绘 PNG。
 
 func _ready() -> void:
+	# 图鉴可能是进程首个触达 Spec 的场景：不 ensure 则 champions 为空、网格全空
+	Spec.ensure()
 	position = Vector2(Layout.W / 2.0, Layout.H / 2.0)
 	var bg := ColorRect.new()
 	bg.color = Palette.INK[950]
@@ -47,9 +49,16 @@ func _ready() -> void:
 	add_child(back)
 
 
+var _detail_layer: CanvasLayer = null
+
+
 func _detail(c: Dictionary) -> void:
 	Sess.sfx.play("ui")
+	# 单实例守卫：连点多格会叠 N 层 dim（每层各自挡输入、要逐层点关）
+	if _detail_layer != null and is_instance_valid(_detail_layer):
+		_detail_layer.queue_free()
 	var layer := CanvasLayer.new()
+	_detail_layer = layer
 	layer.layer = 95
 	add_child(layer)
 	var dim := ColorRect.new()
@@ -57,7 +66,8 @@ func _detail(c: Dictionary) -> void:
 	dim.size = Vector2(Layout.W, Layout.H)
 	dim.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and ev.pressed:
-			layer.queue_free())
+			layer.queue_free()
+			_detail_layer = null)
 	layer.add_child(dim)
 	var panel := Panel.new()
 	panel.size = Vector2(680, 560)
@@ -120,11 +130,14 @@ class _Portrait extends Button:
 		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		var v := VBoxContainer.new()
 		v.alignment = BoxContainer.ALIGNMENT_CENTER
+		# Button 不是容器：VBox 无显式尺寸时收缩到最小内容高，EXPAND_FILL 的立绘分到 0 高
+		v.size = Vector2(104, 140)
 		var tex := TextureRect.new()
 		tex.texture = load("res://assets/pieces/%s.png" % String(c["id"]))
 		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tex.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		tex.custom_minimum_size = Vector2(96, 100)
 		v.add_child(tex)
 		var nm := Label.new()
 		nm.text = "%s %d金" % [String(c["name"]), rarity]

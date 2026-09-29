@@ -13,7 +13,9 @@ extends RefCounted
 const TICK_RATE := 30
 const DT := 1.0 / 30.0
 const OVERTIME_START_TICK := 30 * TICK_RATE
-const EFFECT_INTERVAL := 15  # max(1, round(TICK_RATE / DOT_TICKS_PER_SEC))，两常量皆定数
+# DoT/领域结算间隔：从 Spec 推导（与 TS max(1, round(TICK_RATE / DOT_TICKS_PER_SEC)) 同式），
+# 不落字面量——DOT_TICKS_PER_SEC 调档时间隔与 dt 双真源脱节
+static var EFFECT_INTERVAL := maxi(1, int(round(float(TICK_RATE) / Spec.c("DOT_TICKS_PER_SEC", 2.0))))
 
 const CONTROL_KINDS: Array = ["stun", "silence", "disarm", "slow", "taunt"]
 const STACKABLE_KINDS: Array = ["aspdUp", "atkUp", "armorUp", "mrUp", "dr"]
@@ -39,6 +41,17 @@ var _max_ticks := 0
 
 var finished := false
 var result: Dictionary = {}
+## 输入校验失败标记：非法输入整场拒步进（对齐 TS throw 上抛后「无可玩战斗」）
+var _invalid := false
+
+
+func _bad_input(msg: String) -> void:
+	_invalid = true
+	units.clear()
+	# 步进循环以 finished 为出口：非法输入立刻终局，防驱动方死循环
+	finished = true
+	result = { "winner": -1, "ticks": 0, "timeout": false, "survivors": [], "remainingHpRatio": 0.0 }
+	push_error(msg)
 
 # 热路径常量缓存（Spec 一次性读取）
 var _mana_per_attack := 10.0
@@ -66,36 +79,39 @@ func _init(cfg: Dictionary, sink: Callable = Callable(), record_events: bool = t
 	_occ.resize(Grid.COLS * Grid.ROWS)
 	_occ.fill(-1)
 
-	# 1) 建单位（uid 升序）。输入校验同 TS：非整数 uid/格、重复 uid、越界/重叠格即报错拒建
+	# 1) 建单位（uid 升序）。输入校验同 TS：非法输入整场拒建（TS 为 throw 上抛；
+	# GDScript 无异常系统，push_error 置 _invalid 并中止建场——双端对非法输入都不产出可玩战斗）
 	var inputs: Array = (cfg.get("units", []) as Array).duplicate()
+	# 排序比较器对缺 uid 键容错（0 哨兵保序），逐条拒绝在校验循环内做
 	inputs.sort_custom(func(a, b):
-		return int(a["uid"]) < int(b["uid"]))
+		return int(a.get("uid", 0)) < int(b.get("uid", 0)))
 	var seen_uid := {}
 	for input: Dictionary in inputs:
 		if not ParityUtil.js_is_int(input.get("uid", null)):
-			push_error("战斗输入非整数 uid: %s（%s）" % [str(input.get("uid")), str(input.get("defId"))])
-			continue
-		var cell_d: Dictionary = input["cell"]
+			_bad_input("战斗输入非整数 uid: %s（%s）" % [str(input.get("uid")), str(input.get("defId"))])
+			return
+		var cell_d: Dictionary = input.get("cell", {})
 		if not ParityUtil.js_is_int(cell_d.get("c", null)) or not ParityUtil.js_is_int(cell_d.get("r", null)):
-			push_error("战斗输入非整数格: (%s,%s) %s" % [str(cell_d.get("c")), str(cell_d.get("r")), str(input.get("defId"))])
-			continue
+			_bad_input("战斗输入非整数格: (%s,%s) %s" % [str(cell_d.get("c")), str(cell_d.get("r")), str(input.get("defId"))])
+			return
 		var uid := int(input["uid"])
 		if seen_uid.has(uid):
-			push_error("战斗输入重复 uid: %d（%s）" % [uid, str(input.get("defId"))])
-			continue
+			_bad_input("战斗输入重复 uid: %d（%s）" % [uid, str(input.get("defId"))])
+			return
 		seen_uid[uid] = true
 		var c := int(cell_d["c"])
 		var r := int(cell_d["r"])
 		if not Grid.in_bounds(c, r):
-			push_error("战斗输入越界格: (%d,%d) %s" % [c, r, str(input.get("defId"))])
-			continue
+			_bad_input("战斗输入越界格: (%d,%d) %s" % [c, r, str(input.get("defId"))])
+			return
 		var i := Grid.cell_index(c, r)
 		if _occ[i] != -1:
-			push_error("战斗输入重叠格: (%d,%d) %s 与 uid %d 冲突" % [c, r, str(input.get("defId")), _occ[i]])
-			continue
+			_bad_input("战斗输入重叠格: (%d,%d) %s 与 uid %d 冲突" % [c, r, str(input.get("defId")), _occ[i]])
+			return
 		var u := Unit.create(input)
 		if u == null:
-			continue
+			_bad_input("战斗输入含无法构造的单位: %s" % str(input.get("defId")))
+			return
 		units.append(u)
 		_next_uid = maxi(_next_uid, u.uid + 1)
 		_occ[i] = u.uid
@@ -1017,7 +1033,7 @@ func _kill_unit(u: Unit, killer: Unit) -> void:
 # ───────────────── 主循环 ─────────────────
 
 func step() -> void:
-	if finished:
+	if finished or _invalid:
 		return
 	tick += 1
 

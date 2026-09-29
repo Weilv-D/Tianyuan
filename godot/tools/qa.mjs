@@ -13,7 +13,13 @@ const GODOT_DIR = path.resolve(fileURLToPath(new URL('..', import.meta.url))).re
 function extractTag(text, tag) {
   for (const line of String(text).split(/\r?\n/)) {
     const i = line.indexOf(`${tag} `);
-    if (i >= 0) return JSON.parse(line.slice(i + tag.length + 1));
+    if (i >= 0) {
+      try {
+        return JSON.parse(line.slice(i + tag.length + 1));
+      } catch {
+        return null;
+      }
+    }
   }
   return null;
 }
@@ -33,6 +39,13 @@ function step(name, ok, detail = '') {
     ok = r.status === 0;
   }
   step('import 刷新', ok);
+}
+
+// 1b. 全树脚本加载（--import 与 GdUnit4 都不深检未引用的渲染层：战斗场景曾带
+//     Parse Error 过全部门禁，窗口实机冒烟才暴露——2026-09-29 教训，常设防线）
+{
+  const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/parse_check.gd'], { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  step('全树 parse', r.status === 0 && /PARSE_ALL_OK/.test(String(r.stdout)), (String(r.stdout).match(/PARSE_FAIL \S+/g) ?? []).join(' '));
 }
 
 // 2. 规格导出 + 幂等（同源必同产物）

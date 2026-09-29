@@ -17,7 +17,9 @@ func _tint_of(r: Dictionary, fallback: Color) -> Color:
 	var params: Dictionary = r.get("params", {})
 	if params.has("hue"):
 		return Palette.FX_TINTS.get(int(params["hue"]), fallback)
-	return r.get("tint", fallback)
+	# get 对「存在但值为 null」的键不回落默认值（battle_scene 恒写入 tint 键）
+	var t: Variant = r.get("tint", null)
+	return t if t is Color else fallback
 
 
 func clear() -> void:
@@ -39,7 +41,8 @@ func _register(n: Node2D) -> Node2D:
 func _after(ms: float, fn: Callable) -> void:
 	var g := _gen
 	get_tree().create_timer(ms / 1000.0).timeout.connect(func() -> void:
-		if g == _gen and is_inside_tree():
+		# is_instance_valid 前置：节点已释放时对 freed self 调 is_inside_tree 本身即崩
+		if g == _gen and is_instance_valid(self) and is_inside_tree():
 			fn.call())
 
 
@@ -269,9 +272,11 @@ func fullscreen_flash(color: Color, strength: float = 1.0) -> void:
 	var rect := ColorRect.new()
 	rect.color = Color(color, 0.32 * strength)
 	rect.size = Vector2(Layout.W, Layout.H)
-	rect.position = Vector2(-Layout.W, -Layout.H) / 2.0
+	# 原点铺满 + 挂当前场景根：effects_layer 位于 board_view 缩放子树内，
+	# 全屏矩形挂本层会被缩到 1/4 且随板偏移
+	rect.position = Vector2.ZERO
 	rect.z_index = 90
-	add_child(rect)
+	get_tree().current_scene.add_child(rect)
 	_strays.append(rect)
 	rect.tree_exited.connect(func() -> void: _strays.erase(rect))
 	var tw := rect.create_tween()

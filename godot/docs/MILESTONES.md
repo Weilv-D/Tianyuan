@@ -247,6 +247,37 @@ UnitView（星级 shader 描边 + 墨兽罩染——不烘焙 576 张派生纹�
   → 导出 → 校验日志零 mcp_interaction/零 error → exe 拷回。**以后导出一律走此工具**。
   首版工具漏拷 .godot 致全新 import 阶段 0xC0000005 崩——缓存必须随拷。
 
+## 第十三轮全库深度审查 ✅ 2026-09-29（2.0.1）
+
+用户指令：系统、全面、逐文件深度审查（数值平衡/可读性/结构/错误处理/资源释放），修复后
+验证 + 文档体系同步 + README 重写。执行 = 五路并行只读审查（core / game / render+ui /
+audio+headless+tools+tests / 数值平衡与 spec 对账）+ 高危结论逐条回源码核实（沿用
+Phaser 版十二轮审查纪律）。
+
+**裁定结果**：39 项发现，其中子代理报的 2 项起初被主链路裁定为误报，**1 项随后被
+cat -A 实证推翻（MouseMotion 分支确为死代码——Read 目测缩进不可靠，缩进争议必须
+cat -A 看真实 tab）**；并行会话的视觉审查记忆（基线同为 e8c09ba、未提交修复）贡献了
+本会话五路审查漏掉的独特发现（resultPending 结算链断裂/tint null/viewer 血条/codex
+ensure），逐条回源码核实后修复；其对 `_fmt_skill_desc` 数组参数「40/64 中招」的结论
+经 spec.json 全量扫描证伪（0/64 含数组值），不修。
+
+**最重要发现（战斗场景自 2.0.0 第三轮起从未成功加载）**：battle_scene.gd 两处 Parse
+Error（`var sv := [1.0,2.0,4.0][i]` 无类型数组索引不可推断；game_scene.gd 奇遇按钮回调
+缩进塌陷）——`--import` 不深检脚本、GdUnit4 只加载测试引用链、旧 parse_check.gd 只实例化
+Unit 一个类、像素断言与键盘冒烟都只覆盖 game_scene。**门禁四层全绿而战斗场景是坏的**。
+修复 + qa 增「全树 parse」步骤（headless/parse_check.gd 递归 load 全部 .gd，qa 现 10 步）。
+
+**实机验证盲区方法论教训**：渲染层验证必须「窗口模式跑过 + 内容像素断言」——本轮新增
+`--battle-smoke`（快进到人类参战轮直进战斗场景）与 `--smoke=<tag>,<frames>,keyd`（合成
+D 键断言商店 digest 变化）两条常驻探针，战斗路径 1200 帧含死亡/弹道零错误实证
+（`_sync_all` 阵亡除名 + busy 让路 + 弹道双轨坐标同批修复）。
+
+其余修复全清单见 CHANGELOG 2.0.1：天命免控（对拍语料外的行为分叉——单测钉）、键盘虚
+函数名、商店悬停 connect 累积、图鉴叠层/塌缩、奇遇重入、轮空过期战报、sfx 并发上限、
+bgm tween 管理、parity 恒真断言、export 夹具出 PCK（exe 减 5MB）等。
+
+发布 2.0.1：影子导出 mcp=0，zip 165MB，解压独立冒烟通过。
+
 ## 隔离铁律（最高优先级）
 1. ../src、../public、../index.html、../vite.config.ts、../package.json、../balance、../tests、
    ../scripts、../docs 一律零改动；唯一接触方式是只读 import。

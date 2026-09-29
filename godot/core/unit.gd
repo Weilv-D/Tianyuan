@@ -91,7 +91,7 @@ static func clampf(v: float, lo: float, hi: float) -> float:
 static func create(input: Dictionary) -> Unit:
 	Spec.ensure()
 	var entry = Spec.champion_by_id.get(input.get("defId", ""), null)
-	if entry.is_empty():
+	if entry == null or entry.is_empty():
 		push_error("未知棋子: %s" % str(input.get("defId")))
 		return null
 	var star_v: Variant = input.get("star", 0)
@@ -141,6 +141,8 @@ static func create(input: Dictionary) -> Unit:
 	u.star = star
 	u.is_minion = input.get("isMinion", false)
 	u.is_monster = input.get("monster", false)
+	# 天命 3★五费天生免疫控制（battle.apply_status 以 cc_immune > 0 短路全部 CONTROL_KINDS）
+	u.cc_immune = 1_000_000_000 if legend and Spec.legend("ccImmune") > 0.5 else 0
 
 	# maxHp 下界 1 / startMp 下界 0：负向 bonus 在边界终止，不沿战斗链路传播
 	u.max_hp = maxf(1.0, ParityUtil.js_round(

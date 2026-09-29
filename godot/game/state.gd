@@ -109,9 +109,7 @@ static func clone_board(board: Array) -> Array:
 	var out: Array = []
 	out.resize(board.size())
 	for i: int in board.size():
-		out[i] = board[i] if board[i] != null and board[i] is Dictionary else null
-		if board[i] is Dictionary:
-			out[i] = clone_unit(board[i])
+		out[i] = clone_unit(board[i]) if board[i] is Dictionary else null
 	return out
 
 
@@ -365,7 +363,11 @@ static func can_place(p: Dictionary, iid: int, where: String, slot) -> Dictionar
 	if on_board_now:
 		u = p["board"][src_board]
 	else:
-		u = p["bench"][_index_of_iid(p["bench"], iid)]
+		# 备战席查无此 iid 时 -1 会回绕末格（GD 负索引），必须显式拒绝
+		var bi := _index_of_iid(p["bench"], iid)
+		if bi < 0:
+			return { "ok": false, "reason": "找不到这个棋子" }
+		u = p["bench"][bi]
 	if u == null or not (u is Dictionary):
 		return { "ok": false, "reason": "找不到这个棋子" }
 

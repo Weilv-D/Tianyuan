@@ -108,6 +108,14 @@ batches.forEach((slice, bi) => {
   for (const job of slice) jobMeta.set(job.pairIdx, job.meta);
   writeFileSync(path.join(GODOT_DIR, `.tmp/balance_jobs_${bi}.json`), JSON.stringify({ seedBase, jobs: slice }));
 });
+// 批次临时文件：exit 钩子统一清理（worker 失败走 process.exit 的路径同样覆盖）——
+// 必须在 worker 循环前注册，失败退出时才已挂上
+process.on('exit', () => {
+  for (let bi = 0; bi < batches.length; bi++) {
+    const p2 = path.join(GODOT_DIR, `.tmp/balance_jobs_${bi}.json`);
+    if (existsSync(p2)) unlinkSync(p2);
+  }
+});
 
 // spawnSync：worker 退出后全量收 stdout（异步管道在 Windows 下 godot print 不逐行 flush，实测挂死；
 // 同步路径与 shell 直跑行为一致 —— 心跳/结果都在退出时一次性可得）
@@ -126,10 +134,6 @@ for (let bi = 0; bi < batches.length; bi++) {
   results.set(bi, parsed);
   process.stderr.write(`[balance] 批 ${bi + 1}/${batches.length} 完成（${Math.round((parsed.ms ?? 0) / 100) / 10}s）
 `);
-}
-for (let bi = 0; bi < batches.length; bi++) {
-  const p2 = path.join(GODOT_DIR, `.tmp/balance_jobs_${bi}.json`);
-  if (existsSync(p2)) unlinkSync(p2);
 }
 
 // 归拢（worker 无输出 = 启动/挂死失败，必须报错而不是 0 配对假成功）
@@ -174,10 +178,11 @@ const spread = (standings[0].rate - standings[standings.length - 1].rate) * 100;
 mkdirSync(path.dirname(path.resolve(GODOT_DIR, dbPath)), { recursive: true });
 const db = new DatabaseSync(path.resolve(GODOT_DIR, dbPath));
 db.exec(DDL);
-const insRun = db.prepare('INSERT INTO runs (started_at, finished_at, command, label, game_version, n_per_pair, seed_base, workers, params_json, summary_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+const insRun = db.prepare('INSERT INTO runs (git_head, started_at, finished_at, command, label, game_version, n_per_pair, seed_base, workers, params_json, summary_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 const info = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: path.join(GODOT_DIR, '..'), encoding: 'utf8' });
+const gitHead = String(info.stdout ?? '').trim();
 const now = new Date().toISOString();
-const runId = Number(insRun.run(now, now, 'pair', 'godot-2.0.0-m4', `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
+const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-2.0.1', `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
 const insCfg = db.prepare('INSERT INTO configs (run_id, idx, label, overrides_json) VALUES (?, ?, ?, ?)');
 const cfgIds = [];
 teams.forEach((t, i) => {

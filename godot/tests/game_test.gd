@@ -43,20 +43,22 @@ func test_match_determinism_same_seed_same_digest() -> void:
 
 func test_match_beast_adventure_schedule() -> void:
 	var m := _make(7)
+	# 契约观察值循环外钉死：内嵌 if/else 分支断言在日程漂移时会静默走假分支（恒绿失察）
+	var saw_adventure_at_4 := false
+	var beast_rounds: Array = []
 	for r: int in 4:
 		m.begin_round()
 		if m.round == 4:
-			assert_bool(m.is_adventure_round()).is_true()
-			assert_that(m.adventure_offer != null).is_true()
+			saw_adventure_at_4 = m.is_adventure_round() and m.adventure_offer != null
 		else:
 			assert_bool(m.is_adventure_round()).is_false()
-		if m.round == 1:
-			assert_bool(m.is_beast_round()).is_true()
-		else:
-			assert_bool(m.is_beast_round()).is_false()
+		if m.is_beast_round():
+			beast_rounds.append(m.round)
 		m.settle_round()
 		m.end_round()
 	assert_int(m.round).is_equal(4)
+	assert_bool(saw_adventure_at_4).is_true()
+	assert_array(beast_rounds).is_equal([1])
 
 
 # ── 存档轮转自洽（引擎侧；跨引擎面由 match_probe 的交叉读档覆盖） ──

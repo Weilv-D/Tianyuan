@@ -7,6 +7,7 @@ class_name UnitView
 ## 头顶栈（unitLayout 口径，简化为固定塔）：血条在立绘顶上方，蓝条其下。
 
 const CONTENT_H := 68.0
+# 纯视觉体型缩放（非结算数值）：与 web src/render/view/unitLayout.ts 的 UNIT_STAR_SCALE 手工同值
 const STAR_SCALE := [0.0, 0.9, 1.02, 1.16]
 const BAR_W := 44.0
 const HP_BAR_H := 4.5
@@ -25,6 +26,8 @@ var _mana_bar: ColorRect
 var _pips: Array = []
 var _bob_t := 0.0
 var _base_y := 0.0
+## 位移补间持有计数（hop/攻击突进）：>0 期间上层硬同步让路，防逐帧覆写压死演出
+var busy := 0
 
 
 static func piece_texture(def_id: String) -> Texture2D:
@@ -104,18 +107,22 @@ func place(pos: Vector2) -> void:
 func sync_bars(hp: float, max_hp: float, mp: float, max_mp: float, shield: float = 0.0) -> void:
 	var hp_ratio: float = clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
 	_hp_bar.size.x = BAR_W * hp_ratio
-	# 护盾覆层：低血提亮口径（敌方 <30% 提亮，友方恒色）
-	if team == 1 and hp_ratio < 0.3:
-		_hp_bar.color = Palette.CINNABAR["light"]
+	# 低血提亮每帧按比例重算（含回升恢复）；敌我按 viewer 视角 friendly 而非原始 team
+	if not friendly:
+		_hp_bar.color = Palette.CINNABAR["light"] if hp_ratio < 0.3 else Palette.TEAM_COLOR[1]
+	else:
+		_hp_bar.color = Palette.TEAM_COLOR[0]
 	_mana_bar.size.x = BAR_W * clampf(mp / maxf(max_mp, 1.0), 0.0, 1.0)
 
 
 func play_attack(dir: float, windup: float) -> void:
+	busy += 1
 	var back_v := Vector2(-dir * 3.0, 0)
 	var tw := create_tween()
 	tw.tween_property(self, "position", position + back_v, maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(self, "position", position + Vector2(dir * 5.0, 0), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(self, "position", position, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.finished.connect(_end_busy)
 
 
 func play_hit() -> void:
@@ -132,13 +139,21 @@ func play_death() -> void:
 
 
 func hop_to(target: Vector2, dur: float) -> void:
+	busy += 1
 	var tw := create_tween()
 	tw.tween_property(self, "position", target, maxf(0.016, dur)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.finished.connect(_end_busy)
 	_base_y = target.y
+
+
+func _end_busy() -> void:
+	busy = maxi(0, busy - 1)
 
 
 ## 待机呼吸（静观模式由上层停用 _process）
 func _process(delta: float) -> void:
+	if _portrait.texture == null:
+		return
 	_bob_t += delta
 	_portrait.position.y = -float(_portrait.texture.get_height()) * _portrait.scale.y / 2.0 + 6.0 + sin(_bob_t * 2.1 + position.x * 0.02) * 1.1
 

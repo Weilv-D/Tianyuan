@@ -19,6 +19,7 @@ var float_layer: Node2D
 var fx_layer: EffectsLayer
 var acc := 0.0
 var speed := 1.0
+var _shake_tw: Tween
 var finished := false
 var tick_label: Label
 var speed_buttons: Array = []
@@ -61,7 +62,7 @@ func _ready() -> void:
 
 	# 倍速按钮（原版 speedBtns 1×/2×/4×；空格切换保留）
 	for i: int in 3:
-		var sv := [1.0, 2.0, 4.0][i]
+		var sv: float = [1.0, 2.0, 4.0][i]
 		var sb := Button.new()
 		sb.text = "%d×" % int(sv)
 		sb.position = Vector2(1560 + i * 90, 52)
@@ -105,11 +106,15 @@ func _process(delta: float) -> void:
 	# 震屏：累加器换算位移脉冲（对齐 TS shake(90+shake*90, 0.0022*shake) 的收敛节奏）
 	var shake_v: float = fx_layer.take_shake()
 	if shake_v > 0.0:
+		# 连震先杀旧 tween：多条 tween 同写根 position 会互相争夺（终值兜底也救不回节奏）
+		if _shake_tw != null and _shake_tw.is_valid():
+			_shake_tw.kill()
+			position = Vector2.ZERO
 		var amp: float = minf(14.0, 2.0 + shake_v * 3.0)
-		var tw := create_tween()
-		tw.tween_method(func(t: float) -> void:
+		_shake_tw = create_tween()
+		_shake_tw.tween_method(func(t: float) -> void:
 			position = Vector2(randf_range(-amp, amp), randf_range(-amp, amp)) * (1.0 - t), 0.0, 1.0, minf(0.32, 0.09 + shake_v * 0.09))
-		tw.tween_callback(func() -> void: position = Vector2.ZERO)
+		_shake_tw.tween_callback(func() -> void: position = Vector2.ZERO)
 	acc += minf(0.05, delta) * speed
 	var steps := 0
 	while acc >= DT and steps < 8:
@@ -134,8 +139,8 @@ func _spawn_view(u) -> void:
 	v.uid = int(u.uid)
 	v.setup(u.entry["id"], team, int(u.star), u.is_minion and u.entry.get("id", "") != "" and _is_beast_uid(u))
 	v.friendly = team == viewer_team
-	if team == 1:
-		v._hp_bar.color = Palette.TEAM_COLOR[1]
+	# 敌我恒色（原版口径）：viewer 视角的友军夜蓝/敌军朱砂——swap 局原始 team 会反置
+	v._hp_bar.color = Palette.TEAM_COLOR[0] if v.friendly else Palette.TEAM_COLOR[1]
 	v.place(_cell_pos(u))
 	v.z_index = 30 + u.cell.y * 2
 	add_child(v)
@@ -150,14 +155,19 @@ func _is_beast_uid(u) -> bool:
 func _sync_all() -> void:
 	for u in battle.units:
 		var v: UnitView = views.get(int(u.uid), null)
-		if v == null:
+		if v == null or not is_instance_valid(v):
 			continue
-		v.position = _cell_pos(u)
-		v.z_index = 30 + u.cell.y * 2
-		if not u.alive and v.modulate.a > 0.5:
-			v.play_death()
-		elif u.alive:
+		if u.alive:
+			# 位移补间（hop/攻击突进）持有 position 期间不硬写：逐帧覆写会把演出压成瞬移
+			if v.busy == 0:
+				v.position = _cell_pos(u)
+			v.z_index = 30 + u.cell.y * 2
 			v.sync_bars(u.hp, u.max_hp, u.mp, u.max_mp, u.shield)
+		else:
+			# 阵亡即除名：play_death 尾声 queue_free 后字典残留引用会在下一帧崩掉整个同步
+			views.erase(int(u.uid))
+			if v.modulate.a > 0.5:
+				v.play_death()
 
 
 func _on_event(e: Dictionary) -> void:
@@ -185,7 +195,8 @@ func _on_event(e: Dictionary) -> void:
 				if bool(e.get("isRanged", false)) and speed <= 1.0:
 					var windup := float(e.get("windup", 0.2))
 					get_tree().create_timer(maxf(0.0, windup)).timeout.connect(func() -> void:
-						if is_inside_tree() and not finished and speed <= 1.0:
+						# is_instance_valid 前置：场景已释放时对 freed self 调 is_inside_tree 本身即崩
+						if is_instance_valid(self) and is_inside_tree() and not finished and speed <= 1.0:
 							Sess.sfx.play("shoot"))
 		"damage":
 			var v2: UnitView = views.get(int(e.get("targetUid", -1)), null)
@@ -272,8 +283,12 @@ func _play_projectile(e: Dictionary) -> void:
 	var tgt = _unit_by_uid(int(e.get("targetUid", -1)))
 	if src == null or tgt == null:
 		return
-	var a := board_view.cell_center(src.cell.x, src.cell.y) + Vector2(0, -30)
-	var b := board_view.cell_center(tgt.cell.x, tgt.cell.y) + Vector2(0, -26)
+	# 局部系（board_view 子节点 fx_layer 用）/ 根空间系（float_layer 无缩放）双轨：
+	# bolt 挂根空间必须乘 BATTLE_BOARD_SCALE 并加 board_view.position，与 _cell_pos 同式
+	var la := board_view.cell_center(src.cell.x, src.cell.y) + Vector2(0, -30)
+	var lb := board_view.cell_center(tgt.cell.x, tgt.cell.y) + Vector2(0, -26)
+	var a := board_view.position + la * BATTLE_BOARD_SCALE
+	var b := board_view.position + lb * BATTLE_BOARD_SCALE
 	var dur: float = maxf(0.08, float(e.get("dur", 0.2)))
 	var color := Palette.MOON["light"] if String(e.get("kind", "")) == "arrow" else Palette.SPIRIT["light"]
 	var bolt := Node2D.new()
@@ -289,7 +304,7 @@ func _play_projectile(e: Dictionary) -> void:
 	tw.tween_method(func(t: float) -> void:
 		bolt.position = a.lerp(b, t), 0.0, 1.0, dur)
 	tw.tween_callback(bolt.queue_free)
-	fx_layer._spark(a, b, 2.0, dur * 1000.0 + 60.0, color, 0.5)
+	fx_layer._spark(la, lb, 2.0, dur * 1000.0 + 60.0, color, 0.5)
 
 
 func _cell_local(cell: Dictionary) -> Vector2:
@@ -415,8 +430,14 @@ func _on_battle_end() -> void:
 	back.add_theme_color_override("font_color", Palette.PAPER[100])
 	back.focus_mode = Control.FOCUS_NONE
 	back.pressed.connect(func() -> void:
-		var pending: bool = match_ref.is_over() or not match_ref.human()["alive"]
-		Sess.go("res://render/result.tscn" if pending else "res://render/game_scene.tscn", { "match": match_ref }))
+		if match_ref.is_over():
+			# 终局直跳也要补 end_round（快照 + 冠军 rank1 + phase over）
+			match_ref.end_round()
+			Sess.go("res://render/result.tscn", { "match": match_ref })
+		else:
+			# 非终局（含阵亡）一律回 game_scene 走 _after_settle 战报链：
+			# 阵亡由面板「继续」分流道消层，end_round 不在此跳过
+			Sess.go("res://render/game_scene.tscn", { "match": match_ref, "from_battle": true }))
 	panel.add_child(back)
 
 

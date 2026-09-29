@@ -95,7 +95,12 @@ func standings() -> Array:
 		if pa["alive"] != pb["alive"]:
 			return pa["alive"]
 		if not pa["alive"]:
-			return (int(pa["rank"]) if int(pa["rank"]) != 0 else 99) < (int(pb["rank"]) if int(pb["rank"]) != 0 else 99)
+			# 死者名次相等（仅坏档可达）：idx 决胜对齐 JS 稳定排序的保序语义
+			var ra := int(pa["rank"]) if int(pa["rank"]) != 0 else 99
+			var rb := int(pb["rank"]) if int(pb["rank"]) != 0 else 99
+			if ra != rb:
+				return ra < rb
+			return int(pa["idx"]) < int(pb["idx"])
 		if float(pa["hp"]) != float(pb["hp"]):
 			return float(pa["hp"]) > float(pb["hp"])
 		if int(pa["level"]) != int(pb["level"]):
@@ -290,6 +295,9 @@ func begin_round() -> void:
 
 ## 买入商店第 slot 张（满席且同名 ≥2 时走溢出即合；任何入不了账整体回滚）
 func buy(p: Dictionary, slot: int) -> Dictionary:
+	# 域外/负 slot 对齐 TS 的 undefined→拒绝（GD 负索引会回绕误买）
+	if slot < 0 or slot >= (p["shop"] as Array).size():
+		return { "ok": false, "reason": "none" }
 	var id: Variant = p["shop"][slot]
 	if id == null:
 		return { "ok": false, "reason": "none" }
@@ -694,16 +702,18 @@ func damage_of(result: Dictionary, winner_team: int, winner_board: Array) -> flo
 	var curve: Array = Spec.cfg.get("ROUND_BASE_DAMAGE", [])
 	var base_curve := float(curve[min(round, curve.size() - 1)])
 	# 后期处决曲线放缓：只放缓「阶段处决」，不动「打赢余威」
+	# MATCH_TUNING 兜底值与 config.ts 真源同值（spec 对账门禁保证键在位；
+	# 兜底仅防 JSON 损坏，不得偏离真源——否则处决曲线静默漂移）
 	var tuning: Dictionary = Spec.cfg.get("MATCH_TUNING", {})
-	var late_scale := float(tuning.get("lateDamageCurveScale", 1.0)) if round >= int(tuning.get("lateDamageCurveFromRound", 999)) else 1.0
+	var late_scale := float(tuning.get("lateDamageCurveScale", 0.75)) if round >= int(tuning.get("lateDamageCurveFromRound", 16)) else 1.0
 	var uids := board_uids(winner_board, winner_team)
 	var extra := 0.0
 	for uid in result.get("survivors", {}).get(winner_team, []):
 		var u: Variant = uids.get(uid, null)
 		if u == null:
 			continue
-		extra += float(tuning.get("damagePerSurvivor", 0.0)) + float(int(u["star"]) - 1) * float(tuning.get("damagePerStar", 0.0))
-	return max(1.0, ParityUtil.js_round((base_curve * late_scale + extra) * float(tuning.get("playerDamageScale", 1.0))))
+		extra += float(tuning.get("damagePerSurvivor", 2.0)) + float(int(u["star"]) - 1) * float(tuning.get("damagePerStar", 1.0))
+	return max(1.0, ParityUtil.js_round((base_curve * late_scale + extra) * float(tuning.get("playerDamageScale", 0.5))))
 
 
 ## 结算一场战斗：更新连胜连败、扣血、判定淘汰。

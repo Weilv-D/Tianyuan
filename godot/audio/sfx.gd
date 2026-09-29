@@ -6,6 +6,8 @@ class_name Sfx
 extends Node
 
 const RATE := 22050
+## 同时在响的声部上限（弹道/命中连发的节点堆积防线）
+const MAX_VOICES := 24
 const PENTATONIC := [0, 2, 4, 7, 9]
 const ROOT_HZ := 130.81
 
@@ -147,6 +149,15 @@ func _emit(bus: String, layers: Array) -> void:
 	wav.mix_rate = RATE
 	wav.stereo = true
 	wav.data = data
+	# 并发上限：大规模团战弹道连发会在同帧堆出数十个 player（节点+整条 WAV）。
+	# 超限强停最旧声部让位（remove_child 立即腾位，queue_free 帧末回收节点本体）
+	while get_child_count() >= MAX_VOICES:
+		var oldest := get_child(0) as AudioStreamPlayer
+		if oldest == null:
+			break
+		oldest.stop()
+		remove_child(oldest)
+		oldest.queue_free()
 	var player := AudioStreamPlayer.new()
 	player.bus = bus
 	player.stream = wav

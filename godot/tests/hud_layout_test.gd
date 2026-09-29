@@ -118,7 +118,8 @@ func test_member_grid_fits_card_worst_case() -> void:
 		var last := HudLayout.trait_member_cell(n - 1)
 		assert_int(HudLayout.TRAIT_MEMBER_GRID_X + int(last.x) + HudLayout.TRAIT_MEMBER_SIZE).is_less_equal(w)
 		assert_int(HudLayout.TRAIT_MEMBER_GRID_Y + int(last.y) + HudLayout.TRAIT_MEMBER_SIZE).is_less_equal(HudLayout.trait_member_card_h(n))
-		assert_int(mini(n, HudLayout.TRAIT_MEMBER_COLS) * int(ceil(float(n) / float(HudLayout.TRAIT_MEMBER_COLS)))).is_greater_equal(n)
+		# 网格容量契约由上一行末格界内断言完整承载
+		#（曾有一条 mini(n,COLS)*ceil(n/COLS)>=n 的恒等式断言，对被测代码零约束力，已移除）
 
 
 func test_member_card_clamps_into_cah_band() -> void:

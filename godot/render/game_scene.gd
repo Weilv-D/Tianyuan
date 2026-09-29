@@ -40,6 +40,8 @@ var scout_layer: CanvasLayer = null  # 侦查覆盖层（只读快照；原版 S
 var trait_modal: CanvasLayer = null  # 羁绊全览浮层（nav「羁绊」）
 var detail_card: PanelContainer = null  # 棋子详情卡（悬停只读/点选钉住）
 var detail_pinned_iid := -1
+## 悬停态当前展示的 iid（同 iid 短路——MouseMotion 逐帧触发不重建卡体）
+var detail_hover_iid := -1
 var press_pos := Vector2.ZERO  # 点击→钉卡判定（<8px 视为点选而非拖拽）
 var toast_label: Label = null
 
@@ -70,9 +72,16 @@ func _ready() -> void:
 	_build_trait_rail()
 	_build_action_bar()
 	_build_sell_seal()
-	if match_ref.round == 0:
-		match_ref.begin_round()
-	elif match_ref.needs_advance_on_load():
+	# 静态装饰一律放行鼠标：ColorRect/Panel 默认 mouse_filter=STOP，会吞掉走
+	# _unhandled_input 命中测试的全部鼠标事件（拖拽/点选/徽章/计分板/敌情/器匣）。
+	# 交互 Control（Button/TextureRect）与此后创建的浮层（dim/panel 需吃点击）不在遍历范围
+	for c in get_children():
+		if c is ColorRect or c is Panel:
+			c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if Sess.scene_data.get("from_battle", false):
+		# 战斗返回结算链（原版 resultPending 恢复流）：end_round + 存档 + 双列战报面板
+		_after_settle([])
+	elif match_ref.round == 0 or match_ref.needs_advance_on_load():
 		match_ref.begin_round()
 	refresh_all()
 
@@ -104,10 +113,11 @@ func _build_top_bar() -> void:
 	bar.size = Vector2(Layout.W, Layout.HEADER_H)
 	bar.z_index = -5
 	add_child(bar)
-	var title := _label("百 战 天 元", 34, Palette.PAPER[100], Sess.seal_font)
-	title.position = Vector2(400, 24)
-	title.size = Vector2(800, 50)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# 标题右置小号：居中大字与 round/hp/gold 状态标签（x 600 起）横向重叠叠印
+	var title := _label("百 战 天 元", 22, Palette.PAPER[100], Sess.seal_font)
+	title.position = Vector2(1520, 26)
+	title.size = Vector2(380, 40)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(title)
 	for pair: Array in [["round", 600], ["hp", 780], ["gold", 940], ["level", 1120], ["streak", 1290]]:
 		var l := _label("", 26, Palette.PAPER[100])
@@ -163,6 +173,10 @@ func _build_shop() -> void:
 		var b := Button.new()
 		b.position = Vector2(x, Layout.SHOP_Y)
 		b.custom_minimum_size = Vector2(Layout.SHOP_CW, Layout.SHOP_CH)
+		# 悬停上浮（原版 hover ±8）：常驻按钮只连一次——refresh 循环内重复 connect 会无界累积
+		var bi := i
+		b.mouse_entered.connect(func() -> void: _hover_shop(bi, true))
+		b.mouse_exited.connect(func() -> void: _hover_shop(bi, false))
 		b.focus_mode = Control.FOCUS_NONE
 		var idx := i
 		b.pressed.connect(func() -> void: _on_buy(idx))
@@ -179,7 +193,7 @@ func _build_trait_rail() -> void:
 
 
 func _build_action_bar() -> void:
-	# 2×3 操作列（对齐 HudPanels.buildActionBar；快捷键 D/F/E/Z 见 _unhandled_keyinput）
+	# 2×3 操作列（对齐 HudPanels.buildActionBar；快捷键 D/F/E/Z/空格 见 _unhandled_key_input）
 	var step := Layout.ACT_BTN_W + 10
 	var row_step := Layout.ACT_BTN_H + 10
 	var defs: Array = [
@@ -308,7 +322,7 @@ func _build_side_panels() -> void:
 	add_child(sb_cap)
 	for i: int in 8:
 		var l := _label("", 15, Palette.PAPER[300])
-		l.position = Vector2(Layout.REPORT_X, 338 + i * 30)
+		l.position = Vector2(Layout.REPORT_X, Layout.SCORE_ROW_Y + i * Layout.SCORE_ROW_STEP)
 		l.size = Vector2(Layout.SIDE_W, 24)
 		score_rows.append(l)
 		add_child(l)
@@ -473,18 +487,21 @@ func _refresh_shop() -> void:
 			pt.tween_property(b, "modulate:a", 0.66, 0.46)
 			pt.tween_property(b, "modulate:a", 1.0, 0.46)
 			shop_pulse_tweens.append(pt)
-		# 悬停上浮（原版 hover ±8）
-		var base_y := float(Layout.SHOP_Y)
-		var bi := i
-		b.mouse_entered.connect(func() -> void:
-			var t := create_tween()
-			t.tween_property(shop_buttons[bi], "position:y", base_y - 8.0, 0.32))
-		b.mouse_exited.connect(func() -> void:
-			var t2 := create_tween()
-			t2.tween_property(shop_buttons[bi], "position:y", base_y, 0.32))
 
 
 var shop_pulse_tweens: Array = []
+var _shop_hover_tweens: Array = [null, null, null, null, null]
+
+
+## 商店卡悬停上浮/回落：换向先 kill 旧 tween（对齐 web hoverTween 语义——两条 tween 同写 y 会互相拉扯）
+func _hover_shop(bi: int, enter: bool) -> void:
+	var tw: Tween = _shop_hover_tweens[bi]
+	if tw != null and tw.is_valid():
+		tw.kill()
+	var target := float(Layout.SHOP_Y) - (8.0 if enter else 0.0)
+	tw = create_tween()
+	tw.tween_property(shop_buttons[bi], "position:y", target, 0.32)
+	_shop_hover_tweens[bi] = tw
 
 
 func _clear_button_children(b: Button) -> void:
@@ -493,6 +510,11 @@ func _clear_button_children(b: Button) -> void:
 
 
 func _refresh_trait_rail() -> void:
+	# 悬停笺随刷新关闭：徽章序与档位可能已变（买卖后），留旧笺会展示过期计数
+	if rail_popup != null and trait_members_card == null:
+		rail_popup.queue_free()
+		rail_popup = null
+	rail_popup_badge = -1
 	var badges: Array = []
 	for c in get_children():
 		if c is _TraitBadge:
@@ -506,7 +528,9 @@ func _refresh_trait_rail() -> void:
 	for i: int in badges.size():
 		var badge: _TraitBadge = badges[i]
 		if i < traits.size():
-			badge.visible = true
+			# 可见门与输入侧同源：越出羁绊视窗底的行不渲染（第 15+ 行会压进备战席框）
+			var row_y := float(Layout.RAIL_Y + i * Layout.RAIL_PITCH)
+			badge.visible = HudLayout.rail_row_visible(row_y, float(Layout.RAIL_PITCH))
 			var t: Dictionary = traits[i]
 			var def: Variant = Spec.traits_by_id.get(t["id"], null)
 			badge.set_trait(t["id"], int(t["count"]), int(t["tier"]), def)
@@ -526,11 +550,18 @@ func _refresh_trait_rail() -> void:
 			vi += 1
 
 
+var adventure_layer: CanvasLayer = null
+
+
 func _check_adventure() -> void:
 	if match_ref.adventure_offer == null:
 		return
+	# 已开守卫：offer 未决期间任何 refresh_all 都会重入——叠层且旧按钮仍连着 resolve
+	if adventure_layer != null and is_instance_valid(adventure_layer):
+		return
 	var offer: Dictionary = match_ref.adventure_offer
 	var layer := CanvasLayer.new()
+	adventure_layer = layer
 	layer.layer = 90
 	add_child(layer)
 	var dim := ColorRect.new()
@@ -561,6 +592,7 @@ func _check_adventure() -> void:
 		b.pressed.connect(func() -> void:
 				match_ref.resolve_adventure(idx)
 				layer.queue_free()
+				adventure_layer = null
 				Sess.sfx.play("uiBig")
 				refresh_all())
 		panel.add_child(b)
@@ -779,10 +811,12 @@ func _on_auto_equip() -> void:
 
 
 func _on_toggle_lock() -> void:
+	# 对齐 web onToggleLock：不入撤销栈，但走 afterAction（落盘）——此前只刷新不落盘，
+	# 锁店状态要等下一次动作才持久化
 	var p := match_ref.human()
 	p["shopLocked"] = not p["shopLocked"]
 	Sess.sfx.play("ui")
-	refresh_all()
+	_after_action()
 
 
 ## 装备流 / 卸载流落点：拖拽之外点棋子的统一入口
@@ -824,7 +858,7 @@ func _try_unit_action(world: Vector2) -> bool:
 	return false
 
 
-func _unhandled_keyinput(event: InputEvent) -> void:
+func _unhandled_key_input(event: InputEvent) -> void:
 	if match_ref == null or result_panel != null:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -837,6 +871,8 @@ func _unhandled_keyinput(event: InputEvent) -> void:
 				if result_panel == null:
 					_settings.open(func(prefs: Dictionary) -> void:
 						match_ref.settings["autoDeploy"] = bool(prefs.get("autoDeploy", true)))
+			KEY_SPACE:
+				_start_battle_phase()
 			KEY_D:
 				_on_reroll()
 			KEY_F:
@@ -877,21 +913,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_drop(e.position)
 			get_viewport().set_input_as_handled()
-		elif event is InputEventMouseMotion:
-			if drag_iid >= 0:
-				if drag_ghost != null:
-					drag_ghost.position = get_global_mouse_position()
-			else:
-				var hi := _trait_badge_at(event.position)
-				_update_rail_popup(hi)
-				if hi < 0:
-					# 悬停详情卡（只读态；钉住态不受悬停影响）
-					var hu = _unit_at(event.position)
-					if hu != null:
-						if detail_pinned_iid < 0:
-							_show_detail(hu, false)
-					elif detail_card != null and detail_pinned_iid < 0:
-						_close_detail()
+	elif event is InputEventMouseMotion:
+		if drag_iid >= 0:
+			if drag_ghost != null:
+				drag_ghost.position = get_global_mouse_position()
+		else:
+			var hi := _trait_badge_at(event.position)
+			_update_rail_popup(hi)
+			if hi < 0:
+				# 悬停详情卡（只读态；钉住态不受悬停影响）
+				var hu = _unit_at(event.position)
+				if hu != null:
+					if detail_pinned_iid < 0:
+						_show_detail(hu, false)
+				elif detail_card != null and detail_pinned_iid < 0:
+					_close_detail()
 
 
 ## 鼠标世界位命中哪枚可见徽章（-1 无）
@@ -905,12 +941,20 @@ func _trait_badge_at(world: Vector2) -> int:
 
 
 ## 悬停笺：效果文案（spec effectText 按 tier 取档）+ 名称与计数
+var rail_popup_badge := -1
+
+
 func _update_rail_popup(badge_i: int) -> void:
 	if badge_i < 0:
 		if rail_popup != null and trait_members_card == null:
 			rail_popup.queue_free()
 			rail_popup = null
+		rail_popup_badge = -1
 		return
+	# 同徽章短路：MouseMotion 逐帧触发不重建笺体（计数变化时由 refresh 侧关闭重开）
+	if rail_popup != null and rail_popup_badge == badge_i:
+		return
+	rail_popup_badge = badge_i
 	var b: Dictionary = badges_visible[badge_i]
 	var def: Variant = b["def"]
 	if def == null:
@@ -1102,7 +1146,8 @@ func _start_battle_phase() -> void:
 			me_pair = q
 	Sess.sfx.play_pluck(196.0)  # 徵音起手：开战的弦响（原版 GameScene:803 同款）
 	if me_pair.is_empty():
-		# 轮空（人类不参战）——直接推进
+		# 轮空：清上一场战报残留，结算面板不渲染过期战斗的双列
+		Sess.scene_data.erase("battle_stats")
 		match_ref.settle_round()
 		_after_settle([])
 		return
@@ -1186,12 +1231,12 @@ func _show_round_result() -> void:
 
 # ── 侦查覆盖层（原版 ScoutOverlay 对齐）：点击计分板行/敌情查看对手阵地快照 ──
 
-## 计分板行命中（338 + i×30 起点，含 6px 容差；与侧栏构建几何同源）
+## 计分板行命中（SCORE_ROW_Y + i×STEP 起点，含 6px 容差；与侧栏构建几何同源）
 func _score_row_at(world: Vector2) -> int:
 	if world.x < Layout.REPORT_X - 6.0 or world.x > Layout.REPORT_X + Layout.SIDE_W + 6.0:
 		return -1
 	for i: int in score_rows.size():
-		var y0 := 338.0 + i * 30.0 - 6.0
+		var y0 := float(Layout.SCORE_ROW_Y + i * Layout.SCORE_ROW_STEP) - 6.0
 		if world.y >= y0 and world.y <= y0 + 36.0:
 			return i
 	return -1
@@ -1479,6 +1524,7 @@ func _close_detail() -> void:
 	if detail_card != null:
 		detail_card.queue_free()
 		detail_card = null
+	detail_hover_iid = -1
 
 
 func _fmt_skill_desc(desc: String, params: Dictionary) -> String:
@@ -1494,19 +1540,20 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	var def: Variant = Spec.champion_by_id.get(String(u["defId"]), null)
 	if def == null:
 		return
-	if detail_card != null and detail_pinned_iid == int(u["iid"]):
+	if detail_card != null and (detail_pinned_iid == int(u["iid"]) or detail_hover_iid == int(u["iid"])):
 		return
 	_close_detail()
-	var w := 304
-	var h := 348 if pinned else 304
+	detail_hover_iid = int(u["iid"])
+	var w: int = Layout.DETAIL_W
+	var h: int = (Layout.DETAIL_H + Layout.DETAIL_SELL_BAND) if pinned else Layout.DETAIL_H
 	var rarity := int(def["cost"])
-	# 卡位：贴悬停/点选棋子的右侧，钳在可视域（140..860 带）
+	# 卡位：贴悬停/点选棋子的右侧，钳在可视域（hud_layout 卡位带）
 	var anchor := Vector2(960, 500)
 	var v: UnitView = unit_views.get(int(u["iid"]), null)
 	if v != null:
 		anchor = v.position
 	var px: float = clampf(anchor.x + 40.0, 66.0, 1920.0 - 48.0 - w)
-	var py: float = clampf(anchor.y - h / 2.0, 140.0, maxf(140.0, 860.0 - h))
+	var py: float = clampf(anchor.y - h / 2.0, float(HudLayout.CAH_Y_MIN), maxf(float(HudLayout.CAH_Y_MIN), float(HudLayout.CAH_Y_MAX) - h))
 	detail_card = PanelContainer.new()
 	detail_card.position = Vector2(px, py)
 	detail_card.custom_minimum_size = Vector2(w, h)
@@ -1537,7 +1584,8 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	cost_l.size = Vector2(66, 18)
 	cost_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	card.add_child(cost_l)
-	# 四行战斗数值（星级换算走 config 真源，同结算/估值口径）
+	# 四行战斗数值：星级缩放走 config 真源。口径与 web 备战悬停卡一致（基础星级面板值，
+	# 不含天命/登峰/精英乘区与装备加成——结算口径见 core/unit.gd，战斗内实时值另走 sync_bars）
 	var s: Dictionary = def["base"]
 	var si := star - 1
 	var hp_s := Spec.star_scale("STAR_HP_SCALE", si)
@@ -1751,12 +1799,14 @@ func _toast(msg: String) -> void:
 	toast_label.size = Vector2(600, 26)
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(toast_label)
+	# 闭包捕获本次实例：2.1s 后读成员变量会误删其间弹出的新 toast
+	var lbl := toast_label
 	var tw := create_tween()
 	tw.tween_interval(1.6)
-	tw.tween_property(toast_label, "modulate:a", 0.0, 0.5)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.5)
 	tw.tween_callback(func() -> void:
-		if is_instance_valid(toast_label):
-			toast_label.queue_free())
+		if is_instance_valid(lbl):
+			lbl.queue_free())
 
 
 ## 战报双列（v1.12.0 图表口径）：我方（viewer=0 视角按 stats team 记录）左、敌方右；

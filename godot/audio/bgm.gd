@@ -7,6 +7,7 @@ extends Node
 
 var player: AudioStreamPlayer
 var mood := ""
+var _fade_tw: Tween
 
 
 func _ready() -> void:
@@ -16,18 +17,27 @@ func _ready() -> void:
 	add_child(player)
 
 
+func _kill_fade() -> void:
+	if _fade_tw != null and _fade_tw.is_valid():
+		_fade_tw.kill()
+	_fade_tw = null
+
+
 func set_mood(new_mood: String) -> void:
 	if mood == new_mood and player.playing:
 		return
 	var track: AudioStreamOggVorbis = MusicTracks.stream_for(new_mood)
 	if track == null:
+		_kill_fade()
 		player.stop()
 		mood = new_mood
 		return
 	if player.playing:
-		var tw := create_tween()
-		tw.tween_property(player, "volume_db", -40.0, 0.45)
-		tw.tween_callback(func() -> void: _switch(track, new_mood))
+		# 换曲先杀旧 fade：未决的 _switch 回调会把刚切好的曲子再顶掉一次
+		_kill_fade()
+		_fade_tw = create_tween()
+		_fade_tw.tween_property(player, "volume_db", -40.0, 0.45)
+		_fade_tw.tween_callback(func() -> void: _switch(track, new_mood))
 	else:
 		_switch(track, new_mood)
 
@@ -37,10 +47,13 @@ func _switch(track: AudioStreamOggVorbis, new_mood: String) -> void:
 	player.stream = track
 	player.volume_db = -40.0
 	player.play()
-	var tw := create_tween()
-	tw.tween_property(player, "volume_db", 0.0, 0.7)
+	_kill_fade()
+	_fade_tw = create_tween()
+	_fade_tw.tween_property(player, "volume_db", 0.0, 0.7)
 
 
 func stop() -> void:
+	# 连 stop 一起杀：否则 0.45s 内 pending 的 _switch 会把刚停的 BGM 复活
+	_kill_fade()
 	player.stop()
 	mood = ""

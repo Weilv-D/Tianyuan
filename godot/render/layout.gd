@@ -83,6 +83,9 @@ const INTEL_Y := 140
 const SIDE_W := 282
 const REPORT_X := W - 48 - SIDE_W  # 1590
 const REPORT_Y := 620
+# 计分板八行（构建与点击命中同源——字面量双写会在调行高时错位）
+const SCORE_ROW_Y := 338
+const SCORE_ROW_STEP := 30
 
 # ── 记事（左下）──
 const LOG_X := 48

@@ -60,3 +60,23 @@ func test_conservation_invariants() -> void:
 		var taken_by_type: float = float(u.taken_by_type["physical"]) + float(u.taken_by_type["magic"]) + float(u.taken_by_type["true"])
 		assert_float(taken_by_type).is_equal_approx(u.taken_damage, 0.0001)
 		assert_float(u.absorbed_damage).is_greater_equal(0.0)
+
+
+func test_legend_t3_cc_immune() -> void:
+	# 天命 3★五费天生免疫控制（cc_immune 曾漏移植：对拍语料无天命局未覆盖，此为回归钉）
+	Spec.ensure()
+	var five_ids: Array = Spec.champion_ids_by_cost.get("5", [])
+	assert_int(five_ids.size()).is_greater(0)
+	var bid := String(five_ids[0])
+	var legend := Unit.create({"uid": 1, "defId": bid, "team": 0, "star": 3, "cell": {"c": 3, "r": 2}})
+	var plain := Unit.create({"uid": 2, "defId": bid, "team": 0, "star": 1, "cell": {"c": 4, "r": 2}})
+	assert_int(legend.cc_immune).is_equal(1_000_000_000)
+	assert_int(plain.cc_immune).is_equal(0)
+	var b := Battle.new({"seed": 7, "units": [
+		{"uid": 1, "defId": bid, "team": 0, "star": 3, "cell": {"c": 3, "r": 2}},
+		{"uid": 2, "defId": bid, "team": 1, "star": 1, "cell": {"c": 4, "r": 6}},
+	], "traits": {}})
+	b.add_status(b.units[0], b.units[0], "stun", 1.0, 0.0)
+	assert_bool(b.units[0].has_status("stun")).is_false()
+	b.add_status(b.units[1], b.units[1], "stun", 1.0, 0.0)
+	assert_bool(b.units[1].has_status("stun")).is_true()

@@ -23,11 +23,17 @@ function parseArgs(argv) {
   return out;
 }
 
-/** 从进程输出里提取 `TAG {json}` 行（双端都以此协议交付结果） */
+/** 从进程输出里提取 `TAG {json}` 行（双端都以此协议交付结果）；坏行按 null 处理不抛 */
 function extractTag(text, tag) {
   for (const line of String(text).split(/\r?\n/)) {
     const i = line.indexOf(`${tag} `);
-    if (i >= 0) return JSON.parse(line.slice(i + tag.length + 1));
+    if (i >= 0) {
+      try {
+        return JSON.parse(line.slice(i + tag.length + 1));
+      } catch {
+        return null;
+      }
+    }
   }
   return null;
 }
@@ -57,6 +63,9 @@ export function run(draws = 1_000_000) {
       const ts = runTs(args);
       const gd = runGd(args);
       const diffs = FIELDS.filter((k) => JSON.stringify(ts[k]) !== JSON.stringify(gd[k]));
+      // 探针同殁防线：双端都拿不到 PARITY_JSON 时各字段同为 undefined，字段比对会
+      // 恒等假绿——__error 必须显式判失败（只有单端报错时字段 diff 也已覆盖）
+      if (ts.__error && gd.__error) diffs.push('__error(both)');
       const ok = diffs.length === 0;
       if (!ok) failed += 1;
       rows.push({ mode, seed, ok, fnv: gd.fnv1a32 ?? '?', diffs, ts, gd });
