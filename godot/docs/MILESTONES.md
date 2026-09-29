@@ -206,8 +206,17 @@ UnitView（星级 shader 描边 + 墨兽罩染——不烘焙 576 张派生纹�
 功能清单对齐、tools/balance Node 编排 + headless 批次 worker + SQLite 同表结构（CRN 公式
 原值）、Windows 绿色 exe 导出冒烟、视觉验收截图批次、zip 分发。出口：**2.0.0 已发布**。
 
-## M5（待令）立绘 512 重制批次
-8 张样稿过审 → 64 张量产 → 集成。本次不实施。
+## M5 立绘重制集成 ✅ 2026-09-29（用户交付成品，1024 口径）
+- 素材：云端 ComfyUI + Qwen-Image-2.1 重绘 **108 张 = 64 角色（纯文生图，五官留白红线）+
+  44 装备（edit 路线）**，逐张机检 + 子代理分批复审全通过，种子档案齐全
+  （`C:\WORKSPACE\output`，report.md/stats.json/seeds 留档）。**只进 godot/，
+  冻结树 src/render/art 零接触**（原版继续用旧图）。
+- 口径裁决：用户定 **1024**（final_1024；512 备选一键可回）。角色 832×1216 全幅
+  （占高恰 1.0）、装备画布 832~1408 高不等，全部经 TextureRect 等比适配或紧裁公式。
+- 代码适配：UnitView 立绘缩放从硬编码 `CONTENT_H/150` 改 **按实际纹理高归一**
+  （紧画布约定：主体占满高、脚底贴底——154px 旧图与 1216px 新图同公式）。
+- 体积：素材 +157MB → exe 238MB / zip 165MB（1024 的代价，用户知情选定）。
+- 验证：导入零错、autostart/exe/解压三冒烟零 SCRIPT ERROR、棋盘带像素断言在位、qa 9/9。
 
 ## 隔离铁律（最高优先级）
 1. ../src、../public、../index.html、../vite.config.ts、../package.json、../balance、../tests、

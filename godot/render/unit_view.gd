@@ -50,12 +50,14 @@ func setup(p_def_id: String, p_team: int, p_star: int, p_is_beast: bool) -> void
 	base.scale = Vector2(1.0, 0.5)
 	add_child(base)
 
-	# 立绘：shader 描边（银/金）与墨兽罩染
+	# 立绘：shader 描边（银/金）与墨兽罩染。
+	# 缩放按实际纹理高归一（素材约定 = 紧裁画布：主体占满高、脚底贴底——
+	# 旧 154px 与 M5 重制 512px 两种素材同一公式；曾硬编码 /150 只对旧画布成立）
+	# 内容高归一：显示主体高恒为 CONTENT_H（脚底对齐 y≈0）
 	_portrait = Sprite2D.new()
 	_portrait.texture = piece_texture(def_id)
-	# 内容高归一：源图按 CONTENT_H 缩放（脚底对齐 y≈0）
 	var tex_h := float(_portrait.texture.get_height()) if _portrait.texture != null else 150.0
-	var k := CONTENT_H / 150.0
+	var k := CONTENT_H / maxf(1.0, tex_h)
 	_portrait.scale = Vector2(k, k)
 	_portrait.position = Vector2(0, -tex_h * k / 2.0 + 6.0)
 	var mat := ShaderMaterial.new()
