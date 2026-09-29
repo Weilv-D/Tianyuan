@@ -607,6 +607,8 @@ func _on_battle_end() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(560, 300)
 	panel.position = Vector2((Layout.W - 560) / 2.0, (Layout.H - 300) / 2.0)
+	# 器物化：砚石嵌金面板（引擎默认灰 Panel 不入夜宴语汇，形制统一由器物谱出）
+	Artifacts.night_panel(panel)
 	dim.add_child(panel)
 	MicroFx.enter(panel)
 	var title_txt := "胜" if winner == viewer_team else ("败" if winner >= 0 else "平")
@@ -624,10 +626,8 @@ func _on_battle_end() -> void:
 	back.text = "返 回"
 	back.position = Vector2(190, 210)
 	back.custom_minimum_size = Vector2(180, 46)
-	back.add_theme_font_override("font", Sess.body_font)
-	back.add_theme_font_size_override("font_size", 24)
-	back.add_theme_color_override("font_color", Palette.PAPER[100])
-	back.focus_mode = Control.FOCUS_NONE
+	# 器物化：墨玉三态按钮（字体/三态色/focus/动效一体由形制库出，不再散点覆写）
+	Artifacts.jade_button(back, {"size": 24})
 	back.pressed.connect(func() -> void:
 		if match_ref.is_over():
 			# 终局直跳也要补 end_round（快照 + 冠军 rank1 + phase over）

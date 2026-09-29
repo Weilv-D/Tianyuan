@@ -11,7 +11,7 @@ func _initialize() -> void:
 	t0 = Time.get_ticks_usec()
 	sfx.prewarm_sounds(["star3"])
 	var again := Time.get_ticks_usec() - t0
-	# 池内已有 1 变体：直接走渲染计时口径校验（_render_wav 纯函数可入线程）
+	# 池内已满变体：直接走渲染计时口径校验（_render_wav 纯函数可入线程）
 	t0 = Time.get_ticks_usec()
 	var w: AudioStreamWAV = sfx._render_wav(sfx._layers_for("star3"))
 	var rerender := Time.get_ticks_usec() - t0
@@ -21,8 +21,9 @@ func _initialize() -> void:
 	if again > 2000:
 		print("SFX_FAIL prewarm replay not cached")
 		fails += 1
-	# 契约 2：池内恰 1 变体
-	if int((sfx._pool["star3"] as Array).size()) != 1:
+	# 契约 2：满池契约 —— 预载后池须恰 VARIANTS_PER_SOUND 个变体（2.4.0 起播放
+	# 路径零 worker 派出的前提：池常满，play 不再触发后室补变体）
+	if int((sfx._pool["star3"] as Array).size()) != sfx.VARIANTS_PER_SOUND:
 		print("SFX_FAIL pool size")
 		fails += 1
 	# 契约 3：首合成落在合成耗时量级（>5ms——纯 GDScript 逐样本合成的真实成本；

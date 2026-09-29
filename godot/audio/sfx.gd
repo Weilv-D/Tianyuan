@@ -116,12 +116,13 @@ func _layers_for(sound_name: String) -> Array:
 	return layers
 
 
-## 同步预热（挂 boot 后台线程，进程级一次）：16 具名配方各合成 1 变体入池——
-## 对局首批 cast/hit/shoot 不再吃首载合成尖刺（探针也走此入口避免 worker 竞态）
+## 同步预热：具名配方各合成 VARIANTS_PER_SOUND 个变体入池（主线程）。
+## 对局首批 cast/hit/shoot 不再吃首载合成尖刺；池常满 → 播放路径零 worker 派发
 func prewarm_sounds(names: Array) -> void:
 	for n: String in names:
-		if not _pool.has(n) or (_pool[n] as Array).is_empty():
-			_pool[n] = [_render_wav(_layers_for(n))]
+		var pool: Array = _pool.get_or_add(n, [])
+		while pool.size() < VARIANTS_PER_SOUND:
+			pool.append(_render_wav(_layers_for(n)))
 
 
 ## 开战弦响（原版 GameScene:803 徵音起手 / LegendaryFx:94 宫音落印同款）
@@ -163,25 +164,21 @@ func _emit(bus: String, layers: Array, sound_name := "") -> void:
 			var idx: int = int(_pool_robin.get_or_add(sound_name, 0)) % pool.size()
 			_pool_robin[sound_name] = idx + 1
 			wav = pool[idx]
-			# 本次重掷的 layers 不浪费：后台合成入池（变体轮播防音色机械化）
+			# 本次重掷的 layers 不浪费：当场合成入池（变体轮播防音色机械化）。
+			# 主线程内联合成 —— worker 合成 + call_deferred 回调在退出期实证段错误
+			# （EXIT=139，buy 探针复现；2.4.0 判例：播放路径零 worker 派发）
 			if pool.size() < VARIANTS_PER_SOUND and not bool(_pool_backfill.get(sound_name, false)):
 				_pool_backfill[sound_name] = true
-				_backfill_async(sound_name, layers)
+				pool.append(_render_wav(layers))
+				_pool_backfill[sound_name] = false
 	_spawn_voice(bus, wav)
 
 
-## 后台补变体：合成纯计算（无场景树访问），完成后回主线程入库
-func _backfill_async(sound_name: String, layers: Array) -> void:
-	WorkerThreadPool.add_task(func() -> void:
-		var w := _render_wav(layers)
-		call_deferred("_backfill_done", sound_name, w))
-
-
-func _backfill_done(sound_name: String, w: AudioStreamWAV) -> void:
-	_pool_backfill[sound_name] = false
+## 单片变体入池（启动预载链主线程分片调用；池不满才合成）
+func pool_variant(sound_name: String) -> void:
 	var pool: Array = _pool.get_or_add(sound_name, [])
 	if pool.size() < VARIANTS_PER_SOUND:
-		pool.append(w)
+		pool.append(_render_wav(_layers_for(sound_name)))
 
 
 ## 纯合成（线程可入；无 IO/树访问）

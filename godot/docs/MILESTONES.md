@@ -360,8 +360,10 @@ ui/audio/tools/headless/tests/data 全量，约 1.7 万行，core 对 TS 冻结�
   且等待协程要挂 autoload（场景节点会被切换释放，协程静默死亡）。
 - **判例：冒烟必须验收退出码**。2.0.3 的解压冒烟只看 SMOKE_SHOT 打印（假绿）——
   进程在 quit 后 teardown 段错误（预热任务无 join + static 持 GPU 资源），EXIT=139。
-  修复 = Sess._exit_tree 里 wait_for_task_completion + FxAtlas.release_all。
+  当时的修复 = Sess._exit_tree 里 wait_for_task_completion + FxAtlas.release_all。
   「跑完打印 OK」与「干净退出」是两件事，自动化一律 echo EXIT=$?。
+  **2.4.0 修正**：该修复本身在 4.7 构建反成崩点（release_all 落拆树途中撞 dying
+  RenderingServer）——本条结论以 2.4.0 节为准。
 
 ## 2.3.0 首页构图与经营体感（2026-09-29，用户两轮实机反馈）
 
@@ -375,3 +377,32 @@ ui/audio/tools/headless/tests/data 全量，约 1.7 万行，core 对 TS 冻结�
   命中失败。
 - **经验：探针引用 autoload 标识符（Sess/Match）只存在于正常 run**；headless --script
   模式编译不到它们（zz 探针的历史坑复用），覆盖场景逻辑一律走 `--smoke` 尾参扩展。
+
+## 2.4.0 夜宴器物谱（2026-09-29，用户令：拟物质感系统级全面升级）
+
+用户点名屏风/玉石/砚台/琉璃/黄金/宝石并要求风格统一、系统覆盖、把握意蕴。落法不是贴
+材质图，而是「夜宴器物谱」：界面上每个表面都是夜宴席上的一件器物，形制出
+`ui/artifacts.gd`、色出 `ui/palette.gd`、纹出 `render/atlas.gd` 程序化烘焙（绢/砚/玉/
+琉/金/木/宝石/朱砂印八器）。首页升级为六折绢屏「夜宴图」——墨影画在各自屏心，遮挡从
+构图的间距问题变成结构上不存在。
+
+- **判例：worker 线程 `ResourceLoader.load` 贴图 = 退出期二相故障**。最小复现：worker
+  载 3 张 ctex 后 quit，EXIT=139；窗口探针 EXIT=124 挂死同根（RID 越权建 + 拆除竞态）。
+  2.1.0「线程池化预载」只压概率未除根。终版：主线程帧预算分片预载（90ms/帧，序章淡入
+  掩盖 hitch），ImageTexture 一律主线程提交；音效预载同链分片、播放路径零 worker。
+- **判例：`Image.set_pixel` 越界是 ERROR 级刷屏，能拖垮主线程烘焙**。一处未钳位坐标 =
+  每像素一条 backtrace，I/O 把 0.5s 的烘焙放大到分钟级（探针超时首崩因）。新纹理先过
+  bake 计时门再接链；越界即钳位，不靠「反正只打错误」。
+- **判例：视觉探针必须窗口态；`--autostart` 必须放 `--` 之后**。headless dummy 渲染器
+  不发射 `RenderingServer.frame_post_draw`，`--smoke` 截图 await 永久挂起（EXIT=124）；
+  `--autostart` 放 `--` 前会被当引擎参数吞掉，scene_data 不种子 → buy 探针 gold=-1 仍
+  判 OK 的假绿、hover 探针协程被 SCRIPT ERROR 打断。功能探针（--script）不受影响。
+- **判例：退出期主动释放 static GPU 缓存反致崩**（修正 2.1.0 结论）。`release_all()` 落
+  拆树途中，dying 节点仍持纹理 last-ref，RID 释放撞 dying RenderingServer = EXIT=139
+  （2.3.0 基线 battle 探针同崩——同根，非本版引入但本版触发面更大）。static 缓存任其
+  泄漏，ObjectDB 宽容路径打警告不析构，实证 EXIT=0；函数保留注明不再调用。
+- **判例：探针假绿三态**——没跑到目标场景（_unit_at 报错即场景不对）、断言阈值失效
+  （gold=-1 < 40 判 OK）、只验打印不验退出码。buy 探针以「金币 40→38 + views=1」双值
+  验收，EXIT 必须在验收语句里。
+- **方法：二分污染**。排查退出崩溃时，「boot 不调预载」的中性化会把后续每个测试都变成
+  无链状态，得出全套假阴性；每次都核对被改文件的真实调用图再解读结果。

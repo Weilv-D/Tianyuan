@@ -14,9 +14,9 @@ var xp_bar_fg: ColorRect = null
 var xp_text: Label = null
 
 
-## 浮层面板夜宴底：引擎默认 Panel 是中性灰，违反「任何颜色必须来自 Palette」红线。
-## 漆面材质化：宣纸纤维底纹 × 深蓝染色 × 金线边（FxAtlas.panel_box 9-slice）——
-## 纯色 Flat 是「草稿感」的 UI 残留
+## 浮层面板砚底：引擎默认 Panel 是中性灰，违反「任何颜色必须来自 Palette」红线。
+## 器物化：砚石底纹（金星石眼 + 水磨痕）× 深蓝染色 × 鎏金双边（FxAtlas.panel_box
+## 9-slice）—— 纯色 Flat 是「草稿感」的 UI 残留
 func _style_night_panel(p: Panel) -> void:
 	p.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97), Color(Palette.GILT["base"], 0.5)))
 
@@ -262,6 +262,8 @@ func _build_shop() -> void:
 		var b := Button.new()
 		b.position = Vector2(x, Layout.SHOP_Y)
 		b.custom_minimum_size = Vector2(Layout.SHOP_CW, Layout.SHOP_CH)
+		# 商肆格=砚石小格位（器物谱：格）；悬停上浮另行接管（_hover_shop）
+		Artifacts.cell_button(b)
 		# 悬停上浮（原版 hover ±8）：常驻按钮只连一次——refresh 循环内重复 connect 会无界累积
 		var bi := i
 		b.mouse_entered.connect(func() -> void: _hover_shop(bi, true))
@@ -298,12 +300,9 @@ func _build_action_bar() -> void:
 		b.text = d[0]
 		b.position = Vector2(Layout.ACT_X + d[1] * step, Layout.ACT_Y + d[2] * row_step)
 		b.custom_minimum_size = Vector2(Layout.ACT_BTN_W, Layout.ACT_BTN_H)
-		b.add_theme_font_override("font", Sess.body_font)
-		b.add_theme_font_size_override("font_size", 19)
-		b.add_theme_color_override("font_color", Palette.PAPER[100])
-		b.focus_mode = Control.FOCUS_NONE
+		# 墨玉三态按钮（器物谱：玉）—— 形制/动效由 Artifacts 一处出
+		Artifacts.jade_button(b, {"size": 19})
 		b.pressed.connect(d[3] as Callable)
-		MicroFx.hook(b)
 		add_child(b)
 
 
@@ -327,12 +326,9 @@ func _build_phase_strip() -> void:
 	fight.text = "开 战 · 空格"
 	fight.position = Vector2(cx + 20, py - 16)
 	fight.custom_minimum_size = Vector2(140, 32)
-	fight.add_theme_font_override("font", Sess.body_font)
-	fight.add_theme_font_size_override("font_size", 13)
-	fight.add_theme_color_override("font_color", Palette.PAPER[100])
-	fight.focus_mode = Control.FOCUS_NONE
+	# 开战键=鎏金主钮（墨玉底 + GILT 主字）：全场唯一昂扬动作
+	Artifacts.jade_button(fight, {"size": 13, "hero": true})
 	fight.pressed.connect(_start_battle_phase)
-	MicroFx.hook(fight)
 	add_child(fight)
 
 
@@ -341,12 +337,8 @@ func _build_item_bar() -> void:
 	var frame := Panel.new()
 	frame.position = Vector2(Layout.ITEM_BAR_X - 8, Layout.ITEM_BAR_Y - 8)
 	frame.size = Vector2(Layout.ITEM_BAR_W + 16, gh + 16)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.INK[900], 0.66)
-	sb.border_color = Color(Palette.INK[500], 0.6)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(0)
-	frame.add_theme_stylebox_override("panel", sb)
+	# 器匣框=砚石嵌金面板（器物谱：砚）
+	Artifacts.night_panel(frame)
 	add_child(frame)
 	var cap := _label("器 匣", 15, Palette.PAPER[300], Sess.seal_font)
 	cap.position = Vector2(Layout.ITEM_BAR_X + 6, Layout.ITEM_BAR_Y - 22)
@@ -357,6 +349,8 @@ func _build_item_bar() -> void:
 		var chip := Button.new()
 		chip.position = Vector2(Layout.ITEM_BAR_X + col * (Layout.ITEM_SIZE + Layout.ITEM_GAP), Layout.ITEM_BAR_Y + row * (Layout.ITEM_SIZE + Layout.ITEM_GAP))
 		chip.custom_minimum_size = Vector2(Layout.ITEM_SIZE, Layout.ITEM_SIZE)
+		# 器匣格=砚石小格位（器物谱：格）
+		Artifacts.cell_button(chip)
 		chip.focus_mode = Control.FOCUS_NONE
 		var idx := i
 		chip.pressed.connect(func() -> void: _on_item_chip(idx))
@@ -367,9 +361,7 @@ func _build_item_bar() -> void:
 	unload.text = "卸 载"
 	unload.position = Vector2(Layout.ITEM_BAR_X + Layout.ITEM_BAR_W - 84, Layout.ITEM_BAR_Y + Layout.UNLOAD_BTN_DY)
 	unload.custom_minimum_size = Vector2(84, 26)
-	unload.add_theme_font_override("font", Sess.body_font)
-	unload.add_theme_font_size_override("font_size", 13)
-	unload.focus_mode = Control.FOCUS_NONE
+	Artifacts.jade_button(unload, {"size": 13})
 	unload.pressed.connect(_on_toggle_unload)
 	add_child(unload)
 	# 溢出分页（仅超页时可见——set_page_controls 驱动）
@@ -377,16 +369,14 @@ func _build_item_bar() -> void:
 	page_prev.text = "◀"
 	page_prev.position = Vector2(Layout.ITEM_BAR_X + 80, Layout.ITEM_BAR_Y + Layout.UNLOAD_BTN_DY)
 	page_prev.custom_minimum_size = Vector2(26, 26)
-	page_prev.add_theme_font_size_override("font_size", 11)
-	page_prev.focus_mode = Control.FOCUS_NONE
+	Artifacts.jade_button(page_prev, {"size": 11})
 	page_prev.pressed.connect(func() -> void: _on_item_page(-1))
 	add_child(page_prev)
 	page_next = Button.new()
 	page_next.text = "▶"
 	page_next.position = Vector2(Layout.ITEM_BAR_X + 160, Layout.ITEM_BAR_Y + Layout.UNLOAD_BTN_DY)
 	page_next.custom_minimum_size = Vector2(26, 26)
-	page_next.add_theme_font_size_override("font_size", 11)
-	page_next.focus_mode = Control.FOCUS_NONE
+	Artifacts.jade_button(page_next, {"size": 11})
 	page_next.pressed.connect(func() -> void: _on_item_page(1))
 	add_child(page_next)
 	page_text = _label("", 13, Palette.PAPER[400])
@@ -452,21 +442,10 @@ func _build_side_panels() -> void:
 
 
 func _build_sell_seal() -> void:
-	var seal := Panel.new()
+	# 朱砂大方印（器物谱：印）—— 拖拽出售目标；形制/边线/鎏金收口出 Artifacts
+	var seal := Artifacts.sell_seal(float(Layout.SELL_SIZE))
 	seal.position = Vector2(Layout.SELL_X, Layout.SELL_Y)
-	seal.size = Vector2(Layout.SELL_SIZE, Layout.SELL_SIZE)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.DANGER["base"], 0.85)
-	sb.border_color = Palette.PAPER[300]
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(0)
-	seal.add_theme_stylebox_override("panel", sb)
 	add_child(seal)
-	var t := _label("售", 30, Palette.PAPER[100], Sess.seal_font)
-	t.position = Vector2(Layout.SELL_X, Layout.SELL_Y + 12)
-	t.size = Vector2(Layout.SELL_SIZE, 40)
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(t)
 
 
 # ── 刷新（Match 状态 → 视图） ─────────────────────────────
@@ -588,8 +567,8 @@ func _refresh_shop() -> void:
 			b.disabled = true
 			continue
 		b.disabled = float(p["gold"]) < float(def["cost"])
-		# 直购角标（商肆 1-5；仅可买时显示——原版同口径）
-		var badge := _label(str(i + 1), 12, Palette.PAPER[400])
+		# 直购序位印（器物谱·朱砂方印；商肆 1-5；仅可买时显示——原版同口径）
+		var badge := Artifacts.seal_badge(str(i + 1), 20.0)
 		badge.position = Vector2(5, 3)
 		badge.visible = not b.disabled
 		b.add_child(badge)
@@ -610,6 +589,10 @@ func _refresh_shop() -> void:
 		trait_l.size = Vector2(Layout.SHOP_CW - 16, 20)
 		trait_l.clip_text = true
 		b.add_child(trait_l)
+		# 费阶宝石（器物谱·琢面）：右上角落印，与名字行稀有度色同源互证
+		var gem := Artifacts.cost_gem(int(def["cost"]), 18.0)
+		gem.position = Vector2(Layout.SHOP_CW - 19.0, 12.0)
+		b.add_child(gem)
 		# 场上/备战已有同名：呼吸脉冲（「买它=向合成推进」提示——原版同口径）
 		if owned_ids.has(id) and not b.disabled:
 			var pt := create_tween().set_loops()
@@ -700,6 +683,8 @@ func _check_adventure() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(760, 320)
 	panel.position = Vector2((Layout.W - 760) / 2.0, (Layout.H - 320) / 2.0)
+	# 奇遇匣=砚石嵌金面板（器物谱：砚）
+	Artifacts.night_panel(panel)
 	dim.add_child(panel)
 	MicroFx.enter(panel)
 	var title := _label("奇 遇 · 择 一", 28, Palette.GILT["light"], Sess.seal_font)
@@ -714,29 +699,10 @@ func _check_adventure() -> void:
 		b.text = "%s\n%s" % [opt["title"], opt["desc"]]
 		b.position = Vector2(20 + i * 244, 90)
 		b.custom_minimum_size = Vector2(224, 200)
-		b.add_theme_font_override("font", Sess.body_font)
-		b.add_theme_font_size_override("font_size", 17)
-		b.add_theme_color_override("font_color", Palette.PAPER[100])
-		# 夜宴样式覆写：默认按钮无边框无底色，与暗幕融为一体
-		var osb := StyleBoxFlat.new()
-		osb.bg_color = Color(Palette.INK[850], 0.95)
-		osb.border_color = Color(Palette.GILT["base"], 0.55)
-		osb.set_border_width_all(1)
-		osb.set_corner_radius_all(0)
-		osb.content_margin_left = 12
-		osb.content_margin_right = 12
-		osb.content_margin_top = 10
-		osb.content_margin_bottom = 10
-		b.add_theme_stylebox_override("normal", osb)
-		var hsb := osb.duplicate()
-		hsb.border_color = Palette.GILT["light"]
-		b.add_theme_stylebox_override("hover", hsb)
-		var psb := osb.duplicate()
-		psb.bg_color = Color(Palette.INK[800], 0.95)
-		b.add_theme_stylebox_override("pressed", psb)
+		# 奇遇选项卡=墨玉大卡（器物谱：玉）—— 三态与全站按钮同律
+		Artifacts.jade_button(b, {"size": 17})
 		# desc 超宽不换行会横向溢出三卡互叠
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		b.focus_mode = Control.FOCUS_NONE
 		var idx := i
 		b.pressed.connect(func() -> void:
 				match_ref.resolve_adventure(idx)
@@ -950,6 +916,10 @@ func _refresh_item_bar() -> void:
 			chip.disabled = true
 			continue
 		chip.disabled = false
+		# 琉璃背衬（器物谱：厚薄缘光垫在装备图标下 —— 器匣格的玉匣承盘）
+		var glaze := Artifacts.glaze_back(Layout.ITEM_SIZE - 8.0, Layout.ITEM_SIZE - 8.0)
+		glaze.position = Vector2(4, 4)
+		chip.add_child(glaze)
 		var icon := TextureRect.new()
 		icon.texture = load("res://assets/items/%s.png" % id)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -959,7 +929,7 @@ func _refresh_item_bar() -> void:
 		chip.add_child(icon)
 		if gi == selected_item_idx:
 			var sel := ColorRect.new()
-			sel.color = Color(Palette.SPIRIT["base"], 0.25)
+			sel.color = Color(Palette.GILT["base"], 0.16)
 			sel.size = Vector2(Layout.ITEM_SIZE - 4, Layout.ITEM_SIZE - 4)
 			sel.position = Vector2(2, 2)
 			sel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1227,16 +1197,14 @@ func _update_rail_popup(badge_i: int) -> void:
 	rail_popup = PanelContainer.new()
 	rail_popup.position = Vector2(pos["x"], pos["y"])
 	rail_popup.custom_minimum_size = Vector2(layout["w"], layout["h"])
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.INK[900], 0.96)
-	sb.border_color = Palette.GILT["deep"] if tier >= 0 else Palette.INK[500]
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(0)
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 8
-	rail_popup.add_theme_stylebox_override("panel", sb)
+	# 羁绊笺=砚石嵌金面板（器物谱：砚）；激活与否由头字色与档位宝石表达
+	Artifacts.night_panel(rail_popup)
 	add_child(rail_popup)
+	# 档位宝石（激活时右上角落印；TRAIT_TIER_COLOR 真源）
+	if tier >= 0:
+		var tg := Artifacts.tier_gem(tier, 12.0)
+		tg.position = Vector2(float(layout["w"]) - 26.0, 10.0)
+		rail_popup.add_child(tg)
 	var head := "%s　%d" % [String(def["name"]), int(b["count"])]
 	var hl := _label(head, 18, Palette.GILT["light"] if tier >= 0 else Palette.PAPER[300])
 	rail_popup.add_child(hl)
@@ -1268,12 +1236,8 @@ func _open_trait_members(badge_i: int) -> void:
 	trait_members_card = PanelContainer.new()
 	trait_members_card.position = Vector2(HudLayout.TRAIT_MEMBER_X, py)
 	trait_members_card.custom_minimum_size = Vector2(card_w, card_h)
-	var sb2 := StyleBoxFlat.new()
-	sb2.bg_color = Color(Palette.INK[900], 0.97)
-	sb2.border_color = Palette.GILT["base"] if int(b["tier"]) >= 0 else Palette.INK[500]
-	sb2.set_border_width_all(1)
-	sb2.set_corner_radius_all(0)
-	trait_members_card.add_theme_stylebox_override("panel", sb2)
+	# 成员卡=砚石嵌金面板（器物谱：砚）
+	Artifacts.night_panel(trait_members_card)
 	add_child(trait_members_card)
 	var def: Variant = b["def"]
 	var head := _label("%s · %d 人 · 已上阵 %d" % [String(def["name"]), members.size(), int(b["count"])], 19, Palette.PAPER[100])
@@ -1670,6 +1634,8 @@ func _show_eliminated() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(560, 420)
 	panel.position = Vector2((Layout.W - 560) / 2.0, (Layout.H - 420) / 2.0)
+	# 道消匣=砚石嵌金面板（器物谱：砚）
+	Artifacts.night_panel(panel)
 	dim.add_child(panel)
 	MicroFx.enter(panel)
 	var title := _label("道 消", 52, Palette.CINNABAR["light"], Sess.seal_font)
@@ -1701,10 +1667,8 @@ func _show_eliminated() -> void:
 
 
 func _style_action_button(b: Button) -> void:
-	b.add_theme_font_override("font", Sess.body_font)
-	b.add_theme_font_size_override("font_size", 20)
-	b.add_theme_color_override("font_color", Palette.PAPER[100])
-	b.focus_mode = Control.FOCUS_NONE
+	# 道消出口=墨玉大钮（器物谱：玉）
+	Artifacts.jade_button(b, {"size": 20})
 
 
 ## 玩家淘汰后把剩下的回合快进完，给出最终名次（原版 fastForward 同回路）
@@ -1931,12 +1895,8 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	detail_card = PanelContainer.new()
 	detail_card.position = Vector2(px, py)
 	detail_card.custom_minimum_size = Vector2(w, h)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.INK[900], 0.97)
-	sb.border_color = Palette.RARITY_COLOR[rarity]
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(0)
-	detail_card.add_theme_stylebox_override("panel", sb)
+	# 详情卡=砚石嵌金面板（器物谱：砚）；稀有度身份由顶条与费阶宝石承担
+	Artifacts.night_panel(detail_card)
 	add_child(detail_card)
 	var card: Panel = Panel.new()
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1959,6 +1919,10 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	cost_l.size = Vector2(66, 18)
 	cost_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	card.add_child(cost_l)
+	# 费阶宝石（器物谱）：贴在费数左侧，琢面 × 稀有度色
+	var cost_g := Artifacts.cost_gem(rarity, 14.0)
+	cost_g.position = Vector2(w - 97.0, 23.0)
+	card.add_child(cost_g)
 	# 四行战斗数值：星级缩放走 config 真源。口径与 web 备战悬停卡一致（基础星级面板值，
 	# 不含天命/登峰/精英乘区与装备加成——结算口径见 core/unit.gd，战斗内实时值另走 sync_bars）
 	var s: Dictionary = def["base"]
@@ -1975,15 +1939,14 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 		var rl := _label(String(rows[i]), 13, Palette.PAPER[300])
 		rl.position = Vector2(14, 66 + i * 19)
 		card.add_child(rl)
-	# 装备三格（图标 + 格下短名）
+	# 装备三格（琉璃背衬 + 图标 + 格下短名）
 	var items: Array = u.get("items", [])
 	for i2: int in 3:
 		var fx := 14 + i2 * 96
-		var frame := ColorRect.new()
-		frame.color = Color(Palette.INK[800], 0.4)
-		frame.position = Vector2(fx, 148)
-		frame.size = Vector2(88, 30)
-		card.add_child(frame)
+		# 琉璃格（器物谱：装备嵌于琉璃格中）；空位留薄胎示「可容」
+		var glaze := Artifacts.glaze_back(88.0, 30.0)
+		glaze.position = Vector2(fx, 148)
+		card.add_child(glaze)
 		if i2 < items.size():
 			var iid: String = items[i2]
 			var idef: Variant = Spec.item_by_id.get(iid, null)
@@ -2022,10 +1985,7 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 		sell_btn.text = "出 售 · %d 金" % GameState.sell_value(u)
 		sell_btn.position = Vector2(14, h - 42)
 		sell_btn.custom_minimum_size = Vector2(w - 28, 32)
-		sell_btn.add_theme_font_override("font", Sess.body_font)
-		sell_btn.add_theme_font_size_override("font_size", 13)
-		sell_btn.add_theme_color_override("font_color", Palette.PAPER[100])
-		sell_btn.focus_mode = Control.FOCUS_NONE
+		Artifacts.jade_button(sell_btn, {"size": 13})
 		var armed := {"v": false}
 		sell_btn.pressed.connect(func() -> void:
 			if sell_star >= 2 and not armed["v"]:

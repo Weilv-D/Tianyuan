@@ -28,34 +28,10 @@ func _ready() -> void:
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(tag)
 
-	# 剪影屏风（构图纠偏）：早前长卷平铺横穿按钮列正中——实心按钮把人物脸一切两半
-	# （用户实机报告）。改为中心留空、左右两簇错落簇拥：x ∈ [-240, 240] 只留标题与
-	# 按钮，人物沉到画面下三分之一，脸全部不被覆盖
-	var picks := [7, 19, 31, 44, 56]
-	var n_champs: int = Spec.champions.size()
-	# 屏风四枚：左右各二，**净距 ≥125px** —— 立绘兵器横向伸出量约 30-60px，
-	# 重叠构图会让前排兵器扫进后排人物的脸（用户实机报告）；不重叠则绝不遮挡。
-	# 内淡小、外浓大的纵深层次；全部沉到下缘，中心区只留标题与按钮。
-	# [左边缘 x, 底边 y, 高, alpha] —— 根为中心基制（0 = 画面中心）
-	var layout: Array = [
-		[-770, 455.0, 250.0, 0.32], [-395, 500.0, 195.0, 0.44],
-		[200.0, 500.0, 195.0, 0.44], [520.0, 455.0, 250.0, 0.32],
-	]
-	for k: int in layout.size():
-		var cfg: Array = layout[k]
-		var idx := int(picks[k]) % n_champs
-		var def_id := String(Spec.champions[idx]["id"])
-		var tex: Texture2D = load("res://assets/pieces/%s.png" % def_id)
-		if tex == null:
-			continue
-		var sh := Sprite2D.new()
-		sh.texture = tex
-		sh.centered = false
-		sh.modulate = Color(Palette.INK[500], float(cfg[3]))
-		var hgt := float(cfg[2])
-		sh.scale = Vector2(hgt / 208.0, hgt / 208.0)
-		sh.position = Vector2(float(cfg[0]), float(cfg[1]) - hgt)
-		add_child(sh)
+	# 折屏「夜宴图」（2.4.0 器物谱）：六折绢屏立于山海前，棋相墨影画在各自屏心，
+	# 中折绘山水云月与落款。屏格抹头相隔 —— 墨影各守其屏，兵器无从交叠扫脸
+	# （2.3.0 脸被切/兵器扫邻脸两轮实机事故后，遮挡物归入画格即结构性根除）
+	add_child(MenuBackdrop.build_screen([7, 19, 44, 56]))
 
 	var has_save: bool = SaveStore.has_save("normal")
 	var has_daily: bool = SaveStore.has_save("daily")
@@ -151,5 +127,5 @@ func _menu_button(text: String, y: float, enabled: bool) -> Button:
 
 
 func _panel_style(bg: Color, border: Color) -> StyleBoxTexture:
-	# 漆面按钮：宣纸纤维底纹 × 状态染色（FxAtlas.panel_box 9-slice；夜宴禁圆角 → 直角边线）
-	return FxAtlas.panel_box(bg, border)
+	# 墨玉按钮：玉纹内光 × 状态染色（FxAtlas.jade_box 9-slice；夜宴禁圆角 → 直角）
+	return FxAtlas.jade_box(bg)

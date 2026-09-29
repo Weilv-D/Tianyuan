@@ -13,7 +13,18 @@ func _ready() -> void:
 	bg.color = Palette.INK[950]
 	bg.position = Vector2(-Layout.W, -Layout.H) / 2.0
 	bg.size = Vector2(Layout.W, Layout.H)
+	bg.z_index = -10  # 山海垫底：远山(-6/-5)压其上，文字(z 0)压山上
 	add_child(bg)
+	# 夜色山海纵深：两层远山（game_scene 夜空远山同语）；make_mountain 出场景绝对坐标，
+	# 本景根是中心基制 → 反向偏移半屏，山脚线落在画面下缘
+	var m1 := MenuBackdrop.make_mountain(Palette.INK[800], 0.6, Layout.H - 96.0, 130.0, 10.0, 51)
+	m1.position = Vector2(-Layout.W / 2.0, -Layout.H / 2.0)
+	m1.z_index = -6
+	add_child(m1)
+	var m2 := MenuBackdrop.make_mountain(Palette.INK[850], 0.85, Layout.H - 24.0, 170.0, 7.0, 97)
+	m2.position = Vector2(-Layout.W / 2.0, -Layout.H / 2.0)
+	m2.z_index = -5
+	add_child(m2)
 
 	var standings: Array = match_ref.standings()
 	var human_rank := 0
@@ -43,6 +54,12 @@ func _ready() -> void:
 		line.position = Vector2(-330, y)
 		line.size = Vector2(700, 36)
 		add_child(line)
+		# 三甲嵌宝（金/银/哑金）：贴名次行文字左侧，与行文字居中对齐（行高 36 · 宝石 12 → y+12）
+		if rank <= 3:
+			var gem_col: Color = Palette.GILT["light"] if rank == 1 else (Palette.PAPER[200] if rank == 2 else Palette.GILT["base"])
+			var gem := Artifacts.gem_pip(gem_col, 12.0)
+			gem.position = Vector2(-356.0, y + 12.0)
+			add_child(gem)
 		y += 46.0
 
 	# 每日模式记录最佳名次
@@ -60,10 +77,7 @@ func _ready() -> void:
 	back.text = "回 到 主 菜 单"
 	back.position = Vector2(-180, 420)
 	back.custom_minimum_size = Vector2(360, 64)
-	back.add_theme_font_override("font", Sess.body_font)
-	back.add_theme_font_size_override("font_size", 24)
-	back.add_theme_color_override("font_color", Palette.PAPER[100])
-	back.focus_mode = Control.FOCUS_NONE
+	Artifacts.jade_button(back, {"size": 24})  # 墨玉三态（字色/玉纹/微动效随器物谱）
 	back.pressed.connect(func() -> void: Sess.go("res://render/menu.tscn"))
 	add_child(back)
 

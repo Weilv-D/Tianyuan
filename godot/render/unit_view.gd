@@ -94,15 +94,12 @@ func setup(p_def_id: String, p_team: int, p_star: int, p_is_beast: bool) -> void
 	_mana_bar = _bar(Vector2(-BAR_W / 2.0, bar_y - MANA_BAR_H - 1.5), Vector2(0, MANA_BAR_H), Palette.VOID["base"])
 	add_child(_mana_bar)
 
-	# 星标（3 枚菱形）
+	# 星标（3 粒琢面宝石：器物谱·宝石 —— 点亮 GILT，未点墨玉空胎）
 	for i: int in 3:
-		var pip := ColorRect.new()
-		pip.color = Palette.GILT["light"] if i < star else Color(Palette.INK[600], 0.8)
-		pip.size = Vector2(7, 7)
-		pip.rotation = PI / 4.0
-		pip.position = Vector2((i - 1) * 10 - 3.5, bar_y - MANA_BAR_H - 12.0)
-		_pips.append(pip)
+		var pip := Artifacts.gem_pip(Palette.GILT["light"] if i < star else Color(Palette.INK[600], 0.85), 7.5)
+		pip.position = Vector2((i - 1) * 10.0, bar_y - MANA_BAR_H - 8.5)
 		add_child(pip)
+		_pips.append(pip)
 
 	set_star_scale()
 

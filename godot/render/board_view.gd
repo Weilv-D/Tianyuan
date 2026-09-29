@@ -58,6 +58,29 @@ func _ready() -> void:
 	add_child(_hover_layer)
 
 	_build_candle_lights()
+	# 星位宝石（器物谱·琢面）：四星位 + 天元各嵌一粒小金宝石 —— 「漆奁嵌宝」
+	_build_star_gems()
+
+
+## 星位/天元宝石：Gem 纹理琢面 × GILT，天元加大并附宝光晕（原 draw_circle 墨点升级）
+func _build_star_gems() -> void:
+	for star: Vector2i in [Vector2i(2, 2), Vector2i(6, 2), Vector2i(2, 6), Vector2i(6, 6)]:
+		var g := Artifacts.gem_pip(Color(Palette.GILT["light"], 0.85), 7.0)
+		g.position = cell_center(star.x, star.y)
+		g.z_index = 1
+		add_child(g)
+	var halo := Sprite2D.new()
+	halo.texture = FxAtlas.texture(FxAtlas.GLOW)
+	halo.material = FxAtlas.add_material()
+	halo.modulate = Color(Palette.GILT["base"], 0.32)
+	halo.position = cell_center(4, 4)
+	halo.scale = Vector2.ONE * (26.0 / 128.0)
+	halo.z_index = 1
+	add_child(halo)
+	var tyuan := Artifacts.gem_pip(Color(Palette.GILT["glow"], 0.95), 9.0)
+	tyuan.position = cell_center(4, 4)
+	tyuan.z_index = 1
+	add_child(tyuan)
 
 
 ## 夜宴烛光（web 版没有的 2D 光照层）：棋盘两盏米金 PointLight2D 缓摇曳 ——
@@ -127,10 +150,8 @@ func _draw() -> void:
 	# 敌营纱幕（仅准备模式）：上半 4 行压暗 —— 「敌营」与「我方阵地」一眼可读
 	if not battle_mode:
 		draw_rect(Rect2(pad, pad, size - pad * 2, size / 2.0 - pad), Color(Palette.INK[950], 0.34))
-	# 星位四点 + 天元（围棋语汇：交叉点上点墨）
-	for star: Vector2i in [Vector2i(2, 2), Vector2i(6, 2), Vector2i(2, 6), Vector2i(6, 6)]:
-		draw_circle(cell_center(star.x, star.y), 2.0, Color(Palette.GILT["light"], 0.35))
-	draw_circle(cell_center(4, 4), 2.6, Color(Palette.GILT["light"], 0.6))
+	# 星位四点 + 天元：围棋语汇的交叉点墨已升格为嵌宝（见 _build_star_gems）——
+	# 此处仅保留天元外圈「宝光轮」（线与宝石的收口）
 	draw_arc(cell_center(4, 4), 6.0, 0, TAU, 24, Color(Palette.GILT["light"], 0.3), 1.0)
 
 

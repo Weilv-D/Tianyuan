@@ -21,25 +21,55 @@ var _fade: ColorRect
 ## 该探针永远落在 game/menu，战斗路径回归钉失效，2026-09-29 第十四轮审查实证）
 var battle_smoke := false
 
-## 启动预热任务 id（boot 写入；-1 无在途）——FxAtlas 烘焙必须等它收尾
-var prewarm_task := -1
+## 启动预载（帧预算制，主线程分片）：序章 3.4s 淡入期内把 108 张贴图与音效预池
+## 吃完，主线程每帧最多干 90ms —— hitch 被淡入掩盖，全程零跨线程。
+## 纪律：**不用 WorkerThreadPool 载贴图** —— worker 的 ResourceLoader.load 会在
+## RenderingServer 越权建 RID，与主线程并发即退出期段错误/挂死（2.4.0 实证二相
+## 故障 EXIT=139/124，最小复现 = worker 载 3 张 ctex 后 quit；2.1.0「线程池化
+## 预载」只压低了概率，未除根 —— 探针门禁的 EXIT 验收钉死此判例）。
+var _prime_queue: Array = []
 var _atlas_done := false
 
+## 启动预载的音效配方（对局首批发音；池填满 VARIANTS_PER_SOUND 变体）
+const PRIME_SOUNDS := [
+	"coin", "ui", "uiBig", "warn", "levelup", "star3", "skillBig",
+	"shoot", "heal", "shield", "cast", "death", "victory", "defeat",
+]
 
-## 特效材质烘焙收口：等启动预热完成再主线程烘焙（挂 Sess 常驻——boot 场景会被
-## 切换释放，协程挂它身上会在 autostart/battle-smoke 直切路径静默死亡）。
-## 竞态实证：主线程 ImageTexture 提交与非主线程 ResourceLoader 并发 → 导出体段错误。
-func start_atlas_bake() -> void:
-	_bake_when_ready()
+
+func prime_assets() -> void:
+	if not _prime_queue.is_empty():
+		return
+	for c: Dictionary in Spec.champions:
+		_prime_queue.append("res://assets/pieces/%s.png" % String(c["id"]))
+	for it: Dictionary in Spec.items:
+		_prime_queue.append("res://assets/items/%s.png" % String(it["id"]))
+	# 音效全变体池：每具名配方 VARIANTS_PER_SOUND 个变体，逐片合成（闭包按值捕获
+	# 逐个局部副本 —— 循环变量直捕是 2.3.0 已判的闭包共享事故）
+	for n: String in PRIME_SOUNDS:
+		var nm := String(n)
+		for v: int in 3:
+			_prime_queue.append(func() -> void: sfx.pool_variant(nm))
+	_prime_step()
 
 
-func _bake_when_ready() -> void:
-	while prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(prewarm_task):
+## 帧预算分片：每帧最多 90ms，剩余挂下一帧（协程宿主张 = Sess 常驻，换场不死）
+func _prime_step() -> void:
+	var budget := Time.get_ticks_msec() + 90
+	while not _prime_queue.is_empty() and Time.get_ticks_msec() < budget:
+		var item: Variant = _prime_queue.pop_front()
+		if item is Callable:
+			(item as Callable).call()  # 音效变体单片合成
+		else:
+			ResourceLoader.load(String(item), "Texture2D")
+	if not _prime_queue.is_empty():
 		await get_tree().process_frame
+		_prime_step()
+		return
+	# 器物谱纹理烘焙收口：预载完成后主线程一次成型（ImageTexture 必须主线程提交）
 	if not _atlas_done:
 		_atlas_done = true
 		FxAtlas.prewarm()
-	prewarm_task = -1
 
 
 func _ready() -> void:
@@ -274,14 +304,14 @@ func _run_smoke(spec_txt: String) -> void:
 
 
 func _exit_tree() -> void:
-	# 进程退出链：先于引擎 teardown 落定两件在途事——
-	# 1) 预热任务 join（退出期在途 WorkerThreadPool 任务 + 假驱动析构 = 段错误，
-	#    headless 探针纪律同根因；基线 2.0.3 即有此退出崩溃，非 2.1.0 引入）
-	if prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(prewarm_task):
-		WorkerThreadPool.wait_for_task_completion(prewarm_task)
-	prewarm_task = -1
-	# 2) static 缓存持有的 GPU 资源先于 RenderingServer 拆除释放
-	FxAtlas.release_all()
+	# 退出纪律（2.4.0 实证修正 2.1.0 判例）：**不在退出期清 FxAtlas static 缓存**。
+	# 2.1.0 曾以「static 析构晚于 RenderingServer 拆除」为由在 _exit_tree 调
+	# release_all() 主动释放；实证在本机构建（4.7.1）适得其反——该调用落在拆树
+	# 途中， dying 节点/样式盒仍持纹理 last-ref，ImageTexture 析构的 RID 释放撞上
+	# 正在拆除的 RenderingServer = 段错误（EXIT=139；buy/battle 探针复现，
+	# 基线 battle 探针同崩 —— 同根）。静态缓存任其泄漏：引擎 ObjectDB 退出路径
+	# 对泄漏资源打警告而不析构，实证 EXIT=0（menu/hud/hover/buy 四探针验收）。
+	pass
 
 
 func _load_fonts() -> void:

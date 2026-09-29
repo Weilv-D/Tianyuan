@@ -3,26 +3,16 @@ extends Node2D
 ## 之后进 Menu。字体经 Sess 预载（篆体必先于首笔）。取「天」与 TS 版同源
 ## （traitIcons.ts：源字体无「弈」篆形，开屏题字用「天」）。
 
-## 启动预热（仅游戏进程——headless 探针/平衡 worker 不跑主场景，无 teardown 竞态）：
-## 后台线程先纹理（108 张同步解码是图鉴首开 1.1s 冻结/上场 146ms 尖刺的根因，
-## 预载后任何 load 都是缓存命中）再音效（16 配方各 1 变体）
+## 启动预热（仅游戏进程——headless 探针/平衡 worker 不跑主场景）。
+## 帧预算主线程分片（2.4.0 判例：worker 线程 ResourceLoader.load 贴图会在
+## RenderingServer 越权建 RID，退出期二相故障 EXIT=139/124 —— 跨线程预载已除根）：
+## 序章 3.4s 淡入期内吃完 108 张贴图 + 音效预池 + 器物谱纹理烘焙，hitch 被淡入掩盖
 func _prewarm() -> void:
-	Sess.prewarm_task = WorkerThreadPool.add_task(func() -> void:
-		for c: Dictionary in Spec.champions:
-			ResourceLoader.load("res://assets/pieces/%s.png" % String(c["id"]), "Texture2D")
-		for it: Dictionary in Spec.items:
-			ResourceLoader.load("res://assets/items/%s.png" % String(it["id"]), "Texture2D")
-		Sess.sfx.prewarm_sounds([
-			"coin", "ui", "uiBig", "warn", "levelup", "star3", "skillBig",
-			"shoot", "heal", "shield", "cast", "death", "victory", "defeat"]))
+	Sess.prime_assets()
 
 
 func _ready() -> void:
 	_prewarm()
-	# 特效/氛围纹理一次成型（约 200ms 逐像素烘焙）：必须在预热任务收尾之后——
-	# 主线程 ImageTexture 提交与非主线程 ResourceLoader 并发在导出体上实证段错误
-	#（工程内时序松未复现）。协程挂常驻 Sess：boot 自身在直切路径会被释放。
-	Sess.start_atlas_bake()
 	# --battle-smoke：探针自带换场（session.gd 的 deferred battle_scene），
 	# 序章整段让路——否则本函数的转发后注册会把战斗场景顶掉（2026-09-29 实证）
 	if Sess.battle_smoke:

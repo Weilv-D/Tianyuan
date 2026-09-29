@@ -37,10 +37,8 @@ func _ready() -> void:
 	back.text = "返 回"
 	back.position = Vector2(-90, 470)
 	back.custom_minimum_size = Vector2(180, 50)
-	back.add_theme_font_override("font", Sess.body_font)
-	back.add_theme_font_size_override("font_size", 22)
-	back.add_theme_color_override("font_color", Palette.PAPER[100])
-	back.focus_mode = Control.FOCUS_NONE
+	# 墨玉三态按钮（器物谱）：字体/字色/三态/焦点全由形制库接管
+	Artifacts.jade_button(back, {"size": 22})
 	back.pressed.connect(func() -> void:
 		if Sess.scene_data.get("from_game", false) and Sess.scene_data.get("match", null) != null:
 			Sess.go("res://render/game_scene.tscn", { "match": Sess.scene_data["match"] })
@@ -70,6 +68,8 @@ func _detail(c: Dictionary) -> void:
 			_detail_layer = null)
 	layer.add_child(dim)
 	var panel := Panel.new()
+	# 砚石嵌金面板（器物谱）：替代引擎默认灰 Panel
+	Artifacts.night_panel(panel)
 	panel.size = Vector2(680, 560)
 	panel.position = Vector2((Layout.W - 680) / 2.0, (Layout.H - 560) / 2.0)
 	dim.add_child(panel)
@@ -149,6 +149,10 @@ class _Portrait extends Button:
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(nm)
 		add_child(v)
+		# 费阶宝石（器物谱·琢面）：右上角落印，不遮立绘主体；稀有度色边仍由 Flat 直绘（信息载体）
+		var gem := Artifacts.cost_gem(rarity, 12.0)
+		gem.position = Vector2(104.0 - 16.0, 4.0)
+		add_child(gem)
 
 
 func _trait_names_cx(c: Dictionary) -> String:
