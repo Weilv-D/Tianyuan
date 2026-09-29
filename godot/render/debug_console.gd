@@ -89,7 +89,8 @@ func _handle(id: String) -> void:
 		"gold":
 			p["gold"] = float(p["gold"]) + 50.0
 		"level":
-			p["level"] = mini(9, int(p["level"]) + 1)
+			# 等级上限读 Spec 真源（曾硬编码 9，spec 调 MAX_LEVEL 时 DEV 命令会写出越界等级）
+			p["level"] = mini(int(Spec.c("MAX_LEVEL", 9)), int(p["level"]) + 1)
 		"hpPlus":
 			p["hp"] = minf(Spec.c("PLAYER_START_HP"), float(p["hp"]) + 20.0)
 		"comp":
@@ -136,6 +137,9 @@ func _handle(id: String) -> void:
 				var bi2 := (p["bench"] as Array).find(merged)
 				p["bench"][bi2] = null
 				p["board"][dst] = merged
+			else:
+				# 兜底：未合成出 3★（兜底不可达，但防负索引写备战末格——GD 负索引不报错）
+				push_warning("legend: 未合成出 3★（bench<3 或同名池不足）")
 		"items":
 			# 满袋：按 MAX_ITEMS_PER_UNIT 分发（TS 同源纪律——超发会在 stripItems 时撑爆器匣）
 			var bag: Array = ["xuanjia", "moren", "lingzhu", "yunlv", "xueyu", "fafu"]
