@@ -520,6 +520,7 @@ func fullscreen_flash(color: Color, strength: float = 1.0) -> void:
 	# 全屏矩形挂本层会被缩到 1/4 且随板偏移
 	rect.position = Vector2.ZERO
 	rect.z_index = 90
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 瞬态装饰不放行会吞 0.18s 点击
 	get_tree().current_scene.add_child(rect)
 	_strays.append(rect)
 	rect.tree_exited.connect(func() -> void: _strays.erase(rect))

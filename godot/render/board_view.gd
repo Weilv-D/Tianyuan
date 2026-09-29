@@ -21,8 +21,12 @@ var _hover_layer: Node2D
 func _ready() -> void:
 	var size := float(Layout.BOARD_SIZE)
 	# 漆纹层：着色器生成的笔触漆纹叠在 _draw 底座之下（z=-1）
+	# 装饰件吞点击 = 2.3.0 已判事故的漏网之鱼：ColorRect 默认 STOP，640×640 恰盖全盘，
+	# 棋盘上一切 press/motion 被吞——场上棋子拖不动/点选不钉/悬停无卡/装备穿不上
+	#（2026-09-29 用户实机报障，drag 探针 STOP_AT 枚举实证）
 	var lacquer := ColorRect.new()
 	lacquer.color = Color.WHITE
+	lacquer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lacquer.position = Vector2.ZERO
 	lacquer.size = Vector2(size, size)
 	var mat := ShaderMaterial.new()

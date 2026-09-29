@@ -34,7 +34,7 @@ func _build() -> void:
 	sb.set_corner_radius_all(0)
 	_panel.add_theme_stylebox_override("panel", sb)
 	add_child(_panel)
-	var title := _lbl("实验控制台（仅调试版本）", 16, Palette.GILT["light"], Sess.seal_font)
+	var title := _lbl("实验控制台（仅调试版本）", 16, Palette.GILT["light"], Sess.body_font)
 	title.position = Vector2(0, 6)
 	title.size = Vector2(720, 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

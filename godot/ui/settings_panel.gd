@@ -1,9 +1,11 @@
 extends CanvasLayer
-## 设置面板（SettingsPanel.ts 对齐版 · M3 次批紧凑面）：三总线音量 / 静观 / 自动上场
-## + 音乐出处脚注（原版 musicCreditLine 同行）。prefs 走 SaveStore（user://prefs.json）。
+## 设置面板（SettingsPanel.ts 对齐版）：三总线音量 / 静观 / 自动上场
+## + 对局内动作（重开 / 投降 · 二次确认清档，GameScene.openSettings 同面）
+## + 音乐出处脚注。prefs 走 SaveStore（user://prefs.json）。
 class_name SettingsPanel
 
 var _on_changed: Callable
+var _resign_armed := false  # 投降二次确认（再点才清档退出；切面板即复位）
 
 
 func open(on_changed: Callable = Callable()) -> void:
@@ -19,8 +21,8 @@ func open(on_changed: Callable = Callable()) -> void:
 			close())
 	add_child(dim)
 	var panel := Panel.new()
-	panel.size = Vector2(520, 460)
-	panel.position = Vector2((Layout.W - 520) / 2.0, (Layout.H - 460) / 2.0)
+	panel.size = Vector2(520, 520)
+	panel.position = Vector2((Layout.W - 520) / 2.0, (Layout.H - 520) / 2.0)
 	# 夜宴底覆写：默认 Panel 中性灰 + CheckBox/HSlider 深底不可见（色板红线）
 	# 漆面材质化（FxAtlas.panel_box）：宣纸纤维 × 深蓝 × 金线，与三大浮层同源
 	panel.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97)))
@@ -108,14 +110,43 @@ func open(on_changed: Callable = Callable()) -> void:
 		panel.add_child(cb)
 		y += 44.0
 	var note := _lbl("改动即时生效并随面板关闭落盘", 14, Palette.PAPER[500])
-	note.position = Vector2(40, y + 8)
+	note.position = Vector2(40, y + 4)
 	panel.add_child(note)
 	var credit := _lbl(MusicTracks.credit_line(), 13, Palette.PAPER[500])
-	credit.position = Vector2(40, y + 30)
+	credit.position = Vector2(40, y + 26)
 	panel.add_child(credit)
+	# 对局内动作（web inMatch 同面）：重开清本模式档开新局；投降两段确认后清档回菜单。
+	# 无退出存档钩子（存档只在动作点发生），清档即终局——无 web abandoned 防回写问题
+	var cur := get_tree().current_scene if get_tree() != null else null
+	if cur != null and cur.name == "Game":
+		var m: Match = Sess.scene_data.get("match", null)
+		var mode := String(m.mode) if m != null else "normal"
+		var re := Button.new()
+		re.text = "重 开 对 局"
+		re.position = Vector2(50, 398)
+		re.custom_minimum_size = Vector2(190, 44)
+		Artifacts.jade_button(re, {"size": 17})
+		re.pressed.connect(func() -> void:
+			SaveStore.clear_save(mode)
+			Sess.go("res://render/game_scene.tscn", { "match": Match.new(
+				int(Time.get_unix_time_from_system() * 1000.0) & 0x7FFFFFFF, "你", mode) }))
+		panel.add_child(re)
+		var resign := Button.new()
+		resign.text = "投 降"
+		resign.position = Vector2(280, 398)
+		resign.custom_minimum_size = Vector2(190, 44)
+		Artifacts.jade_button(resign, {"size": 17})
+		resign.pressed.connect(func() -> void:
+			if not _resign_armed:
+				_resign_armed = true
+				resign.text = "确认投降？（清档）"
+				return
+			SaveStore.clear_save(mode)
+			Sess.go("res://render/menu.tscn"))
+		panel.add_child(resign)
 	var done := Button.new()
 	done.text = "完 成"
-	done.position = Vector2(180, 396)
+	done.position = Vector2(180, 462)
 	done.custom_minimum_size = Vector2(160, 44)
 	# 墨玉三态（器物谱：形制库统一出口——原手搓四行散点覆写）
 	Artifacts.jade_button(done, {"size": 20})

@@ -203,6 +203,8 @@ func _draw_bg() -> void:
 	bg.position = Vector2.ZERO
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.z_index = -10
+	# 全屏装饰放行：TextureRect 默认 STOP，会吞掉战斗层后续一切命中测试
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	var m1 := MenuBackdrop.make_mountain(Palette.INK[800], 0.55, Layout.H - 90.0, 130.0, 10.0, 51)
 	m1.z_index = -9

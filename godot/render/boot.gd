@@ -32,6 +32,7 @@ func _ready() -> void:
 	bg.color = Palette.INK[950]
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.position = Vector2(-Layout.W, -Layout.H) / 2.0
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 装饰放行：STOP 会吞后续场景首帧点击
 	add_child(bg)
 
 	var glyph := Label.new()

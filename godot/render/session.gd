@@ -174,6 +174,42 @@ func _smoke_frames(n: int) -> void:
 		await get_tree().process_frame
 
 
+## 合成鼠标事件（drag 探针）：push_input(in_local_coords=true) 直接收视口（设计）坐标，
+## 不经 DisplayServer 像素换算——最大化窗口 + viewport stretch 下手工乘比例有黑边偏移，
+## 曾致探针落点差 4px 落空（2026-09-29 实证：器匣点击 (360,926) 偏到 x=330 差 4px 未进格）
+func _qa_mouse(kind: String, design: Vector2) -> void:
+	if kind == "press" or kind == "release":
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = kind == "press"
+		ev.position = design
+		ev.global_position = design
+		get_window().push_input(ev, true)
+	else:
+		var ev2 := InputEventMouseMotion.new()
+		ev2.position = design
+		ev2.global_position = design
+		get_window().push_input(ev2, true)
+
+
+## 己方棋盘首行中央格（drag 探针落点）
+func _qa_board_slot0() -> Vector2:
+	return Vector2(Layout.GRID_X + Layout.CELL / 2.0, Layout.GRID_Y + 4 * Layout.CELL + Layout.CELL / 2.0)
+
+
+## 枚举 subtree 内 visible + STOP 且矩形含 world 的 Control（吞点元凶诊断）
+func _qa_stop_at(n: Node, world: Vector2) -> Array:
+	var out: Array = []
+	if n is Control:
+		var c := n as Control
+		if c.mouse_filter == Control.MOUSE_FILTER_STOP and c.visible:
+			if c.get_global_rect().has_point(world):
+				out.append(c)
+	for ch: Node in n.get_children():
+		out.append_array(_qa_stop_at(ch, world))
+	return out
+
+
 func _enter_game() -> void:
 	get_tree().change_scene_to_file("res://render/game_scene.tscn")
 
@@ -186,6 +222,9 @@ func _run_smoke(spec_txt: String) -> void:
 	var hover := spec.size() > 2 and spec[2] == "hover"
 	var perf := spec.size() > 2 and spec[2] == "perf"
 	var buy := spec.size() > 2 and spec[2] == "buy"
+	var drag := spec.size() > 2 and spec[2] == "drag"
+	var tab2 := spec.size() > 2 and spec[2] == "tab2"
+	var tab3 := spec.size() > 2 and spec[2] == "tab3"
 	var frame_ms: Array = []
 	var fx_peak := 0
 	var shop_before := ""
@@ -257,6 +296,64 @@ func _run_smoke(spec_txt: String) -> void:
 			var sc4 = get_tree().current_scene
 			var views_n: int = sc4.get("unit_views").size() if sc4 != null and sc4.get("unit_views") != null else -1
 			print("UI_BUY gold=", gold2, " views=", views_n, " ", "OK purchased" if gold2 < 40.0 else "FAIL unspent")
+		if tab2 or tab3:
+			# 图鉴页签实机点击：羁绊（屏 x950）/ 装备（屏 x1100），y=112 为页签带中心
+			var px: float = 1100.0 if tab3 else 950.0
+			if i == 40:
+				_qa_mouse("press", Vector2(px, 112))
+			elif i == 43:
+				_qa_mouse("release", Vector2(px, 112))
+		elif drag and i == 30:
+			# 拖拽链素材：备战席 0 号塞一枚棋子 + 器匣塞一件装备（真实合成鼠标事件走
+			# press/motion/release 全链——buy 探针的 pressed.emit 绕过输入层测不到这里）
+			var dm: Match = scene_data.get("match", null)
+			if dm != null:
+				Spec.ensure()
+				dm.human()["bench"][0] = GameState.create_unit(String(Spec.champions[0]["id"]), 1)
+				if (dm.human()["items"] as Array).is_empty():
+					dm.human()["items"].append(String(Spec.items[0]["id"]))
+				get_tree().current_scene.call_deferred("refresh_all")
+		elif drag and i == 70:
+			_qa_mouse("press", Vector2(Layout.BENCH_X + 32, Layout.BENCH_Y + 32))
+		elif drag and i == 73:
+			_qa_mouse("motion", Vector2(760, 700))
+		elif drag and i == 76:
+			_qa_mouse("motion", _qa_board_slot0())
+		elif drag and i == 79:
+			_qa_mouse("release", _qa_board_slot0())
+		elif drag and i == 84:
+			_qa_mouse("press", Vector2(Layout.ITEM_BAR_X + 26, Layout.ITEM_BAR_Y + 26))
+		elif drag and i == 87:
+			_qa_mouse("release", Vector2(Layout.ITEM_BAR_X + 26, Layout.ITEM_BAR_Y + 26))
+		elif drag and i == 92:
+			_qa_mouse("press", _qa_board_slot0())
+		elif drag and i == 95:
+			_qa_mouse("release", _qa_board_slot0())
+		elif drag and i == 93:
+			# press 后中间态：drag_iid>=0 = press 到达 _unhandled_input 并命中棋子；
+			# -1 = press 被 Control 层吞掉或 pick 落空。顺带枚举吞点元凶：
+			var sc6 = get_tree().current_scene
+			print("UI_DRAG_MID drag_iid=%s sel=%s unload=%s" % [
+				str(sc6.get("drag_iid")), str(sc6.get("selected_item_idx")), str(sc6.get("unload_mode"))])
+			for c: Control in _qa_stop_at(sc6, _qa_board_slot0()):
+				print("STOP_AT ", c.get_path(), " rect=", c.get_global_rect())
+			for c2: Control in _qa_stop_at(sc6, Vector2(Layout.ITEM_BAR_X + 26, Layout.ITEM_BAR_Y + 26)):
+				print("STOP_ITEMBAR ", c2.get_class(), " rect=", c2.get_global_rect())
+		elif drag and i == 100:
+			# 钉卡链：装备已穿（selected 清 -1）后同点点选 = _toggle_pin
+			_qa_mouse("press", _qa_board_slot0())
+		elif drag and i == 102:
+			_qa_mouse("release", _qa_board_slot0())
+		elif drag and i == 108:
+			var dm2: Match = scene_data.get("match", null)
+			var sc5 = get_tree().current_scene
+			var moved: bool = dm2 != null and dm2.human()["board"][0] != null
+			var sel: int = int(sc5.get("selected_item_idx")) if sc5 != null and sc5.get("selected_item_idx") != null else -99
+			var pinned_v: Variant = sc5.get("detail_pinned_iid") if sc5 != null else null
+			var pinned: bool = pinned_v != null and int(pinned_v) >= 0
+			var u0: Variant = dm2.human()["board"][0] if moved else null
+			var eq_n: int = (u0["items"] as Array).size() if u0 != null else -1
+			print("UI_DRAG moved=%s sel=%d equipped=%d pinned=%s" % [str(moved), sel, eq_n, str(pinned)])
 		if keyd and i == 40:
 			var m: Match = scene_data.get("match", null)
 			if m != null:

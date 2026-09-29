@@ -14,6 +14,7 @@ func _ready() -> void:
 	bg.position = Vector2(-Layout.W, -Layout.H) / 2.0
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.z_index = -10  # 山海垫底：远山(-6/-5)压其上，文字(z 0)压山上
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE  # 装饰放行
 	add_child(bg)
 	# 夜色山海纵深：两层远山（game_scene 夜空远山同语）；make_mountain 出场景绝对坐标，
 	# 本景根是中心基制 → 反向偏移半屏，山脚线落在画面下缘

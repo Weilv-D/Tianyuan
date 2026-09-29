@@ -40,8 +40,13 @@ var _pips: Array = []
 var _shield_bar: ColorRect = null
 var _bob_t := 0.0
 var _base_y := 0.0
+## 格位锚（place/hop 维护）：攻击姿态演算以此为基准——高攻速两拍交叠时相对
+## 基准（当时 scale/position）会逐拍衰减漂移（压扁/位移累积，2026-09-29 实机报障）
+var _home := Vector2.ZERO
 ## 位移补间持有计数（hop/攻击突进）：>0 期间上层硬同步让路，防逐帧覆写压死演出
 var busy := 0
+var _move_tw: Tween
+var _atk_tw: Tween
 
 
 static func piece_texture(def_id: String) -> Texture2D:
@@ -139,6 +144,7 @@ func flash_star() -> void:
 
 func place(pos: Vector2) -> void:
 	position = pos
+	_home = pos
 	_base_y = pos.y
 
 
@@ -188,17 +194,27 @@ func sync_bars(hp: float, max_hp: float, mp: float, max_mp: float, shield: float
 
 func play_attack(dir: float, windup: float) -> void:
 	busy += 1
-	var back_v := Vector2(-dir * 3.0, 0)
-	var base_s := scale
+	# 高攻速两拍交叠：旧拍未回弹完新拍即起——旧补间先杀（kill 后 finished 不发，
+	# busy 手动回吐），姿态锚回 _home；压扁/回弹一律绝对基准 STAR_SCALE，相对基准
+	# （捕获当时 scale）会在交叠中逐拍衰减——战斗后期全体被压扁的根因
+	if _atk_tw != null and _atk_tw.is_valid():
+		_atk_tw.kill()
+		busy = maxi(0, busy - 1)
+	if _move_tw != null and _move_tw.is_valid():
+		_move_tw.kill()
+		busy = maxi(0, busy - 1)
+	position = _home
+	var base_y: float = STAR_SCALE[star] * (0.98 if is_beast else 1.0)
 	var tw := create_tween()
 	# 蓄力：后拉同时纵向微压（squash）—— 突进时弹回（stretch 回弹），打击感的起笔
 	tw.set_parallel(true)
-	tw.tween_property(self, "position", position + back_v, maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(self, "scale:y", base_s.y * 0.9, maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.chain().tween_property(self, "position", position + Vector2(dir * 5.0, 0), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(self, "scale:y", base_s.y, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.chain().tween_property(self, "position", position, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "position", _home + Vector2(-dir * 3.0, 0), maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(self, "scale:y", base_y * 0.9, maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(self, "position", _home + Vector2(dir * 5.0, 0), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(self, "scale:y", base_y, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(self, "position", _home, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.finished.connect(_end_busy)
+	_atk_tw = tw
 
 
 func play_hit() -> void:
@@ -250,9 +266,15 @@ func _ink_burst() -> void:
 
 func hop_to(target: Vector2, dur: float) -> void:
 	busy += 1
+	# 在途位移补间先杀（连跳：旧 tween 未落位新 hop 即起，双写 position 互相拉扯）
+	if _move_tw != null and _move_tw.is_valid():
+		_move_tw.kill()
+		busy = maxi(0, busy - 1)
 	var tw := create_tween()
 	tw.tween_property(self, "position", target, maxf(0.016, dur)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	tw.finished.connect(_end_busy)
+	_move_tw = tw
+	_home = target
 	_base_y = target.y
 
 
@@ -295,6 +317,9 @@ func _bar(pos: Vector2, sz: Vector2, color: Color) -> ColorRect:
 	b.position = pos
 	b.size = sz
 	b.color = color
+	# 血条/蓝条/护盾条悬在立绘顶部：ColorRect 默认 STOP 会吞掉棋盘上经过条带的
+	# motion（悬停详情卡在血条处断流）——装饰件一律放行（2.3.0 判例同源）
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return b
 
 

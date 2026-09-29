@@ -238,11 +238,13 @@ func _build_board() -> void:
 func _build_bench() -> void:
 	var frame := ColorRect.new()
 	frame.color = Color(Palette.INK[900], 0.85)
-	# 上沿加高到 -56：星级/血条塔（≈-53）此前压出框沿叠到「备 战」签条
-	frame.position = Vector2(Layout.BENCH_X - 6, Layout.BENCH_Y - 56)
-	frame.size = Vector2(Layout.BENCH_W + 12, Layout.BENCH_CELL + 60)
+	# 上沿 -32：恰好容下星级/血条塔（塔顶 ≈ BENCH_Y-21）且顶缘与阶段条带齐平——
+	# 旧 -56 使黑框顶（756）吞掉开战按钮（756-788）与「备 战」签条的视觉层次
+	#（2026-09-29 用户实机报「备战栏和按钮相互遮挡」，截图定性后错带归位）
+	frame.position = Vector2(Layout.BENCH_X - 6, Layout.BENCH_Y - 32)
+	frame.size = Vector2(Layout.BENCH_W + 12, Layout.BENCH_CELL + 36)
 	add_child(frame)
-	var cap := _label("备 战", 18, Palette.PAPER[400], Sess.seal_font)
+	var cap := _label("备 战", 18, Palette.PAPER[400])
 	cap.position = Vector2(Layout.BENCH_X, Layout.BENCH_Y - 26)
 	add_child(cap)
 
@@ -308,14 +310,14 @@ func _build_phase_strip() -> void:
 		line.position = Vector2(seg[0], py)
 		line.size = Vector2(seg[1] - seg[0], 1)
 		add_child(line)
-	var ph := _label("备 战", 15, Palette.PAPER[100], Sess.seal_font)
-	ph.position = Vector2(cx - 230, py - 12)
+	var ph := _label("备 战", 15, Palette.PAPER[100])
+	ph.position = Vector2(cx - 230, py - 18)
 	ph.size = Vector2(160, 24)
 	ph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(ph)
 	var fight := Button.new()
 	fight.text = "开 战 · 空格"
-	fight.position = Vector2(cx + 20, py - 16)
+	fight.position = Vector2(cx + 20, py - 24)
 	fight.custom_minimum_size = Vector2(140, 32)
 	# 开战键=鎏金主钮（墨玉底 + GILT 主字）：全场唯一昂扬动作
 	Artifacts.jade_button(fight, {"size": 13, "hero": true})
@@ -331,8 +333,9 @@ func _build_item_bar() -> void:
 	# 器匣框=砚石嵌金面板（器物谱：砚）
 	Artifacts.night_panel(frame)
 	add_child(frame)
-	var cap := _label("器 匣", 15, Palette.PAPER[300], Sess.seal_font)
-	cap.position = Vector2(Layout.ITEM_BAR_X + 6, Layout.ITEM_BAR_Y - 22)
+	var cap := _label("器 匣", 15, Palette.PAPER[300])
+	# 与卸载钮同带（856-878）而字底不压器匣框沿（892）——旧 -22 时字底 900 压框 8px
+	cap.position = Vector2(Layout.ITEM_BAR_X + 6, Layout.ITEM_BAR_Y - 44)
 	add_child(cap)
 	for i: int in int(Spec.c("ITEM_BAR_SLOTS")):
 		var col := i % Layout.ITEM_COLS
@@ -1603,7 +1606,7 @@ func _open_scout(title: String, sub: String, board: Array) -> void:
 			panel.add_child(icon)
 	# 羁绊行（激活档按 tier 降序）
 	var ty := gy + cell * 4.0 + 16.0
-	var cap := _label("羁 绊", 15, Palette.PAPER[300], Sess.seal_font)
+	var cap := _label("羁 绊", 15, Palette.PAPER[300])
 	cap.position = Vector2(28, ty)
 	panel.add_child(cap)
 	var active: Array = []

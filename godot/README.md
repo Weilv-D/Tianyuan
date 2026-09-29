@@ -1,10 +1,10 @@
-# 百战天元 · 夜宴 —— Godot 版（版本线 2.4.x）
+# 百战天元 · 夜宴 —— Godot 版（版本线 2.5.x）
 
 > Phaser 3 版（冻结于 1.20.0）的桌面重制线：Godot 4.7.1 标准版 + GDScript 单一内核，
 > Windows 绿色 exe 分发。首验收点 = 与冻结版全功能对等（跨引擎逐事件对拍门禁背书），
 > 已于 2.0.0 定版；其后 2.0.1~2.4.1 十五轮全库深度审查与四轮视觉/质感升级
 > （2.1.0 纹理化 → 2.2.0 引擎独有表现 → 2.3.0 经营体感 → 2.4.0 夜宴器物谱 →
-> 2.4.1 审查收敛）。当前版本 **2.4.1**。
+> 2.4.1 审查收敛 → 2.5.0 实机报障收敛：交互根修 + 图鉴三册）。当前版本 **2.5.0**。
 
 ## 目录结构
 
@@ -47,10 +47,13 @@ node tools/export_release.mjs   # → out/BaiZhanTianYuan.exe（自含 PCK）
 `--script` 模式不受影响）：
 
 - `--autostart` 跳过序章直入对局（**必须放在 `--` 之后**，否则被当引擎参数吞掉）。
-- `--smoke=<tag>,<frames>[,keyd|hover|perf|buy]` 跑 N 帧截图到 `.tmp-shots-godot/<tag>.png`
-  并退出；`keyd` 合成 D 键断言商店 digest（键盘层回归钉），`hover` 塞棋子+合成
-  Motion 断言详情卡 + 64 棋子技能描述全量回填，`buy` 第 40 帧触发首张商店卡、第 46 帧
-  以「金币 40→38 + views=1」双值断言购买链，`perf` 报帧耗时/fx 峰值。
+- `--smoke=<tag>,<frames>[,keyd|hover|perf|buy|drag|tab2|tab3]` 跑 N 帧截图到
+  `.tmp-shots-godot/<tag>.png` 并退出；`keyd` 合成 D 键断言商店 digest（键盘层回归钉），
+  `hover` 塞棋子+合成 Motion 断言详情卡 + 64 棋子技能描述全量回填，`buy` 第 40 帧触发
+  首张商店卡、第 46 帧以「金币 40→38 + views=1」双值断言购买链，`perf` 报帧耗时/fx 峰值，
+  `drag` 真实合成鼠标事件跑四链（拖拽落子/器匣选装/点棋子穿装/点选钉卡——
+  `Window.push_input(ev, true)` 直收设计坐标，勿再用 parse_input_event 手工换算），
+  `tab2`/`tab3` 实机点击图鉴页签截羁绊/装备册。
 - `--battle-smoke` 快进到人类参战轮直进战斗场景，跑满 1200 帧截图 `battle.png`
   后退出 0（死亡/弹道/震屏/演出路径的窗口回归钉；boot 经 `Sess.battle_smoke`
   让路，不会被序章转发顶掉）。
@@ -70,7 +73,7 @@ node tools/export_release.mjs   # → out/BaiZhanTianYuan.exe（自含 PCK）
 ## 表现层口径（2.4.x · 夜宴器物谱）
 
 形制出 `ui/artifacts.gd`、色出 `ui/palette.gd`、纹出 `render/atlas.gd` 程序化烘焙，
-三处真源合一：砚石（面板底，金星石眼+水磨痕+鎏金器口）、墨玉（按钮三态）、绢面
+三处真源合一：砚石（面板底，金星石眼+石理斑+鎏金器口）、墨玉（按钮三态）、绢面
 （首页六折屏画心）、琉璃（器匣/装备背衬）、乌木（屏风抹头）、琢面宝石（费阶/星位/
 星级/三甲）、朱砂方印（序位/落款）。禁圆角、禁荧光、禁紫；程序化纹理全部画成中性
 亮度、modulate 定色（底已暗再乘深色会黑死）。首页「夜宴图」折屏：棋相墨影各守屏心，
@@ -92,7 +95,7 @@ src → spec.json，Godot 侧永不反向引用。
 ## 文档
 
 - [docs/MILESTONES.md](./docs/MILESTONES.md) —— M0→M5 里程碑执行记录与十五轮审查判例
-- [docs/CHANGELOG.md](./docs/CHANGELOG.md) —— 2.x 版本记录（2.4.1 = 第十五轮全库深审）
+- [docs/CHANGELOG.md](./docs/CHANGELOG.md) —— 2.x 版本记录（2.5.0 = 实机报障收敛）
 - [docs/PARITY_CODEC.md](./docs/PARITY_CODEC.md) —— 对拍协议规格
 - [docs/UX_DELTAS.md](./docs/UX_DELTAS.md) —— UI 局部优化清单（逐条过审）
 - [AGENTS.md](./AGENTS.md) —— agent 协作守则（铁律/门禁/审查纪律，施工前必读）

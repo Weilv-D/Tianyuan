@@ -9,7 +9,7 @@ class_name FxAtlas
 ##
 ## 器物语言（ART_BIBLE「夜宴器物谱」——桌面夜宴上席的每一件器物；2.4.1 摘除
 ## PAPER/VIGNETTE/GILT 三张零消费者死纹理——预载链逐像素烘焙不是免费的）：
-##   砚石 STONE  —— 面板砚底：金星石眼 + 水磨痕 + 鎏金双边线（HUD 面板统一种子）
+##   砚石 STONE  —— 面板砚底：金星石眼 + 石理斑 + 鎏金器口四边线（HUD 面板统一种子）
 ##   绢面 SILK   —— 屏风/浮层衬：平纹织造 + 陈绢绢斑（折屏画心）
 ##   墨玉 JADE   —— 交互器物：絮状玉纹 + 内光（按钮三态手感的材质底）
 ##   琉璃 GLAZE  —— 器匣/装备背衬：厚薄缘光 + 两道捉光斑（夜光琉璃，非荧光）
@@ -356,14 +356,6 @@ static func _bake_stone() -> Image:
 		img.set_pixel(px, py, Color(1.0, 0.97, 0.85, 0.9))
 		img.set_pixel(px + 1, py, Color(1.0, 0.95, 0.8, 0.4))
 		img.set_pixel(px, py + 1, Color(1.0, 0.95, 0.8, 0.4))
-	# 水磨痕：匠人理砚的极淡横弧
-	for i: int in 7:
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var wy := float(s & 0xFFFF) / 65536.0 * float(size)
-		for x: int in size:
-			var yy := int(wy + sin(x * 0.02 + float(i) * 2.0) * 3.0)
-			if yy >= 0 and yy < size:
-				img.set_pixel(x, yy, Color(1, 1, 1, 0.03))
 	# 器口：外白发丝 + 内鎏金线（9-slice margin 2 保锐利直角 —— 夜宴禁圆角）
 	var line := Color(1.0, 1.0, 1.0)
 	for i: int in size:
