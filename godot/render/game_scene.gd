@@ -8,6 +8,35 @@ var match_ref: Match
 var board_view: BoardView
 var unit_views := {}  # iid -> UnitView
 var labels := {}      # 顶栏动态文本
+var streak_cap: Label = null
+var hp_bar_fg: ColorRect = null
+var xp_bar_fg: ColorRect = null
+var xp_text: Label = null
+
+
+## 浮层面板夜宴底：引擎默认 Panel 是中性灰，违反「任何颜色必须来自 Palette」红线
+func _style_night_panel(p: Panel) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(Palette.INK[900], 0.97)
+	sb.border_color = Color(Palette.GILT["base"], 0.5)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(0)
+	p.add_theme_stylebox_override("panel", sb)
+
+
+## 顶栏 56×3 微条（ink 底随建随盖，前景条由 refresh 定宽）
+func _mini_bar(pos: Vector2, color: Color) -> ColorRect:
+	var bg := ColorRect.new()
+	bg.color = Color(Palette.INK[700], 0.9)
+	bg.position = pos
+	bg.size = Vector2(56, 3)
+	add_child(bg)
+	var b := ColorRect.new()
+	b.color = color
+	b.position = pos
+	b.size = Vector2(56, 3)
+	add_child(b)
+	return b
 var shop_buttons: Array = []
 var undo_stack: Array = []
 const UNDO_LIMIT := 30
@@ -113,18 +142,54 @@ func _build_top_bar() -> void:
 	bar.size = Vector2(Layout.W, Layout.HEADER_H)
 	bar.z_index = -5
 	add_child(bar)
-	# 标题右置小号：居中大字与 round/hp/gold 状态标签（x 600 起）横向重叠叠印
-	var title := _label("百 战 天 元", 22, Palette.PAPER[100], Sess.seal_font)
-	title.position = Vector2(1520, 26)
-	title.size = Vector2(380, 40)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# 中央品牌（HudPanels.buildTopBar 口径）：居中题字 + 英文微注 + 两侧金线；
+	# 五数值右对齐分列 1340..1780，与题字带 856..1064 结构性错开
+	var title := _label("百 战 天 元", 24, Palette.PAPER[100], Sess.seal_font)
+	title.position = Vector2(760, 14)
+	title.size = Vector2(400, 36)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
-	for pair: Array in [["round", 600], ["hp", 780], ["gold", 940], ["level", 1120], ["streak", 1290]]:
-		var l := _label("", 26, Palette.PAPER[100])
-		l.position = Vector2(pair[1], 28)
-		l.size = Vector2(200, 36)
-		labels[pair[0]] = l
+	var sub := _label("NIGHT FEAST", 10, Palette.INK[300])
+	sub.position = Vector2(760, 50)
+	sub.size = Vector2(400, 16)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(sub)
+	for seg: Array in [[856, 890], [1030, 1064]]:
+		var gl := ColorRect.new()
+		gl.color = Color(Palette.GILT["base"], 0.3)
+		gl.position = Vector2(float(seg[0]), 38)
+		gl.size = Vector2(float(seg[1] - seg[0]), 1)
+		add_child(gl)
+	# 右侧五数值（HudPanels stat 口径）：值右对齐 17px + 小注 10px，标签进小注不进值
+	var stats: Array = [
+		["round", "回 合", 1340, Palette.PAPER[100]],
+		["gold", "金", 1450, Palette.GILT["light"]],
+		["streak", "来 金", 1560, Palette.GILT["base"]],
+		["hp", "生 命", 1670, Palette.SPIRIT["base"]],
+		["level", "等 级", 1780, Palette.PAPER[100]],
+	]
+	for s: Array in stats:
+		var l := _label("", 17, s[3])
+		l.position = Vector2(int(s[2]) - 200, 16)
+		l.size = Vector2(200, 24)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		labels[s[0]] = l
 		add_child(l)
+		var cap := _label(String(s[1]), 10, Palette.INK[300])
+		cap.position = Vector2(int(s[2]) - 58, 48)
+		cap.size = Vector2(68, 16)
+		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		add_child(cap)
+		if s[0] == "streak":
+			streak_cap = cap
+	# hp/xp 微条（口径：hp 56×3 @ (1670-106,80) SPIRIT；xp 56×3 @ (1780-106,80) VOID）
+	hp_bar_fg = _mini_bar(Vector2(1564, 80), Palette.SPIRIT["base"])
+	xp_bar_fg = _mini_bar(Vector2(1674, 80), Palette.VOID["base"])
+	xp_text = _label("", 10, Palette.INK[300])
+	xp_text.position = Vector2(1700, 74)
+	xp_text.size = Vector2(72, 14)
+	xp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(xp_text)
 	# 左导航（原版 nav：图鉴/羁绊/阵容；样稿 .nl 双行）
 	var nav_labels: Array = [["图 鉴", "Codex"], ["羁 绊", "Bonds"], ["阵 容", "Legion"]]
 	var nav_cbs: Array = [
@@ -159,8 +224,9 @@ func _build_board() -> void:
 func _build_bench() -> void:
 	var frame := ColorRect.new()
 	frame.color = Color(Palette.INK[900], 0.85)
-	frame.position = Vector2(Layout.BENCH_X - 6, Layout.BENCH_Y - 28)
-	frame.size = Vector2(Layout.BENCH_W + 12, Layout.BENCH_CELL + 32)
+	# 上沿加高到 -56：星级/血条塔（≈-53）此前压出框沿叠到「备 战」签条
+	frame.position = Vector2(Layout.BENCH_X - 6, Layout.BENCH_Y - 56)
+	frame.size = Vector2(Layout.BENCH_W + 12, Layout.BENCH_CELL + 60)
 	add_child(frame)
 	var cap := _label("备 战", 18, Palette.PAPER[400], Sess.seal_font)
 	cap.position = Vector2(Layout.BENCH_X, Layout.BENCH_Y - 26)
@@ -338,6 +404,8 @@ func _build_side_panels() -> void:
 	log_label = _label("", 16, Palette.PAPER[300])
 	log_label.position = Vector2(Layout.LOG_X, Layout.LOG_Y + 34)
 	log_label.size = Vector2(Layout.LOG_W, Layout.LOG_H - 40)
+	# 奇遇回合长行横穿器匣：CJK 按字断行
+	log_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
 	add_child(log_label)
 	# 上回合战报（右下）
 	var hair2 := ColorRect.new()
@@ -380,16 +448,26 @@ func _build_sell_seal() -> void:
 
 func refresh_all() -> void:
 	var p := match_ref.human()
-	(labels["round"] as Label).text = "第 %d 回合" % match_ref.round
-	(labels["hp"] as Label).text = "生命 %d" % int(p["hp"])
-	(labels["gold"] as Label).text = "金 %d" % int(p["gold"])
-	(labels["level"] as Label).text = "Lv%d · %d/%d" % [int(p["level"]), int(p["xp"]), Economy.xp_to_next(int(p["level"]))]
-	var streak_txt := "—"
-	if int(p["streak"]) > 0:
-		streak_txt = "胜%d" % int(p["streak"])
-	elif int(p["streak"]) < 0:
-		streak_txt = "败%d" % -int(p["streak"])
-	(labels["streak"] as Label).text = streak_txt
+	# TS SceneRefresh 口径：值纯数字（标签在小注）、来金 = 5+利息+连胜、hp/xp 微条
+	(labels["round"] as Label).text = str(match_ref.round)
+	(labels["hp"] as Label).text = str(int(p["hp"]))
+	(labels["gold"] as Label).text = str(int(p["gold"]))
+	(labels["level"] as Label).text = str(int(p["level"]))
+	var inc := 5 + Economy.interest_of(p["gold"]) + Economy.streak_gold(int(p["streak"]))
+	(labels["streak"] as Label).text = "+%d" % inc
+	if streak_cap != null:
+		var st := int(p["streak"])
+		streak_cap.text = ("来 金 · 连胜 %d" % st) if st >= 2 else (("来 金 · 连败 %d" % -st) if st <= -2 else "来 金")
+	if hp_bar_fg != null:
+		hp_bar_fg.size.x = 56.0 * clampf(float(p["hp"]) / Spec.c("PLAYER_START_HP", 110.0), 0.0, 1.0)
+	if xp_bar_fg != null:
+		var need := Economy.xp_to_next(int(p["level"]))
+		if need > 0:
+			xp_bar_fg.size.x = 56.0 * clampf(float(p["xp"]) / float(need), 0.0, 1.0)
+			xp_text.text = "%d/%d" % [int(p["xp"]), need]
+		else:
+			xp_bar_fg.size.x = 56.0
+			xp_text.text = "满级"
 	_refresh_units()
 	_refresh_shop()
 	_refresh_item_bar()
@@ -453,6 +531,12 @@ func _refresh_shop() -> void:
 		b.position.y = Layout.SHOP_Y
 		if id == null:
 			b.disabled = true
+			# 售罄留痕（TS 口径 dim + —）：纯暗块读作坏格
+			var sold := _label("—", 17, Color(Palette.PAPER[400], 0.5))
+			sold.position = Vector2(Layout.SHOP_CW / 2.0 - 40.0, 86)
+			sold.size = Vector2(80, 26)
+			sold.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			b.add_child(sold)
 			continue
 		var def: Variant = Spec.champion_by_id.get(id, null)
 		if def == null:
@@ -572,7 +656,7 @@ func _check_adventure() -> void:
 	panel.size = Vector2(760, 320)
 	panel.position = Vector2((Layout.W - 760) / 2.0, (Layout.H - 320) / 2.0)
 	dim.add_child(panel)
-	var title := _label("奇 遇 · 择 一", 34, Palette.GILT["light"], Sess.seal_font)
+	var title := _label("奇 遇 · 择 一", 28, Palette.GILT["light"], Sess.seal_font)
 	title.position = Vector2(0, 20)
 	title.size = Vector2(760, 50)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -585,8 +669,27 @@ func _check_adventure() -> void:
 		b.position = Vector2(20 + i * 244, 90)
 		b.custom_minimum_size = Vector2(224, 200)
 		b.add_theme_font_override("font", Sess.body_font)
-		b.add_theme_font_size_override("font_size", 18)
+		b.add_theme_font_size_override("font_size", 17)
 		b.add_theme_color_override("font_color", Palette.PAPER[100])
+		# 夜宴样式覆写：默认按钮无边框无底色，与暗幕融为一体
+		var osb := StyleBoxFlat.new()
+		osb.bg_color = Color(Palette.INK[850], 0.95)
+		osb.border_color = Color(Palette.GILT["base"], 0.55)
+		osb.set_border_width_all(1)
+		osb.set_corner_radius_all(0)
+		osb.content_margin_left = 12
+		osb.content_margin_right = 12
+		osb.content_margin_top = 10
+		osb.content_margin_bottom = 10
+		b.add_theme_stylebox_override("normal", osb)
+		var hsb := osb.duplicate()
+		hsb.border_color = Palette.GILT["light"]
+		b.add_theme_stylebox_override("hover", hsb)
+		var psb := osb.duplicate()
+		psb.bg_color = Color(Palette.INK[800], 0.95)
+		b.add_theme_stylebox_override("pressed", psb)
+		# desc 超宽不换行会横向溢出三卡互叠
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		b.focus_mode = Control.FOCUS_NONE
 		var idx := i
 		b.pressed.connect(func() -> void:
@@ -751,7 +854,7 @@ func _refresh_side_panels() -> void:
 		elif int(pl["streak"]) <= -2:
 			streak_txt = " 败%d" % -int(pl["streak"])
 		var rank_txt := str(int(pl["rank"])) if int(pl["rank"]) != 0 else "—"
-		row.text = "%s %-7s %3d%s" % [rank_txt, String(pl["name"]).substr(0, 7), int(pl["hp"]), streak_txt]
+		row.text = "%s %s %s%s" % [rank_txt, _pad_disp(String(pl["name"]), 15), _pad_disp(str(int(pl["hp"])), 4, true), streak_txt]
 	# 记事：尾部 9 条
 	var lines: Array = match_ref.log.slice(maxi(0, match_ref.log.size() - 9))
 	log_label.text = "\n".join(lines)
@@ -1025,10 +1128,21 @@ func _open_trait_members(badge_i: int) -> void:
 	add_child(trait_members_card)
 	var def: Variant = b["def"]
 	var head := _label("%s · %d 人 · 已上阵 %d" % [String(def["name"]), members.size(), int(b["count"])], 19, Palette.PAPER[100])
-	trait_members_card.add_child(head)
+	# PanelContainer 把每个子都拉伸到同一矩形（标题与网格互相叠压）——经
+	# MarginContainer + VBox 纵排（TS 口径：标题行在上、成员网格在下）
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	trait_members_card.add_child(margin)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 8)
+	margin.add_child(vb)
+	vb.add_child(head)
 	var grid := GridContainer.new()
 	grid.columns = HudLayout.TRAIT_MEMBER_COLS
-	trait_members_card.add_child(grid)
+	vb.add_child(grid)
 	var p := match_ref.human()
 	var on_board := {}
 	for u in p["board"]:
@@ -1176,6 +1290,7 @@ func _show_round_result() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(720, 560)
 	panel.position = Vector2((Layout.W - 720) / 2.0, (Layout.H - 560) / 2.0)
+	_style_night_panel(panel)
 	dim.add_child(panel)
 	var title := _label("回 合 结 算", 36, Palette.GILT["light"], Sess.seal_font)
 	title.position = Vector2(0, 22)
@@ -1229,6 +1344,21 @@ func _show_round_result() -> void:
 	panel.add_child(cont)
 
 
+## 显示宽度（CJK 记 2、ASCII 记 1）与定宽填充：计分板列对齐用
+static func _disp_w(s: String) -> int:
+	var w := 0
+	for ch in s:
+		w += 2 if ch.unicode_at(0) > 0x2E7F else 1
+	return w
+
+
+static func _pad_disp(s: String, width: int, left_pad: bool = false) -> String:
+	var diff := width - _disp_w(s)
+	if diff <= 0:
+		return s
+	return s + " ".repeat(diff) if not left_pad else " ".repeat(diff) + s
+
+
 # ── 侦查覆盖层（原版 ScoutOverlay 对齐）：点击计分板行/敌情查看对手阵地快照 ──
 
 ## 计分板行命中（SCORE_ROW_Y + i×STEP 起点，含 6px 容差；与侧栏构建几何同源）
@@ -1272,6 +1402,9 @@ func _open_scout_for_intel() -> void:
 			_open_scout(String(pl["name"]), "生命 %d　等级 %d" % [int(pl["hp"]), int(pl["level"])], pl["board"] as Array)
 		elif int(q["ghost"]) >= 0:
 			_open_scout("墨 影", "沿用〔%s〕出局阵容" % String(match_ref.players[int(q["ghost"])]["name"]), match_ref.board_of_opponent(q))
+		elif q.get("beast", false):
+			# 墨兽轮无可侦：与 nav「阵容」入口同口径浮讯（静默无反应两入口不一致）
+			_toast("墨兽轮 · 无可侦查")
 		return
 
 
@@ -1292,8 +1425,9 @@ func _open_scout(title: String, sub: String, board: Array) -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(bw, bh)
 	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
+	_style_night_panel(panel)
 	dim.add_child(panel)
-	var ttl := _label("%s 的阵地" % title, 22, Palette.PAPER[100], Sess.seal_font)
+	var ttl := _label("%s 的阵地" % title, 22, Palette.PAPER[100])
 	ttl.position = Vector2(28, 18)
 	panel.add_child(ttl)
 	var subl := _label(sub, 13, Palette.PAPER[400])
@@ -1527,13 +1661,90 @@ func _close_detail() -> void:
 	detail_hover_iid = -1
 
 
-func _fmt_skill_desc(desc: String, params: Dictionary) -> String:
+## 技能描述模板回填（champions.ts DESC_KEYS 对等移植）：占位键 → 语义化格式器——
+## 百分比键 ×100 加 %、嵌套键从 status/summon/extraStatus 子字典取值、
+## volleySpan/vulnDur 与实现同式推导；模板未列的键原样保留。
+## 此前朴素「全键 float()」对 dict/bool 型 params（42+8 处）直接炸卡，且百分比裸小数。
+func _fmt_skill_desc(desc: String, p: Dictionary) -> String:
 	var out := desc
-	for k in params:
-		var v: float = float(params[k])
-		var s := str(int(v)) if absf(v - roundf(v)) < 0.001 else "%.2f" % v
-		out = out.replace("{%s}" % String(k), s)
+	for key: String in [
+		"atk", "sp", "value", "healOnHit", "shieldOnHit", "damageReduction", "reflect",
+		"threshold", "dpsSp", "resetOnKill", "hpPct", "atkPct", "statusValue",
+		"extraStatusValue", "vulnerability", "falloff", "stackAtkOnHit", "thresholdMult",
+		"finalMult", "healPerExecute", "statusFlat", "statusDur", "shieldDur", "radius",
+		"dur", "delay", "length", "shots", "volleySpan", "jumps", "knockback", "count",
+		"vulnDur", "maxStacks", "maxRepeats",
+	]:
+		var ph := "{%s}" % key
+		if out.contains(ph):
+			out = out.replace(ph, _desc_fmt(key, p))
 	return out
+
+
+static func _num(v: Variant) -> float:
+	return float(v) if v is float or v is int else 0.0
+
+
+## TS String(number) 口径：整数不带小数尾（GD str(8.0)="8.0"，TS String(8)="8"）
+static func _snum(v: Variant) -> String:
+	var f := _num(v)
+	return str(int(f)) if absf(f - roundf(f)) < 0.0001 else str(f)
+
+
+static func _pctv(v: Variant) -> String:
+	return "%.0f%%" % (_num(v) * 100.0)
+
+
+static func _sub(p: Dictionary, path: String) -> Dictionary:
+	var d: Variant = p.get(path, null)
+	return d if d is Dictionary else {}
+
+
+func _desc_fmt(key: String, p: Dictionary) -> String:
+	match key:
+		# 纯百分比键（值即比例 0.45 → 45%）
+		"atk", "sp", "value", "healOnHit", "shieldOnHit", "damageReduction", "reflect", \
+		"threshold", "dpsSp", "resetOnKill", "falloff", "stackAtkOnHit", "healPerExecute", "vulnerability":
+			return _pctv(p.get(key, null))
+		# 嵌套取值键（summon / status / extraStatus 子字典）
+		"hpPct":
+			return _pctv(_sub(p, "summon").get("hpPct", null))
+		"atkPct":
+			return _pctv(_sub(p, "summon").get("atkPct", null))
+		"statusValue":
+			return _pctv(_num(_sub(p, "status").get("value", null)) / 100.0)
+		"extraStatusValue":
+			return _pctv(_num(_sub(p, "extraStatus").get("value", null)) / 100.0)
+		# 平值/时长/计数键（String 口径，缺值按 0/1）
+		"statusFlat":
+			return str(int(_num(_sub(p, "status").get("value", null))))
+		"statusDur":
+			return _snum(_sub(p, "status").get("dur", p.get("dur", null)))
+		"shieldDur":
+			return _snum(p.get("shieldDur", null))
+		"radius":
+			return str(int(_num(p.get("radius", null))) if p.get("radius", null) != null else 1)
+		"dur":
+			return _snum(p.get("dur", null) if p.get("dur", null) != null else _sub(p, "status").get("dur", null))
+		"delay", "knockback":
+			return str(int(_num(p.get(key, null))))
+		"length":
+			return str(int(_num(p.get("length", null))))
+		"shots", "jumps":
+			return str(int(_num(p.get(key, null))) if p.get(key, null) != null else 1)
+		"count":
+			return str(int(_num(_sub(p, "summon").get("count", null))))
+		"maxStacks", "maxRepeats":
+			return str(int(_num(p.get(key, null))))
+		# 推导式键（与实现同式）
+		"volleySpan":
+			return _snum(float(ParityUtil.js_round(((_num(p.get("shots", null)) if p.get("shots", null) != null else 1.0) - 1.0) * _num(p.get("interval", null)) * 100.0)) / 100.0)
+		"vulnDur":
+			return _snum(p.get("vulnDur", null) if p.get("vulnDur", null) != null else _num(p.get("dur", null)) + 2.0)
+		# 阈值倍率（1.0 = 100%），实现侧缺省 2
+		"thresholdMult", "finalMult":
+			return _pctv(p.get(key, null) if p.get(key, null) != null else 2.0)
+	return "{%s}" % key
 
 
 func _show_detail(u: Dictionary, pinned: bool) -> void:
@@ -1576,7 +1787,8 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	var name_l := _label(String(def["name"]), 20, Palette.PAPER[100])
 	name_l.position = Vector2(14, 12)
 	card.add_child(name_l)
-	var sub_l := _label("%s　%s" % [String(def["title"]), "★".repeat(star)], 13, Palette.GILT["light"])
+	var title_txt := "" if String(def["title"]) == String(def["name"]) else String(def["title"]) + "　"
+	var sub_l := _label("%s%s" % [title_txt, "★".repeat(star)], 13, Palette.GILT["light"])
 	sub_l.position = Vector2(14, 40)
 	card.add_child(sub_l)
 	var cost_l := _label("%d 费" % rarity, 13, Palette.PAPER[300])
@@ -1696,6 +1908,7 @@ func _toggle_trait_modal() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(bw, bh)
 	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
+	_style_night_panel(panel)
 	dim.add_child(panel)
 	var title := _label("羁 绊 全 览", 30, Palette.SPIRIT["light"], Sess.seal_font)
 	title.position = Vector2(0, 20)

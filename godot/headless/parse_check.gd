@@ -24,6 +24,9 @@ func _scan(dir_path: String, bad: Array) -> void:
 		if d.current_is_dir() and not name.begins_with("."):
 			_scan("%s/%s" % [dir_path, name], bad)
 		elif name.ends_with(".gd"):
+			# load 触发 parse：语法错误会打到进程输出（SCRIPT ERROR），返回值与
+			# reload()/new() 均不反映（2026-09-29 实证 load/new 双假绿）——
+			# 门禁由 qa 步骤扫描本探针输出的 SCRIPT ERROR 行兜底
 			var script: Variant = load("%s/%s" % [dir_path, name])
 			if script == null:
 				bad.append("%s/%s" % [dir_path, name])

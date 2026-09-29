@@ -194,7 +194,11 @@ class _FxShape extends Node2D:
 
 	func _draw() -> void:
 		if kind == 0:
-			draw_circle(Vector2(radius, radius * 1.3), radius, color)
+			# 三层同心渐弱：单层 draw_circle 是硬边实心盘，战斗视角下格外突兀
+			var c0 := Vector2(radius, radius * 1.3)
+			draw_circle(c0, radius, Color(color, color.a * 0.35))
+			draw_circle(c0, radius * 0.66, Color(color, color.a * 0.7))
+			draw_circle(c0, radius * 0.36, color)
 		else:
 			draw_arc(Vector2(radius, radius), radius - 1.0, 0, TAU, 32, color, 2.0)
 			draw_circle(Vector2(radius, radius), radius * 0.55, Color(color, color.a * 0.5))

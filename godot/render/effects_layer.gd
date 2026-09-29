@@ -133,7 +133,9 @@ func _ground_stain(pos: Vector2, rx: float, ry: float, color: Color, dur: float)
 	n.radius = rx
 	n.radius2 = ry
 	n.position = pos
-	z_index = -5
+	# 墨染沉入漆盘：压层的是墨点节点自身（曾裸写 z_index 误压整层——首个墨染后
+	# 后续特效全被压到漆盘之下近乎不可见）
+	n.z_index = -5
 	add_child(_register(n))
 	var tw := n.create_tween()
 	tw.tween_method(func(t: float) -> void:

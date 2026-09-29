@@ -21,7 +21,8 @@ static func _key_of(mode: String) -> String:
 
 
 static func _load_data(raw: String) -> Variant:
-	var parsed: Variant = JSON.parse_string(raw)
+	# 空串判空先于 parse：JSON.parse_string("") 每次打一条引擎 ERROR（日志噪音）
+	var parsed: Variant = JSON.parse_string(raw) if raw.strip_edges() != "" else null
 	if parsed == null or not (parsed is Dictionary):
 		return null
 	var v: Variant = parsed.get("v", null)
@@ -118,7 +119,8 @@ const DEFAULT_PREFS := {
 ## 静观模式首启按标准默认（false），用户在设置面板主动开启后以用户为准。
 static func load_prefs() -> Dictionary:
 	var out: Dictionary = DEFAULT_PREFS.duplicate()
-	var parsed: Variant = JSON.parse_string(_read_file(PREF_PATH))
+	var pref_raw := _read_file(PREF_PATH)
+	var parsed: Variant = JSON.parse_string(pref_raw) if pref_raw.strip_edges() != "" else null
 	if not (parsed is Dictionary):
 		return out
 	var v: Variant = parsed.get("volBgm", null)

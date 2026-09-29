@@ -81,7 +81,8 @@ func _detail(c: Dictionary) -> void:
 	tex.size = Vector2(220, 260)
 	panel.add_child(tex)
 	var rarity := int(c["cost"])
-	var name_l := _lbl("%s · %s" % [c["name"], c["title"]], 26, Palette.RARITY_COLOR[rarity])
+	var name_txt := String(c["name"]) if String(c["title"]) == String(c["name"]) else "%s · %s" % [c["name"], c["title"]]
+	var name_l := _lbl(name_txt, 26, Palette.RARITY_COLOR[rarity])
 	name_l.position = Vector2(270, 34)
 	panel.add_child(name_l)
 	var meta := _lbl("%s · %d 金" % [_trait_names_cx(c), rarity], 17, Palette.PAPER[300])

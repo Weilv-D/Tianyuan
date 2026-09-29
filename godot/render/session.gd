@@ -18,6 +18,9 @@ var sfx
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# 进程级规格装载：图鉴等场景可能先于任何对局路径触达 Spec（静态直读不触发
+	# ensure，全库 60+ 处直读靠调用顺序侥幸——在会话咽喉统一装载）
+	Spec.ensure()
 	_load_fonts()
 	_setup_audio_buses()
 	_setup_smoke()
@@ -106,6 +109,20 @@ func _run_smoke(spec_txt: String) -> void:
 			var u_at = sc.call("_unit_at", pos3)
 			print("UI_HOVER scene=", sc.name, " views=", views_n, " unit_at=", u_at != null,
 				" hover_iid=", sc.get("detail_hover_iid"), " ", "OK detail-card" if card != null else "FAIL no-card")
+		elif hover and i == 100:
+			# 64 棋子全量技能描述回填：崩卡（dict/bool params）与未替换占位（键表缺口）都要抓
+			var sc4 = get_tree().current_scene
+			var bad := 0
+			var resid := 0
+			for c: Dictionary in Spec.champions:
+				var sk: Dictionary = c["skillSpec"]
+				var txt: String = sc4.call("_fmt_skill_desc", String(sk["desc"]), sk.get("params", {}))
+				if txt.is_empty():
+					bad += 1
+				elif txt.contains("{"):
+					resid += 1
+					print("DESC_RESID ", c["id"], " ", txt.substr(0, 60))
+			print("DESC_ALL n=", Spec.champions.size(), " bad=", bad, " residual=", resid)
 		if keyd and i == 40:
 			var m: Match = scene_data.get("match", null)
 			if m != null:

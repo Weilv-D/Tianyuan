@@ -87,8 +87,64 @@ func _ready() -> void:
 		_spawn_view(u)
 	# start 事件在构造期已发 —— 视图血条立即同步一轮
 	_sync_all()
+	# 左右羁绊面板（TS renderMatchTraitPanel 口径：config.traits 每队激活羁绊；
+	# 此前 1920 宽下战斗两侧大片空置）
+	_build_trait_panels(config)
 	# 开战低吟（原版 BattleScene 交战瞬间 warn；BGM battle 心境已由 Sess.go 路由）
 	Sess.sfx.play("warn")
+
+
+func _build_trait_panels(cfg: Dictionary) -> void:
+	var traits_cfg: Dictionary = cfg.get("traits", {})
+	var foe := 1 if viewer_team == 0 else 0
+	_build_one_trait_panel(Vector2(40, 130), "我 方", _team_name(viewer_team), Palette.SPIRIT["base"], traits_cfg.get(str(viewer_team), []))
+	_build_one_trait_panel(Vector2(1460, 130), "敌 方", _team_name(foe), Palette.CINNABAR["base"], traits_cfg.get(str(foe), []))
+
+
+func _team_name(team: int) -> String:
+	for q: Dictionary in match_ref.pairings:
+		if int(q["a"]) == team or int(q["b"]) == team:
+			var idx := match_ref.player_idx_of_team(q, team)
+			if idx >= 0 and idx < (match_ref.players as Array).size():
+				return String(match_ref.players[idx]["name"])
+	return ""
+
+
+func _build_one_trait_panel(pos: Vector2, title: String, who: String, accent: Color, traits: Array) -> void:
+	var t1 := _label(title, 17, Palette.PAPER[100])
+	t1.position = pos
+	add_child(t1)
+	var t2 := _label(who, 12, accent)
+	t2.position = pos + Vector2(72, 5)
+	add_child(t2)
+	var y := pos.y + 34
+	var active: Array = traits.filter(func(t): return int(t.get("tier", -1)) >= 0)
+	active.sort_custom(func(a, b): return int(a["tier"]) > int(b["tier"]))
+	if active.is_empty():
+		var none := _label("（未激活任何羁绊）", 12, Palette.INK[300])
+		none.position = Vector2(pos.x, y)
+		add_child(none)
+		return
+	for t: Dictionary in active:
+		var def: Variant = Spec.traits_by_id.get(String(t["id"]), null)
+		if def == null:
+			continue
+		var tier := mini(int(t["tier"]), 3)
+		var chip := _label("【%s】" % String(def["name"]), 13, Palette.TRAIT_TIER_COLOR[tier])
+		chip.position = Vector2(pos.x, y)
+		add_child(chip)
+		var cnt := _label("%d　第%d档" % [int(t["count"]), tier + 1], 12, Palette.PAPER[100])
+		cnt.position = Vector2(pos.x + 84, y + 2)
+		add_child(cnt)
+		y += 28
+		var eff: Array = def.get("effectText", [])
+		if tier < eff.size():
+			var eff_l := _label(String(eff[tier]), 12, Palette.PAPER[300])
+			eff_l.position = Vector2(pos.x + 10, y)
+			eff_l.size = Vector2(400, 200)
+			eff_l.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+			add_child(eff_l)
+			y += 46
 
 
 func _draw_bg() -> void:
@@ -416,7 +472,7 @@ func _on_battle_end() -> void:
 	title.size = Vector2(560, 90)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	panel.add_child(title)
-	var sub := _label("第 %d 回合 · %d ticks" % [match_ref.round, battle.tick], 20, Palette.PAPER[300])
+	var sub := _label("第 %d 回合 · %.1f 秒" % [match_ref.round, float(battle.tick) / 30.0], 20, Palette.PAPER[300])
 	sub.position = Vector2(0, 130)
 	sub.size = Vector2(560, 30)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

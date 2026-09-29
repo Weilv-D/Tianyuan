@@ -45,7 +45,10 @@ function step(name, ok, detail = '') {
 //     Parse Error 过全部门禁，窗口实机冒烟才暴露——2026-09-29 教训，常设防线）
 {
   const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/parse_check.gd'], { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
-  step('全树 parse', r.status === 0 && /PARSE_ALL_OK/.test(String(r.stdout)), (String(r.stdout).match(/PARSE_FAIL \S+/g) ?? []).join(' '));
+  // SCRIPT ERROR 兜底：load 对语法错误的返回值不反映（错误只打日志），
+  // 必须扫输出——load/new 双假绿均实证过（2026-09-29 括号失衡过门禁）
+  step('全树 parse', r.status === 0 && /PARSE_ALL_OK/.test(String(r.stdout)) && !/SCRIPT ERROR/.test(`${r.stdout ?? ''}
+${r.stderr ?? ''}`), (String(r.stdout).match(/PARSE_FAIL \S+/g) ?? []).join(' '));
 }
 
 // 2. 规格导出 + 幂等（同源必同产物）

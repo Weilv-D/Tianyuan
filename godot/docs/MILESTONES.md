@@ -278,6 +278,19 @@ bgm tween 管理、parity 恒真断言、export 夹具出 PCK（exe 减 5MB）�
 
 发布 2.0.1：影子导出 mcp=0，zip 165MB，解压独立冒烟通过。
 
+### 深度视觉检查报告全量修复（2026-09-29，2.0.2）
+
+并行会话交付 MCP 实机逐屏视觉检查报告（基线 e8c09ba：P0×2/P1×6/P2×6/P3×12）。
+六个头部缺陷 2.0.1 已修；本轮吸收其余全部条目。**判例**：①「_fmt_skill_desc 数组参数」
+经实测为 dict/str/bool 型（我只扫 list 误判证伪后复核反转——**类型普查要全类型分布，
+不只查一种**）；②技能描述口径真源是 TS `DESC_KEYS` 语义格式器表（35 键带百分比/嵌套/
+推导规则），朴素数值替换永远对不齐——**文案格式是契约面，移植要整表**；③parse_check
+的 load/new 对语法错误双假绿（返回值不反映、错误只打日志）——门禁最终形态 = load 全树
++ 输出 SCRIPT ERROR 扫描（注入坏码反向验证必抓）；④PanelContainer 多子同矩形叠压/
+ColorRect 默认 STOP 吞输入/引擎默认 Panel 灰脱离色板——Godot 容器与控件默认值是
+移植坑高发区。顶栏最终采纳 TS HudPanels 原版口径（品牌居中双行+金线+五数值右对齐+
+来金口径），不沿用自创布局。
+
 ## 隔离铁律（最高优先级）
 1. ../src、../public、../index.html、../vite.config.ts、../package.json、../balance、../tests、
    ../scripts、../docs 一律零改动；唯一接触方式是只读 import。

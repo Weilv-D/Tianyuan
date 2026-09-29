@@ -21,6 +21,13 @@ func open(on_changed: Callable = Callable()) -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(520, 460)
 	panel.position = Vector2((Layout.W - 520) / 2.0, (Layout.H - 460) / 2.0)
+	# 夜宴底覆写：默认 Panel 中性灰 + CheckBox/HSlider 深底不可见（色板红线）
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(Palette.INK[900], 0.97)
+	sb.border_color = Color(Palette.GILT["base"], 0.5)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(0)
+	panel.add_theme_stylebox_override("panel", sb)
 	dim.add_child(panel)
 	var prefs: Dictionary = SaveStore.load_prefs()
 	var title := _lbl("设 置", 30, Palette.GILT["light"], Sess.seal_font)
@@ -40,6 +47,25 @@ func open(on_changed: Callable = Callable()) -> void:
 		sl.value = float(prefs[row[1]])
 		sl.position = Vector2(150, y)
 		sl.size = Vector2(280, 24)
+		# 滑杆色板化：默认灰轨在夜蓝底上不可辨
+		var grab := StyleBoxFlat.new()
+		grab.bg_color = Palette.GILT["light"]
+		grab.set_corner_radius_all(0)
+		grab.content_margin_left = 10
+		grab.content_margin_right = 10
+		grab.content_margin_top = 4
+		grab.content_margin_bottom = 4
+		sl.add_theme_stylebox_override("grabber_area", grab)
+		var grab_h := grab.duplicate()
+		grab_h.bg_color = Palette.GILT["base"]
+		sl.add_theme_stylebox_override("grabber_area_highlight", grab_h)
+		var rail := StyleBoxFlat.new()
+		rail.bg_color = Color(Palette.INK[700], 0.9)
+		rail.content_margin_left = 1
+		rail.content_margin_right = 1
+		rail.content_margin_top = 4
+		rail.content_margin_bottom = 4
+		sl.add_theme_stylebox_override("slider", rail)
 		var bus_name := String(row[2])
 		sl.value_changed.connect(func(v: float) -> void:
 			prefs[row[1]] = v
@@ -54,6 +80,34 @@ func open(on_changed: Callable = Callable()) -> void:
 		cb.add_theme_font_override("font", Sess.body_font)
 		cb.add_theme_font_size_override("font_size", 16)
 		cb.add_theme_color_override("font_color", Palette.PAPER[200])
+		# 复选框色板化：默认勾选态白底在深底上刺眼、未选态边框不可见
+		var cbx := StyleBoxFlat.new()
+		cbx.bg_color = Color(Palette.INK[850], 0.95)
+		cbx.border_color = Color(Palette.INK[300], 0.8)
+		cbx.set_border_width_all(1)
+		cbx.set_corner_radius_all(0)
+		cbx.content_margin_left = 2
+		cbx.content_margin_right = 2
+		cbx.content_margin_top = 2
+		cbx.content_margin_bottom = 2
+		cb.add_theme_stylebox_override("normal", cbx)
+		var cbh := cbx.duplicate()
+		cbh.border_color = Palette.GILT["light"]
+		cb.add_theme_stylebox_override("hover", cbh)
+		var cbp := cbx.duplicate()
+		cbp.bg_color = Palette.GILT["light"]
+		cbp.border_color = Palette.GILT["light"]
+		cb.add_theme_stylebox_override("pressed", cbp)
+		var cbk := cbx.duplicate()
+		cbk.bg_color = Palette.GILT["base"]
+		cbk.border_color = Palette.GILT["base"]
+		cb.add_theme_stylebox_override("checked", cbk)
+		var cbkh := cbk.duplicate()
+		cbkh.border_color = Palette.GILT["light"]
+		cb.add_theme_stylebox_override("checked_hover", cbkh)
+		var cbkp := cbk.duplicate()
+		cbkp.bg_color = Palette.GILT["light"]
+		cb.add_theme_stylebox_override("checked_pressed", cbkp)
 		cb.toggled.connect(func(on: bool) -> void: prefs[row2[1]] = on)
 		panel.add_child(cb)
 		y += 44.0
