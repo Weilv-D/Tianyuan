@@ -140,6 +140,32 @@ func place(pos: Vector2) -> void:
 	_base_y = pos.y
 
 
+## 落子弹性：从上方 22px 弹落（BACK ease）+ 触地两粒尘点 —— 布阵手感（首次落位用）
+func place_pop(pos: Vector2) -> void:
+	place(pos)
+	var y1 := pos.y
+	position.y = y1 - 22.0
+	var tw := create_tween()
+	tw.tween_property(self, "position:y", y1, 0.26).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void:
+		for i: int in 5:
+			var ang := randf() * PI
+			var v := Vector2(cos(ang) * randf_range(30.0, 70.0), -randf_range(10.0, 40.0))
+			var p0 := Vector2(0, 2)
+			var sp := Sprite2D.new()
+			sp.texture = FxAtlas.texture(FxAtlas.INK_DOT)
+			sp.material = FxAtlas.add_material()
+			sp.modulate = Color(Palette.INK[400], 0.55)
+			sp.position = p0
+			sp.scale = Vector2.ONE * randf_range(0.05, 0.1)
+			add_child(sp)
+			var tw2 := sp.create_tween()
+			tw2.tween_method(func(t: float) -> void:
+				sp.position = p0 + Vector2(v.x, v.y) * t + Vector2(0, 220.0 * t * t)
+				sp.modulate.a = 0.55 * (1.0 - t), 0.0, 1.0, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw2.tween_callback(sp.queue_free))
+
+
 func sync_bars(hp: float, max_hp: float, mp: float, max_mp: float, shield: float = 0.0) -> void:
 	var hp_ratio: float = clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
 	_hp_bar.size.x = BAR_W * hp_ratio
@@ -154,10 +180,15 @@ func sync_bars(hp: float, max_hp: float, mp: float, max_mp: float, shield: float
 func play_attack(dir: float, windup: float) -> void:
 	busy += 1
 	var back_v := Vector2(-dir * 3.0, 0)
+	var base_s := scale
 	var tw := create_tween()
+	# 蓄力：后拉同时纵向微压（squash）—— 突进时弹回（stretch 回弹），打击感的起笔
+	tw.set_parallel(true)
 	tw.tween_property(self, "position", position + back_v, maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(self, "position", position + Vector2(dir * 5.0, 0), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "position", position, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "scale:y", base_s.y * 0.9, maxf(0.06, windup * 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(self, "position", position + Vector2(dir * 5.0, 0), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(self, "scale:y", base_s.y, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(self, "position", position, 0.17).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.finished.connect(_end_busy)
 
 
@@ -167,11 +198,42 @@ func play_hit() -> void:
 	tw.tween_property(_portrait, "modulate", Color.WHITE, 0.09)
 
 
+## 死亡「墨晕溶解」：噪声阈值 shader 吞没立绘 + 裁切缘染墨下沉 + 墨珠四散
+## （web 版只有整体淡出——此处为 Godot 独有表现；静观模式由上层保持淡出口径）
 func play_death() -> void:
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://render/dissolve.gdshader")
+	mat.set_shader_parameter("noise_tex", FxAtlas.texture(FxAtlas.NOISE))
+	mat.set_shader_parameter("edge_color", Color(Palette.INK[950]))
+	_portrait.material = mat
+	# 血条/蓝条/星标随队直落：整层轻沉
 	var tw := create_tween()
-	tw.tween_property(self, "modulate:a", 0.0, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	tw.parallel().tween_property(self, "position:y", position.y + 14.0, 0.42)
+	tw.tween_method(func(t: float) -> void:
+		mat.set_shader_parameter("progress", t), 0.0, 1.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(self, "position:y", position.y + 18.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(self, "modulate:a", 0.35, 0.55)
 	tw.tween_callback(queue_free)
+	_ink_burst()
+
+
+## 墨珠四散（溶解同时）：朱黑小墨点自躯干弹散下沉 —— 「人化墨而去」
+func _ink_burst() -> void:
+	for i: int in 9:
+		var ang := randf() * TAU
+		var v := Vector2(cos(ang) * randf_range(20.0, 90.0), randf_range(-60.0, -10.0))
+		var p0 := Vector2(randf_range(-10.0, 10.0), -randf_range(8.0, 30.0))
+		var sp := Sprite2D.new()
+		sp.texture = FxAtlas.texture(FxAtlas.INK_DOT)
+		sp.material = FxAtlas.add_material()
+		sp.modulate = Color(Palette.CINNABAR["base"] if randf() < 0.4 else Palette.INK[500], 0.8)
+		sp.position = p0
+		sp.scale = Vector2.ONE * randf_range(0.06, 0.14)
+		add_child(sp)
+		var tw := sp.create_tween()
+		tw.tween_method(func(t: float) -> void:
+			sp.position = p0 + Vector2(v.x, v.y) * t + Vector2(0, 130.0 * t * t)
+			sp.modulate.a = 0.8 * (1.0 - t), 0.0, 1.0, randf_range(0.4, 0.7)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(sp.queue_free)
 
 
 func hop_to(target: Vector2, dur: float) -> void:

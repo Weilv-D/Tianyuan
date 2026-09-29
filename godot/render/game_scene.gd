@@ -14,14 +14,11 @@ var xp_bar_fg: ColorRect = null
 var xp_text: Label = null
 
 
-## 浮层面板夜宴底：引擎默认 Panel 是中性灰，违反「任何颜色必须来自 Palette」红线
+## 浮层面板夜宴底：引擎默认 Panel 是中性灰，违反「任何颜色必须来自 Palette」红线。
+## 漆面材质化：宣纸纤维底纹 × 深蓝染色 × 金线边（FxAtlas.panel_box 9-slice）——
+## 纯色 Flat 是「草稿感」的 UI 残留
 func _style_night_panel(p: Panel) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.INK[900], 0.97)
-	sb.border_color = Color(Palette.GILT["base"], 0.5)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(0)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97), Color(Palette.GILT["base"], 0.5)))
 
 
 ## 顶栏 56×3 微条（ink 底随建随盖，前景条由 refresh 定宽）
@@ -538,7 +535,7 @@ func _place_unit_view(u: Dictionary, pos: Vector2) -> void:
 		v.setup(u["defId"], 0, int(u["star"]), u.get("isBeast", false))
 		add_child(v)
 		unit_views[int(u["iid"])] = v
-		v.place(pos)
+		v.place_pop(pos)
 	else:
 		v.place(pos)
 		v.set_star_scale()

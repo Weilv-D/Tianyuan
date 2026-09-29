@@ -118,6 +118,7 @@ func _lbl(text: String, size: int, color: Color, font = null) -> Label:
 class _Portrait extends Button:
 	func setup(c: Dictionary) -> void:
 		var rarity := int(c["cost"])
+		# 稀有度色边是信息载体（随档变色），Flat 直绘；漆面材质只给大面板
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(Palette.INK[850], 0.9)
 		sb.border_color = Color(Palette.RARITY_COLOR[rarity], 0.55)

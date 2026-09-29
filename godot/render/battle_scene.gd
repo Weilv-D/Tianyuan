@@ -25,6 +25,17 @@ var tick_label: Label
 var speed_buttons: Array = []
 var _atmo: Atmosphere
 var _last_float_at := {}  # 飘字错峰键表（int(x)*2048+int(y) → msec）
+# ── 相机语言（web 版没有的打击感层）：punch 冲击缩放 / focus 施法推镜 / hit-stop 顿帧 /
+# slow 处决慢镜 —— 全部只动演出时钟（acc 系数与根 scale），内核 30Hz 判定不受任何影响
+var _punch := 0.0          # 当前冲击缩放分量（衰减到 0）
+var _focus := 0.0          # 当前施法聚焦缩放分量
+var _focus_center := Vector2(960.0, 468.0)  # 推镜锚（棋盘中心，屏幕绝对）
+var _hitstop_until := 0    # msec：顿帧期内 acc 停止推进（粒子/飘字 tween 照飞）
+var _slow_until := 0       # msec：慢镜期内 acc 以 0.35 倍推进
+var _cam_tw: Tween
+var _punch_tw: Tween
+var _focus_tw: Tween
+var _shake_off := Vector2.ZERO
 
 
 func _update_speed_buttons() -> void:
@@ -195,30 +206,65 @@ func _draw_bg() -> void:
 func _process(delta: float) -> void:
 	if finished:
 		return
-	# 震屏：累加器换算位移脉冲（对齐 TS shake(90+shake*90, 0.0022*shake) 的收敛节奏）
+	# 震屏：累加器换算位移脉冲（对齐 TS shake(90+shake*90, 0.0022*shake) 的收敛节奏）。
+	# 位移写 _shake_off —— 根 position 由 _process 尾统一合成（震动 + 推镜缩放补偿）
 	var shake_v: float = fx_layer.take_shake()
 	if shake_v > 0.0:
-		# 连震先杀旧 tween：多条 tween 同写根 position 会互相争夺（终值兜底也救不回节奏）
+		# 连震先杀旧 tween：多条 tween 同写位移会互相争夺（终值兜底也救不回节奏）
 		if _shake_tw != null and _shake_tw.is_valid():
 			_shake_tw.kill()
-			position = Vector2.ZERO
+			_shake_off = Vector2.ZERO
 		var amp: float = minf(14.0, 2.0 + shake_v * 3.0)
 		_shake_tw = create_tween()
 		_shake_tw.tween_method(func(t: float) -> void:
-			position = Vector2(randf_range(-amp, amp), randf_range(-amp, amp)) * (1.0 - t), 0.0, 1.0, minf(0.32, 0.09 + shake_v * 0.09))
-		_shake_tw.tween_callback(func() -> void: position = Vector2.ZERO)
-	acc += minf(0.05, delta) * speed
-	var steps := 0
-	while acc >= DT and steps < 8:
-		battle.step()
-		acc -= DT
-		steps += 1
-	_sync_all()
-	tick_label.text = "%.1f" % (float(battle.tick) / 30.0)
+			_shake_off = Vector2(randf_range(-amp, amp), randf_range(-amp, amp)) * (1.0 - t), 0.0, 1.0, minf(0.32, 0.09 + shake_v * 0.09))
+		_shake_tw.tween_callback(func() -> void: _shake_off = Vector2.ZERO)
+	# 相机合成：punch（冲击）/ focus（施法推镜）以锚点为缩放中心，position 补偿防漂移
+	var s := 1.0 + _punch + _focus
+	scale = Vector2(s, s)
+	position = _shake_off + _focus_center * (1.0 - s)
+	# 打击时钟：hit-stop 顿帧期内判定冻结（粒子/飘字补间照飞——「时间被砸停一瞬」）；
+	# 处决慢镜期 acc 以 0.35 倍推进（内核慢放，演出补间原速）
+	var now := Time.get_ticks_msec()
+	if now >= _hitstop_until:
+		var rate := 0.35 if now < _slow_until else 1.0
+		acc += minf(0.05, delta) * speed * rate
+		var steps := 0
+		while acc >= DT and steps < 8:
+			battle.step()
+			acc -= DT
+			steps += 1
+		_sync_all()
+		tick_label.text = "%.1f" % (float(battle.tick) / 30.0)
 	if Input.is_action_just_pressed("ui_accept"):
 		speed = 1.0 if speed > 1.0 else 4.0
 		Sess.sfx.play("ui")
 		_update_speed_buttons()
+
+
+## 冲击缩放（zoom punch）：暴击/处决命中时画面向棋盘中心猛压一瞬
+func _cam_punch(strength: float) -> void:
+	if fx_layer.calm:
+		return
+	if _punch_tw != null and _punch_tw.is_valid():
+		_punch_tw.kill()
+	_punch = strength
+	_punch_tw = create_tween()
+	_punch_tw.tween_method(func(v: float) -> void: _punch = v, strength, 0.0, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## 施法推镜：画面向施法者缓推聚焦片刻再回落（镜头语言——「谁在吟唱」）
+func _cam_focus_on(world: Vector2, amount := 0.07) -> void:
+	if fx_layer.calm:
+		return
+	_focus_center = world
+	if _focus_tw != null and _focus_tw.is_valid():
+		_focus_tw.kill()
+	_focus = 0.0 if _focus <= 0.01 else _focus
+	_focus_tw = create_tween()
+	_focus_tw.tween_method(func(v: float) -> void: _focus = v, _focus, amount, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_focus_tw.tween_interval(0.42)
+	_focus_tw.tween_method(func(v: float) -> void: _focus = v, amount, 0.0, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 
 func _cell_pos(u) -> Vector2:
@@ -309,6 +355,14 @@ func _on_event(e: Dictionary) -> void:
 				tier = "execute"
 			var dmg_c := _dmg_color(tier, crit)
 			_float_text(e, e.get("amount", 0.0), dmg_c, "", tier)
+			# 打击感三件套（web 版没有）：暴击顿帧+轻压；处决重顿帧+慢镜+重压
+			if crit:
+				_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + 50)
+				_cam_punch(0.012)
+			if tier == "execute":
+				_hitstop_until = maxi(_hitstop_until, Time.get_ticks_msec() + 140)
+				_slow_until = maxi(_slow_until, Time.get_ticks_msec() + 400)
+				_cam_punch(0.03)
 			# 命中特效：普攻 impact（crit 参数），法伤走 hue=2
 			var fx_src = _unit_by_uid(int(e.get("uid", -1)))
 			if fx_src != null:
@@ -328,6 +382,14 @@ func _on_event(e: Dictionary) -> void:
 			# 施法起手音（演出本体走 fx 事件；此处对齐原版 castStart 的 cast 音）
 			if speed <= 1.0:
 				Sess.sfx.play("cast")
+			# 施法推镜（镜头语言）+ 动态光：画面向施法者缓推聚焦——五费推得更近，
+			# 且施法者脚下一盏光骤亮（「谁在吟唱」——棋盘先亮起来）
+			var cs = _unit_by_uid(int(e.get("uid", -1)))
+			if cs != null:
+				var five := int(cs.entry.get("cost", 1)) >= 5
+				_cam_focus_on(_cell_pos(cs), 0.10 if five else 0.06)
+				board_view.flash_light(board_view.cell_center(cs.cell.x, cs.cell.y),
+					Palette.FX_TINTS.get(1, Palette.GILT["light"]), 0.9 if five else 0.7)
 		"cast":
 			# 五费大招走 skillBig，其余 cast（原版同档）
 			if speed <= 1.0:

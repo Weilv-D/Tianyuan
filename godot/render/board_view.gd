@@ -57,6 +57,46 @@ func _ready() -> void:
 	_hover_layer.z_index = 6
 	add_child(_hover_layer)
 
+	_build_candle_lights()
+
+
+## 夜宴烛光（web 版没有的 2D 光照层）：棋盘两盏米金 PointLight2D 缓摇曳 ——
+## 「夜宴有灯」的氛围底；blend ADD 在漆面上点出暖光池，与夜蓝底形成冷暖对比
+func _build_candle_lights() -> void:
+	var size := float(Layout.BOARD_SIZE)
+	for cfg: Array in [[Vector2(size * 0.16, size * 0.2), 1.0], [Vector2(size * 0.84, size * 0.2), 0.86]]:
+		var light := PointLight2D.new()
+		light.texture = FxAtlas.texture(FxAtlas.GLOW)
+		light.color = Palette.GILT["base"]
+		light.energy = 0.9
+		light.texture_scale = 4.6
+		light.position = cfg[0]
+		light.z_index = -2
+		add_child(light)
+		# 烛光摇曳：energy 呼吸 + 灯位微晃（双 tween 异频叠加，不机械）
+		var t1 := light.create_tween().set_loops()
+		t1.tween_property(light, "energy", 1.15 * float(cfg[1]), 2.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		t1.tween_property(light, "energy", 0.82 * float(cfg[1]), 2.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		var t2 := light.create_tween().set_loops()
+		t2.tween_property(light, "position:x", float(cfg[0].x) - 5.0, 3.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		t2.tween_property(light, "position:x", float(cfg[0].x) + 5.0, 4.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## 施法动态光：世界局部坐标处一盏光骤亮再熄（谁在吟唱，光先知道）
+func flash_light(local_pos: Vector2, color: Color, dur := 0.8) -> void:
+	var light := PointLight2D.new()
+	light.texture = FxAtlas.texture(FxAtlas.GLOW)
+	light.color = color
+	light.energy = 0.0
+	light.texture_scale = 3.2
+	light.position = local_pos
+	light.z_index = -2
+	add_child(light)
+	var tw := light.create_tween()
+	tw.tween_property(light, "energy", 1.35, dur * 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(light, "energy", 0.0, dur * 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(light.queue_free)
+
 
 func _draw() -> void:
 	var pad := float(Layout.BOARD_PAD)

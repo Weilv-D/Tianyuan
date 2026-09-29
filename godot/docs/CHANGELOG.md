@@ -1,4 +1,114 @@
-# 夜宴 · Godot 版变更日志（版本线 2.0.x）
+# 夜宴 · Godot 版变更日志（版本线 2.x）
+
+## 2.2.0（2026-09-29，超越 web 版 —— Godot 独有表现层）
+
+用户裁决「质感表现要远远超越 web 版本」——2.1.0 完成对齐后，本版启用 web (Canvas2D)
+做不到的引擎能力：打击感顿帧、真 2D 光照、镜头语言、材质化 UI、墨晕转场。零平衡/内核
+改动（对拍门禁同数通过）。
+
+- **打击感三件套（battle_scene 相机语言）**：
+  - hit-stop 顿帧——暴击 50ms / 处决 140ms，判定时钟冻结（acc 停推）而粒子/飘字补间
+    照飞，「时间被砸停一瞬」；
+  - zoom punch——暴击 1.2% / 处决 3% 缩放猛压（以棋盘中心为锚，position 补偿防漂移）；
+  - 处决慢镜——kill 且伤>0 时判定时钟以 0.35 倍推进 400ms（内核慢放，演出原速）。
+  静观模式全部旁路（fx_layer.calm）。
+- **施法推镜**：castStart 时画面向施法者缓推聚焦（普通 6% / 五费 10%，入 0.24s →
+  驻 0.42s → 回 0.4s）——「谁在吟唱」的镜头语言。
+- **死亡墨晕溶解（render/dissolve.gdshader）**：噪声阈值吞没立绘 + 裁切缘染墨 + 整体
+  微沉，同时九珠朱黑墨点四散下沉——「人化墨而去」（web 版只有整体淡出）。
+- **夜宴烛光（board_view 2D 光照层）**：棋盘两盏米金 PointLight2D（energy 呼吸 + 灯位
+  异频微晃 = 烛光摇曳，blend ADD 在漆面点出暖光池）；施法瞬间施法者脚下动态光骤亮
+  （board_view.flash_light）。
+- **漆面流光（lacquer.gdshader）**：一道窄亮带沿对角 45s 巡行（TIME 内置），静态包浆
+  变成「活的」漆面。
+- **攻击 squash & stretch（unit_view）**：攻击蓄力纵向压 0.9、突进时 BACK 弹回；
+  落子弹性 place_pop（自上 22px 弹落 + 触地尘点）接入布阵首建。
+- **墨晕转场（render/ink_transition.gdshader + session.gd）**：场景切换改为「墨渍吞没」
+  ——分形噪声打散的不规则前沿自四周向中心吞没再散开，替代纯 alpha 淡入淡出。
+- **UI 漆面材质化（FxAtlas.PANEL + panel_box）**：三大浮层 / 菜单按钮 / 设置面板 /
+  图鉴大面板换 9-slice 漆面 StyleBoxTexture（中性亮度纹理 × modulate 染色——底已暗
+  再乘深色会黑死，第一次实现翻车实证）；图鉴小卡保 Flat（稀有度色边是信息载体）。
+- 判例入 MILESTONES：StyleBoxTexture 无 border_*（运行期才炸）；「底色已暗 × 深色
+  modulate = 黑死」的染色数学。
+- 验证：qa 11/11；menu/battle 探针零脚本错误；截图目视（漆面按钮/战斗演出落位）；
+  版本号 2.2.0（并行会话在途 2.1.1 修复轮避让，minor 语义归属本版）。
+
+## 2.1.1（2026-09-29，第十四轮全库深度审查收敛）
+
+用户实机报告「人物脚底的黑色圆有问题，乱飘」驱动，随后对 godot/ 全树做逐文件深度审查
+（69 个 .gd + 11 个 .mjs + 6 个 .tscn + 夹具/配置，约 1.7 万行；core 六件套对照 TS 冻结树
+逐点抽验）。10 项发现全部修复，4 项判例登记不修；全部改动对拍零影响（qa 11/11 同数通过）。
+
+### P1 脚底投影错位（用户报告项，视觉缺陷）
+- **根因**：`unit_view.gd` 旧投影 `_soft_circle` 内置校正偏移（`position=(-r,-r·1.3)`，
+  使 `_draw` 的圆心 `(r, r·1.3)` 恰好落在父节点原点）被 `setup()` 的
+  `shadow.position = Vector2(0, 2)` **覆写**——绘制圆心落到脚位 (+26,+35.8)·scale
+  （1★≈右下方 +23/+32）：黑圆整体漂浮错位，并随 hop/攻击突进在格间滑移（「乱飘」的
+  实机观感）。且形状为 52×52 硬边正圆，而 web 冻结版规格（UnitView.ts:134）是
+  **52×20 软椭圆**（glow 纹理压扁、染黑、alpha 0.5、贴脚 (0,0)）。2.0.2 只软化了
+  边缘（三层同心），位置与椭圆形状两项背离原样存在。
+- **修复前探针实证**：shadow 全局 = view + (+0.5,+3.9 / -2.7,+0.9 …) 逐帧漂移；
+  红圈标注截图显示每个角色的黑圆都散落在右下方格间（绿圈=脚位）。
+- **修复**：改为 Sprite2D + 程序化径向渐变纹理（64×64 smoothstep 衰减，一次生成
+  static 复用），52×20、染黑 alpha 0.5、锚定脚位 (0,+2)；删除 `_soft_circle` 与
+  `_FxShape` 的 kind 0 分支（与 web 手工同步关系写入常量注释）。
+- **修复后验证**：独立探针 dx≡0.000、dy≡2×scale（1★/2★/3★ 0.9/1.02/1.16 三档
+  逐一复核）；战斗场景帧内采样 worst_dx=0.000（12 单位、含移动/战斗/死亡路径）；
+  独立截图 + 战斗中段截图像素复核（椭圆贴脚、软边、无漂浮）。
+
+### P2 `--battle-smoke` 探针被 boot 转发架空（门禁回归钉失效）
+- **根因**：`session._battle_smoke()` 注册 deferred battle_scene 换场后，
+  `boot._ready` 见 scene_data 非空又注册 deferred game_scene——**后注册者胜出**，
+  探针永远落在 game/menu（本轮首跑实证：落菜单）。AGENTS.md 规定的战斗路径
+  窗口实机冒烟因此从未真正进入过战斗场景。
+- **修复**：Sess 增 `battle_smoke` 标志，boot 检测到即整段让路；探针自包含化
+  （1200 帧 → 截图 `.tmp-shots-godot/battle.png` → quit 0），可自动化。
+- **验证**：单参数全链实测（进战斗场景 → 跑完整场 → 截图落位 → exit 0，零脚本错误）。
+
+### P2 显示路径平衡字面量
+- **来金预览字面量**：`game_scene.refresh_all` 的 `5 + interest + streak` 中 5 是
+  INCOME_BASE 字面量（TS 冻结版同处亦为字面量；本文纪律：显示路径不落平衡数值，
+  spec 调参时预告会与实际收入静默背离）。改走 `Spec.c("INCOME_BASE")`。
+- **验证**：game 探针 37 金档顶栏「来金 +8」= 5+3（兴趣档），D 键 reroll 全链零错误。
+
+### P2 GdUnit4 打进发布包
+- `export_presets.cfg` exclude_filter 未列 `addons/*` → 整套测试框架进发布 PCK
+  （运行时零引用，tests/* 已排除）。补排除；exe 体积收益以下次出包实证为准。
+
+### P3 批（DEV 面/工具链/纵深防御）
+- `debug_console` level 命令硬编码 `mini(9, …)` → 读 `Spec.c("MAX_LEVEL")`；
+  legend 命令 `merged == null` 时 `bench[-1]` 负索引静默写末格（GD 负索引不报错）
+  → 补 else 分支 push_warning 兜底。
+- `balance.mjs` runs.label 硬编码 `godot-2.0.2`（发版即漂移）→ 从 project.godot
+  派生 `godot-<version>`；`balance_worker` 心跳误打引擎启动累计 ms（原注释意旨
+  定位卡点）→ 改打本配对耗时。
+- `match.damage_of` / `economy.streak_gold` / `xp_to_next`：空表时负索引读空数组
+  直接崩（TS 侧是 NaN 静默传播，同样不可接受）→ 空表守卫 + push_error（spec 对账
+  门禁下不可达，属纵深防御）。
+- `game_scene` 详情卡横向 clamp 上界硬编码 1920 → `Layout.W`。
+
+### 审查纪律与误报裁定
+- spec.json 计数与 hash 全对（64/44/17/36，fnv1a32=b586ca3c，幂等两次导出字节一致）；
+  数值单一消费口仅 `core/spec.gd` 一处（grep 全树实证）。
+- core 六件套对 TS 冻结树逐点抽验全部一致：warrior/guardian 档位默认表（含 tier≥3
+  回落 0.2/0.14）、marksman 第三击 forceCrit、resurrect 费用降序+uid 决胜、
+  execute 处决量（hp+shield+1 豁免真伤帽）、chain 衰减式、applyTraits 钩子注册序
+  （羁绊 id 字典序 → 装备固定序）、商店权重抽样（严格小于+跳过零权重+末位兜底）。
+- **登记不修判例**：① `codec.str_tok` 越界字符 TS throw vs GD push_error 的行为差
+  仅存在于脏数据路径（对拍夹具不覆盖，显式报错优于静默）；② debug_console items
+  命令的 6 个硬编码装备 id 实测全部在名单内（DEV 面零风险）；③ 空表守卫修的是
+  「GD 崩 vs TS NaN」的共同坏结局，不改变任何现行数值路径。
+- **并行会话对账**：本审期间并行会话落地 2.0.3 性能轮与本审 2.1.1 前的 2.1.0 视觉轮；
+  本审修复（unit_view/session/boot/game_scene/export_presets/debug_console/balance）
+  曾以在途态被其收口提交带入历史，内容逐条回核无失真。最终验证树 = 3bc6d05（2.1.0）
+  + 本审未提交三件（economy/match/balance_worker）。
+
+### 验证汇总
+- `npm run qa` **11/11**（import / 全树 parse / perf 回归 / spec 导出+幂等 / GdUnit4
+  4 用例 / rng 6 组合 / battle 21 局逐事件 / codec 24 事件 / match 7 整局逐行 /
+  balance 冒烟）。
+- 窗口探针：battle-smoke 全链、战斗投影锚定（worst_dx=0.000）、game 顶栏与 reroll
+  路径，零 SCRIPT ERROR；修复前后同探针对照（红圈标注截图留档 .tmp，不入库）。
 
 ## 2.1.0（2026-09-29，视觉质感全面升级 —— M3 表现层收官）
 

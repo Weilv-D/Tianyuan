@@ -17,6 +17,8 @@ const HEX := "fx_hex"            # 六边形底座（护盾「身份牌」）
 const PAPER := "fx_paper"        # 宣纸纤维（棋盘底纹，暖色）
 const GRAIN := "fx_grain"        # 全屏纸面颗粒（白噪声，alpha 低）
 const VIGNETTE := "fx_vignette"  # 暗角（把视线压回战场中心）
+const NOISE := "fx_noise"        # 平滑值噪声灰度（溶解阈值/墨晕边缘用）
+const PANEL := "fx_panel"        # 漆面面板底：深蓝纸纤维 + 四边发丝线（9-slice）
 
 static var _cache: Dictionary = {}
 static var _prewarmed := false
@@ -36,7 +38,7 @@ static func prewarm() -> void:
 	if _prewarmed:
 		return
 	_prewarmed = true
-	for key: String in [GLOW, INK_DOT, RING, SPARK, SLASH, HEX, PAPER, GRAIN, VIGNETTE]:
+	for key: String in [GLOW, INK_DOT, RING, SPARK, SLASH, HEX, PAPER, GRAIN, VIGNETTE, NOISE, PANEL]:
 		texture(key)
 
 
@@ -47,6 +49,24 @@ static func texture(key: String) -> Texture2D:
 	var tex := ImageTexture.create_from_image(img)
 	_cache[key] = tex
 	return tex
+
+
+## 漆面面板 StyleBox（9-slice；bg 染色、边线随纹理）—— UI 面板材质化的统一入口
+static func panel_box(bg: Color, border: Color) -> StyleBoxTexture:
+	var sb := StyleBoxTexture.new()
+	sb.texture = texture(PANEL)
+	sb.texture_margin_left = 2
+	sb.texture_margin_right = 2
+	sb.texture_margin_top = 2
+	sb.texture_margin_bottom = 2
+	sb.modulate_color = bg
+	# 边线由纹理四边承担（StyleBoxTexture 无 border 绘制；border 参数仅供
+	# 调用方语义占位 —— Flat 才有 border_*，混用会运行期炸）
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	return sb
 
 
 ## 全屏纸面颗粒叠加：极低透明度叠在一切之上 —— 数码感的天敌（textures.ts grainOverlay）
@@ -100,6 +120,10 @@ static func _bake(key: String) -> Image:
 			return _bake_grain()
 		VIGNETTE:
 			return _bake_vignette()
+		NOISE:
+			return _bake_noise()
+		PANEL:
+			return _bake_panel()
 	return Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
 
 
@@ -274,6 +298,43 @@ static func _bake_vignette() -> Image:
 			else:
 				a = 0.1 + 0.24 * (t - 0.72) / 0.28
 			img.set_pixel(x, y, Color(0, 0, 0, clampf(a, 0.0, 0.34)))
+	return img
+
+
+## 平滑值噪声灰度（R 通道；溶解 shader 的逐像素阈值源）
+static func _bake_noise() -> Image:
+	var size := 256
+	var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
+	var n1 := _value_noise(size, 9.0, 401)
+	var n2 := _value_noise(size, 27.0, 809)
+	for y: int in size:
+		for x: int in size:
+			var v := clampf(n1[y * size + x] * 0.7 + n2[y * size + x] * 0.3, 0.0, 1.0)
+			img.set_pixel(x, y, Color(v, v, v))
+	return img
+
+
+## 漆面面板底：**中性亮度**画底（modulate 染色承担最终色 —— 底已暗再乘深色会黑死）。
+## 底 ~0.62 亮灰蓝 + 亮纤维丝 + 白边线 + 金次边线；StyleBoxTexture.modulate_color
+## 乘 INK 系深色后 = 深蓝漆面且纤维隐约可辨，金线乘后成暗金（9-slice margin 2 保锐利）
+static func _bake_panel() -> Image:
+	var size := 256
+	var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
+	var n := _value_noise(size, 7.0, 911)
+	for y: int in size:
+		for x: int in size:
+			var v := 0.60 + (n[y * size + x] - 0.5) * 0.16
+			img.set_pixel(x, y, Color(v, v + 0.03, v + 0.07))
+	var line := Color(1.0, 1.0, 1.0)
+	for i: int in size:
+		img.set_pixel(i, 0, line)
+		img.set_pixel(i, size - 1, line)
+		img.set_pixel(0, i, line)
+		img.set_pixel(size - 1, i, line)
+	var gilt := Color(0.92, 0.84, 0.62)
+	for i: int in size:
+		img.set_pixel(i, 1, gilt)
+		img.set_pixel(i, size - 2, gilt)
 	return img
 
 

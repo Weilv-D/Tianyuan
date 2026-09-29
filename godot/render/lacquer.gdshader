@@ -40,10 +40,15 @@ void fragment() {
 	// 宣纸颗粒
 	float g = hash12(uv * 640.0) - 0.5;
 	col += g * grain_amount;
-	// 清漆高光：一条柔和的斜向亮带缓慢扫过（米金 #e3cfa0 系，低强度）
+	// 清漆高光：静态柔光带（米金，低强度）
 	vec3 sheen_col = vec3(0.890, 0.812, 0.627);
 	float band = smoothstep(0.45, 0.0, abs(uv.x + uv.y * 0.6 - 0.9));
 	col += sheen_col * band * sheen * (0.6 + 0.4 * lac);
+	// 流光：一道更窄的亮带沿对角缓慢巡行（TIME 内置；「漆面是活的」—— 超越 web 的
+	// 静态烘焙包浆），巡行周期约 45s，存在感刻意压到清漆高光的四成
+	float sweep_pos = fract(uv.x * 0.8 + uv.y * 0.5 - TIME * 0.022);
+	float sweep = smoothstep(0.30, 0.0, abs(sweep_pos - 0.5));
+	col += sheen_col * sweep * sheen * 0.4 * (0.5 + 0.5 * lac);
 	// 边缘沉入夜色（盘沿 vignette）
 	float d = max(abs(uv.x - 0.5), abs(uv.y - 0.5)) * 2.0;
 	col *= 1.0 - 0.28 * smoothstep(0.72, 1.0, d);

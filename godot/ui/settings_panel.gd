@@ -22,12 +22,8 @@ func open(on_changed: Callable = Callable()) -> void:
 	panel.size = Vector2(520, 460)
 	panel.position = Vector2((Layout.W - 520) / 2.0, (Layout.H - 460) / 2.0)
 	# 夜宴底覆写：默认 Panel 中性灰 + CheckBox/HSlider 深底不可见（色板红线）
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(Palette.INK[900], 0.97)
-	sb.border_color = Color(Palette.GILT["base"], 0.5)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(0)
-	panel.add_theme_stylebox_override("panel", sb)
+	# 漆面材质化（FxAtlas.panel_box）：宣纸纤维 × 深蓝 × 金线，与三大浮层同源
+	panel.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97), Color(Palette.GILT["base"], 0.5)))
 	dim.add_child(panel)
 	var prefs: Dictionary = SaveStore.load_prefs()
 	var title := _lbl("设 置", 30, Palette.GILT["light"], Sess.seal_font)

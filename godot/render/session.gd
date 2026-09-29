@@ -59,8 +59,12 @@ func _setup_fade() -> void:
 	cl.layer = 100
 	add_child(cl)
 	_fade = ColorRect.new()
-	_fade.color = Color(0.027, 0.035, 0.047)
-	_fade.modulate.a = 0.0
+	_fade.color = Color.WHITE
+	# 墨晕转场：shader progress 驱动的「墨渍吞没」前沿（分形噪声打散）
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://render/ink_transition.gdshader")
+	mat.set_shader_parameter("progress", 0.0)
+	_fade.material = mat
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cl.add_child(_fade)
@@ -306,15 +310,17 @@ func go(path: String, data: Dictionary = {}) -> void:
 	_transition_to(path)
 
 
-## 淡出夜色 → 切场 → 淡入；淡出期间吞输入防误点（transition.fadeTo 同口径）。
+## 墨晕吞没 → 切场 → 墨散；吞没期间吞输入防误点（transition.fadeTo 同口径）。
+## shader 前沿由分形噪声打散（墨渍渗纸的不规则吞没线），替代纯 alpha 淡入淡出。
 ## 幕布未就绪/不在树（探针直换等路径）回退硬切。
 func _transition_to(path: String) -> void:
 	if _fade == null or not is_inside_tree():
 		get_tree().change_scene_to_file(path)
 		return
 	_fade.mouse_filter = Control.MOUSE_FILTER_STOP
+	var mat := _fade.material as ShaderMaterial
 	var tw := create_tween()
-	tw.tween_property(_fade, "modulate:a", 1.0, 0.16)
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("progress", v), 0.0, 1.0, 0.24)
 	tw.tween_callback(func() -> void: get_tree().change_scene_to_file(path))
-	tw.tween_property(_fade, "modulate:a", 0.0, 0.20)
+	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("progress", v), 1.0, 0.0, 0.28)
 	tw.tween_callback(func() -> void: _fade.mouse_filter = Control.MOUSE_FILTER_IGNORE)

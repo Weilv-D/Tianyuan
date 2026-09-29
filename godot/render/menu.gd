@@ -138,14 +138,6 @@ func _menu_button(text: String, y: float, enabled: bool) -> Button:
 	return b
 
 
-func _panel_style(bg: Color, border: Color) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(0)  # 夜宴禁圆角（ART_BIBLE §9.2）
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
-	return sb
+func _panel_style(bg: Color, border: Color) -> StyleBoxTexture:
+	# 漆面按钮：宣纸纤维底纹 × 状态染色（FxAtlas.panel_box 9-slice；夜宴禁圆角 → 直角边线）
+	return FxAtlas.panel_box(bg, border)
