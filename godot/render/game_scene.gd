@@ -448,12 +448,14 @@ func _build_sell_seal() -> void:
 
 func refresh_all() -> void:
 	var p := match_ref.human()
-	# TS SceneRefresh 口径：值纯数字（标签在小注）、来金 = 5+利息+连胜、hp/xp 微条
+	# TS SceneRefresh 口径：值纯数字（标签在小注）、来金 = 基础+利息+连胜、hp/xp 微条。
+	# 基础值走 Spec 单一真源（TS 冻结版同处为字面量 5；本文纪律：显示路径不落平衡数值，
+	# spec 调 INCOME_BASE 时预告必须跟着变，否则显示与实际收入静默背离）
 	(labels["round"] as Label).text = str(match_ref.round)
 	(labels["hp"] as Label).text = str(int(p["hp"]))
 	(labels["gold"] as Label).text = str(int(p["gold"]))
 	(labels["level"] as Label).text = str(int(p["level"]))
-	var inc := 5 + Economy.interest_of(p["gold"]) + Economy.streak_gold(int(p["streak"]))
+	var inc := int(Spec.c("INCOME_BASE", 5)) + Economy.interest_of(p["gold"]) + Economy.streak_gold(int(p["streak"]))
 	(labels["streak"] as Label).text = "+%d" % inc
 	if streak_cap != null:
 		var st := int(p["streak"])
@@ -1766,7 +1768,7 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	var v: UnitView = unit_views.get(int(u["iid"]), null)
 	if v != null:
 		anchor = v.position
-	var px: float = clampf(anchor.x + 40.0, 66.0, 1920.0 - 48.0 - w)
+	var px: float = clampf(anchor.x + 40.0, 66.0, float(Layout.W) - 48.0 - w)
 	var py: float = clampf(anchor.y - h / 2.0, float(HudLayout.CAH_Y_MIN), maxf(float(HudLayout.CAH_Y_MIN), float(HudLayout.CAH_Y_MAX) - h))
 	detail_card = PanelContainer.new()
 	detail_card.position = Vector2(px, py)

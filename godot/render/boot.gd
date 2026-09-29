@@ -19,6 +19,10 @@ func _prewarm() -> void:
 
 func _ready() -> void:
 	_prewarm()
+	# --battle-smoke：探针自带换场（session.gd 的 deferred battle_scene），
+	# 序章整段让路——否则本函数的转发后注册会把战斗场景顶掉（2026-09-29 实证）
+	if Sess.battle_smoke:
+		return
 	# 实机冒烟：--autostart 跳过序章直入对局（TS ?autostart=1 先例）。
 	# 必须转发既有 scene_data —— Sess.go 的 data 参数默认空字典，不传会把
 	# _setup_smoke 放进去的 match 清空，game_scene 拿不到对局弹回菜单

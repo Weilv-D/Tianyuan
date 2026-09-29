@@ -14,6 +14,9 @@ var body_font: SystemFont
 var bus_ready := false
 var bgm
 var sfx
+## --battle-smoke 占用中：boot 序章让路（不得再转发 game_scene 把战斗场景顶掉——曾致
+## 该探针永远落在 game/menu，战斗路径回归钉失效，2026-09-29 第十四轮审查实证）
+var battle_smoke := false
 
 
 func _ready() -> void:
@@ -36,7 +39,9 @@ func _ready() -> void:
 ## 存 .tmp-shots-godot/<tag>.png（不入库）并退出 0；供门禁/视觉验收批次复用。
 ## keyd 后缀：第 40/41 帧合成 D 键 press/release，结尾输出 UI_KEY_D 行（商店 digest 变化 =
 ## 键盘层存活；_unhandled_key_input 曾拼错整层死亡，2026-09-29 审查修复的回归钉）。
-## --battle-smoke：快进到人类参战轮直接进战斗场景（死亡/弹道/演出路径的窗口实机冒烟）。
+## --battle-smoke：快进到人类参战轮直进战斗场景（死亡/弹道/演出路径的窗口实机冒烟），
+## 跑满 1200 帧后截图 .tmp-shots-godot/battle.png 并 quit(0)——可自动化（AGENTS.md 战斗
+## 路径回归钉）。boot 经 Sess.battle_smoke 标志让路，不转发 game_scene。
 func _setup_smoke() -> void:
 	for a: String in OS.get_cmdline_user_args():
 		if a.begins_with("--smoke="):
@@ -44,11 +49,14 @@ func _setup_smoke() -> void:
 		elif a == "--autostart":
 			scene_data = { "match": Match.new(20260928, "你", "normal") }
 		elif a == "--battle-smoke":
+			battle_smoke = true
 			_battle_smoke()
 
 
-## 快进到人类参战的一轮，直进战斗场景（渲染路径：_sync_all 死亡除名/弹道坐标/震屏）
+## 快进到人类参战的一轮，直进战斗场景（渲染路径：_sync_all 死亡除名/弹道坐标/震屏）。
+## 跑满 1200 帧（含死亡/弹道全过程）后截图落 .tmp-shots-godot/battle.png 并退出 0。
 func _battle_smoke() -> void:
+	battle_smoke = true
 	var m := Match.new(20260929, "你", "normal")
 	for i: int in 12:
 		m.begin_round()
@@ -62,12 +70,27 @@ func _battle_smoke() -> void:
 				m.settle_round()
 				m.end_round()
 				scene_data = { "match": m, "pair": me, "config": cfg }
+				# deferred 链：本函数的换场先注册、boot._ready 的转发后注册——
+				# 后注册者胜出。battle_smoke 标志令 boot 直接让路（见 boot.gd）
 				get_tree().change_scene_to_file.call_deferred("res://render/battle_scene.tscn")
+				await _smoke_frames(1200)
+				var dir := ProjectSettings.globalize_path("res://.tmp-shots-godot")
+				DirAccess.make_dir_recursive_absolute(dir)
+				var img := get_viewport().get_texture().get_image()
+				img.save_png("%s/battle.png" % dir)
+				print("SMOKE_SHOT battle")
+				get_tree().quit(0)
 				return
 		m.settle_round()
 		m.end_round()
 	push_error("battle-smoke: 12 轮内未遇到人类参战轮")
 	get_tree().quit(1)
+
+
+## 公共帧等待（await 链：本节点是常驻 autoload，场景切换不会中断它）
+func _smoke_frames(n: int) -> void:
+	for i: int in n:
+		await get_tree().process_frame
 
 
 func _enter_game() -> void:
