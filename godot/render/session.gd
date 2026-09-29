@@ -14,9 +14,32 @@ var body_font: SystemFont
 var bus_ready := false
 var bgm
 var sfx
+
+## 场景转场幕布（transition.ts 对齐：160ms 淡出夜色 → 切场 → 淡入）
+var _fade: ColorRect
 ## --battle-smoke 占用中：boot 序章让路（不得再转发 game_scene 把战斗场景顶掉——曾致
 ## 该探针永远落在 game/menu，战斗路径回归钉失效，2026-09-29 第十四轮审查实证）
 var battle_smoke := false
+
+## 启动预热任务 id（boot 写入；-1 无在途）——FxAtlas 烘焙必须等它收尾
+var prewarm_task := -1
+var _atlas_done := false
+
+
+## 特效材质烘焙收口：等启动预热完成再主线程烘焙（挂 Sess 常驻——boot 场景会被
+## 切换释放，协程挂它身上会在 autostart/battle-smoke 直切路径静默死亡）。
+## 竞态实证：主线程 ImageTexture 提交与非主线程 ResourceLoader 并发 → 导出体段错误。
+func start_atlas_bake() -> void:
+	_bake_when_ready()
+
+
+func _bake_when_ready() -> void:
+	while prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(prewarm_task):
+		await get_tree().process_frame
+	if not _atlas_done:
+		_atlas_done = true
+		FxAtlas.prewarm()
+	prewarm_task = -1
 
 
 func _ready() -> void:
@@ -26,7 +49,21 @@ func _ready() -> void:
 	Spec.ensure()
 	_load_fonts()
 	_setup_audio_buses()
+	_setup_fade()
 	_setup_smoke()
+
+
+## 转场幕布：常驻 CanvasLayer 顶层，go() 走淡出→切场→淡入（硬切是「草稿感」的来源之一）
+func _setup_fade() -> void:
+	var cl := CanvasLayer.new()
+	cl.layer = 100
+	add_child(cl)
+	_fade = ColorRect.new()
+	_fade.color = Color(0.027, 0.035, 0.047)
+	_fade.modulate.a = 0.0
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cl.add_child(_fade)
 	bgm = load("res://audio/bgm.gd").new()
 	bgm.name = "Bgm"
 	add_child(bgm)
@@ -60,6 +97,12 @@ func _battle_smoke() -> void:
 	var m := Match.new(20260929, "你", "normal")
 	for i: int in 12:
 		m.begin_round()
+		# 塞三枚上场棋子：空场在「空阵直胜」修复后 0 秒速败，战斗画面无从谈起
+		#（探针目的是渲染路径：弹道/死亡/震屏的实机冒烟）
+		var hb := m.human()
+		for slot: int in 3:
+			if hb["board"][slot] == null:
+				hb["board"][slot] = GameState.create_unit(String(Spec.champions[slot]["id"]), 1)
 		if not m.pairings.is_empty() and m.round > 1:
 			var me: Dictionary = {}
 			for q: Dictionary in m.pairings:
@@ -208,6 +251,17 @@ func _run_smoke(spec_txt: String) -> void:
 	get_tree().quit(0)
 
 
+func _exit_tree() -> void:
+	# 进程退出链：先于引擎 teardown 落定两件在途事——
+	# 1) 预热任务 join（退出期在途 WorkerThreadPool 任务 + 假驱动析构 = 段错误，
+	#    headless 探针纪律同根因；基线 2.0.3 即有此退出崩溃，非 2.1.0 引入）
+	if prewarm_task >= 0 and not WorkerThreadPool.is_task_completed(prewarm_task):
+		WorkerThreadPool.wait_for_task_completion(prewarm_task)
+	prewarm_task = -1
+	# 2) static 缓存持有的 GPU 资源先于 RenderingServer 拆除释放
+	FxAtlas.release_all()
+
+
 func _load_fonts() -> void:
 	seal_font = load("res://assets/fonts/YiShanBeiZhuanTi.ttf")
 	# 正文走系统宋体（现版 Phaser 用浏览器宋体渲染正文，Godot 等价物 = SystemFont）
@@ -249,4 +303,18 @@ func go(path: String, data: Dictionary = {}) -> void:
 	elif path.contains("result"):
 		mood = "final"
 	bgm.set_mood(mood)
-	get_tree().change_scene_to_file(path)
+	_transition_to(path)
+
+
+## 淡出夜色 → 切场 → 淡入；淡出期间吞输入防误点（transition.fadeTo 同口径）。
+## 幕布未就绪/不在树（探针直换等路径）回退硬切。
+func _transition_to(path: String) -> void:
+	if _fade == null or not is_inside_tree():
+		get_tree().change_scene_to_file(path)
+		return
+	_fade.mouse_filter = Control.MOUSE_FILTER_STOP
+	var tw := create_tween()
+	tw.tween_property(_fade, "modulate:a", 1.0, 0.16)
+	tw.tween_callback(func() -> void: get_tree().change_scene_to_file(path))
+	tw.tween_property(_fade, "modulate:a", 0.0, 0.20)
+	tw.tween_callback(func() -> void: _fade.mouse_filter = Control.MOUSE_FILTER_IGNORE)

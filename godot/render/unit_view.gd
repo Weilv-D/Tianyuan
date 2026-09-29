@@ -114,6 +114,27 @@ func set_star_scale() -> void:
 	scale = Vector2(s, s)
 
 
+## 合成升星：立绘白闪 + 底座金环迸散（升星瞬间的句号；game_scene 检出合并时调用）
+func flash_star() -> void:
+	if _portrait == null:
+		return
+	var tw := create_tween()
+	tw.tween_property(_portrait, "modulate", Color(1.7, 1.7, 1.55), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_portrait, "modulate", Color.WHITE, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	var ring := Sprite2D.new()
+	ring.texture = FxAtlas.texture(FxAtlas.RING)
+	ring.material = FxAtlas.add_material()
+	ring.modulate = Color(Palette.GILT["light"], 0.9)
+	ring.position = Vector2(0, -6)
+	ring.scale = Vector2.ONE * (24.0 / 128.0)
+	add_child(ring)
+	var rt := ring.create_tween()
+	rt.tween_method(func(t: float) -> void:
+		ring.scale = Vector2.ONE * (24.0 + 96.0 * t) / 128.0
+		ring.modulate.a = 0.9 * (1.0 - t), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	rt.tween_callback(ring.queue_free)
+
+
 func place(pos: Vector2) -> void:
 	position = pos
 	_base_y = pos.y

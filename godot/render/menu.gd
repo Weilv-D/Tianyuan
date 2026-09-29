@@ -12,11 +12,38 @@ func _ready() -> void:
 	var title := _seal_label("百 战 天 元", 96, Palette.PAPER[100])
 	title.position = Vector2(cx - 400, -330)
 	title.size = Vector2(800, 130)
+	# 标题鎏金光晕（MenuScene.setShadow 同语言：GILT 软晕垫字后）
+	title.add_theme_color_override("font_shadow_color", Color(Palette.GILT["base"], 0.5))
+	title.add_theme_constant_override("shadow_offset_x", 0)
+	title.add_theme_constant_override("shadow_offset_y", 0)
+	title.add_theme_constant_override("shadow_outline_size", 28)
 	add_child(title)
 	var sub := _seal_label("夜 宴", 40, Palette.GILT["light"])
 	sub.position = Vector2(cx - 400, -200)
 	sub.size = Vector2(800, 60)
 	add_child(sub)
+	var tag := _body_label("八 人 对 弈　·　幽 冥 水 墨", 16, Palette.GILT["base"])
+	tag.position = Vector2(cx - 400, -136)
+	tag.size = Vector2(800, 26)
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(tag)
+
+	# 底部剪影长卷：几名棋子的墨影平铺，暗合「点将」的意象（MenuScene 对齐）
+	var picks := [7, 19, 31, 44, 56]
+	var n_champs: int = Spec.champions.size()
+	for k: int in picks.size():
+		var idx := int(picks[k]) % n_champs
+		var def_id := String(Spec.champions[idx]["id"])
+		var tex: Texture2D = load("res://assets/pieces/%s.png" % def_id)
+		if tex == null:
+			continue
+		var sh := Sprite2D.new()
+		sh.texture = tex
+		sh.centered = false
+		sh.modulate = Color(Palette.INK[500], 0.34)
+		sh.position = Vector2(-260.0 * 2.0 + k * 260.0 - 104.0, 390.0 - 260.0)
+		sh.scale = Vector2(260.0 / 208.0, 260.0 / 208.0)
+		add_child(sh)
 
 	var has_save: bool = SaveStore.has_save("normal")
 	var has_daily: bool = SaveStore.has_save("daily")
@@ -40,7 +67,7 @@ func _ready() -> void:
 	settings.pressed.connect(func() -> void: sp.open())
 	add_child(settings)
 
-	var ver := _body_label("夜宴 · Godot 版 %s" % String(ProjectSettings.get_setting("application/config/version", "2.0.0-m3")), 16, Palette.PAPER[500])
+	var ver := _body_label("夜宴 · Godot 版 %s" % String(ProjectSettings.get_setting("application/config/version", "2.1.0")), 16, Palette.PAPER[500])
 	ver.position = Vector2(cx - 400, 480)
 	ver.size = Vector2(800, 30)
 	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -69,11 +96,8 @@ func _enter(kind: String) -> void:
 
 
 func _draw_bg() -> void:
-	var bg := ColorRect.new()
-	bg.color = Palette.INK[950]
-	bg.position = Vector2(-Layout.W, -Layout.H) / 2.0
-	bg.size = Vector2(Layout.W, Layout.H)
-	add_child(bg)
+	# 夜色山海（index.html #bg 对齐）：夜空渐变/月晕/云絮/远山/雾带/星尘/颗粒
+	add_child(MenuBackdrop.new())
 
 
 func _seal_label(text: String, size: int, color: Color) -> Label:
@@ -110,6 +134,7 @@ func _menu_button(text: String, y: float, enabled: bool) -> Button:
 	b.add_theme_stylebox_override("pressed", _panel_style(Palette.INK[900], Palette.GILT["base"]))
 	b.add_theme_stylebox_override("disabled", _panel_style(Palette.INK[900], Palette.INK[600]))
 	b.focus_mode = Control.FOCUS_NONE
+	MicroFx.hook(b)
 	return b
 
 

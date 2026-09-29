@@ -306,3 +306,32 @@ Node 入树、产品后台任务放场景生命周期（boot），不放 autoloa
    ../scripts、../docs 一律零改动；唯一接触方式是只读 import。
 2. godot/ 自含 node 工具链（自己的 package.json/node_modules）。
 3. 数据单向：../src/data + ../src/core/config → data/spec.json；Godot 侧永不反向引用。
+
+## 2.1.0 视觉质感升级（2026-09-29，第十四轮发令）
+
+- **判例：质感差距 ≠ 功能差距**。对照 TS 树逐面盘点后确认功能面（拖拽/侦查/撤销/器匣/
+  战报/快捷键 D·F·E·Space·Z·1-5·Esc）早已对齐，「太草稿」的真实根源是三件：特效用
+  draw_circle 硬边几何（web 是烘焙纹理 × ADD 发光叠加）、无全局氛围层（宣纸颗粒/环境
+  粒子/转场），以及一次性的稀有时刻没有专属演出（三星五费）。修质感不修功能，对拍
+  门禁同数通过即是「零平衡扰动」的证明。
+- **判例：程序化纹理的线程边界**。FxAtlas 逐像素 Image 生成可入 WorkerThreadPool，
+  但 ImageTexture.create_from_image 必须主线程 —— 折衷：boot 序章黑屏期主线程一次
+  prewarm（~250ms 不可感知），对局首帧 worst 从 271ms 收敛为探针噪声。
+- **判例：CPUParticles2D 属性面**。amount_ratio 在 4.7.1 CPUParticles2D 不可写
+  （SCRIPT ERROR 运行期才炸）——加密余烬用 amount = EMBER_AMOUNT × 2；粒子初色
+  随机用 color_initial_ramp（Gradient），`color` 属性是纯 Color 不要混写。
+- **判例：假绿三遇**。parse_check 的 PARSE_ALL_OK 第三次在真 Parse Error 前失守
+  （load 返回值不反映）。全树 parse 步的 SCRIPT ERROR 输出扫描兜底是唯一可信线，
+  新增脚本必须经 qa 全量而非单看 parse 步。
+- **判例：Edit 深缩进**。给 5-6 tab 深的块插行时 new_string 多打一个 tab（6 tabs
+  块配 5 tabs else → Unindent/Expected statement 两连报）；修复一律 python 带断言
+  替换 + cat -A 复核，不再裸 Edit。
+
+- **判例：导出体 ≠ 工程内（时序敏感）**。同一份代码工程内跑得好好的，导出体上
+  主线程 ImageTexture 提交撞预热线程 ResourceLoader 直接段错误（verbose 崩点在
+  立绘加载中）。凡「启动期后台 load + 主线程建 GPU 资源」的组合，必须等待收尾——
+  且等待协程要挂 autoload（场景节点会被切换释放，协程静默死亡）。
+- **判例：冒烟必须验收退出码**。2.0.3 的解压冒烟只看 SMOKE_SHOT 打印（假绿）——
+  进程在 quit 后 teardown 段错误（预热任务无 join + static 持 GPU 资源），EXIT=139。
+  修复 = Sess._exit_tree 里 wait_for_task_completion + FxAtlas.release_all。
+  「跑完打印 OK」与「干净退出」是两件事，自动化一律 echo EXIT=$?。

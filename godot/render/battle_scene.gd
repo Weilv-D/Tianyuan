@@ -23,11 +23,15 @@ var _shake_tw: Tween
 var finished := false
 var tick_label: Label
 var speed_buttons: Array = []
+var _atmo: Atmosphere
+var _last_float_at := {}  # 飘字错峰键表（int(x)*2048+int(y) → msec）
 
 
 func _update_speed_buttons() -> void:
 	if fx_layer != null:
 		fx_layer.deco_suppressed = speed > 1.0
+	if _atmo != null:
+		_atmo.deco_suppressed = speed > 1.0
 	for i: int in speed_buttons.size():
 		var b: Button = speed_buttons[i]
 		b.modulate = Color.WHITE if absf(speed - [1.0, 2.0, 4.0][i]) < 0.01 else Color(1, 1, 1, 0.45)
@@ -55,8 +59,19 @@ func _ready() -> void:
 	add_child(float_layer)
 
 	fx_layer = EffectsLayer.new()
+	fx_layer.calm = bool(SaveStore.load_prefs().get("calm", false))
 	fx_layer.z_index = 20
 	board_view.add_child(fx_layer)
+
+	# 战斗氛围：盘面余烬上浮（决赛圈——场上仅余两名玩家——加密转亮朱金）
+	_atmo = Atmosphere.new()
+	board_view.add_child(_atmo)
+	_atmo.setup_area(float(Layout.BOARD_PAD), Layout.CELL * 8.0, Layout.CELL * 8.0, float(Layout.BOARD_SIZE))
+	var alive := 0
+	for pl: Dictionary in match_ref.players:
+		if bool(pl.get("alive", true)):
+			alive += 1
+	_atmo.set_phase("final" if alive <= 2 else "battle")
 
 	tick_label = _label("", 22, Palette.PAPER[300])
 	tick_label.position = Vector2(Layout.W / 2.0 - 60, 66)
@@ -94,6 +109,8 @@ func _ready() -> void:
 	_build_trait_panels(config)
 	# 开战低吟（原版 BattleScene 交战瞬间 warn；BGM battle 心境已由 Sess.go 路由）
 	Sess.sfx.play("warn")
+	# 朱砂开战闪（BattleScene L465 对齐；静观模式由 effects_layer.calm 吞掉）
+	fx_layer.fullscreen_flash(Palette.CINNABAR["light"], 0.8)
 
 
 func _build_trait_panels(cfg: Dictionary) -> void:
@@ -150,12 +167,29 @@ func _build_one_trait_panel(pos: Vector2, title: String, who: String, accent: Co
 
 
 func _draw_bg() -> void:
-	var bg := ColorRect.new()
-	bg.color = Palette.INK[950]
+	# 夜空渐变 + 远山（game_scene 同语；战斗氛围更深）
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.6, 1.0])
+	g.colors = PackedColorArray([Palette.INK[950], Palette.INK[900], Palette.INK[800]])
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill_from = Vector2(0.5, 0.0)
+	tex.fill_to = Vector2(0.5, 1.0)
+	tex.width = 32
+	tex.height = 256
+	var bg := TextureRect.new()
+	bg.texture = tex
 	bg.position = Vector2.ZERO
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.z_index = -10
 	add_child(bg)
+	var m1 := MenuBackdrop.make_mountain(Palette.INK[800], 0.55, Layout.H - 90.0, 130.0, 10.0, 51)
+	m1.z_index = -9
+	add_child(m1)
+	var m2 := MenuBackdrop.make_mountain(Palette.INK[850], 0.8, Layout.H - 20.0, 170.0, 7.0, 97)
+	m2.z_index = -8
+	add_child(m2)
+	Atmosphere.dress(self, Layout.W, Layout.H)
 
 
 func _process(delta: float) -> void:
@@ -261,12 +295,19 @@ func _on_event(e: Dictionary) -> void:
 			if v2 != null:
 				v2.play_hit()
 			var crit := bool(e.get("crit", false))
-			var dmg_kind := String(e.get("kind", ""))
-			var tier: String = "crit" if crit else ("skill" if dmg_kind == "skill" else "normal")
-			var dmg_c := _dmg_color(e)
-			if dmg_kind == "true":
-				tier = "true"
-				dmg_c = Palette.DAMAGE_COLOR["true"]
+			var dmg_kind := String(e.get("type", ""))
+			var src := String(e.get("source", "attack"))
+			# 飘字分级对齐 DamageText.ts：dot 两系 / 技能系 / 暴击 / 处决（击杀且伤>0 最高优先）
+			var tier: String = "normal"
+			if src == "dot":
+				tier = "dotBleed" if dmg_kind == "true" else "dotBurn"
+			elif src == "skill":
+				tier = "true" if dmg_kind == "true" else "skill"
+			if crit and src == "attack":
+				tier = "crit"
+			if bool(e.get("kill", false)) and float(e.get("amount", 0.0)) > 0.0:
+				tier = "execute"
+			var dmg_c := _dmg_color(tier, crit)
 			_float_text(e, e.get("amount", 0.0), dmg_c, "", tier)
 			# 命中特效：普攻 impact（crit 参数），法伤走 hue=2
 			var fx_src = _unit_by_uid(int(e.get("uid", -1)))
@@ -274,7 +315,7 @@ func _on_event(e: Dictionary) -> void:
 				var tgt_fx = _unit_by_uid(int(e.get("targetUid", -1)))
 				var fpos: Vector2 = board_view.cell_center(tgt_fx.cell.x, tgt_fx.cell.y) if tgt_fx != null else Vector2.ZERO
 				fx_layer.play({ "kind": "impact", "pos": fpos, "tint": dmg_c,
-					"params": { "crit": 1.0 if crit else 0.0, "hue": 2.0 if String(e.get("type", "")) == "magic" else 0.0 } })
+					"params": { "crit": 1.0 if crit else 0.0, "hue": 2.0 if dmg_kind == "magic" else 0.0 } })
 		"heal":
 			_float_text(e, e.get("amount", 0.0), Palette.SPIRIT["light"], "+", "heal")
 			if speed <= 1.0:
@@ -384,14 +425,21 @@ func _unit_by_uid(uid: int):
 	return null
 
 
-func _dmg_color(e: Dictionary) -> Color:
-	if bool(e.get("crit", false)):
-		return Palette.DAMAGE_COLOR["crit"]
-	match String(e.get("type", "physical")):
-		"magic":
+## 飘字分色（DamageText.ts STYLE 表：等级 → 语义色）
+func _dmg_color(tier: String, _crit := false) -> Color:
+	match tier:
+		"crit":
+			return Palette.DAMAGE_COLOR["crit"]
+		"skill":
 			return Palette.DAMAGE_COLOR["magic"]
 		"true":
 			return Palette.DAMAGE_COLOR["true"]
+		"execute":
+			return Palette.GILT["glow"]
+		"dotBurn":
+			return Palette.EMBER["light"]
+		"dotBleed":
+			return Palette.CINNABAR["base"]
 	return Palette.DAMAGE_COLOR["physical"]
 
 
@@ -399,17 +447,23 @@ func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = ""
 	var u = _unit_by_uid(int(e.get("targetUid", e.get("uid", -1))))
 	if u == null:
 		return
-	# 分级参数（DamageText.ts：size/rise/life/pop；dot 两级 16px）
+	# 分级参数（DamageText.ts：size/rise/life/pop/hold/glow/shake）
 	var size := 20
 	var rise := 34.0
 	var life := 0.72
 	var pop := 1.15
+	var hold := false
+	var glow := false
+	var shake := false
 	match tier:
 		"crit":
 			size = 32
 			rise = 46.0
 			life = 0.9
 			pop = 1.7
+			hold = true
+			glow = true
+			shake = true
 		"skill":
 			size = 26
 			rise = 40.0
@@ -420,6 +474,14 @@ func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = ""
 			rise = 42.0
 			life = 0.86
 			pop = 1.4
+		"execute":
+			size = 36
+			rise = 54.0
+			life = 1.1
+			pop = 2.0
+			hold = true
+			glow = true
+			shake = true
 		"heal":
 			size = 22
 			rise = 40.0
@@ -429,14 +491,25 @@ func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = ""
 			rise = 26.0
 			life = 0.62
 			pop = 1.05
+	var anchor := _cell_pos(u)
+	# 错峰：同一目标 110ms 内的飘字横向错开（同目标叠字防粘连；键表超 256 淘汰最旧）
+	var now := Time.get_ticks_msec()
+	var fkey := int(anchor.x) * 2048 + int(anchor.y)
+	var stacked := now - int(_last_float_at.get(fkey, -10000)) < 110
+	_last_float_at[fkey] = now
+	if _last_float_at.size() > 256:
+		_last_float_at.erase(_last_float_at.keys()[0])
 	var l := Label.new()
 	l.text = "%s%d" % [prefix, int(amount)]
 	l.add_theme_font_override("font", Sess.body_font)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
-	l.add_theme_color_override("font_outline_color", Palette.INK[950])
-	l.add_theme_constant_override("outline_size", 4)
-	l.position = _cell_pos(u) + Vector2(-10 + randf_range(-6.0, 6.0), -90)
+	l.add_theme_color_override("font_outline_color", Palette.DAMAGE_OUTLINE.get(tier, Palette.DAMAGE_OUTLINE["normal"]))
+	l.add_theme_constant_override("outline_size", 6 if glow else 4)
+	if glow:
+		l.material = FxAtlas.add_material()
+	l.position = anchor + Vector2(randf_range(-23.0, 23.0) if stacked else randf_range(-6.0, 6.0), -90)
+	l.rotation = randf_range(-0.07, 0.07) if stacked else 0.0
 	l.z_index = 60
 	l.pivot_offset = Vector2(8, 12)
 	l.scale = Vector2(pop, pop)
@@ -445,7 +518,12 @@ func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = ""
 	tw.set_parallel(true)
 	tw.tween_property(l, "position:y", l.position.y - rise, life).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(l, "scale", Vector2.ONE, 0.09).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, life * 0.45).set_delay(life * 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(l, "modulate:a", 0.0, life * 0.45).set_delay(life * (0.62 if hold else 0.55)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	if shake:
+		# 暴击/处决：落字横抖（顿帧式冲击）
+		var sx := l.position.x
+		tw.tween_property(l, "position:x", sx + randf_range(-5.0, 5.0), 0.06).set_delay(0.03)
+		tw.tween_property(l, "position:x", sx, 0.06).set_delay(0.09)
 	tw.chain().tween_callback(l.queue_free)
 
 
@@ -468,6 +546,7 @@ func _on_battle_end() -> void:
 	panel.size = Vector2(560, 300)
 	panel.position = Vector2((Layout.W - 560) / 2.0, (Layout.H - 300) / 2.0)
 	dim.add_child(panel)
+	MicroFx.enter(panel)
 	var title_txt := "胜" if winner == viewer_team else ("败" if winner >= 0 else "平")
 	var title := _label(title_txt, 64, Palette.GILT["light"] if winner == viewer_team else Palette.CINNABAR["light"], Sess.seal_font)
 	title.position = Vector2(0, 30)

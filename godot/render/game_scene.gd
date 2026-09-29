@@ -73,6 +73,8 @@ var detail_pinned_iid := -1
 var detail_hover_iid := -1
 var press_pos := Vector2.ZERO  # 点击→钉卡判定（<8px 视为点选而非拖拽）
 var toast_label: Label = null
+var _atmo: Atmosphere  # 盘面灵尘氛围（战斗期切余烬由战斗场景自管）
+var _top_last := {}  # 顶栏数值前值（金币跳字用）
 
 
 func _ready() -> void:
@@ -118,12 +120,30 @@ func _ready() -> void:
 # ── 静态构建 ──────────────────────────────────────────────
 
 func _draw_bg() -> void:
-	var bg := ColorRect.new()
-	bg.color = Palette.INK[950]
+	# 夜空渐变（上深渊 → 地平线微亮）+ 远山两层（menu 山海同语、压暗到位）
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.6, 1.0])
+	g.colors = PackedColorArray([Palette.INK[950], Palette.INK[900], Palette.INK[800]])
+	var tex := GradientTexture2D.new()
+	tex.gradient = g
+	tex.fill_from = Vector2(0.5, 0.0)
+	tex.fill_to = Vector2(0.5, 1.0)
+	tex.width = 32
+	tex.height = 256
+	var bg := TextureRect.new()
+	bg.texture = tex
 	bg.position = Vector2.ZERO
 	bg.size = Vector2(Layout.W, Layout.H)
 	bg.z_index = -10
 	add_child(bg)
+	var m1 := MenuBackdrop.make_mountain(Palette.INK[800], 0.6, Layout.H - 96.0, 130.0, 10.0, 51)
+	m1.z_index = -9
+	add_child(m1)
+	var m2 := MenuBackdrop.make_mountain(Palette.INK[850], 0.85, Layout.H - 24.0, 170.0, 7.0, 97)
+	m2.z_index = -8
+	add_child(m2)
+	# 质感底座：全屏宣纸颗粒（0.02 —— 数码感的天敌；鼠标穿透）
+	Atmosphere.dress(self, Layout.W, Layout.H)
 
 
 func _label(text: String, size: int, color: Color, font = null) -> Label:
@@ -219,6 +239,11 @@ func _build_board() -> void:
 	board_view = BoardView.new()
 	board_view.position = Vector2(Layout.BOARD_X, Layout.BOARD_Y)
 	add_child(board_view)
+	# 盘面氛围：灵尘自盘底缓浮（BoardView.motes 同语言；战斗期由开战流程切余烬）
+	_atmo = Atmosphere.new()
+	board_view.add_child(_atmo)
+	_atmo.setup_area(float(Layout.BOARD_PAD), Layout.CELL * 8.0, Layout.CELL * 8.0, float(Layout.BOARD_SIZE))
+	_atmo.set_phase("prep")
 
 
 func _build_bench() -> void:
@@ -280,6 +305,7 @@ func _build_action_bar() -> void:
 		b.add_theme_color_override("font_color", Palette.PAPER[100])
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(d[3] as Callable)
+		MicroFx.hook(b)
 		add_child(b)
 
 
@@ -308,6 +334,7 @@ func _build_phase_strip() -> void:
 	fight.add_theme_color_override("font_color", Palette.PAPER[100])
 	fight.focus_mode = Control.FOCUS_NONE
 	fight.pressed.connect(_start_battle_phase)
+	MicroFx.hook(fight)
 	add_child(fight)
 
 
@@ -453,7 +480,11 @@ func refresh_all() -> void:
 	# spec 调 INCOME_BASE 时预告必须跟着变，否则显示与实际收入静默背离）
 	(labels["round"] as Label).text = str(match_ref.round)
 	(labels["hp"] as Label).text = str(int(p["hp"]))
-	(labels["gold"] as Label).text = str(int(p["gold"]))
+	# 金币「跳字」：与上次刷新差值大时滚动（MicroFx.roll_number；同值直设）
+	var gold_l := labels["gold"] as Label
+	var gold_now := int(p["gold"])
+	MicroFx.roll_number(gold_l, int(_top_last.get("gold", gold_now)), gold_now)
+	_top_last["gold"] = gold_now
 	(labels["level"] as Label).text = str(int(p["level"]))
 	var inc := int(Spec.c("INCOME_BASE", 5)) + Economy.interest_of(p["gold"]) + Economy.streak_gold(int(p["streak"]))
 	(labels["streak"] as Label).text = "+%d" % inc
@@ -658,6 +689,7 @@ func _check_adventure() -> void:
 	panel.size = Vector2(760, 320)
 	panel.position = Vector2((Layout.W - 760) / 2.0, (Layout.H - 320) / 2.0)
 	dim.add_child(panel)
+	MicroFx.enter(panel)
 	var title := _label("奇 遇 · 择 一", 28, Palette.GILT["light"], Sess.seal_font)
 	title.position = Vector2(0, 20)
 	title.size = Vector2(760, 50)
@@ -1294,6 +1326,7 @@ func _show_round_result() -> void:
 	panel.position = Vector2((Layout.W - 720) / 2.0, (Layout.H - 560) / 2.0)
 	_style_night_panel(panel)
 	dim.add_child(panel)
+	MicroFx.enter(panel)
 	var title := _label("回 合 结 算", 36, Palette.GILT["light"], Sess.seal_font)
 	title.position = Vector2(0, 22)
 	title.size = Vector2(640, 54)
@@ -1429,6 +1462,7 @@ func _open_scout(title: String, sub: String, board: Array) -> void:
 	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
 	_style_night_panel(panel)
 	dim.add_child(panel)
+	MicroFx.enter(panel)
 	var ttl := _label("%s 的阵地" % title, 22, Palette.PAPER[100])
 	ttl.position = Vector2(28, 18)
 	panel.add_child(ttl)
@@ -1520,6 +1554,7 @@ func _show_eliminated() -> void:
 	panel.size = Vector2(560, 420)
 	panel.position = Vector2((Layout.W - 560) / 2.0, (Layout.H - 420) / 2.0)
 	dim.add_child(panel)
+	MicroFx.enter(panel)
 	var title := _label("道 消", 52, Palette.CINNABAR["light"], Sess.seal_font)
 	title.position = Vector2(0, 40)
 	title.size = Vector2(560, 76)
@@ -1600,6 +1635,10 @@ func _detect_merge_sound(before: Dictionary) -> void:
 		# 只有「此前已有同 iid 棋子」的升星才算合成 —— 首次买入（before 无此 iid）
 		# 不鸣（曾误判每次首买都 levelup，与 coin 叠声）
 		if before.has(iid) and star > int(before[iid]):
+			# 升星瞬间：视图白闪 + 金环迸散（任何星级；天命演出只在五费三星追加）
+			var v: UnitView = unit_views.get(iid, null)
+			if v != null:
+				v.flash_star()
 			if star >= 3:
 				var u = GameState.find_unit(match_ref.human(), iid)
 				var cost := 0
@@ -1610,6 +1649,8 @@ func _detect_merge_sound(before: Dictionary) -> void:
 				if cost >= 5:
 					Sess.sfx.play("star3")
 					Sess.sfx.play("skillBig")
+					# 天命之印：三星五费全屏演出（样稿制式；静观模式自动缩短）
+					LegendaryFx.play(self, String(u["defId"]), bool(SaveStore.load_prefs().get("calm", false)))
 				else:
 					Sess.sfx.play("star3")
 			else:
@@ -1915,6 +1956,7 @@ func _toggle_trait_modal() -> void:
 	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
 	_style_night_panel(panel)
 	dim.add_child(panel)
+	MicroFx.enter(panel)
 	var title := _label("羁 绊 全 览", 30, Palette.SPIRIT["light"], Sess.seal_font)
 	title.position = Vector2(0, 20)
 	title.size = Vector2(bw, 44)
