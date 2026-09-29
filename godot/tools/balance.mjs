@@ -58,6 +58,12 @@ CREATE TABLE IF NOT EXISTS unit_stats (
 
 // ── 主流程 ──
 const args = parseArgs(process.argv.slice(2));
+// runs.label 从 project.godot 读版本（曾硬编码 'godot-2.0.2'，发版后入库标签漂移失真）
+const godotVersion = (() => {
+  const t = readFileSync(path.join(GODOT_DIR, 'project.godot'), 'utf8');
+  const m = t.match(/config\/version="([^"]+)"/);
+  return m ? m[1] : 'unknown';
+})();
 const nPerPair = parseInt(args.n ?? '50', 10);
 const seedBase = parseInt(args['seed-base'] ?? String(DEFAULT_SEED_BASE), 10);
 // 单进程默认：M1 实测单进程 ~38 局/s（72 对 × 50 局 ≈ 95s）；多进程冷启动会抢 .godot 缓存锁
@@ -182,7 +188,7 @@ const insRun = db.prepare('INSERT INTO runs (git_head, started_at, finished_at, 
 const info = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: path.join(GODOT_DIR, '..'), encoding: 'utf8' });
 const gitHead = String(info.stdout ?? '').trim();
 const now = new Date().toISOString();
-const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-2.0.3', `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
+const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-' + godotVersion, `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
 const insCfg = db.prepare('INSERT INTO configs (run_id, idx, label, overrides_json) VALUES (?, ?, ?, ?)');
 const cfgIds = [];
 teams.forEach((t, i) => {
