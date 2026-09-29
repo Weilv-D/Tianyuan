@@ -13,6 +13,18 @@ const BAR_W := 44.0
 const HP_BAR_H := 4.5
 const MANA_BAR_H := 3.5
 
+# 投影：52×20 软椭圆、染黑、alpha 0.5，锚定脚位（0,+2）。
+# 与 web src/render/board/UnitView.ts 的 shadow（glow 纹理压扁 setDisplaySize(52,20) /
+# setTint(SHADE) / setAlpha(0.5)，坐标 (0,0)）同值——视觉参数手工同步，非结算数值。
+# 历史事故：旧实现 _soft_circle 的校正偏移（-r,-r·1.3）被 setup 用 (0,2) 覆写，
+# 绘制圆心落到脚位 (+26,+35.8)·scale ≈ 右下方 23~37px——黑圆整体漂浮错位并随
+# hop/突进在格间滑移（用户实机报「脚底黑圆乱飘」），形状还是 52×52 硬边正圆
+# 而非 web 的压扁软椭圆。现改为程序化径向渐变纹理 Sprite2D，一次生成静态复用。
+const SHADOW_W := 52.0
+const SHADOW_H := 20.0
+const SHADOW_ALPHA := 0.5
+static var _shadow_tex: Texture2D
+
 var def_id: String
 var team := 0
 var star := 1
@@ -41,9 +53,12 @@ func setup(p_def_id: String, p_team: int, p_star: int, p_is_beast: bool) -> void
 	is_beast = p_is_beast
 	z_index = 10
 
-	# 投影
-	var shadow := _soft_circle(26.0, Color(Palette.SHADE, 0.45))
+	# 投影（软椭圆，锚脚位；纹理一次生成静态复用）
+	var shadow := Sprite2D.new()
+	shadow.texture = _shadow_texture()
+	shadow.scale = Vector2(SHADOW_W / 64.0, SHADOW_H / 64.0)
 	shadow.position = Vector2(0, 2)
+	shadow.modulate = Color(Palette.SHADE, SHADOW_ALPHA)
 	add_child(shadow)
 
 	# 底座（稀有度色圆环）
@@ -158,15 +173,18 @@ func _process(delta: float) -> void:
 	_portrait.position.y = -float(_portrait.texture.get_height()) * _portrait.scale.y / 2.0 + 6.0 + sin(_bob_t * 2.1 + position.x * 0.02) * 1.1
 
 
-func _soft_circle(r: float, color: Color) -> Node2D:
-	# _FxShape 是 Node2D：没有 Control 式 size 属性（曾误赋值即炸，setup 中途中断
-	# → 立绘/血条/星标全不建，棋盘空壳——2026-09-29 战斗路径首跑实证修复）
-	var n := _FxShape.new()
-	n.kind = 0
-	n.radius = r
-	n.color = color
-	n.position = Vector2(-r, -r * 1.3)
-	return n
+## 投影纹理：64×64 径向渐变（smoothstep 衰减），白底黑染由 Sprite2D modulate 完成
+static func _shadow_texture() -> Texture2D:
+	if _shadow_tex == null:
+		var im := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+		var mid := 31.5
+		for y: int in 64:
+			for x: int in 64:
+				var d: float = Vector2(x + 0.5, y + 0.5).distance_to(Vector2(mid, mid)) / mid
+				var a: float = clampf(1.0 - d, 0.0, 1.0)
+				im.set_pixel(x, y, Color(1, 1, 1, a * a * (3.0 - 2.0 * a)))
+		_shadow_tex = ImageTexture.create_from_image(im)
+	return _shadow_tex
 
 
 func _soft_ring(r: float, color: Color, alpha: float) -> Node2D:

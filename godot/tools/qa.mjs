@@ -51,6 +51,15 @@ function step(name, ok, detail = '') {
 ${r.stderr ?? ''}`), (String(r.stdout).match(/PARSE_FAIL \S+/g) ?? []).join(' '));
 }
 
+// 1c. 性能回归（fx 预算门 / 音效变体池命中——P1 修复的常驻钉）
+{
+  const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/perf_probe.gd'], { encoding: 'utf8', windowsHide: true, timeout: 120_000 });
+  const out_txt = String(r.stdout);
+  const si = out_txt.indexOf('SFX star3 ');
+  const m = si >= 0 ? out_txt.slice(si, out_txt.indexOf(String.fromCharCode(10), si)) : '';
+  step('perf 回归', r.status === 0 && /PERF_PROBE OK/.test(String(r.stdout)), m ? m.trim() : '');
+}
+
 // 2. 规格导出 + 幂等（同源必同产物）
 {
   const run1 = spawnSync(process.execPath, ['--import', 'tsx', 'tools/export_spec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });

@@ -3,7 +3,22 @@ extends Node2D
 ## 之后进 Menu。字体经 Sess 预载（篆体必先于首笔）。取「天」与 TS 版同源
 ## （traitIcons.ts：源字体无「弈」篆形，开屏题字用「天」）。
 
+## 启动预热（仅游戏进程——headless 探针/平衡 worker 不跑主场景，无 teardown 竞态）：
+## 后台线程先纹理（108 张同步解码是图鉴首开 1.1s 冻结/上场 146ms 尖刺的根因，
+## 预载后任何 load 都是缓存命中）再音效（16 配方各 1 变体）
+func _prewarm() -> void:
+	WorkerThreadPool.add_task(func() -> void:
+		for c: Dictionary in Spec.champions:
+			ResourceLoader.load("res://assets/pieces/%s.png" % String(c["id"]), "Texture2D")
+		for it: Dictionary in Spec.items:
+			ResourceLoader.load("res://assets/items/%s.png" % String(it["id"]), "Texture2D")
+		Sess.sfx.prewarm_sounds([
+			"coin", "ui", "uiBig", "warn", "levelup", "star3", "skillBig",
+			"shoot", "heal", "shield", "cast", "death", "victory", "defeat"]))
+
+
 func _ready() -> void:
+	_prewarm()
 	# 实机冒烟：--autostart 跳过序章直入对局（TS ?autostart=1 先例）。
 	# 必须转发既有 scene_data —— Sess.go 的 data 参数默认空字典，不传会把
 	# _setup_smoke 放进去的 match 清空，game_scene 拿不到对局弹回菜单

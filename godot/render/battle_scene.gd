@@ -26,6 +26,8 @@ var speed_buttons: Array = []
 
 
 func _update_speed_buttons() -> void:
+	if fx_layer != null:
+		fx_layer.deco_suppressed = speed > 1.0
 	for i: int in speed_buttons.size():
 		var b: Button = speed_buttons[i]
 		b.modulate = Color.WHITE if absf(speed - [1.0, 2.0, 4.0][i]) < 0.01 else Color(1, 1, 1, 0.45)

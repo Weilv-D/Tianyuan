@@ -11,6 +11,12 @@ var shake_accum := 0.0
 var _gen := 0
 var _strays: Array = []
 
+## 渲染预算：存活 fx 节点超帽后跳过装饰件（墨点/火花，单次命中 ~16-21 节点的主要
+## 构成；实测峰值 1×=224 / 4×=397）——主体 glow/ring 保留，命中感知不丢
+const FX_BUDGET := 140
+## 倍速下装饰抑制（4× 此前只关声音不关视觉）
+var deco_suppressed := false
+
 
 ## 色彩：params.hue → FX_TINTS → fallback（对齐 tintOf）
 func _tint_of(r: Dictionary, fallback: Color) -> Color:
@@ -88,6 +94,8 @@ func _glow(pos: Vector2, s0: float, s1: float, dur: float, color: Color, a0: flo
 
 
 func _spark(from: Vector2, to: Vector2, width: float, dur: float, color: Color, a0: float = 0.8) -> Node2D:
+	if deco_suppressed or _strays.size() >= FX_BUDGET:
+		return _Fx.new()
 	var n := _Fx.new()
 	n.kind = 2
 	n.color = Color(color, a0)
@@ -106,6 +114,8 @@ func _spark(from: Vector2, to: Vector2, width: float, dur: float, color: Color, 
 
 ## 墨点迸溅（inkDot 粒子语义；手动节点池替代 Phaser 粒子发射器）
 func _burst_dots(pos: Vector2, count: int, color: Color, speed: float, scale_v: float = 0.2) -> void:
+	if deco_suppressed or _strays.size() >= FX_BUDGET:
+		return
 	for i: int in count:
 		var n := _Fx.new()
 		n.kind = 3

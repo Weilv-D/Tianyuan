@@ -182,7 +182,7 @@ const insRun = db.prepare('INSERT INTO runs (git_head, started_at, finished_at, 
 const info = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: path.join(GODOT_DIR, '..'), encoding: 'utf8' });
 const gitHead = String(info.stdout ?? '').trim();
 const now = new Date().toISOString();
-const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-2.0.2', `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
+const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-2.0.3', `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
 const insCfg = db.prepare('INSERT INTO configs (run_id, idx, label, overrides_json) VALUES (?, ?, ?, ?)');
 const cfgIds = [];
 teams.forEach((t, i) => {

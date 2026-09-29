@@ -1555,6 +1555,8 @@ func _style_action_button(b: Button) -> void:
 
 ## 玩家淘汰后把剩下的回合快进完，给出最终名次（原版 fastForward 同回路）
 func _fast_forward_after_death() -> void:
+	# 每回合让渲染一帧：内核结算 ~239ms/回合，同步跑完 ≈5-6s 整窗无响应
+	_toast("推演中…")
 	var guard := 0
 	while not match_ref.is_over() and guard < 60:
 		match_ref.begin_round()
@@ -1563,6 +1565,7 @@ func _fast_forward_after_death() -> void:
 		match_ref.settle_round()
 		match_ref.end_round()
 		guard += 1
+		await get_tree().process_frame
 	Sess.go("res://render/result.tscn", { "match": match_ref })
 
 

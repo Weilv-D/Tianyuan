@@ -80,10 +80,22 @@ func _run_smoke(spec_txt: String) -> void:
 	var frames := int(spec[1]) if spec.size() > 1 else 120
 	var keyd := spec.size() > 2 and spec[2] == "keyd"
 	var hover := spec.size() > 2 and spec[2] == "hover"
+	var perf := spec.size() > 2 and spec[2] == "perf"
+	var frame_ms: Array = []
+	var fx_peak := 0
 	var shop_before := ""
 	var gold_before := -1.0
 	for i: int in frames:
+		var t0 := Time.get_ticks_usec()
 		await get_tree().process_frame
+		if perf:
+			frame_ms.append(float(Time.get_ticks_usec() - t0) / 1000.0)
+			var sc = get_tree().current_scene
+			var fx = sc.get("fx_layer") if sc != null else null
+			if fx != null:
+				fx_peak = maxi(fx_peak, fx.get_child_count())
+			elif i == 60:
+				print("PERF_DIAG scene=", sc.name if sc != null else "null", " has_fx=", fx != null)
 		if hover and i == 30:
 			# 塞一枚备战棋子并刷新，给悬停详情卡一个命中目标
 			var hm: Match = scene_data.get("match", null)
@@ -153,6 +165,15 @@ func _run_smoke(spec_txt: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png("%s/%s.png" % [dir, tag])
 	print("SMOKE_SHOT ", tag)
+	if perf and frame_ms.size() > 4:
+		var sorted_ms := frame_ms.duplicate()
+		sorted_ms.sort()
+		var avg := 0.0
+		for v: float in sorted_ms:
+			avg += v
+		avg /= sorted_ms.size()
+		print("SMOKE_PERF avg=%.1fms worst=%.1fms p95=%.1fms fx_peak=%d" % [
+			avg, sorted_ms[-1], sorted_ms[int(sorted_ms.size() * 0.95)], fx_peak])
 	if keyd:
 		var m2: Match = scene_data.get("match", null)
 		if m2 == null:

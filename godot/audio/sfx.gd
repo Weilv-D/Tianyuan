@@ -8,7 +8,17 @@ extends Node
 const RATE := 22050
 ## 同时在响的声部上限（弹道/命中连发的节点堆积防线）
 const MAX_VOICES := 24
+## 配方变体池上限：play() 每次重掷 pan/音高 jitter，轮播多变体避免固定音色机械化；
+## 首次同步合成 1 个（首载不退化），命中后台补合成至满
+const VARIANTS_PER_SOUND := 3
 const PENTATONIC := [0, 2, 4, 7, 9]
+
+## 配方变体池（name → 变体 WAV 数组）：首播同步合成 1 变体（首载不退化），
+## 命中轮播 + 后台用本次重掷参数补合成至满——star3 单次 79.5ms 的主线程
+## 逐样本合成从「每次播放」降为「每配方每变体一次」
+var _pool := {}
+var _pool_robin := {}
+var _pool_backfill := {}
 const ROOT_HZ := 130.81
 
 # 原版音效面里走 UI 总线的名字（其余全部走 SFX）
@@ -16,6 +26,14 @@ const UI_NAMES := {"coin": true, "ui": true, "uiBig": true, "warn": true}
 
 
 func play(sound_name: String) -> void:
+	var layers: Array = _layers_for(sound_name)
+	if layers.is_empty():
+		return
+	_emit("UI" if UI_NAMES.get(sound_name, false) else "SFX", layers, sound_name)
+
+
+## 配方组装（含每次重掷的 pan/音高 jitter）——play 与预热共用
+func _layers_for(sound_name: String) -> Array:
 	var layers: Array = []
 	var p := randf() * 0.36 - 0.18
 	var k := 1.0
@@ -94,8 +112,16 @@ func play(sound_name: String) -> void:
 				layers.append(["tone", _note_hz(4 - i, 0), 0.6, "sine", 0.13, i * 0.13, 0.012, 1600.0, 0.6, 0.0])
 			layers.append(["tone", 54.0, 1.2, "sine", 0.26, 0.5, 0.02, 600.0, 0.8, 0.0])
 		_:
-			return
-	_emit("UI" if UI_NAMES.get(sound_name, false) else "SFX", layers)
+			return []
+	return layers
+
+
+## 同步预热（挂 boot 后台线程，进程级一次）：16 具名配方各合成 1 变体入池——
+## 对局首批 cast/hit/shoot 不再吃首载合成尖刺（探针也走此入口避免 worker 竞态）
+func prewarm_sounds(names: Array) -> void:
+	for n: String in names:
+		if not _pool.has(n) or (_pool[n] as Array).is_empty():
+			_pool[n] = [_render_wav(_layers_for(n))]
 
 
 ## 开战弦响（原版 GameScene:803 徵音起手 / LegendaryFx:94 宫音落印同款）
@@ -124,7 +150,42 @@ func _layer_end(l: Array) -> float:
 
 ## 渲染发声：全部层混进一条立体声 WAV，单播放器挂对应总线。
 ## 累积缓冲用 Array（引用语义 —— Packed* 是值类型，传参后写入不落回）。
-func _emit(bus: String, layers: Array) -> void:
+func _emit(bus: String, layers: Array, sound_name := "") -> void:
+	var wav: AudioStreamWAV
+	if sound_name == "":
+		wav = _render_wav(layers)
+	else:
+		var pool: Array = _pool.get_or_add(sound_name, [])
+		if pool.is_empty():
+			wav = _render_wav(layers)
+			pool.append(wav)
+		else:
+			var idx: int = int(_pool_robin.get_or_add(sound_name, 0)) % pool.size()
+			_pool_robin[sound_name] = idx + 1
+			wav = pool[idx]
+			# 本次重掷的 layers 不浪费：后台合成入池（变体轮播防音色机械化）
+			if pool.size() < VARIANTS_PER_SOUND and not bool(_pool_backfill.get(sound_name, false)):
+				_pool_backfill[sound_name] = true
+				_backfill_async(sound_name, layers)
+	_spawn_voice(bus, wav)
+
+
+## 后台补变体：合成纯计算（无场景树访问），完成后回主线程入库
+func _backfill_async(sound_name: String, layers: Array) -> void:
+	WorkerThreadPool.add_task(func() -> void:
+		var w := _render_wav(layers)
+		call_deferred("_backfill_done", sound_name, w))
+
+
+func _backfill_done(sound_name: String, w: AudioStreamWAV) -> void:
+	_pool_backfill[sound_name] = false
+	var pool: Array = _pool.get_or_add(sound_name, [])
+	if pool.size() < VARIANTS_PER_SOUND:
+		pool.append(w)
+
+
+## 纯合成（线程可入；无 IO/树访问）
+func _render_wav(layers: Array) -> AudioStreamWAV:
 	var total := 0.0
 	for l: Array in layers:
 		total = maxf(total, _layer_end(l))
@@ -144,13 +205,17 @@ func _emit(bus: String, layers: Array) -> void:
 	for i: int in n:
 		data.encode_s16(i * 4, int(clampf(float(left[i]), -1.0, 1.0) * 32767.0))
 		data.encode_s16(i * 4 + 2, int(clampf(float(right[i]), -1.0, 1.0) * 32767.0))
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = RATE
-	wav.stereo = true
-	wav.data = data
-	# 并发上限：大规模团战弹道连发会在同帧堆出数十个 player（节点+整条 WAV）。
-	# 超限强停最旧声部让位（remove_child 立即腾位，queue_free 帧末回收节点本体）
+	var out := AudioStreamWAV.new()
+	out.format = AudioStreamWAV.FORMAT_16_BITS
+	out.mix_rate = RATE
+	out.stereo = true
+	out.data = data
+	return out
+
+
+## 起声部：变体池 WAV 可多 player 共享；并发上限（超限强停最旧声部让位——
+## remove_child 立即腾位，queue_free 帧末回收节点本体）
+func _spawn_voice(bus: String, wav: AudioStreamWAV) -> void:
 	while get_child_count() >= MAX_VOICES:
 		var oldest := get_child(0) as AudioStreamPlayer
 		if oldest == null:
