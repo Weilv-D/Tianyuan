@@ -20,6 +20,9 @@ const PANEL_TITLE_H := 40
 const HEADER_H := 92
 const NAV_X := 48
 const NAV_GAP := 96
+## 顶栏五数值右对齐分列 1340..1780；金币列位（飞币锚与 stats 行共用——
+## 双写字面量会在调列位时静默错锚，2.4.1 收敛）
+const TOP_STAT_GOLD_X := 1450
 
 # ── 大漆盘（8×8，准备与战斗共用）──
 const CELL := 72

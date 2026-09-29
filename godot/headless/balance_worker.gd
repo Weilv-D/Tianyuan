@@ -47,6 +47,7 @@ func _run_pairs(msg: Dictionary) -> Dictionary:
 	var results: Array = []
 	var agg := {}
 	for job: Dictionary in jobs:
+		var pair_t0 := Time.get_ticks_msec()
 		var pair_idx := int(job.get("pairIdx", 0))
 		var k0 := int(job.get("k0", 0))
 		var n := int(job.get("n", 0))
@@ -77,8 +78,9 @@ func _run_pairs(msg: Dictionary) -> Dictionary:
 			"pairIdx": pair_idx, "wins0": wins0, "wins1": wins1, "draws": draws,
 			"ticksTotal": ticks_total, "timeouts": timeouts,
 		})
-		# 心跳：每完成一个配对打一行 stderr（挂死时最后心跳即卡点定位）
-		printerr("[worker] pair %d done (%dms)" % [pair_idx, Time.get_ticks_usec() / 1000])
+		# 心跳：每完成一个配对打一行 stderr（挂死时最后心跳即卡点定位；打本配对耗时，
+		# 曾误打引擎启动累计 ms——数字庞大且与本配对无关）
+		printerr("[worker] pair %d done (%dms)" % [pair_idx, Time.get_ticks_msec() - pair_t0])
 	var units_out: Array = []
 	for key: String in agg.keys():
 		units_out.append(agg[key])

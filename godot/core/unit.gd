@@ -5,6 +5,10 @@ extends RefCounted
 
 const MAX_SAFE_INT := 9007199254740991.0
 
+## RESIST_CAP 兜底默认值：与 config.ts 真源同值的单一常量（两处调用点共用，
+## spec 改档未重导出时至少两侧同步——2.4.1 审查修复，原为两处各写 220.0）
+const RESIST_CAP_FALLBACK := 220.0
+
 var uid: int
 var entry: Dictionary
 var team: int
@@ -103,7 +107,8 @@ static func create(input: Dictionary) -> Unit:
 	if pow_mult != null and not ParityUtil.js_finite(pow_mult):
 		push_error("非法 powMult: %s（%s）" % [str(pow_mult), str(input.get("defId"))])
 		return null
-	var in_bonus: Dictionary = input.get("bonus", {})
+	var bonus_v: Variant = input.get("bonus", null)
+	var in_bonus: Dictionary = bonus_v if bonus_v is Dictionary else {}
 	for k: String in in_bonus:
 		if not ParityUtil.js_finite(in_bonus[k]):
 			push_error("非法 bonus.%s: %s（%s）" % [k, str(in_bonus[k]), str(input.get("defId"))])
@@ -118,7 +123,8 @@ static func create(input: Dictionary) -> Unit:
 	# unit↔ItemFx 存在 class_name 循环引用（Godot 解析器不支持）：
 	# 装备聚合在这里只能经运行时 load 调用，编译期不出现 ItemFx 标识符
 	var item_fx := load("res://core/items_core.gd")
-	var eff: Dictionary = item_fx.item_effects(input.get("items", []))
+	var items_v: Variant = input.get("items", null)
+	var eff: Dictionary = item_fx.item_effects(items_v if items_v is Array else [])
 	# 装备加成与外部 bonus 同键求和（同 itemEffects 按件求和口径；覆盖会丢装备贡献）
 	var bonus: Dictionary = {}
 	for k: String in eff["bonus"]:
@@ -131,8 +137,9 @@ static func create(input: Dictionary) -> Unit:
 	var legend_hp := Spec.legend("hpMult") if legend else 1.0
 	var legend_pow := Spec.legend("powerMult") if legend else 1.0
 	var elite: bool = int(entry["cost"]) == 4 and star == 3 and not input.get("isMinion", false) and not input.get("monster", false)
-	var elite_hp: float = Spec.cfg.get("T3_ELITE_COST4", {}).get("hpMult", 1.0) if elite else 1.0
-	var elite_pow: float = Spec.cfg.get("T3_ELITE_COST4", {}).get("powerMult", 1.0) if elite else 1.0
+	# 登峰倍率走 Spec.elite()（缺键 push_error，与 legend() 同纪律；旧裸读静默 1.0）
+	var elite_hp: float = Spec.elite("hpMult") if elite else 1.0
+	var elite_pow: float = Spec.elite("powerMult") if elite else 1.0
 	var global_hp := Spec.c("GLOBAL_HP_SCALE", 1.0)
 
 	u.uid = int(input["uid"])
@@ -244,11 +251,11 @@ func eff_aspd() -> float:
 
 
 func eff_armor() -> float:
-	return clampf(base_armor + sum_status("armorUp") - sum_status("armorShred"), 0.0, Spec.c("RESIST_CAP", 220.0))
+	return clampf(base_armor + sum_status("armorUp") - sum_status("armorShred"), 0.0, Spec.c("RESIST_CAP", RESIST_CAP_FALLBACK))
 
 
 func eff_mr() -> float:
-	return clampf(base_mr + sum_status("mrUp") - sum_status("mrShred"), 0.0, Spec.c("RESIST_CAP", 220.0))
+	return clampf(base_mr + sum_status("mrUp") - sum_status("mrShred"), 0.0, Spec.c("RESIST_CAP", RESIST_CAP_FALLBACK))
 
 
 func eff_move_time() -> float:

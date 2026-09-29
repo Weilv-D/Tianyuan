@@ -4,6 +4,11 @@
 class_name Skills
 extends RefCounted
 
+## 固定逻辑 tick（30Hz）：与 battle.gd TICK_RATE 同值的文件级声明。
+## 两处同字面量是有意为之——core 内文件级 const 不可跨文件引用（class_name 环形
+## 依赖），改 tick 率必须双文件同步（对拍门禁的 FNV 摘要会立刻抓出轨）
+const TICK_RATE := 30
+
 
 const DEBUFF_KINDS: Array = [
 	"stun", "silence", "disarm", "slow", "wound",
@@ -332,7 +337,7 @@ static func _init_impls() -> void:
 					if s.kind == String(st["kind"]) and s.src == src_tag:
 						live += 1
 				var max_stacks: Variant = p.get("maxStacks", null)
-				if max_stacks == null or live < int(max_stacks):
+				if max_stacks == null or float(max_stacks) <= 0.0 or live < int(max_stacks):
 					a.add_status(u, u, String(st["kind"]), float(st["dur"]), float(st.get("value", 0.0)), src_tag)
 			state["fired"] = int(state["fired"]) + 1
 			if int(state["fired"]) < shots:
@@ -521,7 +526,7 @@ static func _init_impls() -> void:
 					return
 				for s: Status in u.statuses:
 					if (s.kind == "aspdUp" or s.kind == "atkUp") and s.src == src_tag:
-						s.ticks = int(ParityUtil.js_round(dur * 30.0))
+						s.ticks = int(ParityUtil.js_round(dur * TICK_RATE))
 				a.fx("buffAura", {"uid": u.uid, "params": {"hue": 1.0}}))
 		if p.get("invulnWhileCasting", false):
 			api.add_status(u, u, "invuln", dur, 0.0)
@@ -597,9 +602,10 @@ static func _init_impls() -> void:
 ## 施放技能的统一入口
 static func execute_skill(api, u: Unit) -> void:
 	_init_impls()
-	var spec: Dictionary = u.entry.get("skillSpec", null)
-	if spec == null or spec.is_empty():
+	var spec_v: Variant = u.entry.get("skillSpec", null)
+	if not (spec_v is Dictionary) or (spec_v as Dictionary).is_empty():
 		return
+	var spec: Dictionary = spec_v
 	var impl: Callable = IMPL.get(String(spec["kind"]), Callable())
 	if not impl.is_valid():
 		push_error("未知技能类型: %s（%s）—— champions 与 skills.IMPL 脱节" % [String(spec["kind"]), String(u.entry["id"])])

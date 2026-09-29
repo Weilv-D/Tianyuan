@@ -14,6 +14,10 @@ static func interest_of(gold: float) -> int:
 static func streak_gold(streak: int) -> int:
 	var n := absi(streak)
 	var table: Array = Spec.cfg.get("WIN_STREAK_GOLD", []) if streak > 0 else Spec.cfg.get("LOSE_STREAK_GOLD", [])
+	# 空表守卫：负索引读空数组直接崩（TS 是 undefined→NaN 静默传播）；spec 对账门禁下不可达
+	if table.is_empty():
+		push_error("连胜/连败奖励表缺失（spec 损坏）——按 0 结算")
+		return 0
 	return int(table[min(n, table.size() - 1)])
 
 
@@ -33,6 +37,10 @@ static func xp_to_next(level: int) -> int:
 	if level >= max_level:
 		return 0
 	var table: Array = Spec.cfg.get("XP_TO_NEXT", [])
+	# 空表守卫：负索引读空数组直接崩（TS 是 undefined→NaN 静默传播）；门禁下不可达
+	if table.is_empty():
+		push_error("XP_TO_NEXT 缺失（spec 损坏）——按 0 结算")
+		return 0
 	return int(table[max(0, min(table.size() - 1, level - 1))])
 
 

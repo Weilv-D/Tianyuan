@@ -15,7 +15,7 @@ const DT := 1.0 / 30.0
 const OVERTIME_START_TICK := 30 * TICK_RATE
 # DoT/领域结算间隔：从 Spec 推导（与 TS max(1, round(TICK_RATE / DOT_TICKS_PER_SEC)) 同式），
 # 不落字面量——DOT_TICKS_PER_SEC 调档时间隔与 dt 双真源脱节
-static var EFFECT_INTERVAL := maxi(1, int(round(float(TICK_RATE) / Spec.c("DOT_TICKS_PER_SEC", 2.0))))
+static var EFFECT_INTERVAL := maxi(1, ParityUtil.js_round(TICK_RATE / Spec.c("DOT_TICKS_PER_SEC", 2.0)))
 
 const CONTROL_KINDS: Array = ["stun", "silence", "disarm", "slow", "taunt"]
 const STACKABLE_KINDS: Array = ["aspdUp", "atkUp", "armorUp", "mrUp", "dr"]
@@ -50,7 +50,9 @@ func _bad_input(msg: String) -> void:
 	units.clear()
 	# 步进循环以 finished 为出口：非法输入立刻终局，防驱动方死循环
 	finished = true
-	result = { "winner": -1, "ticks": 0, "timeout": false, "survivors": [], "remainingHpRatio": 0.0 }
+	# 合成 result 与 _finish 同形：survivors 必须是 Dictionary（Array 会让消费方
+	# match.damage_of 的 .get 崩）；winner=-1 为非法哨兵，消费方须按平局早退
+	result = { "winner": -1, "ticks": 0, "timeout": false, "survivors": {}, "remainingHpRatio": 0.0 }
 	push_error(msg)
 
 # 热路径常量缓存（Spec 一次性读取）
@@ -1378,6 +1380,11 @@ func _check_end() -> void:
 
 
 func _finish(winner, timeout: bool) -> void:
+	# 断环：killRenew 的闭包经 u.kill_handlers 捕获 u 自身（u→handlers→closure→u），
+	# Godot 无环回收器，战斗结束后 Unit+闭包泄漏到进程退出（balance 千局长跑累积）。
+	# 终局后击杀链不再触发（TS 同语义），清空安全——2.4.1 审查修复
+	for u: Unit in units:
+		u.kill_handlers.clear()
 	finished = true
 	var survivors := {}
 	var remaining_hp_ratio := {}

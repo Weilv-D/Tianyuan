@@ -29,6 +29,10 @@ var battle_smoke := false
 ## 预载」只压低了概率，未除根 —— 探针门禁的 EXIT 验收钉死此判例）。
 var _prime_queue: Array = []
 var _atlas_done := false
+## 转场进行中（墨晕吞没→换场→淡入）。键盘入口一律短路：转场窗口内按键会在
+## 「结算已跑、phase 未翻」的中间态上做出第二个动作（空格=回合双结算，2.4.1 修复）
+var transitioning := false
+var _fade_tw: Tween = null
 
 ## 启动预载的音效配方（对局首批发音；池填满 VARIANTS_PER_SOUND 变体）
 const PRIME_SOUNDS := [
@@ -324,8 +328,11 @@ func _load_fonts() -> void:
 func _setup_audio_buses() -> void:
 	if bus_ready:
 		return
-	# 三总线：Master → BGM / SFX / UI（混响挂在 SFX；音量由 prefs 起始，M3 占位 0.5/0.75/0.6）
-	for bus_name in ["BGM", "SFX", "UI"]:
+	# 三总线：Master → BGM / SFX / UI（混响挂在 SFX）。音量起始值走 user://prefs.json
+	# （2.4.1 审查修复：原硬编码 0.5/0.75/0.6，用户改音量重启后滑杆显示已存值而总线
+	# 在默认值——静默失效的状态分裂；DEFAULT_PREFS 同值兜底）
+	var prefs: Dictionary = SaveStore.load_prefs()
+	for bus_name: String in ["BGM", "SFX", "UI"]:
 		var idx := AudioServer.bus_count
 		AudioServer.add_bus(idx)
 		AudioServer.set_bus_name(idx, bus_name)
@@ -337,10 +344,19 @@ func _setup_audio_buses() -> void:
 		rev.damping = 0.7
 		rev.wet = 0.12
 		AudioServer.add_bus_effect(sfx, rev)
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("BGM"), linear_to_db(0.5))
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("SFX"), linear_to_db(0.75))
-	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("UI"), linear_to_db(0.6))
+	_apply_prefs_volume(prefs)
 	bus_ready = true
+
+
+## 音量/静音偏好 → 总线（设置面板保存与启动回放共用同一入口）
+func _apply_prefs_volume(prefs: Dictionary) -> void:
+	for pair: Array in [["BGM", "volBgm"], ["SFX", "volSfx"], ["UI", "volUi"]]:
+		var v: Variant = prefs.get(String(pair[1]), null)
+		var lin: float = 0.5 if not ParityUtil.js_finite(v) else clampf(float(v), 0.0, 1.0)
+		AudioServer.set_bus_volume_db(AudioServer.get_bus_index(String(pair[0])),
+			linear_to_db(lin) if lin > 0.0 else linear_to_db(0.0001))
+	var m: Variant = prefs.get("muted", false)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), m == true)
 
 
 ## 场景切换（带数据；对应 Phaser fadeTo）。BGM 心境随场景自动路由
@@ -365,10 +381,18 @@ func _transition_to(path: String) -> void:
 	if _fade == null or not is_inside_tree():
 		get_tree().change_scene_to_file(path)
 		return
+	# 连发 go()：先杀在途转场 tween（两条同写 progress 的补间会互相拉扯目标场景）
+	if _fade_tw != null and _fade_tw.is_valid():
+		_fade_tw.kill()
 	_fade.mouse_filter = Control.MOUSE_FILTER_STOP
+	transitioning = true
 	var mat := _fade.material as ShaderMaterial
 	var tw := create_tween()
+	_fade_tw = tw
 	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("progress", v), 0.0, 1.0, 0.24)
 	tw.tween_callback(func() -> void: get_tree().change_scene_to_file(path))
 	tw.tween_method(func(v: float) -> void: mat.set_shader_parameter("progress", v), 1.0, 0.0, 0.28)
-	tw.tween_callback(func() -> void: _fade.mouse_filter = Control.MOUSE_FILTER_IGNORE)
+	tw.tween_callback(func() -> void:
+		_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		transitioning = false
+		_fade_tw = null)

@@ -28,18 +28,24 @@ static func enter(c: Control, dy := 22.0) -> void:
 	tw.tween_property(c, "position:y", y0 - dy, 0.26).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
-## 数值滚动：label 文本从 from 滚到 to（金币变化「跳字」手感）
+## 数值滚动：label 文本从 from 滚到 to（金币变化「跳字」手感）。
+## tween_method 的插值参数 t 即当前值（from→to 线性），直接格式化——
+## 曾用 carrier 字典存起点却无写入点，动画全程静止后跳变（2.4.1 审查修复）
 static func roll_number(l: Label, from_v: int, to_v: int, fmt := "%d") -> void:
 	if from_v == to_v:
 		l.text = fmt % to_v
 		return
-	var carrier := { "v": float(from_v) }
 	var tw := l.create_tween()
 	tw.tween_method(func(t: float) -> void:
-		l.text = fmt % int(roundf(carrier["v"])), from_v, float(to_v), 0.3)
+		l.text = fmt % int(roundf(t)), from_v, float(to_v), 0.3)
 	tw.tween_callback(func() -> void: l.text = fmt % to_v)
 
 
 static func _scale_to(c: Control, v: float) -> void:
+	# 换向先 kill 旧 tween（快速 hover 进出并发展写 scale；2.4.1 审查修复）
+	var old: Variant = c.get_meta("micro_fx_tw", null)
+	if old != null and (old as Tween).is_valid():
+		(old as Tween).kill()
 	var tw := c.create_tween()
+	c.set_meta("micro_fx_tw", tw)
 	tw.tween_property(c, "scale", Vector2.ONE * v, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

@@ -18,7 +18,7 @@ class_name Artifacts
 ## 浮层面板砚底（引擎默认 Panel 是中性灰 —— 违反「任何颜色必须来自 Palette」红线）。
 ## 形参取 Control：Panel 与 PanelContainer 通吃（覆写点就在 Control 上）
 static func night_panel(p: Control) -> void:
-	p.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97), Color(Palette.GILT["base"], 0.5)))
+	p.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97)))
 
 
 ## 墨玉三态按钮：常 INK850 → 悬 INK700（金字）→ 按下 INK900（金哑）。
@@ -103,6 +103,28 @@ static func glaze_back(w: float, h: float) -> Sprite2D:
 	s.scale = Vector2(w / 128.0, h / 128.0)
 	s.centered = false
 	return s
+
+
+## 文本标签形制（五处散点 _label/_lbl 构造收敛于此——2.4.1 审查修复）。
+## opts: {"font": Font, "align": "center"/"right", "w": 宽, "clip": true, "wrap": true}
+static func label(text: String, size: int, color: Color, opts := {}) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_override("font", opts.get("font", Sess.body_font))
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	if opts.has("w"):
+		l.size = Vector2(float(opts["w"]), l.size.y)
+	var al: String = String(opts.get("align", ""))
+	if al == "center":
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	elif al == "right":
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	if opts.get("clip", false):
+		l.clip_text = true
+	if opts.get("wrap", false):
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
 
 
 ## 出售印形制（66×66 朱砂大方印：金字 + 鎏金内线 + 纸白边）—— 拖拽出售目标

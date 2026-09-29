@@ -1,4 +1,4 @@
-// 生成对拍编解码合成夹具：覆盖全部 17 类事件、可选字段在/缺、零值、分数值、null winner、
+// 生成对拍编解码合成夹具：覆盖全部 16 类事件、可选字段在/缺、零值、分数值、null winner、
 // 乱序 params 键（编码侧必须排序）。产物 data/codec_fixture.json 供 GDScript 侧往返验收。
 // 用法：node --import tsx tools/parity_codec.mjs
 import { writeFileSync, mkdirSync } from 'node:fs';

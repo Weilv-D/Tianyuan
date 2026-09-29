@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { run as runRngParity } from './parity_check.mjs';
 
-const GODOT_EXE = 'C:/WORKSPACE/game/Godot_v4.7.1-stable_win64.exe';
+import { GODOT_EXE } from './godot_exe.mjs';
 // 注意：URL('..') 以 / 结尾，dirname 会再剥一层指到仓库根（实机事故根源），必须 resolve
 const GODOT_DIR = path.resolve(fileURLToPath(new URL('..', import.meta.url))).replaceAll('\\', '/');
 
@@ -63,18 +63,31 @@ ${r.stderr ?? ''}`), (String(r.stdout).match(/PARSE_FAIL \S+/g) ?? []).join(' ')
 // 2. 规格导出 + 幂等（同源必同产物）
 {
   const run1 = spawnSync(process.execPath, ['--import', 'tsx', 'tools/export_spec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
-  const spec1 = readFileSync(path.join(GODOT_DIR, 'data', 'spec.json'));
   const run2 = spawnSync(process.execPath, ['--import', 'tsx', 'tools/export_spec.mjs'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 120_000 });
-  const spec2 = readFileSync(path.join(GODOT_DIR, 'data', 'spec.json'));
+  // spec.json 读取包 try：全新 checkout 缺文件时 ENOENT 未捕获会崩掉整个门禁而非 neat FAIL
+  let spec1, spec2;
+  try {
+    spec1 = readFileSync(path.join(GODOT_DIR, 'data', 'spec.json'));
+    spec2 = readFileSync(path.join(GODOT_DIR, 'data', 'spec.json'));
+  } catch (e) {
+    step('spec 导出+对账', false, 'spec.json 读取失败: ' + e.message);
+    step('spec 幂等', false, 'spec.json 读取失败');
+    spec1 = spec2 = Buffer.alloc(0);
+    if (run1.status === 0) run1.status = 1;
+    if (run2.status === 0) run2.status = 1;
+  }
   step('spec 导出+对账', run1.status === 0 && run2.status === 0, String(run1.stdout).trim());
-  step('spec 幂等', Buffer.compare(spec1, spec2) === 0);
+  step('spec 幂等', spec1.length > 0 && Buffer.compare(spec1, spec2) === 0);
 }
 
 // 3. GdUnit4 单元测试（纯逻辑，无 UI 输入，须 --ignoreHeadlessMode）
 {
   const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '-s', 'res://addons/gdUnit4/bin/GdUnitCmdTool.gd', '-a', 'tests', '--ignoreHeadlessMode'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 180_000 });
   const m = String(r.stdout).match(/(\d+) test cases \| (\d+) errors \| (\d+) failures/);
-  step('GdUnit4 单测', r.status === 0, m ? m[0] : String(r.stderr).split('\n')[0] ?? '');
+  // 零用例判 FAIL：tests 目录失联/加载异常时 GdUnitCmdTool 也退 0——只验 status 是假绿缝
+  const cases = m ? Number(m[1]) : 0;
+  step('GdUnit4 单测', r.status === 0 && cases > 0 && m && Number(m[2]) === 0 && Number(m[3]) === 0,
+    m ? m[0] : String(r.stderr).split('\n')[0] ?? '');
 }
 
 // 4. RNG 跨引擎对拍（默认百万抽样；--quick 时降为十万）
@@ -119,7 +132,7 @@ ${r.stderr ?? ''}`), (String(r.stdout).match(/PARSE_FAIL \S+/g) ?? []).join(' ')
   const quick = process.argv.includes('--quick');
   const r = spawnSync(process.execPath, ['--import', 'tsx', 'tools/balance.mjs', '--', '--pairs=6', '--n=2', '--db=out/balance-qa.db'], { cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
   const ok = r.status === 0 && /配对=6 局=12/.test(String(r.stdout));
-  const m = String(r.stdout).match(/极差 [0-9.]+%/);
+  const m = String(r.stdout).match(/极差 [0-9.]+%|部分矩阵/);
   const detail = m ? m[0] : (String(r.stderr).split('\n')[0] ?? '');
   step('balance 冒烟', ok, detail);
 }

@@ -107,11 +107,10 @@ func _detail(c: Dictionary) -> void:
 
 
 func _lbl(text: String, size: int, color: Color, font = null) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_override("font", font if font != null else Sess.body_font)
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	# 形制库薄包装（六处散点构造收敛——2026-09-29 审查；本地签名保持不变以不动调用面）
+	var l := Artifacts.label(text, size, color)
+	if font != null:
+		l.add_theme_font_override("font", font)
 	return l
 
 

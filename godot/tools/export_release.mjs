@@ -10,12 +10,28 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const GODOT = 'C:/WORKSPACE/game/Godot_v4.7.1-stable_win64.exe';
+import { GODOT_EXE as GODOT } from './godot_exe.mjs';
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHADOW = path.join(tmpdir(), 'bzt-godot-export');
 
-rmSync(SHADOW, { recursive: true, force: true });
+function fail(msg) {
+  // 经 finally 收尾的失败路径：process.exit() 不走异常展开（finally 不执行），
+  // 影子目录会残留数百 MB——2.4.1 审查修复。exitCode + throw 让 finally 清场
+  console.error(msg);
+  process.exitCode = 1;
+  throw new Error(msg);
+}
+
 try {
+  try {
+    rmSync(SHADOW, { recursive: true, force: true });
+  } catch (e) {
+    // 残留句柄/杀软扫描可令 rmSync 抛 EBUSY/EPERM：如实失败并提示手动删除，
+    // 而不是把旧影子目录留在原地让每次运行重复失败
+    console.error(`[export] 旧影子目录删除失败（${e.code ?? e.message}）——请手动删除 ${SHADOW} 后重试`);
+    process.exitCode = 1;
+    throw e;
+  }
   mkdirSync(SHADOW, { recursive: true });
   for (const ent of ['assets', 'audio', 'core', 'game', 'render', 'ui', 'addons', 'redist', '.godot']) {
     const src = path.join(HERE, ent);
@@ -31,8 +47,7 @@ try {
   if (!existsSync(path.join(SHADOW, '.godot'))) {
     // .godot 导入缓存必拷（缺失时全新 import 会崩 0xC0000005）；到这里说明源端就没有，
     // 如实报错退出而不是静默重 import（旧兜底分支既永不触发也无状态检查）
-    console.error('[export] 源工程缺少 .godot 导入缓存——先在编辑器/headless --import 生成');
-    process.exit(1);
+    fail('[export] 源工程缺少 .godot 导入缓存——先在编辑器/headless --import 生成');
   }
   mkdirSync(path.join(SHADOW, 'out'), { recursive: true });
   const r = spawnSync(GODOT, ['--headless', '--path', SHADOW, '--export-release', 'Windows Desktop'], {
@@ -43,8 +58,7 @@ try {
   const errs = (log.match(/^ERROR/gm) ?? []).length;
   console.log(`[export] status=${r.status} errors=${errs} mcp_entries=${mcp}`);
   if (r.status !== 0 || errs > 0 || mcp > 0) {
-    console.error('[export] 影子导出异常——中止拷回');
-    process.exit(1);
+    fail('[export] 影子导出异常——中止拷回');
   }
   const exe = path.join(SHADOW, 'out', 'BaiZhanTianYuan.exe');
   mkdirSync(path.join(HERE, 'out'), { recursive: true });

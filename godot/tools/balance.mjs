@@ -2,7 +2,7 @@
 // 冻结仓——配置组装不是战斗内核，无双实现纪律不破），战斗执行全部走 godot --headless
 // 批次 worker（headless/balance_worker.gd）。CRN 金锁公式与 balance/lib/seeds.ts 逐位一致。
 // SQLite 同表结构（runs/configs/pair_results/unit_stats），node:sqlite 内置。
-// 用法：node --import tsx tools/balance.mjs [--n 50] [--seed-base 20260829] [--workers N] [--db out/balance-gd.db]
+// 用法：node --import tsx tools/balance.mjs [--n=50] [--seed-base 20260829] [--workers N] [--db out/balance-gd.db]
 import { spawnSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { availableParallelism } from 'node:os';
@@ -13,7 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { PRESET_COMPS, buildTeam } from '../../src/game/comp.ts';
 import { GAME_VERSION } from '../../src/version.ts';
 
-const GODOT_EXE = 'C:/WORKSPACE/game/Godot_v4.7.1-stable_win64.exe';
+import { GODOT_EXE } from './godot_exe.mjs';
 const GODOT_DIR = path.resolve(fileURLToPath(new URL('..', import.meta.url))).replaceAll('\\', '/');
 
 function parseArgs(argv) {
@@ -173,22 +173,30 @@ for (const res of allResults) {
   const total = res.wins0 + res.wins1 + res.draws;
   wins[i][j] = { rate: res.wins0 / total, n: total, draws: res.draws, avgTicks: res.ticksTotal / total, timeouts: res.timeouts };
 }
+// 空行（部分矩阵如冒烟 --pairs 只产出 (0,j)）的均值必须是 null 而非 0/0=NaN：
+// NaN 入库会污染 runs.summary_json（实测 balance-qa.db 25/26/27 run 全表 NaN%）
 const rates = teams.map((_, i) => {
   const row = wins[i].filter(Boolean);
-  return row.reduce((a, w) => a + w.rate, 0) / row.length;
+  return row.length ? row.reduce((a, w) => a + w.rate, 0) / row.length : null;
 });
-const standings = teams.map((t, i) => ({ i, label: t.label, rate: rates[i] })).sort((a, b) => b.rate - a.rate);
-const spread = (standings[0].rate - standings[standings.length - 1].rate) * 100;
+const standings = teams.map((t, i) => ({ i, label: t.label, rate: rates[i] })).sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
+const complete = rates.every((r) => r !== null);
+const spread = complete ? (standings[0].rate - standings[standings.length - 1].rate) * 100 : null;
 
 // ── 入库 ──
 mkdirSync(path.dirname(path.resolve(GODOT_DIR, dbPath)), { recursive: true });
 const db = new DatabaseSync(path.resolve(GODOT_DIR, dbPath));
+try {
 db.exec(DDL);
 const insRun = db.prepare('INSERT INTO runs (git_head, started_at, finished_at, command, label, game_version, n_per_pair, seed_base, workers, params_json, summary_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-const info = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: path.join(GODOT_DIR, '..'), encoding: 'utf8' });
-const gitHead = String(info.stdout ?? '').trim();
+// git 头取不到不致命（入库标签降级 unknown），但 spawn 必须限时——挂起会拖死整个门禁
+const info = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: path.join(GODOT_DIR, '..'), encoding: 'utf8', timeout: 10_000 });
+const gitHead = info.status === 0 ? String(info.stdout ?? '').trim() || 'unknown' : 'unknown';
 const now = new Date().toISOString();
-const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-' + godotVersion, `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({ spread: spread.toFixed(1) + '%', standings: standings.map((s) => `${s.label}=${(s.rate * 100).toFixed(1)}%`) })).lastInsertRowid);
+const runId = Number(insRun.run(gitHead, now, now, 'pair', 'godot-' + godotVersion, `${GAME_VERSION}/godot`, nPerPair, seedBase, batches.length, JSON.stringify({ engine: 'godot' }), JSON.stringify({
+  ...(complete ? { spread: spread.toFixed(1) + '%' } : { spread: null, partial: true }),
+  standings: standings.map((s) => `${s.label}=${s.rate === null ? 'N/A' : (s.rate * 100).toFixed(1) + '%'}`),
+})).lastInsertRowid);
 const insCfg = db.prepare('INSERT INTO configs (run_id, idx, label, overrides_json) VALUES (?, ?, ?, ?)');
 const cfgIds = [];
 teams.forEach((t, i) => {
@@ -205,14 +213,19 @@ const insUnit = db.prepare('INSERT OR REPLACE INTO unit_stats (run_id, config_id
 for (const u of unitAgg.values()) {
   insUnit.run(runId, cfgIds[u.compIdx], u.compIdx, u.defId, u.star, u.battles, u.deaths, u.dealt, u.taken, u.healed, u.absorbed, u.casts, u.dealtP, u.dealtM, u.dealtT, u.takenP, u.takenM, u.takenT);
 }
-db.close();
+} finally {
+  db.close();
+}
 
 // ── 报告 ──
 const totalBattles = allResults.reduce((a, r) => a + r.wins0 + r.wins1 + r.draws, 0);
 console.log(`[balance] engine=godot 配对=${allResults.length} 局=${totalBattles} n/对=${nPerPair} seedBase=${seedBase}`);
 console.log(`[balance] godot 计算耗时 ${Math.round(gdMs)}ms（${Math.round(totalBattles / (gdMs / 1000))} 局/秒）· 总墙钟 ${((Date.now() - t0) / 1000).toFixed(1)}s · ${batches.length} 进程`);
-console.log(`[balance] 九套胜率极差 ${spread.toFixed(1)}%`);
+console.log(complete
+  ? `[balance] 九套胜率极差 ${spread.toFixed(1)}%`
+  : '[balance] 部分矩阵（--pairs 冒烟）：存在无对战配置，极差不计算');
 for (const s of standings) {
+  if (s.rate === null) continue;
   console.log(`  ${(s.rate * 100).toFixed(1)}%  ${s.label}`);
 }
 console.log(`[balance] 已入库 ${path.resolve(GODOT_DIR, dbPath)}（runs/configs/pair_results/unit_stats 四表）`);

@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const GODOT_EXE = 'C:/WORKSPACE/game/Godot_v4.7.1-stable_win64.exe';
+import { GODOT_EXE } from './godot_exe.mjs';
 // 注意：URL('..') 以 / 结尾，dirname 会再剥一层指到仓库根（实机事故根源），必须 resolve
 const GODOT_DIR = path.resolve(fileURLToPath(new URL('..', import.meta.url))).replaceAll('\\', '/');
 /** 单次探针硬超时：防个别 Godot 启动僵死拖垮整个门禁（实机教训） */
@@ -42,14 +42,14 @@ function runTs(args) {
   const r = spawnSync(process.execPath, ['--import', 'tsx', 'tools/parity_rng.mjs', '--', ...args], {
     cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: PROBE_TIMEOUT_MS,
   });
-  return extractTag(r.stdout, 'PARITY_JSON') ?? { __error: r.stderr };
+  return extractTag(r.stdout, 'PARITY_JSON') ?? { __error: r.stderr || `ts-probe-failed status=${r.status}` };
 }
 
 function runGd(args) {
   const r = spawnSync(GODOT_EXE, ['--headless', '--path', GODOT_DIR, '--script', 'res://headless/rng_parity.gd', '--', ...args], {
     cwd: GODOT_DIR, encoding: 'utf8', windowsHide: true, timeout: PROBE_TIMEOUT_MS,
   });
-  return extractTag(r.stdout, 'PARITY_JSON') ?? { __error: (r.error?.code ?? '') + String(r.stderr ?? '').slice(0, 300) };
+  return extractTag(r.stdout, 'PARITY_JSON') ?? { __error: ((r.error?.code ?? '') + String(r.stderr ?? '')).trim() || `gd-probe-failed status=${r.status}` };
 }
 
 const FIELDS = ['mode', 'seed', 'draws', 'fnv1a32', 'sha256', 'head', 'tail'];

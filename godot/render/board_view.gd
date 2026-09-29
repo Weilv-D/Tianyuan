@@ -105,8 +105,24 @@ func _build_candle_lights() -> void:
 		t2.tween_property(light, "position:x", float(cfg[0].x) + 5.0, 4.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-## 施法动态光：世界局部坐标处一盏光骤亮再熄（谁在吟唱，光先知道）
+## 施法动态光：世界局部坐标处一盏光骤亮再熄（谁在吟唱，光先知道）。
+## 并发帽 MAX_FLASH_LIGHTS：连发大招时灯光数曾无上界（2D 光照逐像素开销，
+## 2.4.1 修复）——超帽时直接复用最旧活灯的属性续期，不新建
+const MAX_FLASH_LIGHTS := 3
+var _flash_lights: Array = []
+
+
 func flash_light(local_pos: Vector2, color: Color, dur := 0.8) -> void:
+	for l in _flash_lights:
+		if not is_instance_valid(l):
+			continue
+		if (l as PointLight2D).position.distance_to(local_pos) < 24.0:
+			(l as PointLight2D).color = color  # 同格活灯：换色续期而非叠灯
+			return
+	while _flash_lights.size() >= MAX_FLASH_LIGHTS:
+		var oldest: Variant = _flash_lights.pop_front()
+		if oldest != null and is_instance_valid(oldest):
+			(oldest as PointLight2D).queue_free()
 	var light := PointLight2D.new()
 	light.texture = FxAtlas.texture(FxAtlas.GLOW)
 	light.color = color
@@ -115,10 +131,13 @@ func flash_light(local_pos: Vector2, color: Color, dur := 0.8) -> void:
 	light.position = local_pos
 	light.z_index = -2
 	add_child(light)
+	_flash_lights.append(light)
 	var tw := light.create_tween()
 	tw.tween_property(light, "energy", 1.35, dur * 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(light, "energy", 0.0, dur * 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_callback(light.queue_free)
+	tw.tween_callback(func() -> void:
+		_flash_lights.erase(light)
+		light.queue_free())
 
 
 func _draw() -> void:

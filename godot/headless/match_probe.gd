@@ -217,7 +217,10 @@ func _enc_cells(board: Array) -> String:
 			continue
 		var items_txt := ".".join(u["items"])
 		var beast := "1" if u.get("isBeast", false) else "0"
-		var pow_txt := ":" + ParityUtil.f64_hex(float(u["powMult"])) if u.has("powMult") else ""
+		# 判据与 TS 对齐（!= null）：显式 JSON null 的键视为缺（has 判据会把 null
+		# 编码成 0.0 的 hex——潜伏分叉点；2.4.1 修复）
+		var pow_v: Variant = u.get("powMult", null)
+		var pow_txt := ":" + ParityUtil.f64_hex(float(pow_v)) if pow_v != null else ""
 		parts.append("%d:%d:%s:%d:%s:%s%s" % [i, int(u["iid"]), u["defId"], int(u["star"]), items_txt, beast, pow_txt])
 	if parts.is_empty():
 		return "-"

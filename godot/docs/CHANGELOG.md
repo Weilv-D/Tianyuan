@@ -1,5 +1,115 @@
 # 夜宴 · Godot 版变更日志（版本线 2.x）
 
+## 2.4.1（2026-09-29，第十五轮全库深度审查收敛）
+
+对 2.4.0 的全部 60 个代码文件（约 16.1k 行）做一次系统、逐文件的深度审查：六路并行
+只读审查（core 内核上下半 / 对局层 / 准备场景 / 渲染其余 / 工具链测试数据）逐面覆盖
+数值平衡严谨性、代码可读性、模块划分、错误处理、资源与句柄生命周期五个维度，高危结论
+全部回源码核实后才动手。发现 P1×6、P2×18、P3 一批；误报裁定十五项（既有判例的重复、
+web 同款口径、TS 无异常系统的必然降级等）。本版为纯质量收敛轮：零玩法改动、零数值改动
+（对拍门禁同数通过即证）。
+
+### 审查发现的结构性分布
+
+问题不散布在语法层，而集中在三类「移植副产物」：其一，TypeScript 的异常/真值语义在
+GDScript 无异常系统里的降级点（try/catch 承诺、truthy 判空、throw 口径的注释失真）；
+其二，静态生命周期与场景生命周期的脱耦（标志锁、闭包环、转场窗口）；其三，双真源与
+散点构造在新体制（Spec 单一消费口、Artifacts 形制库）建成后的残留。
+
+### 功能缺陷修复（P1）
+
+- **羁绊悬停笺文字叠压**：笺是 PanelContainer 却直挂三组 Label——容器把全部子件拉伸
+  到同一矩形，效果文案互相覆盖，`rail_popup_layout` 的行位从未生效。改 MarginContainer
+  +VBox 纵排，与成员卡同构（该判例在成员卡注释里有记载，笺上是复发）。
+- **点选钉卡的出售带首次必不出现**：早退门按 iid 判「已显示」，但 `_toggle_pin` 先把
+  pinned 标志置上再调 `_show_detail`——悬停卡必在，恒真早退。详情卡改记「iid+模式」
+  双关键字，悬停卡与钉住卡不再互冒。
+- **转场墨晕期间键盘无闸门**：`_transition_to` 的 fade 只挡鼠标，键盘走
+  `_unhandled_key_input` 不经 GUI——0.24s 转场窗口内空格会令开战二次结算（pairings
+  二次重掷、全员收入扣血翻倍）。Sess 增 `transitioning` 标志，键盘入口首行短路；
+  开战入口另置在途标志双保险，转场 tween 连发先 kill。
+- **金币滚动动画失效**：`MicroFx.roll_number` 的 `tween_method` 回调无视插值参数、
+  读从未写入的 carrier 字典——「跳字滚动」退化成「延迟跳变」。回调直接格式化 t。
+- **折屏整体缩水 25%**：2.4.0 新增纹理按 192px 烘焙，折屏缩放除数写死 256——绢面
+  实际 214×480（设计 286×640），折间空隙 81px、屏底悬空 160px。除数改实测纹理宽，
+  与烘焙尺寸自同步。
+- **音量偏好启动不回放**：prefs 落盘/读档链完整，`_setup_audio_buses` 却硬编码默认
+  值——用户改音量重启后滑杆显示已存值而总线在默认值，静默失效。启动经
+  `load_prefs()` 回放三总线音量与静音；无消费者的 `licensedMusic` 死字段摘除。
+
+### 正确性修复（P2）
+
+- **非法战斗的合成 result 形状不符**：`_bad_input` 的 survivors 是 Array 而消费方按
+  Dictionary `.get`——坏档深路径上运行期崩；winner=-1 哨兵在 match 侧无早退分支。
+  形状改 Dictionary + 消费侧非法即不判胜负不扣血。
+- **死亡演出双触发**：death 事件与 `_sync_all` 同步路径都调 `play_death`——溶解 shader
+  二次替换、下沉双份、墨珠 9→18。UnitView 增 `dying` 幂等闸。
+- **弹道光点永不绘制**：`_play_projectile` 设 kind=1 而 `_Fx._draw` 只覆盖 4~10——
+  每帧空绘，弹道只剩拖尾线。补 kind 1 分支。
+- **余烬抑制单向锁死**：`deco_suppressed` setter 用「当前实际值」当期望值——4× 切回
+  1× 后决赛圈加密永不复燃。相位意图另存。
+- **特效预算帽泄孤儿节点**：`_spark` 超帽 `return Sprite2D.new()` 且调用方全体不消费
+  返回值——每次触帽泄一个无父节点。改返回 null。
+- **天命之印静态锁永久卡真**：`LegendaryFx._active` 只在收场 tween 回调复位，演出中
+  换场则本进程再也不会播。节点 `_exit_tree` 兜底复位；顺带解除 `name` 对 `Node.name`
+  的遮蔽。
+- **代际守卫顺序倒置**：`_after` 的首操作数解引用成员 `_gen`，场景已释放时定时器到期
+  先崩后短路。`is_instance_valid` 提首评。
+- **回放坏快照击穿注释契约**：`verify_replay` 对 config 只验「是 Dictionary」，缺 seed
+  的坏档令 `Battle._init` 运行期错误中断整个校验（TS 靠 try/catch 的承诺在无异常系统
+  里没有对应物）。构造前显式验型（seed 有限 + units 为 Array），坏档降级为「比对位
+  不一致」。
+- **装备未知 id 注释失真**：宣称「与未知棋子同口径立即失败」，实为 log+skip。按无异常
+  系统的真实口径重述（跳过比整场报废更稳，报错必留痕）。
+- **影子导出失败路径残留**：`process.exit(1)` 不走 finally——两处失败路径把数百 MB
+  影子目录留在 tmpdir，与文件头声明矛盾。改 `exitCode + throw` 走 finally；首个
+  `rmSync` 进 try 防 EBUSY 未捕获崩。
+- **balance 冒烟 NaN 入库**：`--pairs` 部分矩阵的空行均值 0/0=NaN 写进
+  `runs.summary_json`（实测 25/26/27 全表 NaN%）。空行记 null、极差仅完整矩阵计算、
+  部分矩阵显式 partial 标注。
+
+### 卫生与一致性修复（P3，择要）
+
+内核侧：`Spec.elite()` 登峰倍率助手补上缺键 push_error 纪律（原裸读静默 1.0）；
+`RESIST_CAP` 兜底两处 220.0 收敛单一常量；`combined_item_ids` 外借静态缓存改返副本；
+`Unit.create` 入口显式 null 容错（GDScript `get(k, def)` 不区分缺键与显式 null）；
+`execute_skill` 的 null 守卫改强类型安全写法；volley `maxStacks=0` 对齐 TS falsy 语义；
+killRenew 闭包自引用环在 `_finish` 断环（Godot 无环回收，千局长跑泄漏）；
+`EFFECT_INTERVAL` 换用 `ParityUtil.js_round`（文件头禁用 `round()` 的自渎）。
+对局层：存档失败经 `_save_or_warn()` 统一显式暴露（toast+warning，原八处调用点全
+忽略返回值）；道消快进增重入防护；羁绊笺/成员卡补齐关闭路径（鼠标离开即关、开卡收
+笺）；成员卡底沿与器匣按钮带的跨契约净距钉死（CAH_Y_MAX 860→838 + 新跨契约测试）；
+羁绊激活音效移出循环（原判据令非首位激活时有光无声）。
+渲染层：六处 `_label` 散点构造收敛 `Artifacts.label`；`_style_night_panel` 双真源删除；
+nav/结算/继续/菜单/设置五组按钮改走墨玉形制库；三张零消费者死纹理（纸纤维/暗角/鎏金
+带）摘出预载链；砚器口内鎏金线补四边；`panel_box` 删 border 死参；施法动态光增并发帽；
+护盾飘字独立档位 + 棋子护盾覆条（形参此前收了不上屏）；`unit_view` 稀有度钳位；
+`MicroFx._scale_to` 换向 kill 旧补间；详情卡横向钳位与顶栏列位裸数字入常量。
+工具链：GdUnit4 零用例判 FAIL（tests 失联时曾可假绿）；spec.json 读取包 try；
+对拍 `__error` 哨兵非空化（双端 spawn 失败空串曾致假绿）；powMult 编码判据两侧对齐
+（`has` → `!= null`，显式 null 不再编码成 0.0）；perf 计时断言改比例口径；GODOT_EXE
+四处置散收敛 `tools/godot_exe.mjs`（支持环境变量覆盖）；git spawn 限时 + db 关闭
+try/finally；usage 注释 `--n 50` → `--n=50`。
+
+### 误报裁定（十五项，择要）
+
+rng 位运算写法与 TS 不同（已证逐位等价，百万抽样背书）；两套 FNV 分别对应 TS 两个不同
+函数（正确成对）；复活先 erase 占位、兼爱 silent 伤害、死亡不逐条发 removed——均为 TS
+同款设计口径；`unit.gd` 运行时 `load` 规避 class_name 环是既定方案；codec「17 类」实为
+16 类但三处实现一致（仅文档计数）；battle `--n=6` 与 README「21 局」恰合非漂移；
+hud-layout.test.ts「十组」计数口径陈旧（实为 20 it，随 README 重写修正）；纹理
+static 缓存退出不释放是 2.4.0 实证判据；codex 稀有度色边 Flat 直绘是信息载体豁免；
+shader 内字面色不可引用 GDScript 常量的既定限制。
+
+### 验证
+
+全树 parse PARSE_ALL_OK；qa 门禁 11/11（spec FNV 逐位不变 = 零平衡扰动）；GdUnit4
+含新增跨契约用例；match 对拍 7/7 覆盖含撤销/恩赐/读档路径（修复未动任何对拍语义）。
+逐项修复的专项验证：折屏缩放经 menu 窗口探针实拍复核比例；转场键盘闸门以 buy 探针
+（帧 40 购买链路）复跑无回归；roll_number 修复后金币飞行链 UI_BUY 40→38 不变；
+spec/balance 工具改动经 node --check + qa 内 steps 实跑。导出体双冒烟（menu+buy）
+EXIT=0。
+
 ## 2.4.0（2026-09-29，夜宴器物谱 —— 拟物质感的系统化）
 
 用户发问：质感与表现力要再全面升级，把屏风、玉石、砚台、琉璃、黄金、宝石这类拟物

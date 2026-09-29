@@ -111,7 +111,6 @@ const DEFAULT_PREFS := {
 	"muted": false,
 	"autoDeploy": true,
 	"calm": false,
-	"licensedMusic": true,
 }
 
 
@@ -138,8 +137,6 @@ static func load_prefs() -> Dictionary:
 		out["autoDeploy"] = parsed["autoDeploy"]
 	if parsed.get("calm", null) is bool:
 		out["calm"] = parsed["calm"]
-	if parsed.get("licensedMusic", null) is bool:
-		out["licensedMusic"] = parsed["licensedMusic"]
 	return out
 
 

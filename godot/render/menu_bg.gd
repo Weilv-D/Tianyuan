@@ -214,6 +214,9 @@ static func build_screen(picks: Array) -> Node2D:
 	fsh.scale = Vector2((total + 420.0) / 128.0, 48.0 / 128.0)
 	root.add_child(fsh)
 	# 六折屏心：绢面 + 折棱明暗交替 + 画心（外四折墨影 / 中二折山水云月）
+	# 缩放除数取实测纹理宽（SILK/WOOD 192px 烘焙）—— 写死 256 曾令整屏缩水 25%
+	#（折间空隙 81px、屏底悬空 160px；2.4.1 审查修复）：与 atlas 烘焙尺寸自同步
+	var tex_w := float(FxAtlas.texture(FxAtlas.SILK).get_width())
 	var heights := {0: 265.0, 1: 230.0, 4: 230.0, 5: 265.0}
 	var fig_pick := {0: 0, 1: 1, 4: 2, 5: 3}
 	for i: int in SCREEN_PANELS:
@@ -223,7 +226,7 @@ static func build_screen(picks: Array) -> Node2D:
 		silk.texture = FxAtlas.texture(FxAtlas.SILK)
 		silk.centered = false
 		silk.position = Vector2(px, top_y)
-		silk.scale = Vector2(SCREEN_PW / 256.0, SCREEN_H / 256.0)
+		silk.scale = Vector2(SCREEN_PW / tex_w, SCREEN_H / tex_w)
 		silk.modulate = Color(Palette.INK[600], fold)
 		silk.z_index = i
 		root.add_child(silk)
@@ -257,7 +260,7 @@ static func build_screen(picks: Array) -> Node2D:
 			stile.texture = FxAtlas.texture(FxAtlas.WOOD)
 			stile.centered = false
 			stile.position = Vector2(stile_x, top_y)
-			stile.scale = Vector2(SCREEN_STILE / 256.0, SCREEN_H / 256.0)
+			stile.scale = Vector2(SCREEN_STILE / tex_w, SCREEN_H / tex_w)
 			stile.modulate = Color(_wood(), 0.96)
 			stile.z_index = 8
 			root.add_child(stile)
@@ -274,7 +277,7 @@ static func build_screen(picks: Array) -> Node2D:
 		rail.texture = FxAtlas.texture(FxAtlas.WOOD)
 		rail.centered = false
 		rail.position = Vector2(float(seg[0]), float(seg[1]))
-		rail.scale = Vector2(rail_w / 256.0, SCREEN_RAIL / 256.0)
+		rail.scale = Vector2(rail_w / tex_w, SCREEN_RAIL / tex_w)
 		rail.modulate = Color(_wood(), 0.98)
 		rail.z_index = 10
 		root.add_child(rail)
@@ -283,7 +286,7 @@ static func build_screen(picks: Array) -> Node2D:
 		post.texture = FxAtlas.texture(FxAtlas.WOOD)
 		post.centered = false
 		post.position = Vector2(float(seg[0]), top_y - SCREEN_RAIL)
-		post.scale = Vector2(14.0 / 256.0, (SCREEN_H + SCREEN_RAIL * 2.0) / 256.0)
+		post.scale = Vector2(14.0 / tex_w, (SCREEN_H + SCREEN_RAIL * 2.0) / tex_w)
 		post.modulate = Color(_wood(), 0.98)
 		post.z_index = 10
 		root.add_child(post)

@@ -11,6 +11,12 @@ class_name LegendaryFx
 
 static var _active := false
 
+
+## 节点拆除即复位静态锁：收场 tween 随树销毁时回调不跑，_active 会永久卡真
+## （本进程后续所有天命之印被 play() 入口吞掉——2.4.1 审查修复）
+func _exit_tree() -> void:
+	_active = false
+
 var _def_id := ""
 var _calm := false
 var _bits: Array = []  # 演出件（收场统一淡出）
@@ -69,7 +75,7 @@ func _ready() -> void:
 	halo.create_tween().tween_property(halo, "modulate:a", 0.35, 0.52).set_delay(0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	# ── 4) 朱砂方印：竖排篆名，双环印框 ──
-	var name := _def_name(_def_id)
+	var seal_name := _def_name(_def_id)
 	var seal := Node2D.new()
 	seal.position = Vector2(cx, cy)
 	seal.scale = Vector2.ONE * 2.1
@@ -78,13 +84,13 @@ func _ready() -> void:
 	_bits.append(seal)
 	var plate := _SealPlate.new()
 	seal.add_child(plate)
-	var name_size := 56 if name.length() <= 2 else 42
+	var name_size := 56 if seal_name.length() <= 2 else 42
 	var name_txt := Label.new()
-	name_txt.text = " ".join(name.split("")) if name.length() <= 1 else "\n".join(name.split(""))
+	name_txt.text = " ".join(seal_name.split("")) if seal_name.length() <= 1 else "\n".join(seal_name.split(""))
 	name_txt.add_theme_font_override("font", Sess.seal_font)
 	name_txt.add_theme_font_size_override("font_size", name_size)
 	name_txt.add_theme_color_override("font_color", Palette.PAPER[50])
-	name_txt.add_theme_constant_override("line_spacing", 6 if name.length() <= 2 else 2)
+	name_txt.add_theme_constant_override("line_spacing", 6 if seal_name.length() <= 2 else 2)
 	name_txt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_txt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_txt.size = Vector2(196, 196)

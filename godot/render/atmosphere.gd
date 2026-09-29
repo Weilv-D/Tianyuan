@@ -43,27 +43,33 @@ func set_phase(phase: String) -> void:
 	match phase:
 		"prep":
 			_motes.emitting = true
+			_phase_embers = false
 			_embers.emitting = false
 			_embers.color_initial_ramp = _ember_ramp(false)
 			_embers.amount = EMBER_AMOUNT
 		"battle":
 			_motes.emitting = true
+			_phase_embers = true
 			_embers.emitting = not deco_suppressed
 			_embers.color_initial_ramp = _ember_ramp(false)
 			_embers.amount = EMBER_AMOUNT
 		"final":
 			_motes.emitting = true
+			_phase_embers = true
 			_embers.emitting = not deco_suppressed
 			_embers.color_initial_ramp = _ember_ramp(true)
 			_embers.amount = EMBER_AMOUNT * 2
 
 
-## 倍速装饰抑制（与 effects_layer.deco_suppressed 同源切换）
+## 倍速装饰抑制（与 effects_layer.deco_suppressed 同源切换）。
+## 相位意图另存：抑制期用「当前实际值」当期望值会单向锁死——切回常速后余烬永不复燃
+## （战斗中 4×→1× 后决赛圈加密失效；2.4.1 审查修复）
 var deco_suppressed := false:
 	set(v):
 		deco_suppressed = v
 		if _embers != null:
-			_embers.emitting = not v and _embers.emitting
+			_embers.emitting = not v and _phase_embers
+var _phase_embers := false
 
 
 func _make_motes() -> CPUParticles2D:

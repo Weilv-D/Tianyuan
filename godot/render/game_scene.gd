@@ -1,8 +1,7 @@
 extends Node2D
-## 准备阶段主场景（GameScene.ts 对齐版，M3 首批核心面）：
-## 顶栏 / 大漆盘（己方半场） / 备战席 / 商店 / 羁绊轨 / 操作列 / 出售印 /
-## 拖拽布阵 / 奇遇面板 / 回合结算浮层 / 开战流程（settle-then-replay 入口）。
-## 战报·记事·侦查·成员卡·设置面板登记于 M3 次批（见 MILESTONES 清单）。
+## 准备阶段主场景（GameScene.ts 对齐版）：顶栏 / 大漆盘 / 备战席 / 商店 / 器匣 /
+## 羁绊轨 / 操作列 / 出售印 / 拖拽布阵 / 奇遇 / 回合结算 / 战报记事 / 侦查 /
+## 羁绊成员卡与全览 / 设置面板 / 开战流程（settle-then-replay 入口全量实装）。
 
 var match_ref: Match
 var board_view: BoardView
@@ -12,13 +11,6 @@ var streak_cap: Label = null
 var hp_bar_fg: ColorRect = null
 var xp_bar_fg: ColorRect = null
 var xp_text: Label = null
-
-
-## 浮层面板砚底：引擎默认 Panel 是中性灰，违反「任何颜色必须来自 Palette」红线。
-## 器物化：砚石底纹（金星石眼 + 水磨痕）× 深蓝染色 × 鎏金双边（FxAtlas.panel_box
-## 9-slice）—— 纯色 Flat 是「草稿感」的 UI 残留
-func _style_night_panel(p: Panel) -> void:
-	p.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97), Color(Palette.GILT["base"], 0.5)))
 
 
 ## 顶栏 56×3 微条（ink 底随建随盖，前景条由 refresh 定宽）
@@ -65,12 +57,16 @@ var badges_visible: Array = []  # [{id,count,tier,def,i,worldHit}] 每回合 ref
 var scout_layer: CanvasLayer = null  # 侦查覆盖层（只读快照；原版 ScoutOverlay）
 var trait_modal: CanvasLayer = null  # 羁绊全览浮层（nav「羁绊」）
 var detail_card: PanelContainer = null  # 棋子详情卡（悬停只读/点选钉住）
+var detail_iid := -1                    # 当前卡对应的 iid（模式判别用）
+var detail_mode := ""                    # "hover" / "pinned" / ""
 var detail_pinned_iid := -1
 ## 悬停态当前展示的 iid（同 iid 短路——MouseMotion 逐帧触发不重建卡体）
 var detail_hover_iid := -1
 var press_pos := Vector2.ZERO  # 点击→钉卡判定（<8px 视为点选而非拖拽）
 var toast_label: Label = null
 var _atmo: Atmosphere  # 盘面灵尘氛围（战斗期切余烬由战斗场景自管）
+var _battle_starting := false  # 开战在途标志（转场窗口内幂等；进场绑 phase 后失效）
+var _fast_forwarding := false  # 道消快进在途标志（重入防护）
 var _top_last := {}  # 顶栏数值前值（金币跳字用）
 var _last_trait_tiers := {}  # 羁绊档位前值（激活点亮检测）
 
@@ -145,11 +141,10 @@ func _draw_bg() -> void:
 
 
 func _label(text: String, size: int, color: Color, font = null) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_override("font", font if font != null else Sess.body_font)
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	# 形制库薄包装（六处散点构造收敛——2026-09-29 审查；本地签名保持不变以不动调用面）
+	var l := Artifacts.label(text, size, color)
+	if font != null:
+		l.add_theme_font_override("font", font)
 	return l
 
 
@@ -181,7 +176,7 @@ func _build_top_bar() -> void:
 	# 右侧五数值（HudPanels stat 口径）：值右对齐 17px + 小注 10px，标签进小注不进值
 	var stats: Array = [
 		["round", "回 合", 1340, Palette.PAPER[100]],
-		["gold", "金", 1450, Palette.GILT["light"]],
+		["gold", "金", Layout.TOP_STAT_GOLD_X, Palette.GILT["light"]],
 		["streak", "来 金", 1560, Palette.GILT["base"]],
 		["hp", "生 命", 1670, Palette.SPIRIT["base"]],
 		["level", "等 级", 1780, Palette.PAPER[100]],
@@ -220,12 +215,8 @@ func _build_top_bar() -> void:
 		nb.text = String(nav_labels[i][0])
 		nb.position = Vector2(Layout.NAV_X + i * Layout.NAV_GAP - 6, 18)
 		nb.custom_minimum_size = Vector2(92, 34)
-		nb.add_theme_font_override("font", Sess.body_font)
-		nb.add_theme_font_size_override("font_size", 14)
-		nb.add_theme_color_override("font_color", Palette.PAPER[100])
-		nb.add_theme_color_override("font_hover_color", Palette.GILT["light"])
-		nb.focus_mode = Control.FOCUS_NONE
-		nb.flat = true
+		# 墨玉三态（器物谱：形制库统一出口——原 flat 手搓与全站三态不一致）
+		Artifacts.jade_button(nb, {"size": 14})
 		nb.pressed.connect(nav_cbs[i])
 		add_child(nb)
 		var en := _label(String(nav_labels[i][1]), 10, Palette.INK[300])
@@ -623,7 +614,7 @@ func _clear_button_children(b: Button) -> void:
 
 func _refresh_trait_rail() -> void:
 	# 悬停笺随刷新关闭：徽章序与档位可能已变（买卖后），留旧笺会展示过期计数
-	if rail_popup != null and trait_members_card == null:
+	if rail_popup != null:
 		rail_popup.queue_free()
 		rail_popup = null
 	rail_popup_badge = -1
@@ -725,9 +716,18 @@ func _push_undo() -> void:
 		undo_stack.pop_front()
 
 
+## 存档统一入口：失败显式暴露（save.gd 契约的 render 侧兑现——磁盘满/权限失败时
+## 无感知继续玩 = 崩溃后回到陈旧档且无提示，2.4.1 审查修复）
+func _save_or_warn() -> void:
+	if SaveStore.save_match(match_ref):
+		return
+	push_warning("存档写入失败（user:// 空间或权限）——对局进度不会持久化")
+	_toast("存档失败：进度不会被保存")
+
+
 func _after_action() -> void:
 	refresh_all()
-	SaveStore.save_match(match_ref)
+	_save_or_warn()
 
 ## ── 经营体感（第三轮表现层）────────────────────────────────
 ## 金币飞顶栏 / 羁绊激活点亮 / 出售墨化 / 开战墨晕。全部只动演出时钟，零内核改动。
@@ -737,7 +737,7 @@ func _after_action() -> void:
 func _fly_coin(from_world: Vector2, gold: int) -> void:
 	if gold <= 0:
 		return
-	var target := Vector2(1450.0, 26.0)  # 顶栏金币值锚（_build_top_bar 口径）
+	var target := Vector2(float(Layout.TOP_STAT_GOLD_X), 26.0)  # 顶栏金币值锚（与 _build_top_bar 同常量）
 	var count := mini(3, 1 + gold / 4)
 	for i: int in count:
 		var c := Sprite2D.new()
@@ -778,9 +778,10 @@ func _detect_trait_activation() -> void:
 			continue
 		var hit: Rect2 = b["hit"]
 		_trait_light_pop(hit.get_center())
-		# 一回合多处激活只放最响的一次音（激活是低频事件）
-		if b == badges_visible[0]:
-			Sess.sfx.play("uiBig")
+	# 一回合多处激活只放最响的一次音（激活是低频事件；原判据「b==首枚」会令
+	# 非首位羁绊激活时有光无声——2.4.1 审查修复）
+	if not freshly.is_empty():
+		Sess.sfx.play("uiBig")
 
 
 func _trait_light_pop(at: Vector2) -> void:
@@ -799,7 +800,7 @@ func _trait_light_pop(at: Vector2) -> void:
 
 ## 出售墨化：棋子先「化墨而去」再结算刷新（早前直接 refresh，单位凭空消失没有句号）
 ## views 字典先脱钩：墨化件自生自灭（0.55s），refresh 重建不会指向已销毁引用
-func _sell_with_fx(iid: int, from_world: Vector2) -> void:
+func _sell_with_fx(iid: int) -> void:
 	var v: UnitView = unit_views.get(iid, null)
 	if v != null and is_instance_valid(v):
 		unit_views.erase(iid)
@@ -1081,6 +1082,10 @@ func _try_unit_action(world: Vector2) -> bool:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	# 转场墨晕进行中：一切键盘动作短路（鼠标已被 fade STOP 吞；键盘此前无闸门，
+	# 转场窗口内空格会令 settle 二次执行——2.4.1 审查修复）
+	if Sess.transitioning:
+		return
 	if match_ref == null or result_panel != null:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -1168,7 +1173,7 @@ var rail_popup_badge := -1
 
 func _update_rail_popup(badge_i: int) -> void:
 	if badge_i < 0:
-		if rail_popup != null and trait_members_card == null:
+		if rail_popup != null:
 			rail_popup.queue_free()
 			rail_popup = null
 		rail_popup_badge = -1
@@ -1205,17 +1210,28 @@ func _update_rail_popup(badge_i: int) -> void:
 		var tg := Artifacts.tier_gem(tier, 12.0)
 		tg.position = Vector2(float(layout["w"]) - 26.0, 10.0)
 		rail_popup.add_child(tg)
+	# 纵排：MarginContainer+VBox（PanelContainer 直挂 Label 会把全部子件拉伸到同一
+	# 矩形互相叠压——2.4.1 审查修复；与成员卡同构，layout 行位由容器接管）
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	rail_popup.add_child(margin)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 2)
+	margin.add_child(vb)
 	var head := "%s　%d" % [String(def["name"]), int(b["count"])]
 	var hl := _label(head, 18, Palette.GILT["light"] if tier >= 0 else Palette.PAPER[300])
-	rail_popup.add_child(hl)
+	vb.add_child(hl)
 	for ln: String in lines:
 		var l2 := _label(ln, 15, Palette.PAPER[200])
 		l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		rail_popup.add_child(l2)
+		vb.add_child(l2)
 	for d: String in desc_lines:
 		var l3 := _label(d, 14, Palette.PAPER[400])
 		l3.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		rail_popup.add_child(l3)
+		vb.add_child(l3)
 
 
 ## 成员卡（点击徽章钉住；hudLayout 5 列网格，全量成员含未上阵）
@@ -1223,6 +1239,10 @@ func _open_trait_members(badge_i: int) -> void:
 	if trait_members_card != null:
 		trait_members_card.queue_free()
 		trait_members_card = null
+	if rail_popup != null:
+		rail_popup.queue_free()
+		rail_popup = null
+		rail_popup_badge = -1
 	var b: Dictionary = badges_visible[badge_i]
 	var trait_id: String = b["id"]
 	# 该羁绊全部成员（origins 或 classes 含之）
@@ -1290,7 +1310,7 @@ func _try_pick(world: Vector2) -> void:
 			pick = p["bench"][i]
 	else:
 		var cell := _world_to_local_cell(world)
-		if cell.y >= 4 and cell.y >= 0:
+		if cell.y >= 4:
 			var idx := (cell.y - 4) * 8 + cell.x
 			if idx >= 0 and idx < 32 and p["board"][idx] != null:
 				pick = p["board"][idx]
@@ -1328,7 +1348,7 @@ func _drop(world: Vector2) -> void:
 		if match_ref.sell(p, drag_iid):
 			Sess.sfx.play("coin")
 			undo_stack.clear()
-			SaveStore.save_match(match_ref)
+			_save_or_warn()
 			refresh_all()
 			drag_iid = -1
 			drag_ghost = null
@@ -1348,7 +1368,7 @@ func _drop(world: Vector2) -> void:
 			Sess.sfx.play("ui")
 	drag_iid = -1
 	drag_ghost = null
-	SaveStore.save_match(match_ref)
+	_save_or_warn()
 	refresh_all()
 
 
@@ -1359,10 +1379,11 @@ func _world_to_local_cell(world: Vector2) -> Vector2i:
 # ── 开战（settle-then-replay 入口） ───────────────────────
 
 func _start_battle_phase() -> void:
-	if match_ref.phase != "prep":
+	if match_ref.phase != "prep" or _battle_starting:
 		return
+	_battle_starting = true
 	undo_stack.clear()
-	SaveStore.save_match(match_ref)
+	_save_or_warn()
 	match_ref.resolve_human_adventure()
 	if match_ref.pairings.is_empty():
 		match_ref.pairings = match_ref.make_pairings(false)
@@ -1388,7 +1409,7 @@ func _start_battle_phase() -> void:
 ## BattleScene 返回后（resultPending）与本地的轮空结算共口
 func _after_settle(_outs: Array) -> void:
 	match_ref.end_round()
-	SaveStore.save_match(match_ref)
+	_save_or_warn()
 	_show_round_result()
 
 
@@ -1405,7 +1426,7 @@ func _show_round_result() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(720, 560)
 	panel.position = Vector2((Layout.W - 720) / 2.0, (Layout.H - 560) / 2.0)
-	_style_night_panel(panel)
+	Artifacts.night_panel(panel)
 	dim.add_child(panel)
 	MicroFx.enter(panel)
 	var title := _label("回 合 结 算", 36, Palette.GILT["light"], Sess.seal_font)
@@ -1442,10 +1463,8 @@ func _show_round_result() -> void:
 	cont.text = "继 续"
 	cont.position = Vector2(270, 490)
 	cont.custom_minimum_size = Vector2(180, 46)
-	cont.add_theme_font_override("font", Sess.body_font)
-	cont.add_theme_font_size_override("font_size", 24)
-	cont.add_theme_color_override("font_color", Palette.PAPER[100])
-	cont.focus_mode = Control.FOCUS_NONE
+	# 墨玉三态（器物谱：形制库统一出口）
+	Artifacts.jade_button(cont, {"size": 24})
 	cont.pressed.connect(func() -> void:
 		result_panel.queue_free()
 		result_panel = null
@@ -1541,7 +1560,7 @@ func _open_scout(title: String, sub: String, board: Array) -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(bw, bh)
 	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
-	_style_night_panel(panel)
+	Artifacts.night_panel(panel)
 	dim.add_child(panel)
 	MicroFx.enter(panel)
 	var ttl := _label("%s 的阵地" % title, 22, Palette.PAPER[100])
@@ -1588,7 +1607,7 @@ func _open_scout(title: String, sub: String, board: Array) -> void:
 	cap.position = Vector2(28, ty)
 	panel.add_child(cap)
 	var active: Array = []
-	for t: Dictionary in match_ref._traits_of(board):
+	for t: Dictionary in match_ref.traits_of_board(board):
 		if int(t["tier"]) >= 0:
 			active.append(t)
 	active.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -1673,10 +1692,13 @@ func _style_action_button(b: Button) -> void:
 
 ## 玩家淘汰后把剩下的回合快进完，给出最终名次（原版 fastForward 同回路）
 func _fast_forward_after_death() -> void:
+	if _fast_forwarding:
+		return  # 连点重入：两个结算协程交错跑同一对局 = 双重收入/推进（2.4.1 修复）
+	_fast_forwarding = true
 	# 每回合让渲染一帧：内核结算 ~239ms/回合，同步跑完 ≈5-6s 整窗无响应
 	_toast("推演中…")
 	var guard := 0
-	while not match_ref.is_over() and guard < 60:
+	while not match_ref.is_over() and guard < 60 and is_inside_tree():
 		match_ref.begin_round()
 		if match_ref.is_over():
 			break
@@ -1786,6 +1808,8 @@ func _close_detail() -> void:
 		detail_card.queue_free()
 		detail_card = null
 	detail_hover_iid = -1
+	detail_iid = -1
+	detail_mode = ""
 
 
 ## 技能描述模板回填（champions.ts DESC_KEYS 对等移植）：占位键 → 语义化格式器——
@@ -1878,10 +1902,13 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	var def: Variant = Spec.champion_by_id.get(String(u["defId"]), null)
 	if def == null:
 		return
-	if detail_card != null and (detail_pinned_iid == int(u["iid"]) or detail_hover_iid == int(u["iid"])):
+	# 早退门按「同 iid 且同模式」判（悬停卡≠钉住卡：点选钉卡需重建以带出售带）
+	if detail_card != null and detail_iid == int(u["iid"]) and detail_mode == ("pinned" if pinned else "hover"):
 		return
 	_close_detail()
 	detail_hover_iid = int(u["iid"])
+	detail_iid = int(u["iid"])
+	detail_mode = "pinned" if pinned else "hover"
 	var w: int = Layout.DETAIL_W
 	var h: int = (Layout.DETAIL_H + Layout.DETAIL_SELL_BAND) if pinned else Layout.DETAIL_H
 	var rarity := int(def["cost"])
@@ -1890,7 +1917,8 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 	var v: UnitView = unit_views.get(int(u["iid"]), null)
 	if v != null:
 		anchor = v.position
-	var px: float = clampf(anchor.x + 40.0, 66.0, float(Layout.W) - 48.0 - w)
+	var px: float = clampf(anchor.x + HudLayout.DETAIL_ANCHOR_DX, float(HudLayout.DETAIL_X_MIN),
+		float(Layout.W) - HudLayout.DETAIL_X_RIGHT_PAD - w)
 	var py: float = clampf(anchor.y - h / 2.0, float(HudLayout.CAH_Y_MIN), maxf(float(HudLayout.CAH_Y_MIN), float(HudLayout.CAH_Y_MAX) - h))
 	detail_card = PanelContainer.new()
 	detail_card.position = Vector2(px, py)
@@ -1994,9 +2022,9 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 				return
 			if match_ref.sell(match_ref.human(), sell_iid):
 				Sess.sfx.play("coin")
-				_sell_with_fx(sell_iid, get_global_mouse_position())
+				_sell_with_fx(sell_iid)
 				undo_stack.clear()
-				SaveStore.save_match(match_ref)
+				_save_or_warn()
 				refresh_all()
 			detail_pinned_iid = -1
 			_close_detail())
@@ -2032,7 +2060,7 @@ func _toggle_trait_modal() -> void:
 	var panel := Panel.new()
 	panel.size = Vector2(bw, bh)
 	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
-	_style_night_panel(panel)
+	Artifacts.night_panel(panel)
 	dim.add_child(panel)
 	MicroFx.enter(panel)
 	var title := _label("羁 绊 全 览", 30, Palette.SPIRIT["light"], Sess.seal_font)

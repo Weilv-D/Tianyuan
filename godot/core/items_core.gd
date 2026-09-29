@@ -19,7 +19,9 @@ static func item_effects(item_ids: Array) -> Dictionary:
 	var params := {}
 	for id: String in item_ids:
 		var def = Spec.item_by_id.get(id, null)
-		# 名单外装备立即失败，绝不带着缺装静默开战（与未知棋子/羁绊/技能同口径）
+		# 名单外装备：push_error 后跳过该件（GDScript 无异常系统，TS 的 throw 整场
+		# 作废降级为 log+skip——与未知棋子的 _bad_input 整场拒建不同口径；坏档/旧档
+		# 带已删装备时跳过比整场报废更稳。报错必留痕，绝不静默）
 		if def == null or def.is_empty():
 			push_error("未知装备 id：%s" % id)
 			continue

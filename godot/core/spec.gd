@@ -53,13 +53,26 @@ static func ensure() -> void:
 
 ## 成品装备池（adventure「丹青成装」与墨兽胜场成品掉落共用；顺序 = ITEMS 原序）
 static var _combined_ids: Array = []
+## 登峰包倍率（T3_ELITE_COST4）：与 legend() 同族的缺键 push_error 纪律——
+## 旧实现 unit.gd 裸读 cfg 静默回落 1.0，登峰乘区整包消失无从察觉（2.4.1 修复）
+static func elite(key: String) -> float:
+	ensure()
+	var pk: Variant = cfg.get("T3_ELITE_COST4", null)
+	if not (pk is Dictionary) or not (pk as Dictionary).has(key):
+		push_error("spec.json 缺少 T3_ELITE_COST4.%s（登峰包倍率）——按 1.0 兜底" % key)
+		return 1.0
+	return float((pk as Dictionary)[key])
+
+
 static func combined_item_ids() -> Array:
 	ensure()
 	if _combined_ids.is_empty():
 		for e: Dictionary in items:
 			if e.get("tier", "") == "combined":
 				_combined_ids.append(e["id"])
-	return _combined_ids
+	# 返回副本：GDScript Array 是引用语义，直接外借静态缓存会被调用方的
+	# append/erase 永久污染（2.4.1 审查修复）
+	return _combined_ids.duplicate()
 
 
 ## 数值常量读取（缺键报错返回默认——默认值与冻结仓字面量同源，兜底防 NaN 漏网）

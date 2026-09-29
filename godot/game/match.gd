@@ -665,6 +665,11 @@ func build_battle_config(pair: Dictionary, swap: bool = false) -> Dictionary:
 
 
 ## 棋盘 → 激活羁绊列表
+## 公开包装（render 层跨类消费的合法入口；私有 _traits_of 保持对拍口径不变）
+func traits_of_board(board: Array) -> Array:
+	return _traits_of(board)
+
+
 func _traits_of(board: Array) -> Array:
 	var ids: Array = []
 	for u: Variant in board:
@@ -700,12 +705,22 @@ func damage_of(result: Dictionary, winner_team: int, winner_board: Array) -> flo
 	if round == 1:
 		return 0.0
 	var curve: Array = Spec.cfg.get("ROUND_BASE_DAMAGE", [])
-	var base_curve := float(curve[min(round, curve.size() - 1)])
+	# 空表守卫：TS 侧 curve[-1] 是 undefined→NaN 静默传播；GD 负索引读空数组直接崩
+	# 对局循环（spec 对账门禁下不可达，属纵深防御）
+	var base_curve: float = 0.0
+	if curve.is_empty():
+		push_error("ROUND_BASE_DAMAGE 缺失（spec 损坏）——阶段基础伤害按 0 结算")
+	else:
+		base_curve = float(curve[min(round, curve.size() - 1)])
 	# 后期处决曲线放缓：只放缓「阶段处决」，不动「打赢余威」
 	# MATCH_TUNING 兜底值与 config.ts 真源同值（spec 对账门禁保证键在位；
 	# 兜底仅防 JSON 损坏，不得偏离真源——否则处决曲线静默漂移）
 	var tuning: Dictionary = Spec.cfg.get("MATCH_TUNING", {})
 	var late_scale := float(tuning.get("lateDamageCurveScale", 0.75)) if round >= int(tuning.get("lateDamageCurveFromRound", 16)) else 1.0
+	if int(result.get("winner", -1)) < 0:
+		# 非法战斗（_bad_input 哨兵）：不判胜负不扣血（TS 上抛无结果，GD 合成 result 的等价口径）
+		push_error("战斗结果非法（winner=-1）：本场按无效处理")
+		return 0.0
 	var uids := board_uids(winner_board, winner_team)
 	var extra := 0.0
 	for uid in result.get("survivors", {}).get(winner_team, []):

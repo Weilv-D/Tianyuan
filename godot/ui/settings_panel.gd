@@ -23,7 +23,7 @@ func open(on_changed: Callable = Callable()) -> void:
 	panel.position = Vector2((Layout.W - 520) / 2.0, (Layout.H - 460) / 2.0)
 	# 夜宴底覆写：默认 Panel 中性灰 + CheckBox/HSlider 深底不可见（色板红线）
 	# 漆面材质化（FxAtlas.panel_box）：宣纸纤维 × 深蓝 × 金线，与三大浮层同源
-	panel.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97), Color(Palette.GILT["base"], 0.5)))
+	panel.add_theme_stylebox_override("panel", FxAtlas.panel_box(Color(Palette.INK[900], 0.97)))
 	dim.add_child(panel)
 	var prefs: Dictionary = SaveStore.load_prefs()
 	var title := _lbl("设 置", 30, Palette.GILT["light"], Sess.seal_font)
@@ -117,9 +117,8 @@ func open(on_changed: Callable = Callable()) -> void:
 	done.text = "完 成"
 	done.position = Vector2(180, 396)
 	done.custom_minimum_size = Vector2(160, 44)
-	done.add_theme_font_override("font", Sess.body_font)
-	done.add_theme_font_size_override("font_size", 20)
-	done.add_theme_color_override("font_color", Palette.PAPER[100])
+	# 墨玉三态（器物谱：形制库统一出口——原手搓四行散点覆写）
+	Artifacts.jade_button(done, {"size": 20})
 	done.pressed.connect(close)
 	panel.add_child(done)
 	_prefs = prefs
@@ -138,9 +137,8 @@ func close() -> void:
 
 
 func _lbl(text: String, size: int, color: Color, font = null) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_override("font", font if font != null else Sess.body_font)
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	# 形制库薄包装（六处散点构造收敛——2026-09-29 审查；本地签名保持不变以不动调用面）
+	var l := Artifacts.label(text, size, color)
+	if font != null:
+		l.add_theme_font_override("font", font)
 	return l

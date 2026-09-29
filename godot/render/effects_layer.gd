@@ -53,8 +53,9 @@ func _register(n: Node) -> Node:
 func _after(ms: float, fn: Callable) -> void:
 	var g := _gen
 	get_tree().create_timer(ms / 1000.0).timeout.connect(func() -> void:
-		# is_instance_valid 前置：节点已释放时对 freed self 调 is_inside_tree 本身即崩
-		if g == _gen and is_instance_valid(self) and is_inside_tree():
+		# is_instance_valid 必须首评：对已释放 self 读成员 _gen / 调 is_inside_tree
+		# 本身即崩（战斗结束立即返回时跨场触发的延时件曾逐条刷错——2.4.1 修复）
+		if is_instance_valid(self) and is_inside_tree() and g == _gen:
 			fn.call())
 
 
@@ -107,7 +108,9 @@ func _glow(pos: Vector2, s0: float, s1: float, dur: float, color: Color, a0: flo
 ## 火星/速度线/弹道：SPARK 纹理沿 from→to（亮端朝飞出方向）
 func _spark(from: Vector2, to: Vector2, width: float, dur: float, color: Color, a0: float = 0.8) -> Sprite2D:
 	if deco_suppressed or _strays.size() >= FX_BUDGET:
-		return Sprite2D.new()
+		# 预算帽：返回 null（曾返回未挂树 Sprite2D = 每次触帽泄一个孤儿节点，
+		# 退出期刷 ObjectDB 告警——2.4.1 审查修复；调用方均不消费返回值）
+		return null
 	var seg := to - from
 	var sp := _img(FxAtlas.SPARK, (from + to) / 2.0, Color(color, a0), seg.angle())
 	sp.scale = Vector2(seg.length() / 64.0, width / 16.0)
@@ -537,6 +540,9 @@ class _Fx extends Node2D:
 
 	func _draw() -> void:
 		match kind:
+			1:
+				# 弹道光点（_play_projectile 设 kind=1；此前无分支 = 每帧空绘）
+				draw_circle(Vector2.ZERO, maxf(radius, 0.5), color)
 			4:
 				var pts := PackedVector2Array()
 				for i: int in 25:

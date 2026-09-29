@@ -7,12 +7,12 @@ class_name FxAtlas
 ## （ImageTexture 必须主线程提交；跨线程贴图加载已除根，见 session.prime_assets）。
 ## 纹理一律白色/中性亮度系，运行期乘 modulate 上色 —— 与 TS TEX 的 setTint 同一用法。
 ##
-## 器物语言（ART_BIBLE「夜宴器物谱」——桌面夜宴上席的每一件器物）：
+## 器物语言（ART_BIBLE「夜宴器物谱」——桌面夜宴上席的每一件器物；2.4.1 摘除
+## PAPER/VIGNETTE/GILT 三张零消费者死纹理——预载链逐像素烘焙不是免费的）：
 ##   砚石 STONE  —— 面板砚底：金星石眼 + 水磨痕 + 鎏金双边线（HUD 面板统一种子）
 ##   绢面 SILK   —— 屏风/浮层衬：平纹织造 + 陈绢绢斑（折屏画心）
 ##   墨玉 JADE   —— 交互器物：絮状玉纹 + 内光（按钮三态手感的材质底）
 ##   琉璃 GLAZE  —— 器匣/装备背衬：厚薄缘光 + 两道捉光斑（夜光琉璃，非荧光）
-##   鎏金 GILT   —— 装饰带：刷金痕 + 锤揲凹点（框/印/绦）
 ##   乌木 WOOD   —— 屏风大框：竖纹 + 脂孔 + 木节（折屏抹头与边框）
 ##   宝石 GEM    —— 琢面刻面：台面 + 冠部扇区明暗 + 腰线（费阶/星位/档位点）
 ##   灵光/墨点/法环/火星/斩击/六边/宣纸/颗粒/暗角/噪声 —— 特效层原语
@@ -26,15 +26,12 @@ const RING := "fx_ring"          # 法环：中空圆环（蓄力阵/环爆）
 const SPARK := "fx_spark"        # 火星：横向渐变椭圆（弹道拖尾/速度线）
 const SLASH := "fx_slash"        # 斩击弧：月牙（尖朝左、弧在右）
 const HEX := "fx_hex"            # 六边形底座（护盾「身份牌」）
-const PAPER := "fx_paper"        # 宣纸纤维（棋盘底纹，暖色）
-const GRAIN := "fx_grain"        # 全屏纸面颗粒（白噪声，alpha 低）
-const VIGNETTE := "fx_vignette"  # 暗角（把视线压回战场中心）
+const GRAIN := "fx_grain"        # 全屏纸面颗粒（白噪声，alpha 低；经 grain_overlay 上屏）
 const NOISE := "fx_noise"        # 平滑值噪声灰度（溶解阈值/墨晕边缘用）
 const STONE := "fx_stone"        # 砚石面板底（HUD 面板/格位/浮层统一）
 const SILK := "fx_silk"          # 绢面（折屏画心/浮层衬底）
 const JADE := "fx_jade"          # 墨玉（按钮交互面）
 const GLAZE := "fx_glaze"        # 琉璃（器匣/装备背衬）
-const GILT := "fx_gilt"          # 鎏金（装饰带：框/印/绦）
 const WOOD := "fx_wood"          # 乌木（屏风大框）
 const GEM := "fx_gem"            # 琢面宝石（费阶/星位/档位宝石点）
 
@@ -56,8 +53,8 @@ static func prewarm() -> void:
 	if _prewarmed:
 		return
 	_prewarmed = true
-	for key: String in [GLOW, INK_DOT, RING, SPARK, SLASH, HEX, PAPER, GRAIN, VIGNETTE, NOISE,
-			STONE, SILK, JADE, GLAZE, GILT, WOOD, GEM]:
+	for key: String in [GLOW, INK_DOT, RING, SPARK, SLASH, HEX, GRAIN, NOISE,
+			STONE, SILK, JADE, GLAZE, WOOD, GEM]:
 		texture(key)
 
 
@@ -70,10 +67,10 @@ static func texture(key: String) -> Texture2D:
 	return tex
 
 
-## 面板砚 StyleBox（9-slice；bg 染色、鎏金双边随纹理）—— HUD 面板/浮层材质化统一入口。
-## StyleBoxTexture 无 border 绘制属性（Flat 才有，混用运行期炸），边线由纹理四边承担：
-## 外一道白发丝 + 内一道金线，描出「砚台嵌金」的器口
-static func panel_box(bg: Color, border: Color) -> StyleBoxTexture:
+## 面板砚 StyleBox（9-slice；bg 染色，鎏金双边随纹理）—— HUD 面板/浮层材质化统一入口。
+## 无边线参数：StyleBoxTexture 无 border 绘制属性（Flat 才有，混用运行期炸），边线由
+## 纹理四边承担（外白发丝 + 内鎏金线 = 「砚台嵌金」器口）——2.4.1 删 border 死参
+static func panel_box(bg: Color) -> StyleBoxTexture:
 	var sb := StyleBoxTexture.new()
 	sb.texture = texture(STONE)
 	sb.texture_margin_left = 2
@@ -120,20 +117,6 @@ static func jade_box(bg: Color) -> StyleBoxTexture:
 	return sb
 
 
-## 绢面 StyleBox（浮层衬底）：无边框（画心四边由结构光收口），content 宽舒
-static func silk_box(bg: Color) -> StyleBoxTexture:
-	var sb := StyleBoxTexture.new()
-	sb.texture = texture(SILK)
-	sb.texture_margin_left = 0
-	sb.texture_margin_right = 0
-	sb.texture_margin_top = 0
-	sb.texture_margin_bottom = 0
-	sb.modulate_color = bg
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
-	return sb
 
 
 ## 宝石 Sprite2D（琢面刻面 × 语义色；费阶/星位/羁绊档位点共用）。
@@ -158,15 +141,6 @@ static func grain_overlay(w: float, h: float) -> TextureRect:
 	return tr
 
 
-## 暗角叠加：把视线压回中心（挂场景根，铺满设计分辨率）
-static func vignette_overlay(w: float, h: float) -> TextureRect:
-	var tr := TextureRect.new()
-	tr.texture = texture(VIGNETTE)
-	tr.stretch_mode = TextureRect.STRETCH_SCALE
-	tr.size = Vector2(w, h)
-	tr.position = Vector2.ZERO
-	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return tr
 
 
 ## static 缓存主动释放入口 —— **当前不在退出链调用**（2.4.0 实证判例，见
@@ -192,12 +166,8 @@ static func _bake(key: String) -> Image:
 			return _bake_slash()
 		HEX:
 			return _bake_hex()
-		PAPER:
-			return _bake_paper()
 		GRAIN:
 			return _bake_grain()
-		VIGNETTE:
-			return _bake_vignette()
 		NOISE:
 			return _bake_noise()
 		STONE:
@@ -208,8 +178,6 @@ static func _bake(key: String) -> Image:
 			return _bake_jade()
 		GLAZE:
 			return _bake_glaze()
-		GILT:
-			return _bake_gilt()
 		WOOD:
 			return _bake_wood()
 		GEM:
@@ -335,33 +303,6 @@ static func _bake_hex() -> Image:
 	return img
 
 
-## 宣纸纤维：暖色明暗颗粒 + 长纤维丝（固定种子 LCG —— 材质不引入 Math.random 开口）
-static func _bake_paper() -> Image:
-	var size := 256
-	var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
-	var n1 := _value_noise(size, 2.2, 7)
-	var n2 := _value_noise(size, 13.0, 31)
-	for y: int in size:
-		for x: int in size:
-			var v := n1[y * size + x] * 0.55 + n2[y * size + x] * 0.45
-			var cc := 18.0 + v * 34.0
-			img.set_pixel(x, y, Color8(int(cc * 1.06), int(cc), int(cc * 0.92)))
-	# 长纤维丝（贝塞尔近似为正弦微扰横线）
-	var fs := 0x1a2b3c4d
-	for i: int in 160:
-		fs = (int(fs) * 1664525 + 1013904223) & 0xFFFFFFFF
-		var y0 := float(fs & 0xFFFF) / 65536.0 * size
-		fs = (fs * 1664525 + 1013904223) & 0xFFFFFFFF
-		var amp := float(fs & 0xFF) / 255.0 * 3.0
-		fs = (fs * 1664525 + 1013904223) & 0xFFFFFFFF
-		var lw := 0.2 + float(fs & 0xFF) / 255.0 * 0.8
-		for x: int in size:
-			var yy := y0 + sin(x * 0.05 + float(i)) * amp
-			# 越界钳位：set_pixel 越界在 GDScript 是 ERROR 级（整条 backtrace 刷屏），
-			# 烘焙在主线程 —— 2.4.0 探针超时根因（错误 I/O 把纹理烘焙拖到分钟级）
-			var yi := clampi(int(yy), 0, size - 1)
-			img.set_pixel(x, yi, Color(1, 1, 1, 0.06 * lw * 4.0))
-	return img
 
 
 ## 全屏纸面颗粒：细密单像素噪声
@@ -375,23 +316,6 @@ static func _bake_grain() -> Image:
 	return img
 
 
-## 暗角：圆形径向（0.3 内透明 → 0.72 处 0.1 → 1.0 处 0.34）
-static func _bake_vignette() -> Image:
-	var size := 256
-	var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
-	var c := size / 2.0
-	for y: int in size:
-		for x: int in size:
-			var t := Vector2(x - c + 0.5, y - c + 0.5).length() / c
-			if t < 0.3:
-				continue
-			var a := 0.0
-			if t < 0.72:
-				a = 0.1 * (t - 0.3) / 0.42
-			else:
-				a = 0.1 + 0.24 * (t - 0.72) / 0.28
-			img.set_pixel(x, y, Color(0, 0, 0, clampf(a, 0.0, 0.34)))
-	return img
 
 
 ## 平滑值噪声灰度（R 通道；溶解 shader 的逐像素阈值源）
@@ -447,10 +371,14 @@ static func _bake_stone() -> Image:
 		img.set_pixel(i, size - 1, line)
 		img.set_pixel(0, i, line)
 		img.set_pixel(size - 1, i, line)
-	var gilt := Color(0.92, 0.84, 0.62)
+	# 器口内鎏金线四边齐全（原仅上下横边，左右缺失与注释不符——2.4.1 补齐）；
+	# 取 Palette.GILT["light"]（旧为板外手调近似金 0.92/0.84/0.62——色板纪律）
+	var gilt := Palette.GILT["light"]
 	for i: int in size:
 		img.set_pixel(i, 1, gilt)
 		img.set_pixel(i, size - 2, gilt)
+		img.set_pixel(1, i, gilt)
+		img.set_pixel(size - 2, i, gilt)
 	return img
 
 
@@ -520,45 +448,6 @@ static func _bake_glaze() -> Image:
 	return img
 
 
-## 鎏金装饰带：刷金横痕 + 锤揲凹点（哑光旧金，不刺眼）
-static func _bake_gilt() -> Image:
-	var size := 192
-	var img := Image.create_empty(size, size, false, Image.FORMAT_RGBA8)
-	var n := _value_noise(size, 8.0, 929)
-	var s := 0x51d3c07
-	for y: int in size:
-		for x: int in size:
-			var grad := 0.06 * (1.0 - float(y) / float(size))
-			var v := 0.72 + grad + (n[y * size + x] - 0.5) * 0.08
-			img.set_pixel(x, y, Color(v, v - 0.02, v - 0.08))
-	# 刷金痕：细密横向明暗丝
-	for i: int in 220:
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var yy := int(float(s & 0xFFFF) / 65536.0 * float(size))
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var lx := float(s & 0xFFFF) / 65536.0 * float(size)
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var ln := 4.0 + float(s & 0xFF) / 255.0 * 60.0
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var bright := float(s & 0xFF) / 255.0 > 0.5
-		var a := 0.04 + float(s & 0xFF) / 255.0 * 0.08
-		for k: int in int(ln):
-			var xx := int(lx) + k
-			if xx >= size:
-				break
-			img.set_pixel(xx, yy, Color(1, 1, 1, a) if bright else Color(0, 0, 0, a))
-	# 锤揲凹点：稀疏小坑 + 坑沿亮边
-	for i: int in 16:
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var px := int(float(s & 0xFFFF) / 65536.0 * float(size))
-		s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
-		var py := int(float(s & 0xFFFF) / 65536.0 * float(size))
-		if px < 1 or py < 1 or px >= size - 1 or py >= size - 1:
-			continue
-		img.set_pixel(px, py, Color(0, 0, 0, 0.22))
-		img.set_pixel(px - 1, py, Color(1, 1, 1, 0.10))
-		img.set_pixel(px, py - 1, Color(1, 1, 1, 0.10))
-	return img
 
 
 ## 乌木：竖纹 + 脂孔 + 木节（屏风大框/器几）

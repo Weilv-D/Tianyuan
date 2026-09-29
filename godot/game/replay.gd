@@ -21,6 +21,16 @@ static func fnv1a_hex(s: String) -> String:
 ## 规则：eventsDigest 非 '' 才记录事件流并比对摘要；'' 为无头批量模拟的快照，
 ## 跳过摘要位、只比 winner / ticks。config 无法构造或重跑中途抛错的快照，
 ## 全部比对位记为不一致，单条坏档不炸整批。
+## 快照 config 构造前验型：seed 有限数 + units 为 Array（Battle._init 对二者裸取，
+## 坏 shape 会在 GDScript 无异常系统里 run-time error 中断整个 verify——TS 靠 try/catch
+## 兜底；此处显式验型把坏档降级为「比对位不一致」，与注释承诺一致）
+static func _config_well_formed(cfg: Variant) -> bool:
+	if not (cfg is Dictionary):
+		return false
+	var d: Dictionary = cfg
+	return ParityUtil.js_finite(d.get("seed", null)) and d.get("units", null) is Array
+
+
 static func verify_replay(snapshots: Array) -> Dictionary:
 	var failures: Array = []
 	var checked := 0
@@ -33,8 +43,9 @@ static func verify_replay(snapshots: Array) -> Dictionary:
 		var winner = MISSING
 		var ticks = MISSING
 		var digest = MISSING
-		if snap.get("config", null) is Dictionary:
-			var battle := Battle.new(snap["config"], Callable(), record)
+		var cfg_v: Variant = snap.get("config", null)
+		if cfg_v is Dictionary and _config_well_formed(cfg_v):
+			var battle := Battle.new(cfg_v, Callable(), record)
 			var result: Dictionary = battle.run()
 			winner = result.get("winner", null)
 			ticks = result.get("ticks", null)

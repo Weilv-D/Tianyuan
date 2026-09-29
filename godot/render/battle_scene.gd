@@ -155,7 +155,17 @@ func _build_one_trait_panel(pos: Vector2, title: String, who: String, accent: Co
 		none.position = Vector2(pos.x, y)
 		add_child(none)
 		return
+	# 行数限量：每条 46px+，激活过多时文本会溢出屏底（屏高 1080；2.4.1 修复——
+	# 尾部折叠为「等 N 项」，与 web 同款的截断口径）
+	const MAX_ROWS := 9
+	var shown: int = 0
 	for t: Dictionary in active:
+		if shown >= MAX_ROWS:
+			var more := _label("…等 %d 项羁绊" % (active.size() - MAX_ROWS), 12, Palette.INK[300])
+			more.position = Vector2(pos.x, y)
+			add_child(more)
+			break
+		shown += 1
 		var def: Variant = Spec.traits_by_id.get(String(t["id"]), null)
 		if def == null:
 			continue
@@ -375,7 +385,8 @@ func _on_event(e: Dictionary) -> void:
 			if speed <= 1.0:
 				Sess.sfx.play("heal")
 		"shield":
-			_float_text(e, e.get("amount", 0.0), Palette.MOON["light"], "+", "heal")
+			# shield 独立档（原借 heal 档 = 治疗绿描边、palette 的 shield 描边死键）
+			_float_text(e, e.get("amount", 0.0), Palette.MOON["light"], "+", "shield")
 			if speed <= 1.0:
 				Sess.sfx.play("shield")
 		"castStart":
@@ -490,6 +501,8 @@ func _unit_by_uid(uid: int):
 ## 飘字分色（DamageText.ts STYLE 表：等级 → 语义色）
 func _dmg_color(tier: String, _crit := false) -> Color:
 	match tier:
+		"shield":
+			return Palette.DAMAGE_COLOR["shield"]
 		"crit":
 			return Palette.DAMAGE_COLOR["crit"]
 		"skill":
@@ -548,6 +561,11 @@ func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = ""
 			size = 22
 			rise = 40.0
 			life = 0.8
+		"shield":
+			# 护盾档：与治疗同节奏、月白语义（描边走 DAMAGE_OUTLINE["shield"]）
+			size = 22
+			rise = 40.0
+			life = 0.8
 		"dotBurn", "dotBleed":
 			size = 16
 			rise = 26.0
@@ -592,7 +610,9 @@ func _float_text(e: Dictionary, amount: float, color: Color, prefix: String = ""
 func _on_battle_end() -> void:
 	# 判定已结算（GameScene）；这里只做 endRound + 存档 + 战报统计带回 + 结算面板
 	match_ref.end_round()
-	SaveStore.save_match(match_ref)
+	if not SaveStore.save_match(match_ref):
+		# 存档失败显式暴露（save.gd 契约；battle 场景无 toast 通道，warning 兜底）
+		push_warning("存档写入失败（user:// 空间或权限）——对局进度不会持久化")
 	_dump_battle_stats()
 	await get_tree().create_timer(0.6).timeout
 	var winner_raw: Variant = battle.result.get("winner", null)
@@ -655,9 +675,8 @@ func _dump_battle_stats() -> void:
 
 
 func _label(text: String, size: int, color: Color, font = null) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_override("font", font if font != null else Sess.body_font)
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	# 形制库薄包装（六处散点构造收敛——2026-09-29 审查；本地签名保持不变以不动调用面）
+	var l := Artifacts.label(text, size, color)
+	if font != null:
+		l.add_theme_font_override("font", font)
 	return l

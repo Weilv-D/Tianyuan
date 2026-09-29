@@ -112,20 +112,8 @@ func _menu_button(text: String, y: float, enabled: bool) -> Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(360, 70)
 	b.position = Vector2(-180, y)
-	b.add_theme_font_override("font", Sess.body_font)
-	b.add_theme_font_size_override("font_size", 26)
-	b.add_theme_color_override("font_color", Palette.PAPER[100] if enabled else Palette.INK[400])
-	b.add_theme_color_override("font_hover_color", Palette.GILT["light"])
-	b.add_theme_color_override("font_pressed_color", Palette.GILT["base"])
-	b.add_theme_stylebox_override("normal", _panel_style(Palette.INK[800], Palette.INK[500]))
-	b.add_theme_stylebox_override("hover", _panel_style(Palette.INK[700], Palette.GILT["deep"]))
-	b.add_theme_stylebox_override("pressed", _panel_style(Palette.INK[900], Palette.GILT["base"]))
-	b.add_theme_stylebox_override("disabled", _panel_style(Palette.INK[900], Palette.INK[600]))
-	b.focus_mode = Control.FOCUS_NONE
-	MicroFx.hook(b)
+	# 墨玉三态（器物谱：形制库统一出口；禁用态字色由 jade_button 的 disabled 语义承担）
+	Artifacts.jade_button(b, {"size": 26})
+	b.disabled = not enabled
 	return b
 
-
-func _panel_style(bg: Color, border: Color) -> StyleBoxTexture:
-	# 墨玉按钮：玉纹内光 × 状态染色（FxAtlas.jade_box 9-slice；夜宴禁圆角 → 直角）
-	return FxAtlas.jade_box(bg)

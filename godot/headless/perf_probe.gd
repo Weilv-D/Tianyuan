@@ -17,8 +17,9 @@ func _initialize() -> void:
 	var rerender := Time.get_ticks_usec() - t0
 	print("SFX star3 first-synth=%.1fms prewarm-replay=%.2fms rerender=%.1fms pool=%d" % [
 		first / 1000.0, again / 1000.0, rerender / 1000.0, (sfx._pool["star3"] as Array).size()])
-	# 契约 1：二次预热必须命中池跳过合成（<2ms）
-	if again > 2000:
+	# 契约 1：二次预热必须命中池跳过合成（比例断言：回放 < 首合成的 1/10——绝对
+	# 毫秒阈值机器敏感，慢机误报/换实现误报，2.4.1 改比例）
+	if first > 0 and again > first / 10.0:
 		print("SFX_FAIL prewarm replay not cached")
 		fails += 1
 	# 契约 2：满池契约 —— 预载后池须恰 VARIANTS_PER_SOUND 个变体（2.4.0 起播放
@@ -26,9 +27,10 @@ func _initialize() -> void:
 	if int((sfx._pool["star3"] as Array).size()) != sfx.VARIANTS_PER_SOUND:
 		print("SFX_FAIL pool size")
 		fails += 1
-	# 契约 3：首合成落在合成耗时量级（>5ms——纯 GDScript 逐样本合成的真实成本；
-	# 若某天实现换 C#/预烘资产此断言重审）
-	if first < 5000:
+	# 契约 3：首合成必须是纯 GDScript 逐样本合成的真实成本量级（>2ms 下界 + 首 >
+	# 回放 10 倍的相对门槛——绝对阈值 5ms 在快机上曾误报，2.4.1 改相对口径；
+	# 若实现换 C#/预烘资产此断言按判例重审）
+	if first < 2000 or (first > 0 and first < again * 10.0):
 		print("SFX_FAIL first synth suspiciously fast")
 		fails += 1
 	print("PERF_PROBE ", "OK" if fails == 0 else "FAIL(%d)" % fails)

@@ -31,11 +31,13 @@ var star := 1
 var is_beast := false
 var friendly := false
 var uid := -1
+var dying := false  # 死亡演出在途（幂等闸；play_death 双触发防护）
 
 var _portrait: Sprite2D
 var _hp_bar: ColorRect
 var _mana_bar: ColorRect
 var _pips: Array = []
+var _shield_bar: ColorRect = null
 var _bob_t := 0.0
 var _base_y := 0.0
 ## 位移补间持有计数（hop/攻击突进）：>0 期间上层硬同步让路，防逐帧覆写压死演出
@@ -63,7 +65,7 @@ func setup(p_def_id: String, p_team: int, p_star: int, p_is_beast: bool) -> void
 
 	# 底座（稀有度色圆环）
 	var def: Variant = Spec.champion_by_id.get(def_id, null)
-	var rarity := int(def["cost"]) if def != null else 1
+	var rarity := clampi(int(def["cost"]) if def != null else 1, 1, 5)  # RARITY_COLOR 键域钳位
 	var base := _soft_ring(24.0, Palette.RARITY_COLOR[rarity], 0.92)
 	base.scale = Vector2(1.0, 0.5)
 	add_child(base)
@@ -93,6 +95,9 @@ func setup(p_def_id: String, p_team: int, p_star: int, p_is_beast: bool) -> void
 	add_child(_hp_bar)
 	_mana_bar = _bar(Vector2(-BAR_W / 2.0, bar_y - MANA_BAR_H - 1.5), Vector2(0, MANA_BAR_H), Palette.VOID["base"])
 	add_child(_mana_bar)
+	# 护盾覆条（月白，与血条同高，接在血条末端）
+	_shield_bar = _bar(Vector2(-BAR_W / 2.0, bar_y), Vector2(0, HP_BAR_H), Palette.MOON["light"])
+	add_child(_shield_bar)
 
 	# 星标（3 粒琢面宝石：器物谱·宝石 —— 点亮 GILT，未点墨玉空胎）
 	for i: int in 3:
@@ -166,6 +171,13 @@ func place_pop(pos: Vector2) -> void:
 func sync_bars(hp: float, max_hp: float, mp: float, max_mp: float, shield: float = 0.0) -> void:
 	var hp_ratio: float = clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0)
 	_hp_bar.size.x = BAR_W * hp_ratio
+	# 护盾覆条：月白窄条接在血条末端（shield 形参此前收了不上屏——头注释与实现
+	# 不符，2.4.1 补齐；无盾时宽 0 隐藏）
+	if _shield_bar != null:
+		var s_ratio: float = clampf(shield / maxf(max_hp, 1.0), 0.0, maxf(0.0, 1.0 - hp_ratio))
+		_shield_bar.size.x = BAR_W * s_ratio
+		_shield_bar.position.x = -BAR_W / 2.0 + BAR_W * hp_ratio
+		_shield_bar.visible = s_ratio > 0.001
 	# 低血提亮每帧按比例重算（含回升恢复）；敌我按 viewer 视角 friendly 而非原始 team
 	if not friendly:
 		_hp_bar.color = Palette.CINNABAR["light"] if hp_ratio < 0.3 else Palette.TEAM_COLOR[1]
@@ -198,6 +210,9 @@ func play_hit() -> void:
 ## 死亡「墨晕溶解」：噪声阈值 shader 吞没立绘 + 裁切缘染墨下沉 + 墨珠四散
 ## （web 版只有整体淡出——此处为 Godot 独有表现；静观模式由上层保持淡出口径）
 func play_death() -> void:
+	if dying:
+		return  # 死亡演出只播一次（death 事件与 _sync_all 双路径；2.4.1 审查修复）
+	dying = true
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://render/dissolve.gdshader")
 	mat.set_shader_parameter("noise_tex", FxAtlas.texture(FxAtlas.NOISE))

@@ -143,8 +143,17 @@ static func report_row_fits_side() -> bool:
 
 # ── 羁绊悬停笺 ──
 
+## 详情卡横向几何（原 game_scene 裸写 66/48/40，无测试钉——2.4.1 收敛）：
+## X_MIN=左栏右缘、X_RIGHT_PAD=屏右安全距、ANCHOR_DX=棋子右侧贴隙
+const DETAIL_X_MIN := 66
+const DETAIL_X_RIGHT_PAD := 48
+const DETAIL_ANCHOR_DX := 40.0
+
 const CAH_Y_MIN := 140
-const CAH_Y_MAX := 860
+# 卡/笺底沿上界：器匣卸载+分页钮带顶 = ITEM_BAR_Y+UNLOAD_BTN_DY = 844，净距 6。
+# 旧值 860 令成员卡下钳时压住按钮带 16px（PanelContainer STOP 吞点击）——跨契约
+# 冲突 2.4.1 修复；golden 由 hud_layout_test 同步钉新值
+const CAH_Y_MAX := 838
 const CAH_MAX_H := CAH_Y_MAX - CAH_Y_MIN
 const RAIL_POPUP_W := 250
 

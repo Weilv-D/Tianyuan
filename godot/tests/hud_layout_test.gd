@@ -1,4 +1,5 @@
-# HUD 几何契约测试（tests/hud-layout.test.ts 十组不变量的 GdUnit4 移植）。
+# HUD 几何契约测试（tests/hud-layout.test.ts 全量不变量的 GdUnit4 移植；
+# 计数随 TS 侧 20 个 it 同步，另有一条跨契约净距钉为 Godot 侧增补）。
 # 遮挡不变量回归：文字不出容器、元素两两不相交、轨不出栏。
 extends GdUnitTestSuite
 
@@ -125,13 +126,26 @@ func test_member_grid_fits_card_worst_case() -> void:
 func test_member_card_clamps_into_cah_band() -> void:
 	var h := HudLayout.trait_member_card_h(24)
 	var py := HudLayout.trait_member_clamp_y(HudLayout.rail_badge_world_y(16), h)
-	assert_float(float(py + h)).is_less_equal(860.0)
-	assert_float(float(py)).is_greater_equal(140.0)
-	assert_int(h).is_less_equal(860 - 140)
+	assert_float(float(py + h)).is_less_equal(float(HudLayout.CAH_Y_MAX))
+	assert_float(float(py)).is_greater_equal(float(HudLayout.CAH_Y_MIN))
+	assert_int(h).is_less_equal(HudLayout.CAH_MAX_H)
 	# 滚动后徽章锚在视口高处：卡钳位仍收在带内
 	var scrolled := HudLayout.trait_member_clamp_y(HudLayout.rail_badge_world_y(0, Layout.RAIL_Y - 300.0), h)
-	assert_float(float(scrolled + h)).is_less_equal(860.0)
-	assert_float(float(scrolled)).is_greater_equal(140.0)
+	assert_float(float(scrolled + h)).is_less_equal(float(HudLayout.CAH_Y_MAX))
+	assert_float(float(scrolled)).is_greater_equal(float(HudLayout.CAH_Y_MIN))
+
+
+## 跨契约：成员卡底沿与器匣卸载/分页钮带顶的净距（CAH 域定立早于器匣加钮，
+## 860 旧值曾压带 16px 吞点击——2.4.1 修复的回归钉）
+func test_member_card_bottom_clears_item_btn_band() -> void:
+	var band_top: float = Layout.ITEM_BAR_Y + Layout.UNLOAD_BTN_DY
+	var h := HudLayout.trait_member_card_h(24)
+	var worst: float = HudLayout.trait_member_clamp_y(1e9, h) + h  # 任意低锚 → 钳到上界
+	assert_float(band_top - worst).is_greater_equal(6.0)
+	# 悬停笺同域同理
+	var pw := HudLayout.RAIL_POPUP_W
+	var popup_bottom: float = HudLayout.rail_popup_pos(1e9, HudLayout.rail_popup_layout(1, 1)["h"])["y"] + HudLayout.rail_popup_layout(1, 1)["h"]
+	assert_float(band_top - popup_bottom).is_greater_equal(0.0)
 
 
 func test_member_pitch_ge_size_plus_gap() -> void:
