@@ -226,6 +226,7 @@ func _run_smoke(spec_txt: String) -> void:
 	var tab2 := spec.size() > 2 and spec[2] == "tab2"
 	var tab3 := spec.size() > 2 and spec[2] == "tab3"
 	var adv := spec.size() > 2 and spec[2] == "adv"
+	var rpt := spec.size() > 2 and spec[2] == "rpt"
 	var frame_ms: Array = []
 	var fx_peak := 0
 	var shop_before := ""
@@ -297,7 +298,30 @@ func _run_smoke(spec_txt: String) -> void:
 			var sc4 = get_tree().current_scene
 			var views_n: int = sc4.get("unit_views").size() if sc4 != null and sc4.get("unit_views") != null else -1
 			print("UI_BUY gold=", gold2, " views=", views_n, " ", "OK purchased" if gold2 < 40.0 else "FAIL unspent")
-		if adv and i == 30:
+		if rpt and i == 30:
+			# 回合结算面板实拍（双列战斗统计）：塞阵容 + 伪造 battle_stats 走 _after_settle
+			#（真实路径要开战跑完整场战斗；统计渲染与数据格式是本探针的验收面）
+			var rm: Match = scene_data.get("match", null)
+			if rm != null:
+				Spec.ensure()
+				for slot: int in 3:
+					if rm.human()["board"][slot] == null:
+						rm.human()["board"][slot] = GameState.create_unit(String(Spec.champions[slot]["id"]), 1)
+				rm.human()["lastOutcome"] = "win"
+				Sess.scene_data["battle_stats"] = [
+					{ "uid": 1, "defId": "duanyue", "name": "断岳", "team": 0, "star": 2, "alive": true,
+						"physical": 1240.0, "magic": 320.0, "true": 60.0 },
+					{ "uid": 2, "defId": "moyu", "name": "墨羽", "team": 0, "star": 1, "alive": true,
+						"physical": 640.0, "magic": 880.0, "true": 0.0 },
+					{ "uid": 3, "defId": "hanguan", "name": "寒星", "team": 0, "star": 1, "alive": false,
+						"physical": 210.0, "magic": 0.0, "true": 40.0 },
+					{ "uid": 4, "defId": "lingque", "name": "灵雀", "team": 1, "star": 3, "alive": true,
+						"physical": 990.0, "magic": 1500.0, "true": 120.0 },
+					{ "uid": 5, "defId": "qingluan", "name": "青鸾", "team": 1, "star": 1, "alive": false,
+						"physical": 80.0, "magic": 260.0, "true": 0.0 },
+				]
+				get_tree().current_scene.call_deferred("_after_settle", [])
+		elif adv and i == 30:
 			# 奇遇面板实拍：直接塞 offer 触发 _check_adventure（真回合要 4/10/16 轮）
 			var am: Match = scene_data.get("match", null)
 			if am != null and am.adventure_offer == null:
