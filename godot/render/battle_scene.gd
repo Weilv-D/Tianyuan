@@ -179,12 +179,16 @@ func _build_one_trait_panel(pos: Vector2, title: String, who: String, accent: Co
 		y += 28
 		var eff: Array = def.get("effectText", [])
 		if tier < eff.size():
-			var eff_l := _label(String(eff[tier]), 12, Palette.PAPER[300])
+			# 效果文案折行数实测、行距动态步进——旧固定 y+=46 在 3 行文案（12px×3=51px）
+			# 时压到下一行羁绊名（文字重叠事故点）
+			var eff_txt := String(eff[tier])
+			var elines := Artifacts.est_lines(eff_txt, 12, 400.0)
+			var eff_l := _label(eff_txt, 12, Palette.PAPER[300])
+			eff_l.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY  # 折行先于 size（钳位判例）
 			eff_l.position = Vector2(pos.x + 10, y)
-			eff_l.size = Vector2(400, 200)
-			eff_l.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+			eff_l.size = Vector2(400, float(elines) * 17.0)
 			add_child(eff_l)
-			y += 46
+			y += maxi(46, elines * 17 + 12)
 
 
 func _draw_bg() -> void:

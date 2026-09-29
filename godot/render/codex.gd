@@ -150,7 +150,7 @@ func _trait_row(t: Dictionary) -> PanelContainer:
 	vb.add_child(body)
 	var desc := _lbl(String(t["description"]), 13, Palette.PAPER[400])
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(BODY_W - 64, 0)
+	desc.custom_minimum_size = Vector2(BODY_W - 64.0, float(Artifacts.est_lines(String(t["description"]), 13, BODY_W - 64.0)) * 19.0)
 	body.add_child(desc)
 	# 档位格：几档亮几格（对局内羁绊行同语汇；档位色 TRAIT_TIER_COLOR 真源）
 	var tiers := HBoxContainer.new()
@@ -165,10 +165,10 @@ func _trait_row(t: Dictionary) -> PanelContainer:
 	var bps: Array = t["breakpoints"]
 	var effs: Array = t.get("effectText", [])
 	for i: int in bps.size():
-		var eff := _lbl("%d 人：%s" % [int(bps[i]), String(effs[i]) if i < effs.size() else "—"],
-			13, Palette.TRAIT_TIER_COLOR[mini(i, 3)] if i == bps.size() - 1 else Palette.PAPER[300])
+		var eff_txt := "%d 人：%s" % [int(bps[i]), String(effs[i]) if i < effs.size() else "—"]
+		var eff := _lbl(eff_txt, 13, Palette.TRAIT_TIER_COLOR[mini(i, 3)] if i == bps.size() - 1 else Palette.PAPER[300])
 		eff.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		eff.custom_minimum_size = Vector2(BODY_W - 64, 0)
+		eff.custom_minimum_size = Vector2(BODY_W - 64.0, float(Artifacts.est_lines(eff_txt, 13, BODY_W - 64.0)) * 19.0)
 		body.add_child(eff)
 	# 成员网格：立绘 + 名（上阵与否不做状态着色——图鉴是全量静态册）
 	var grid := GridContainer.new()
@@ -361,9 +361,9 @@ func _champ_detail(c: Dictionary) -> void:
 	sk_name.position = Vector2(28, 310)
 	panel.add_child(sk_name)
 	var desc := _lbl(String(skill["desc"]), 15, Palette.PAPER[200])
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # 折行先于 size（钳位判例）
 	desc.position = Vector2(28, 348)
 	desc.size = Vector2(624, 180)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(desc)
 
 
@@ -387,9 +387,9 @@ func _item_detail(it: Dictionary) -> void:
 	meta.position = Vector2(150, 80)
 	panel.add_child(meta)
 	var desc := _lbl(String(it["desc"]), 17, Palette.PAPER[200])
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # 折行先于 size（钳位判例）
 	desc.position = Vector2(32, 160)
 	desc.size = Vector2(456, 90)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(desc)
 	var recipe: Variant = it.get("recipe", null)
 	if recipe != null:

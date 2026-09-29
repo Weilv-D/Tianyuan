@@ -411,10 +411,11 @@ func _build_side_panels() -> void:
 	log_cap.position = Vector2(Layout.LOG_X, Layout.LOG_Y + 12)
 	add_child(log_cap)
 	log_label = _label("", 16, Palette.PAPER[300])
+	# 折行/截断先于 size（钳位判例）；奇遇回合长行按字断行、超高截断在区内
+	log_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	log_label.clip_text = true
 	log_label.position = Vector2(Layout.LOG_X, Layout.LOG_Y + 34)
 	log_label.size = Vector2(Layout.LOG_W, Layout.LOG_H - 40)
-	# 奇遇回合长行横穿器匣：CJK 按字断行
-	log_label.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
 	add_child(log_label)
 	# 上回合战报（右下）
 	var hair2 := ColorRect.new()
@@ -426,6 +427,7 @@ func _build_side_panels() -> void:
 	rep_cap.position = Vector2(Layout.REPORT_X, Layout.REPORT_Y + 12)
 	add_child(rep_cap)
 	report_label = _label("", 16, Palette.PAPER[300])
+	report_label.clip_text = true  # 先于 size：未钳位时最小宽=最长行，截断形同虚设
 	report_label.position = Vector2(Layout.REPORT_X, Layout.REPORT_Y + 34)
 	report_label.size = Vector2(Layout.SIDE_W, 200)
 	add_child(report_label)
@@ -574,14 +576,16 @@ func _refresh_shop() -> void:
 		sp.custom_minimum_size = Vector2(Layout.SHOP_CW - 16, 92)
 		sp.position = Vector2(8, 6)
 		b.add_child(sp)
-		var name_l := _label("%s  %d金" % [def["name"], int(def["cost"])], 17, Palette.RARITY_COLOR[int(def["cost"])])
+		var name_l := _label("%s  %d金" % [def["name"], int(def["cost"])], 15, Palette.RARITY_COLOR[int(def["cost"])])
+		# 截断先于 size（钳位判例）：四字名+费数在 104px 卡宽内贴边，未钳位时截断形同虚设
+		name_l.clip_text = true
 		name_l.position = Vector2(8, 104)
 		name_l.size = Vector2(Layout.SHOP_CW - 16, 24)
 		b.add_child(name_l)
 		var trait_l := _label(_trait_names(def), 14, Palette.PAPER[400])
+		trait_l.clip_text = true
 		trait_l.position = Vector2(8, 130)
 		trait_l.size = Vector2(Layout.SHOP_CW - 16, 20)
-		trait_l.clip_text = true
 		b.add_child(trait_l)
 		# 费阶宝石（器物谱·琢面）：右上角落印，与名字行稀有度色同源互证
 		var gem := Artifacts.cost_gem(int(def["cost"]), 18.0)
@@ -690,13 +694,22 @@ func _check_adventure() -> void:
 	for i: int in options.size():
 		var opt: Dictionary = options[i]
 		var b := Button.new()
-		b.text = "%s\n%s" % [opt["title"], opt["desc"]]
 		b.position = Vector2(20 + i * 244, 90)
 		b.custom_minimum_size = Vector2(224, 200)
 		# 奇遇选项卡=墨玉大卡（器物谱：玉）—— 三态与全站按钮同律
 		Artifacts.jade_button(b, {"size": 17})
-		# desc 超宽不换行会横向溢出三卡互叠
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# 标题/描述手工排布。旧码 `b.autowrap_mode = ...` 是潜伏炸点：Button 无此属性，
+		# 赋值即运行时错误中断本函数——按钮不进面板、refresh 链断裂（2.5.1 实证定性）；
+		# desc 折行行数实测估算、显式撑高（autowrap Label 在普通父级下不自动增高）
+		var ttl2 := _label(String(opt["title"]), 17, Palette.GILT["light"])
+		ttl2.position = Vector2(16, 20)
+		b.add_child(ttl2)
+		var dtxt := String(opt["desc"])
+		var dl := _label(dtxt, 13, Palette.PAPER[200])
+		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		dl.position = Vector2(16, 60)
+		dl.size = Vector2(192, float(Artifacts.est_lines(dtxt, 13, 192.0)) * 19.0)
+		b.add_child(dl)
 		var idx := i
 		b.pressed.connect(func() -> void:
 				match_ref.resolve_adventure(idx)
@@ -1198,7 +1211,16 @@ func _update_rail_popup(badge_i: int) -> void:
 	else:
 		lines.append("未激活（%d）" % int(b["count"]))
 	var desc_lines: Array = [String(def.get("description", ""))]
-	var layout := HudLayout.rail_popup_layout(lines.size(), desc_lines.size())
+	# 笺高按实际折行数估算（效果文案 15px/描述 14px 在笺宽内 autowrap，长档 2-3 行——
+	# 旧码按「一文案一行」传参，笺高低估、底部画出笺外）
+	var pop_w := float(HudLayout.RAIL_POPUP_W) - 24.0
+	var eff_n := 0
+	for ln: String in lines:
+		eff_n += Artifacts.est_lines(ln, 15, pop_w)
+	var desc_n := 0
+	for d2: String in desc_lines:
+		desc_n += Artifacts.est_lines(d2, 14, pop_w)
+	var layout := HudLayout.rail_popup_layout(eff_n, desc_n)
 	var pos := HudLayout.rail_popup_pos(HudLayout.rail_badge_world_y(badge_i), layout["h"])
 	if rail_popup != null:
 		rail_popup.queue_free()
@@ -1230,10 +1252,13 @@ func _update_rail_popup(badge_i: int) -> void:
 	for ln: String in lines:
 		var l2 := _label(ln, 15, Palette.PAPER[200])
 		l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# autowrap Label 在 VBox 里的最小高度只算一行——行数实测、显式撑高
+		l2.custom_minimum_size = Vector2(pop_w, float(Artifacts.est_lines(ln, 15, pop_w)) * 21.0)
 		vb.add_child(l2)
 	for d: String in desc_lines:
 		var l3 := _label(d, 14, Palette.PAPER[400])
 		l3.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l3.custom_minimum_size = Vector2(pop_w, float(Artifacts.est_lines(d, 14, pop_w)) * 19.0)
 		vb.add_child(l3)
 
 
@@ -1619,9 +1644,10 @@ func _open_scout(title: String, sub: String, board: Array) -> void:
 	for t: Dictionary in active:
 		parts.append("%s %d" % [String(Spec.traits_by_id[String(t["id"])].get("name", t["id"])), int(t["count"])])
 	var tr := _label(" · ".join(parts) if parts.size() > 0 else "（未激活任何羁绊）", 13, Palette.PAPER[200])
+	tr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tr.clip_text = true  # 全激活 17 羁绊折 3 行封顶，截断防越「关闭」钮带
 	tr.position = Vector2(90, ty + 2)
 	tr.size = Vector2(bw - 130, 60)
-	tr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(tr)
 	var close := Button.new()
 	close.text = "关 闭"
@@ -1989,24 +2015,25 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 			icon.size = Vector2(26, 26)
 			card.add_child(icon)
 			var iname := _label(String(idef["name"]) if idef != null else iid, 10, Palette.PAPER[300])
+			iname.clip_text = true
 			iname.position = Vector2(fx + 30, 154)
 			iname.size = Vector2(56, 18)
-			iname.clip_text = true
 			card.add_child(iname)
 	var trait_l := _label(_trait_names(def), 13, Palette.SPIRIT["light"])
+	trait_l.clip_text = true
 	trait_l.position = Vector2(14, 192)
 	trait_l.size = Vector2(w - 28, 18)
-	trait_l.clip_text = true
 	card.add_child(trait_l)
 	var sk: Dictionary = def["skillSpec"]
 	var skill_l := _label(String(sk["name"]), 14, Palette.VOID["light"])
 	skill_l.position = Vector2(14, 214)
 	card.add_child(skill_l)
 	var desc_l := _label(_fmt_skill_desc(String(sk["desc"]), sk.get("params", {})), 12, Palette.PAPER[400])
-	desc_l.position = Vector2(14, 236)
-	desc_l.size = Vector2(w - 28, h - 236 - (44 if pinned else 0) - 10)
+	# 折行先于 size（autowrap 未开时 size 赋值被全文宽钳位、之后开折行无效）
 	desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_l.clip_text = true
+	desc_l.position = Vector2(14, 236)
+	desc_l.size = Vector2(w - 28, h - 236 - (44 if pinned else 0) - 10)
 	card.add_child(desc_l)
 	# 出售带（仅钉住态；2★/3★ 两步确认——原版同口径）
 	if pinned:
@@ -2105,10 +2132,11 @@ func _toggle_trait_modal() -> void:
 		panel.add_child(cnt)
 		var eff: Array = def.get("effectText", [])
 		var eff_l := _label(String(eff[tier]) if tier >= 0 and tier < eff.size() else (String(eff[0]) if next_bp > 0 and eff.size() > 0 else String(def.get("description", ""))), 12, Palette.PAPER[200] if tier >= 0 else Palette.PAPER[500])
-		eff_l.position = Vector2(230, y + 2)
-		eff_l.size = Vector2(bw - 250, 32)
+		# 折行/截断先于 size（钳位判例）；行距 36 容 12px 两行（34px）
 		eff_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		eff_l.clip_text = true
+		eff_l.position = Vector2(230, y + 2)
+		eff_l.size = Vector2(bw - 250, 32)
 		panel.add_child(eff_l)
 		y += 36.0
 	Sess.sfx.play("ui")
@@ -2184,8 +2212,8 @@ func _render_report_columns(panel: Panel, stats: Array) -> void:
 	var col_w := 310
 	var top := 130
 	var row_h := 34
-	var bar_x := 118
-	var bar_w := 128
+	var bar_x := 126
+	var bar_w := 122
 	var max_dealt := 1.0
 	for st: Dictionary in stats:
 		max_dealt = maxf(max_dealt, float(st["physical"]) + float(st["magic"]) + float(st["true"]))

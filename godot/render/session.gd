@@ -225,6 +225,7 @@ func _run_smoke(spec_txt: String) -> void:
 	var drag := spec.size() > 2 and spec[2] == "drag"
 	var tab2 := spec.size() > 2 and spec[2] == "tab2"
 	var tab3 := spec.size() > 2 and spec[2] == "tab3"
+	var adv := spec.size() > 2 and spec[2] == "adv"
 	var frame_ms: Array = []
 	var fx_peak := 0
 	var shop_before := ""
@@ -296,7 +297,17 @@ func _run_smoke(spec_txt: String) -> void:
 			var sc4 = get_tree().current_scene
 			var views_n: int = sc4.get("unit_views").size() if sc4 != null and sc4.get("unit_views") != null else -1
 			print("UI_BUY gold=", gold2, " views=", views_n, " ", "OK purchased" if gold2 < 40.0 else "FAIL unspent")
-		if tab2 or tab3:
+		if adv and i == 30:
+			# 奇遇面板实拍：直接塞 offer 触发 _check_adventure（真回合要 4/10/16 轮）
+			var am: Match = scene_data.get("match", null)
+			if am != null and am.adventure_offer == null:
+				am.adventure_offer = { "options": [
+					{ "kind": "gold", "title": "横 财", "desc": "金币 +12，计入持有，参与利息结算。" },
+					{ "kind": "item", "title": "丹青成装", "desc": "随机成品装备 ×1，放入装备栏。" },
+					{ "kind": "reinforce", "title": "援 军", "desc": "入驻备战席，占卡池 3 张；席满折返 2 金。" },
+				] }
+				get_tree().current_scene.call_deferred("refresh_all")
+		elif tab2 or tab3:
 			# 图鉴页签实机点击：羁绊（屏 x950）/ 装备（屏 x1100），y=112 为页签带中心
 			var px: float = 1100.0 if tab3 else 950.0
 			if i == 40:

@@ -107,12 +107,18 @@ static func glaze_back(w: float, h: float) -> Sprite2D:
 
 ## 文本标签形制（五处散点 _label/_lbl 构造收敛于此——2.4.1 审查修复）。
 ## opts: {"font": Font, "align": "center"/"right", "w": 宽, "clip": true, "wrap": true}
+## 顺序纪律：clip/wrap 必须先于 size——autowrap 未开时 Label 最小宽=全文宽，
+## size 赋值被钳到全文宽且不回缩，随后再开折行已无效（文字画出框外，2.5.1 判例）
 static func label(text: String, size: int, color: Color, opts := {}) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_override("font", opts.get("font", Sess.body_font))
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
+	if opts.get("clip", false):
+		l.clip_text = true
+	if opts.get("wrap", false):
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if opts.has("w"):
 		l.size = Vector2(float(opts["w"]), l.size.y)
 	var al: String = String(opts.get("align", ""))
@@ -120,11 +126,27 @@ static func label(text: String, size: int, color: Color, opts := {}) -> Label:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	elif al == "right":
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	if opts.get("clip", false):
-		l.clip_text = true
-	if opts.get("wrap", false):
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return l
+
+
+## 显示宽（CJK 记 2、ASCII 记 1）——折行估算与列对齐共用口径
+static func disp_w(s: String) -> int:
+	var w := 0
+	for ch in s:
+		w += 2 if ch.unicode_at(0) > 0x2E7F else 1
+	return w
+
+
+## autowrap 行数估算。Label 的 autowrap 在容器里的最小高度只算一行，容器按此分配
+## 矩形、多行文字画出框外——「手算行距/固定行高」的文字重叠事故皆源于此；凡
+## autowrap 长文本，行数以此估算并显式撑高（custom_minimum_size / 动态步进）。
+## 半角字宽 ≈ 0.5×字号，行效率 0.92 抵消标点收束；估值偏高半行内是安全侧。
+static func est_lines(text: String, font_size: int, width_px: float) -> int:
+	var per_line := maxf(4.0, width_px / (float(font_size) * 0.5) * 0.92)
+	var lines := 0
+	for para: String in text.split("\n"):
+		lines += maxi(1, ceili(float(disp_w(para)) / per_line))
+	return maxi(1, lines)
 
 
 ## 出售印形制（66×66 朱砂大方印：金字 + 鎏金内线 + 纸白边）—— 拖拽出售目标

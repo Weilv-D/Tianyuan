@@ -98,5 +98,7 @@ const LOG_H := 224
 
 # ── 悬停详情卡 ──
 const DETAIL_W := 300
-const DETAIL_H := 304
+# 344：技能描述区（y236 起）得 98px ≈ 5.7 行——旧 304 只给 58px ≈ 3.4 行，
+# 中长技能文案被 clip 截断丢信息（2.5.1）
+const DETAIL_H := 344
 const DETAIL_SELL_BAND := 44
