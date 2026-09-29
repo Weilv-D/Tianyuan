@@ -28,10 +28,21 @@ func _ready() -> void:
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(tag)
 
-	# 底部剪影长卷：几名棋子的墨影平铺，暗合「点将」的意象（MenuScene 对齐）
+	# 剪影屏风（构图纠偏）：早前长卷平铺横穿按钮列正中——实心按钮把人物脸一切两半
+	# （用户实机报告）。改为中心留空、左右两簇错落簇拥：x ∈ [-240, 240] 只留标题与
+	# 按钮，人物沉到画面下三分之一，脸全部不被覆盖
 	var picks := [7, 19, 31, 44, 56]
 	var n_champs: int = Spec.champions.size()
-	for k: int in picks.size():
+	# 屏风四枚：左右各二，**净距 ≥125px** —— 立绘兵器横向伸出量约 30-60px，
+	# 重叠构图会让前排兵器扫进后排人物的脸（用户实机报告）；不重叠则绝不遮挡。
+	# 内淡小、外浓大的纵深层次；全部沉到下缘，中心区只留标题与按钮。
+	# [左边缘 x, 底边 y, 高, alpha] —— 根为中心基制（0 = 画面中心）
+	var layout: Array = [
+		[-770, 455.0, 250.0, 0.32], [-395, 500.0, 195.0, 0.44],
+		[200.0, 500.0, 195.0, 0.44], [520.0, 455.0, 250.0, 0.32],
+	]
+	for k: int in layout.size():
+		var cfg: Array = layout[k]
 		var idx := int(picks[k]) % n_champs
 		var def_id := String(Spec.champions[idx]["id"])
 		var tex: Texture2D = load("res://assets/pieces/%s.png" % def_id)
@@ -40,9 +51,10 @@ func _ready() -> void:
 		var sh := Sprite2D.new()
 		sh.texture = tex
 		sh.centered = false
-		sh.modulate = Color(Palette.INK[500], 0.34)
-		sh.position = Vector2(-260.0 * 2.0 + k * 260.0 - 104.0, 390.0 - 260.0)
-		sh.scale = Vector2(260.0 / 208.0, 260.0 / 208.0)
+		sh.modulate = Color(Palette.INK[500], float(cfg[3]))
+		var hgt := float(cfg[2])
+		sh.scale = Vector2(hgt / 208.0, hgt / 208.0)
+		sh.position = Vector2(float(cfg[0]), float(cfg[1]) - hgt)
 		add_child(sh)
 
 	var has_save: bool = SaveStore.has_save("normal")

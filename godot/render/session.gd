@@ -151,6 +151,7 @@ func _run_smoke(spec_txt: String) -> void:
 	var keyd := spec.size() > 2 and spec[2] == "keyd"
 	var hover := spec.size() > 2 and spec[2] == "hover"
 	var perf := spec.size() > 2 and spec[2] == "perf"
+	var buy := spec.size() > 2 and spec[2] == "buy"
 	var frame_ms: Array = []
 	var fx_peak := 0
 	var shop_before := ""
@@ -205,6 +206,23 @@ func _run_smoke(spec_txt: String) -> void:
 					resid += 1
 					print("DESC_RESID ", c["id"], " ", txt.substr(0, 60))
 			print("DESC_ALL n=", Spec.champions.size(), " bad=", bad, " residual=", resid)
+		if buy and i == 40:
+			# 商店卡合成触发（输入链本身由 keyd/hover 探针覆盖，这里只验
+			# _on_buy → _fly_coin 金币飞行 → 羁绊激活检测 → refresh 全链）
+			var bm: Match = scene_data.get("match", null)
+			if bm != null:
+				bm.human()["gold"] = 40.0
+			var sc3 = get_tree().current_scene
+			if sc3 != null and sc3.get("shop_buttons") != null:
+				var b0: Button = (sc3.get("shop_buttons") as Array)[0]
+				b0.pressed.emit()
+		elif buy and i == 46:
+			# 购买成功 = 金币减少（autoDeploy 开启时棋子直接上台，bench 常驻 0——以金币为据）
+			var bm2: Match = scene_data.get("match", null)
+			var gold2 := float(bm2.human()["gold"]) if bm2 != null else -1.0
+			var sc4 = get_tree().current_scene
+			var views_n: int = sc4.get("unit_views").size() if sc4 != null and sc4.get("unit_views") != null else -1
+			print("UI_BUY gold=", gold2, " views=", views_n, " ", "OK purchased" if gold2 < 40.0 else "FAIL unspent")
 		if keyd and i == 40:
 			var m: Match = scene_data.get("match", null)
 			if m != null:

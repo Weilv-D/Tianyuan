@@ -72,6 +72,7 @@ var press_pos := Vector2.ZERO  # 点击→钉卡判定（<8px 视为点选而非
 var toast_label: Label = null
 var _atmo: Atmosphere  # 盘面灵尘氛围（战斗期切余烬由战斗场景自管）
 var _top_last := {}  # 顶栏数值前值（金币跳字用）
+var _last_trait_tiers := {}  # 羁绊档位前值（激活点亮检测）
 
 
 func _ready() -> void:
@@ -477,10 +478,17 @@ func refresh_all() -> void:
 	# spec 调 INCOME_BASE 时预告必须跟着变，否则显示与实际收入静默背离）
 	(labels["round"] as Label).text = str(match_ref.round)
 	(labels["hp"] as Label).text = str(int(p["hp"]))
-	# 金币「跳字」：与上次刷新差值大时滚动（MicroFx.roll_number；同值直设）
+	# 金币「跳字」+ 入袋脉冲：与上次刷新差值大时滚动（MicroFx.roll_number；同值直设）
 	var gold_l := labels["gold"] as Label
 	var gold_now := int(p["gold"])
-	MicroFx.roll_number(gold_l, int(_top_last.get("gold", gold_now)), gold_now)
+	var gold_from := int(_top_last.get("gold", gold_now))
+	MicroFx.roll_number(gold_l, gold_from, gold_now)
+	if gold_now > gold_from and gold_from >= 0:
+		# 增长脉冲：数值轻弹一下——「钱到账了」的确认感（收入/卖出共用）
+		gold_l.pivot_offset = gold_l.size / 2.0
+		var gp := gold_l.create_tween()
+		gp.tween_property(gold_l, "scale", Vector2.ONE * 1.14, 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		gp.tween_property(gold_l, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_top_last["gold"] = gold_now
 	(labels["level"] as Label).text = str(int(p["level"]))
 	var inc := int(Spec.c("INCOME_BASE", 5)) + Economy.interest_of(p["gold"]) + Economy.streak_gold(int(p["streak"]))
@@ -493,7 +501,13 @@ func refresh_all() -> void:
 	if xp_bar_fg != null:
 		var need := Economy.xp_to_next(int(p["level"]))
 		if need > 0:
-			xp_bar_fg.size.x = 56.0 * clampf(float(p["xp"]) / float(need), 0.0, 1.0)
+			# 经验条增长补间（56px 微条）：经验到账是「经验流」的获得，直接 set 看不出
+			var tx := 56.0 * clampf(float(p["xp"]) / float(need), 0.0, 1.0)
+			if absf(tx - xp_bar_fg.size.x) > 0.5:
+				var xtw := xp_bar_fg.create_tween()
+				xtw.tween_property(xp_bar_fg, "size:x", tx, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			else:
+				xp_bar_fg.size.x = tx
 			xp_text.text = "%d/%d" % [int(p["xp"]), need]
 		else:
 			xp_bar_fg.size.x = 56.0
@@ -503,6 +517,7 @@ func refresh_all() -> void:
 	_refresh_item_bar()
 	_refresh_side_panels()
 	_refresh_trait_rail()
+	_detect_trait_activation()
 	_check_adventure()
 
 
@@ -748,16 +763,119 @@ func _after_action() -> void:
 	refresh_all()
 	SaveStore.save_match(match_ref)
 
+## ── 经营体感（第三轮表现层）────────────────────────────────
+## 金币飞顶栏 / 羁绊激活点亮 / 出售墨化 / 开战墨晕。全部只动演出时钟，零内核改动。
+
+## 金币飞顶栏：一枚鎏金 GLOW 自来源位置抛物线飞向顶栏金币值，落位即脉冲
+## （买入的来源是商店卡、卖出的来源是单位位、收入结算的来源是阶段条中央）
+func _fly_coin(from_world: Vector2, gold: int) -> void:
+	if gold <= 0:
+		return
+	var target := Vector2(1450.0, 26.0)  # 顶栏金币值锚（_build_top_bar 口径）
+	var count := mini(3, 1 + gold / 4)
+	for i: int in count:
+		var c := Sprite2D.new()
+		c.texture = FxAtlas.texture(FxAtlas.GLOW)
+		c.material = FxAtlas.add_material()
+		c.modulate = Color(Palette.GILT["light"], 0.95)
+		c.position = from_world + Vector2(randf_range(-14.0, 14.0), randf_range(-8.0, 8.0))
+		c.scale = Vector2.ONE * (0.09 + 0.03 * float(i))
+		add_child(c)
+		var p0 := c.position
+		var mid := (p0 + target) / 2.0 + Vector2(randf_range(-40.0, 40.0), -90.0)
+		var tw := c.create_tween()
+		tw.tween_method(func(t: float) -> void:
+			# 二次贝塞尔：起飞直、中段扬升、末段扎入（比线性飞更有「抛」的重量）
+			var q1 := (1.0 - t) * (1.0 - t) * p0 + 2.0 * (1.0 - t) * t * mid + t * t * target
+			c.position = q1
+			c.scale = Vector2.ONE * (0.12 * (1.0 - 0.55 * t)), 0.0, 1.0, 0.36).set_delay(float(i) * 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(c.queue_free)
+
+
+## 羁绊激活点亮：某羁绊从「未激活」到「首次激活」的瞬间，徽章位置一枚金光扫环
+## —— 正反馈的仪式感（数据已由 Comp 如实给出，这里只是让那一瞬被看见）
+func _detect_trait_activation() -> void:
+	var ids: Array = _board_def_ids()
+	var now := {}
+	var freshly: Array = []
+	for t: Dictionary in Comp.compute_traits(ids):
+		var id := String(t["id"])
+		now[id] = int(t["tier"])
+		if int(t["tier"]) >= 0 and int(_last_trait_tiers.get(id, -1)) < 0:
+			freshly.append(id)
+	_last_trait_tiers = now
+	if freshly.is_empty():
+		return
+	# 点亮锚：可见徽章序（badges_visible 与 _refresh_trait_rail 同序）
+	for b: Dictionary in badges_visible:
+		if not freshly.has(String(b["id"])):
+			continue
+		var hit: Rect2 = b["hit"]
+		_trait_light_pop(hit.get_center())
+		# 一回合多处激活只放最响的一次音（激活是低频事件）
+		if b == badges_visible[0]:
+			Sess.sfx.play("uiBig")
+
+
+func _trait_light_pop(at: Vector2) -> void:
+	var ring := Sprite2D.new()
+	ring.texture = FxAtlas.texture(FxAtlas.RING)
+	ring.material = FxAtlas.add_material()
+	ring.modulate = Color(Palette.GILT["light"], 0.0)
+	ring.position = at
+	add_child(ring)
+	var tw := ring.create_tween()
+	tw.tween_method(func(t: float) -> void:
+		ring.scale = Vector2.ONE * (28.0 + 70.0 * t) / 128.0
+		ring.modulate.a = 0.85 * (1.0 - t), 0.0, 1.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(ring.queue_free)
+
+
+## 出售墨化：棋子先「化墨而去」再结算刷新（早前直接 refresh，单位凭空消失没有句号）
+## views 字典先脱钩：墨化件自生自灭（0.55s），refresh 重建不会指向已销毁引用
+func _sell_with_fx(iid: int, from_world: Vector2) -> void:
+	var v: UnitView = unit_views.get(iid, null)
+	if v != null and is_instance_valid(v):
+		unit_views.erase(iid)
+		v.play_death()
+
+
+## 开战墨晕：按下开战，按钮位置一枚墨晕环扩散 —— 「开锣」的仪式
+func _start_battle_pulse(at: Vector2) -> void:
+	var stain := Sprite2D.new()
+	stain.texture = FxAtlas.texture(FxAtlas.INK_DOT)
+	stain.material = FxAtlas.add_material()
+	stain.modulate = Color(Palette.INK[500], 0.0)
+	stain.position = at
+	add_child(stain)
+	var tw := stain.create_tween()
+	tw.tween_method(func(t: float) -> void:
+		stain.scale = Vector2.ONE * (20.0 + 160.0 * t) / 64.0
+		stain.modulate.a = 0.5 * (1.0 - t), 0.0, 1.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(stain.queue_free)
+
+
+
+
 
 func _on_buy(slot: int) -> void:
 	_push_undo()
 	var stars_before := _stars_snapshot()
+	# 买前记录来源位与售价：fly 的锚是这张卡，值是它的标价（买后 shop 已换新货）
+	var shop := match_ref.human()["shop"] as Array
+	var from_pos := Vector2(Layout.SHOP_X + slot * (Layout.SHOP_CW + Layout.SHOP_GAP) + Layout.SHOP_CW / 2.0, Layout.SHOP_Y + Layout.SHOP_CH / 2.0)
+	var paid := 0
+	if slot >= 0 and slot < shop.size():
+		var sdef: Variant = Spec.champion_by_id.get(String(shop[slot]), null)
+		paid = int(sdef["cost"]) if sdef != null else 0
 	var r: Dictionary = match_ref.buy(match_ref.human(), slot)
 	if not r["ok"]:
 		undo_stack.pop_back()
 		Sess.sfx.play("warn")
 		return
 	Sess.sfx.play("coin")
+	if paid > 0:
+		_fly_coin(from_pos, paid)
 	_detect_merge_sound(stars_before)
 	_after_action()
 
@@ -1290,6 +1408,8 @@ func _start_battle_phase() -> void:
 		if int(q["a"]) == 0 or int(q["b"]) == 0:
 			me_pair = q
 	Sess.sfx.play_pluck(196.0)  # 徵音起手：开战的弦响（原版 GameScene:803 同款）
+	# 开战墨晕：阶段条中央一枚墨晕环扩散——「开锣」的仪式（随后场景转场墨晕吞没衔接）
+	_start_battle_pulse(Vector2(Layout.W / 2.0, Layout.PHASE_Y))
 	if me_pair.is_empty():
 		# 轮空：清上一场战报残留，结算面板不渲染过期战斗的双列
 		Sess.scene_data.erase("battle_stats")
@@ -1914,6 +2034,7 @@ func _show_detail(u: Dictionary, pinned: bool) -> void:
 				return
 			if match_ref.sell(match_ref.human(), sell_iid):
 				Sess.sfx.play("coin")
+				_sell_with_fx(sell_iid, get_global_mouse_position())
 				undo_stack.clear()
 				SaveStore.save_match(match_ref)
 				refresh_all()

@@ -301,6 +301,33 @@ Node 入树、产品后台任务放场景生命周期（boot），不放 autoloa
 是同一修复的两半：只做缓存命中（变体池）首播仍卡，只做预热（纹理）运行期新路径仍
 裸奔——音频两半都做，纹理预热后 load 全命中。
 
+### 第十四轮全库深度审查（2026-09-29，2.1.1）
+
+用户实机报告「人物脚底的黑色圆有问题，乱飘」驱动 + 全树逐文件审查（core/game/render/
+ui/audio/tools/headless/tests/data 全量，约 1.7 万行，core 对 TS 冻结树逐点抽验）。
+10 项发现全修、4 判例登记不修；对拍零影响（qa 11/11）。完整清单见 CHANGELOG 2.1.1。
+
+- **最重要发现（P1，用户报告项）**：棋子投影 `_soft_circle` 的内置校正偏移被
+  setup() 的 (0,2) 覆写 → 黑圆圆心漂到脚位 (+26,+35.8)·scale 并随位移补间滑移；
+  形状还是 52×52 硬边正圆而非 web 的 52×20 软椭圆。修复 = Sprite2D + 程序化径向
+  渐变纹理锚定脚位。**判例：装饰节点的「内置偏移 + 外部覆写」叠加是静默错位高发
+  模式—— corrective offset 与调用方赋值必须二选一，不能都写。**
+- **P2 门禁回归钉失效**：`--battle-smoke` 的战斗场景换场被 boot 的后注册 deferred
+  转发顶掉，永远落 game/menu。修复 = Sess.battle_smoke 标志 + boot 让路；探针
+  自包含（1200 帧截图退出）。**判例：autoload 与主场景都注册 deferred 换场时后注册
+  者胜出——多入口换场要有明确优先级标志，不能靠注册顺序巧合。**
+- **P2 显示路径字面量**：来金预告的 5 是 INCOME_BASE 字面量（TS 同款），收编 Spec。
+- **P2 出包清单**：export_presets 漏排除 addons/* → GdUnit4 进发布 PCK。
+- **P3×6**：DEV 命令 MAX_LEVEL 真源化/legend 负索引兜底；balance 入库标签版本派生
+  +worker 心跳耗时语义；damage_of/streak_gold/xp_to_next 空表守卫（TS NaN vs GD 崩
+  的共同坏结局）；详情卡 clamp 字面量 1920→Layout.W。
+- **方法论**：探针证据链 = 数值（dx/dy/scale 逐单位打印）+ 像素（红圈标注前后对照
+  截图）+ 场景帧内采样（战斗中 worst_dx）；三层互相独立，缺一不可。
+- **并行会话对账**：本审修复曾以在途态被并行会话收口提交带入历史（内容回核无失真）；
+  最终验证树 = 3bc6d05 + 本审未提交三件。**判例：并行施工期间验证前先跑
+  parse_check 并数 SCRIPT ERROR 行——load() 对语法错误返回非空（假绿），只有输出
+  扫描能发现共享树被在途改动打断。**
+
 ## 隔离铁律（最高优先级）
 1. ../src、../public、../index.html、../vite.config.ts、../package.json、../balance、../tests、
    ../scripts、../docs 一律零改动；唯一接触方式是只读 import。
@@ -335,3 +362,16 @@ Node 入树、产品后台任务放场景生命周期（boot），不放 autoloa
   进程在 quit 后 teardown 段错误（预热任务无 join + static 持 GPU 资源），EXIT=139。
   修复 = Sess._exit_tree 里 wait_for_task_completion + FxAtlas.release_all。
   「跑完打印 OK」与「干净退出」是两件事，自动化一律 echo EXIT=$?。
+
+## 2.3.0 首页构图与经营体感（2026-09-29，用户两轮实机反馈）
+
+- **判例：视觉遮挡类缺陷定量修复**。首页人物被挡连修两轮（长卷被按钮切断 → 第一轮
+  重叠构图兵器扫邻脸），肉眼估间距都躲不过；根因是没量遮挡物尺寸：立绘兵器横向外伸
+  30-60px，构图净距取其两倍起底（125px），一次收敛。修构图先量元素。
+- **判例：来源型动画快照前置**。飞币的锚点与金额在动作前捕获——`match.buy` 后商店已
+  换新货，买后取 cost 取到下一枚的身价（第一版犯过）。
+- **判例：探针坐标系**。窗口探针发事件的坐标是窗口像素（设计 × win/design 比），而
+  Control 的 global_rect 是视口坐标——断言 contains 必须换算后比较，第一版因此误报
+  命中失败。
+- **经验：探针引用 autoload 标识符（Sess/Match）只存在于正常 run**；headless --script
+  模式编译不到它们（zz 探针的历史坑复用），覆盖场景逻辑一律走 `--smoke` 尾参扩展。
