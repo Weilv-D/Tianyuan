@@ -21,6 +21,13 @@ var acc := 0.0
 var speed := 1.0
 var finished := false
 var tick_label: Label
+var speed_buttons: Array = []
+
+
+func _update_speed_buttons() -> void:
+	for i: int in speed_buttons.size():
+		var b: Button = speed_buttons[i]
+		b.modulate = Color.WHITE if absf(speed - [1.0, 2.0, 4.0][i]) < 0.01 else Color(1, 1, 1, 0.45)
 
 
 func _ready() -> void:
@@ -51,6 +58,25 @@ func _ready() -> void:
 	tick_label = _label("", 22, Palette.PAPER[300])
 	tick_label.position = Vector2(Layout.W / 2.0 - 60, 66)
 	add_child(tick_label)
+
+	# 倍速按钮（原版 speedBtns 1×/2×/4×；空格切换保留）
+	for i: int in 3:
+		var sv := [1.0, 2.0, 4.0][i]
+		var sb := Button.new()
+		sb.text = "%d×" % int(sv)
+		sb.position = Vector2(1560 + i * 90, 52)
+		sb.custom_minimum_size = Vector2(80, 30)
+		sb.add_theme_font_override("font", Sess.body_font)
+		sb.add_theme_font_size_override("font_size", 14)
+		sb.add_theme_color_override("font_color", Palette.PAPER[100])
+		sb.focus_mode = Control.FOCUS_NONE
+		sb.pressed.connect(func() -> void:
+			speed = sv
+			Sess.sfx.play("ui")
+			_update_speed_buttons())
+		speed_buttons.append(sb)
+		add_child(sb)
+	_update_speed_buttons()
 
 	viewer_team = 1 if match_ref.player_idx_of_team(pair, 1) == 0 else 0
 
@@ -95,6 +121,7 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("ui_accept"):
 		speed = 1.0 if speed > 1.0 else 4.0
 		Sess.sfx.play("ui")
+		_update_speed_buttons()
 
 
 func _cell_pos(u) -> Vector2:

@@ -37,6 +37,11 @@ var rail_popup: PanelContainer = null
 var trait_members_card: PanelContainer = null
 var badges_visible: Array = []  # [{id,count,tier,def,i,worldHit}] 每回合 refresh 后重建
 var scout_layer: CanvasLayer = null  # 侦查覆盖层（只读快照；原版 ScoutOverlay）
+var trait_modal: CanvasLayer = null  # 羁绊全览浮层（nav「羁绊」）
+var detail_card: PanelContainer = null  # 棋子详情卡（悬停只读/点选钉住）
+var detail_pinned_iid := -1
+var press_pos := Vector2.ZERO  # 点击→钉卡判定（<8px 视为点选而非拖拽）
+var toast_label: Label = null
 
 
 func _ready() -> void:
@@ -57,6 +62,7 @@ func _ready() -> void:
 	_draw_bg()
 	_build_top_bar()
 	_build_board()
+	_build_phase_strip()
 	_build_bench()
 	_build_shop()
 	_build_item_bar()
@@ -109,6 +115,29 @@ func _build_top_bar() -> void:
 		l.size = Vector2(200, 36)
 		labels[pair[0]] = l
 		add_child(l)
+	# 左导航（原版 nav：图鉴/羁绊/阵容；样稿 .nl 双行）
+	var nav_labels: Array = [["图 鉴", "Codex"], ["羁 绊", "Bonds"], ["阵 容", "Legion"]]
+	var nav_cbs: Array = [
+		func() -> void: Sess.go("res://render/codex.tscn", { "match": match_ref, "from_game": true }),
+		func() -> void: _toggle_trait_modal(),
+		func() -> void: _scout_next_opponent(),
+	]
+	for i: int in 3:
+		var nb := Button.new()
+		nb.text = String(nav_labels[i][0])
+		nb.position = Vector2(Layout.NAV_X + i * Layout.NAV_GAP - 6, 18)
+		nb.custom_minimum_size = Vector2(92, 34)
+		nb.add_theme_font_override("font", Sess.body_font)
+		nb.add_theme_font_size_override("font_size", 14)
+		nb.add_theme_color_override("font_color", Palette.PAPER[100])
+		nb.add_theme_color_override("font_hover_color", Palette.GILT["light"])
+		nb.focus_mode = Control.FOCUS_NONE
+		nb.flat = true
+		nb.pressed.connect(nav_cbs[i])
+		add_child(nb)
+		var en := _label(String(nav_labels[i][1]), 10, Palette.INK[300])
+		en.position = Vector2(Layout.NAV_X + i * Layout.NAV_GAP, 52)
+		add_child(en)
 
 
 func _build_board() -> void:
@@ -172,13 +201,31 @@ func _build_action_bar() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(d[3] as Callable)
 		add_child(b)
+
+
+## 阶段条（原版 buildPhaseStrip）：盘下金线对 + 「备 战」+ 开战按钮（唯一开战入口；
+## 旧版挤在操作列下方，与 web 版口径不一）
+func _build_phase_strip() -> void:
+	var cx := Layout.W / 2.0
+	var py := float(Layout.PHASE_Y)
+	for seg: Array in [[cx - 380.0, cx - 310.0], [cx + 290.0, cx + 420.0]]:
+		var line := ColorRect.new()
+		line.color = Color(Palette.GILT["base"], 0.25)
+		line.position = Vector2(seg[0], py)
+		line.size = Vector2(seg[1] - seg[0], 1)
+		add_child(line)
+	var ph := _label("备 战", 15, Palette.PAPER[100], Sess.seal_font)
+	ph.position = Vector2(cx - 230, py - 12)
+	ph.size = Vector2(160, 24)
+	ph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(ph)
 	var fight := Button.new()
-	fight.text = "开 战"
-	fight.position = Vector2(Layout.ACT_X, Layout.ACT_Y + 3 * row_step + 14)
-	fight.custom_minimum_size = Vector2(step - 10, Layout.ACT_BTN_H + 12)
-	fight.add_theme_font_override("font", Sess.seal_font)
-	fight.add_theme_font_size_override("font_size", 26)
-	fight.add_theme_color_override("font_color", Palette.CINNABAR["light"])
+	fight.text = "开 战 · 空格"
+	fight.position = Vector2(cx + 20, py - 16)
+	fight.custom_minimum_size = Vector2(140, 32)
+	fight.add_theme_font_override("font", Sess.body_font)
+	fight.add_theme_font_size_override("font_size", 13)
+	fight.add_theme_color_override("font_color", Palette.PAPER[100])
 	fight.focus_mode = Control.FOCUS_NONE
 	fight.pressed.connect(_start_battle_phase)
 	add_child(fight)
@@ -374,10 +421,22 @@ func _place_unit_view(u: Dictionary, pos: Vector2) -> void:
 
 func _refresh_shop() -> void:
 	var p := match_ref.human()
+	var owned_ids := {}
+	for u in p["board"]:
+		if u != null:
+			owned_ids[u["defId"]] = true
+	for u in p["bench"]:
+		if u != null:
+			owned_ids[u["defId"]] = true
+	for t in shop_pulse_tweens:
+		t.kill()
+	shop_pulse_tweens.clear()
 	for i: int in 5:
 		var b: Button = shop_buttons[i]
 		var id: Variant = p["shop"][i]
 		_clear_button_children(b)
+		b.modulate = Color.WHITE
+		b.position.y = Layout.SHOP_Y
 		if id == null:
 			b.disabled = true
 			continue
@@ -386,6 +445,11 @@ func _refresh_shop() -> void:
 			b.disabled = true
 			continue
 		b.disabled = float(p["gold"]) < float(def["cost"])
+		# 直购角标（商肆 1-5；仅可买时显示——原版同口径）
+		var badge := _label(str(i + 1), 12, Palette.PAPER[400])
+		badge.position = Vector2(5, 3)
+		badge.visible = not b.disabled
+		b.add_child(badge)
 		var thumb := UnitView.piece_texture(id)
 		var sp := TextureRect.new()
 		sp.texture = thumb
@@ -398,10 +462,29 @@ func _refresh_shop() -> void:
 		name_l.position = Vector2(8, 104)
 		name_l.size = Vector2(Layout.SHOP_CW - 16, 24)
 		b.add_child(name_l)
-		var trait_l := _label("%s · %s" % [String(def["origins"][0]), String(def["classes"][0])], 14, Palette.PAPER[400])
+		var trait_l := _label(_trait_names(def), 14, Palette.PAPER[400])
 		trait_l.position = Vector2(8, 130)
 		trait_l.size = Vector2(Layout.SHOP_CW - 16, 20)
+		trait_l.clip_text = true
 		b.add_child(trait_l)
+		# 场上/备战已有同名：呼吸脉冲（「买它=向合成推进」提示——原版同口径）
+		if owned_ids.has(id) and not b.disabled:
+			var pt := create_tween().set_loops()
+			pt.tween_property(b, "modulate:a", 0.66, 0.46)
+			pt.tween_property(b, "modulate:a", 1.0, 0.46)
+			shop_pulse_tweens.append(pt)
+		# 悬停上浮（原版 hover ±8）
+		var base_y := float(Layout.SHOP_Y)
+		var bi := i
+		b.mouse_entered.connect(func() -> void:
+			var t := create_tween()
+			t.tween_property(shop_buttons[bi], "position:y", base_y - 8.0, 0.32))
+		b.mouse_exited.connect(func() -> void:
+			var t2 := create_tween()
+			t2.tween_property(shop_buttons[bi], "position:y", base_y, 0.32))
+
+
+var shop_pulse_tweens: Array = []
 
 
 func _clear_button_children(b: Button) -> void:
@@ -762,6 +845,8 @@ func _unhandled_keyinput(event: InputEvent) -> void:
 				_on_auto_arrange()
 			KEY_Z:
 				_on_undo()
+			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
+				_on_buy(int(key) - KEY_1)
 
 
 # ── 拖拽（拾起-跟随-落子；≥8px 才算拖拽） ─────────────────
@@ -771,6 +856,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var e: InputEventMouseButton = event
 		if e.button_index == MOUSE_BUTTON_LEFT:
 			if e.pressed:
+				press_pos = e.position
 				var badge_i := _trait_badge_at(e.position)
 				if badge_i >= 0:
 					_open_trait_members(badge_i)
@@ -791,13 +877,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_drop(e.position)
 			get_viewport().set_input_as_handled()
-	elif event is InputEventMouseMotion:
-		if drag_iid >= 0:
-			if drag_ghost != null:
-				drag_ghost.position = get_global_mouse_position()
-		else:
-			var hi := _trait_badge_at(event.position)
-			_update_rail_popup(hi)
+		elif event is InputEventMouseMotion:
+			if drag_iid >= 0:
+				if drag_ghost != null:
+					drag_ghost.position = get_global_mouse_position()
+			else:
+				var hi := _trait_badge_at(event.position)
+				_update_rail_popup(hi)
+				if hi < 0:
+					# 悬停详情卡（只读态；钉住态不受悬停影响）
+					var hu = _unit_at(event.position)
+					if hu != null:
+						if detail_pinned_iid < 0:
+							_show_detail(hu, false)
+					elif detail_card != null and detail_pinned_iid < 0:
+						_close_detail()
 
 
 ## 鼠标世界位命中哪枚可见徽章（-1 无）
@@ -952,6 +1046,12 @@ func _drop(world: Vector2) -> void:
 	var p := match_ref.human()
 	if drag_ghost != null:
 		drag_ghost.z_index = 10
+	# 点选（<8px 位移）：钉住/取消棋子详情卡（原版点选钉卡同口径）
+	if press_pos.distance_to(world) < 8.0:
+		_toggle_pin(drag_iid)
+		drag_iid = -1
+		drag_ghost = null
+		return
 	# 出售印
 	if world.x >= Layout.SELL_X and world.x <= Layout.SELL_X + Layout.SELL_SIZE and world.y >= Layout.SELL_Y and world.y <= Layout.SELL_Y + Layout.SELL_SIZE:
 		if match_ref.sell(p, drag_iid):
@@ -1331,6 +1431,332 @@ func _detect_merge_sound(before: Dictionary) -> void:
 			else:
 				Sess.sfx.play("levelup")
 			return  # 一次买入至多一串合并，只鸣一次（原版 celebrate 单次口径）
+
+
+# ── 名称工具：羁绊/职业 id → 中文名（UI 一律禁直显拼音 id） ──────
+
+func _trait_names(def: Dictionary) -> String:
+	var parts: Array = []
+	for tid in def["origins"]:
+		var td: Variant = Spec.traits_by_id.get(String(tid), null)
+		parts.append(String(td["name"]) if td != null else String(tid))
+	for tid2 in def["classes"]:
+		var td2: Variant = Spec.traits_by_id.get(String(tid2), null)
+		parts.append(String(td2["name"]) if td2 != null else String(tid2))
+	return " · ".join(parts)
+
+
+func _unit_at(world: Vector2) -> Variant:
+	var p := match_ref.human()
+	if world.y >= Layout.BENCH_Y - 10 and world.y <= Layout.BENCH_Y + Layout.BENCH_CELL + 10:
+		var i := int((world.x - Layout.BENCH_X) / Layout.BENCH_CELL)
+		if i >= 0 and i < 9 and p["bench"][i] != null:
+			return p["bench"][i]
+	else:
+		var cell := _world_to_local_cell(world)
+		if cell.y >= 4:
+			var idx := (cell.y - 4) * 8 + cell.x
+			if idx >= 0 and idx < 32 and p["board"][idx] != null:
+				return p["board"][idx]
+	return null
+
+
+# ── 棋子详情卡（原版 UnitDetailCard 对齐）：悬停只读 / 点选钉住带出售 ──
+
+func _toggle_pin(iid: int) -> void:
+	if detail_pinned_iid == iid:
+		detail_pinned_iid = -1
+		_close_detail()
+		return
+	detail_pinned_iid = iid
+	var u = GameState.find_unit(match_ref.human(), iid)
+	if u != null:
+		_show_detail(u, true)
+		Sess.sfx.play("ui")
+
+
+func _close_detail() -> void:
+	if detail_card != null:
+		detail_card.queue_free()
+		detail_card = null
+
+
+func _fmt_skill_desc(desc: String, params: Dictionary) -> String:
+	var out := desc
+	for k in params:
+		var v: float = float(params[k])
+		var s := str(int(v)) if absf(v - roundf(v)) < 0.001 else "%.2f" % v
+		out = out.replace("{%s}" % String(k), s)
+	return out
+
+
+func _show_detail(u: Dictionary, pinned: bool) -> void:
+	var def: Variant = Spec.champion_by_id.get(String(u["defId"]), null)
+	if def == null:
+		return
+	if detail_card != null and detail_pinned_iid == int(u["iid"]):
+		return
+	_close_detail()
+	var w := 304
+	var h := 348 if pinned else 304
+	var rarity := int(def["cost"])
+	# 卡位：贴悬停/点选棋子的右侧，钳在可视域（140..860 带）
+	var anchor := Vector2(960, 500)
+	var v: UnitView = unit_views.get(int(u["iid"]), null)
+	if v != null:
+		anchor = v.position
+	var px: float = clampf(anchor.x + 40.0, 66.0, 1920.0 - 48.0 - w)
+	var py: float = clampf(anchor.y - h / 2.0, 140.0, maxf(140.0, 860.0 - h))
+	detail_card = PanelContainer.new()
+	detail_card.position = Vector2(px, py)
+	detail_card.custom_minimum_size = Vector2(w, h)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(Palette.INK[900], 0.97)
+	sb.border_color = Palette.RARITY_COLOR[rarity]
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(0)
+	detail_card.add_theme_stylebox_override("panel", sb)
+	add_child(detail_card)
+	var card: Panel = Panel.new()
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_card.add_child(card)
+	var strip := ColorRect.new()
+	strip.color = Color(Palette.RARITY_COLOR[rarity], 0.85)
+	strip.position = Vector2(0, 0)
+	strip.size = Vector2(w, 3)
+	card.add_child(strip)
+	var star := clampi(int(u["star"]), 1, 3)
+	var name_l := _label(String(def["name"]), 20, Palette.PAPER[100])
+	name_l.position = Vector2(14, 12)
+	card.add_child(name_l)
+	var sub_l := _label("%s　%s" % [String(def["title"]), "★".repeat(star)], 13, Palette.GILT["light"])
+	sub_l.position = Vector2(14, 40)
+	card.add_child(sub_l)
+	var cost_l := _label("%d 费" % rarity, 13, Palette.PAPER[300])
+	cost_l.position = Vector2(w - 80, 14)
+	cost_l.size = Vector2(66, 18)
+	cost_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	card.add_child(cost_l)
+	# 四行战斗数值（星级换算走 config 真源，同结算/估值口径）
+	var s: Dictionary = def["base"]
+	var si := star - 1
+	var hp_s := Spec.star_scale("STAR_HP_SCALE", si)
+	var pw_s := Spec.star_scale("STAR_POWER_SCALE", si)
+	var rows: Array = [
+		"生命 %d" % int(roundf(float(s["hp"]) * hp_s)),
+		"攻击 %d　法强 %d" % [int(roundf(float(s["atk"]) * pw_s)), int(roundf(float(s["sp"]) * pw_s))],
+		"护甲 %d　魔抗 %d" % [int(s["armor"]), int(s["mr"])],
+		"攻速 %.2f　射程 %d　法力 %d" % [float(s["aspd"]), int(s["range"]), int(s["maxMp"])],
+	]
+	for i: int in rows.size():
+		var rl := _label(String(rows[i]), 13, Palette.PAPER[300])
+		rl.position = Vector2(14, 66 + i * 19)
+		card.add_child(rl)
+	# 装备三格（图标 + 格下短名）
+	var items: Array = u.get("items", [])
+	for i2: int in 3:
+		var fx := 14 + i2 * 96
+		var frame := ColorRect.new()
+		frame.color = Color(Palette.INK[800], 0.4)
+		frame.position = Vector2(fx, 148)
+		frame.size = Vector2(88, 30)
+		card.add_child(frame)
+		if i2 < items.size():
+			var iid: String = items[i2]
+			var idef: Variant = Spec.item_by_id.get(iid, null)
+			var icon := TextureRect.new()
+			icon.texture = load("res://assets/items/%s.png" % iid)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.position = Vector2(fx + 2, 150)
+			icon.size = Vector2(26, 26)
+			card.add_child(icon)
+			var iname := _label(String(idef["name"]) if idef != null else iid, 10, Palette.PAPER[300])
+			iname.position = Vector2(fx + 30, 154)
+			iname.size = Vector2(56, 18)
+			iname.clip_text = true
+			card.add_child(iname)
+	var trait_l := _label(_trait_names(def), 13, Palette.SPIRIT["light"])
+	trait_l.position = Vector2(14, 192)
+	trait_l.size = Vector2(w - 28, 18)
+	trait_l.clip_text = true
+	card.add_child(trait_l)
+	var sk: Dictionary = def["skillSpec"]
+	var skill_l := _label(String(sk["name"]), 14, Palette.VOID["light"])
+	skill_l.position = Vector2(14, 214)
+	card.add_child(skill_l)
+	var desc_l := _label(_fmt_skill_desc(String(sk["desc"]), sk.get("params", {})), 12, Palette.PAPER[400])
+	desc_l.position = Vector2(14, 236)
+	desc_l.size = Vector2(w - 28, h - 236 - (44 if pinned else 0) - 10)
+	desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_l.clip_text = true
+	card.add_child(desc_l)
+	# 出售带（仅钉住态；2★/3★ 两步确认——原版同口径）
+	if pinned:
+		var sell_iid := int(u["iid"])
+		var sell_star := star
+		var sell_btn := Button.new()
+		sell_btn.text = "出 售 · %d 金" % GameState.sell_value(u)
+		sell_btn.position = Vector2(14, h - 42)
+		sell_btn.custom_minimum_size = Vector2(w - 28, 32)
+		sell_btn.add_theme_font_override("font", Sess.body_font)
+		sell_btn.add_theme_font_size_override("font_size", 13)
+		sell_btn.add_theme_color_override("font_color", Palette.PAPER[100])
+		sell_btn.focus_mode = Control.FOCUS_NONE
+		var armed := {"v": false}
+		sell_btn.pressed.connect(func() -> void:
+			if sell_star >= 2 and not armed["v"]:
+				armed["v"] = true
+				sell_btn.text = "确认出售 %d★？" % sell_star
+				return
+			if match_ref.sell(match_ref.human(), sell_iid):
+				Sess.sfx.play("coin")
+				undo_stack.clear()
+				SaveStore.save_match(match_ref)
+				refresh_all()
+			detail_pinned_iid = -1
+			_close_detail())
+		card.add_child(sell_btn)
+
+
+# ── 羁绊全览浮层（nav「羁绊」，原版 openTraitModal 对齐） ──
+
+func _toggle_trait_modal() -> void:
+	if trait_modal != null:
+		trait_modal.queue_free()
+		trait_modal = null
+		Sess.sfx.play("ui")
+		return
+	if trait_members_card != null:
+		trait_members_card.queue_free()
+		trait_members_card = null
+	var counts := {}
+	for t: Dictionary in Comp.compute_traits(_board_def_ids()):
+		counts[String(t["id"])] = t
+	trait_modal = CanvasLayer.new()
+	trait_modal.layer = 93
+	add_child(trait_modal)
+	var dim := ColorRect.new()
+	dim.color = Color(Palette.SHADE, 0.55)
+	dim.size = Vector2(Layout.W, Layout.H)
+	dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed:
+			_toggle_trait_modal())
+	trait_modal.add_child(dim)
+	var bw := 640
+	var bh := 720
+	var panel := Panel.new()
+	panel.size = Vector2(bw, bh)
+	panel.position = Vector2((Layout.W - bw) / 2.0, (Layout.H - bh) / 2.0)
+	dim.add_child(panel)
+	var title := _label("羁 绊 全 览", 30, Palette.SPIRIT["light"], Sess.seal_font)
+	title.position = Vector2(0, 20)
+	title.size = Vector2(bw, 44)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	panel.add_child(title)
+	var note := _label("计数只算场上棋子（备战席不计）；同名棋子只计一次。", 11, Palette.PAPER[400])
+	note.position = Vector2(20, 66)
+	note.size = Vector2(bw - 40, 18)
+	panel.add_child(note)
+	var y := 92.0
+	for tid in Spec.traits_by_id:
+		var def: Dictionary = Spec.traits_by_id[tid]
+		var t: Variant = counts.get(String(tid), null)
+		var count := int(t["count"]) if t != null else 0
+		var bps: Array = def["breakpoints"]
+		var tier := -1
+		for i: int in bps.size():
+			if count >= int(bps[i]):
+				tier = i
+		var next_bp := -1
+		for i2: int in bps.size():
+			if int(bps[i2]) > count:
+				next_bp = int(bps[i2])
+				break
+		var ch := _label(_badge_char(String(tid)), 20, Palette.GILT["light"] if tier >= 0 else Palette.INK[400], Sess.seal_font)
+		ch.position = Vector2(20, y + 4)
+		ch.size = Vector2(30, 28)
+		ch.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		panel.add_child(ch)
+		var nm := _label(String(def["name"]), 15, Palette.PAPER[100] if tier >= 0 else Palette.PAPER[500])
+		nm.position = Vector2(58, y + 2)
+		nm.size = Vector2(110, 20)
+		panel.add_child(nm)
+		var cnt := _label("%d/%s" % [count, str(next_bp) if next_bp > 0 else "满"], 12, Palette.PAPER[300])
+		cnt.position = Vector2(170, y + 4)
+		cnt.size = Vector2(50, 18)
+		panel.add_child(cnt)
+		var eff: Array = def.get("effectText", [])
+		var eff_l := _label(String(eff[tier]) if tier >= 0 and tier < eff.size() else (String(eff[0]) if next_bp > 0 and eff.size() > 0 else String(def.get("description", ""))), 12, Palette.PAPER[200] if tier >= 0 else Palette.PAPER[500])
+		eff_l.position = Vector2(230, y + 2)
+		eff_l.size = Vector2(bw - 250, 32)
+		eff_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		eff_l.clip_text = true
+		panel.add_child(eff_l)
+		y += 36.0
+	Sess.sfx.play("ui")
+
+
+func _board_def_ids() -> Array:
+	var ids: Array = []
+	for u in match_ref.human()["board"]:
+		if u != null:
+			ids.append(u["defId"])
+	return ids
+
+
+func _badge_char(trait_id: String) -> String:
+	# 徽章单字与羁绊轨同源（名称首字；轨渲染在 _TraitBadge 内）
+	var def: Variant = Spec.traits_by_id.get(trait_id, null)
+	if def == null:
+		return "？"
+	return String(def["name"]).substr(0, 1)
+
+
+# ── nav「阵容」：侦查本轮对手（原版 scoutNextOpponent 对齐） ──
+
+func _scout_next_opponent() -> void:
+	var pr: Dictionary = {}
+	for q: Dictionary in match_ref.pairings:
+		if int(q["a"]) == 0 or int(q["b"]) == 0:
+			pr = q
+			break
+	if pr.is_empty():
+		_toast("开战后方可侦查")
+		return
+	if pr.get("beast", false):
+		_toast("墨兽轮 · 无阵可侦")
+		return
+	var other := -1
+	if int(pr["a"]) == 0:
+		other = int(pr["b"])
+	elif int(pr["b"]) == 0:
+		other = int(pr["a"])
+	if other >= 0:
+		var pl: Dictionary = match_ref.players[other]
+		_open_scout(String(pl["name"]), "生命 %d　等级 %d" % [int(pl["hp"]), int(pl["level"])], pl["board"] as Array)
+	elif int(pr.get("ghost", -1)) >= 0:
+		_open_scout("墨 影", "沿用〔%s〕出局阵容" % String(match_ref.players[int(pr["ghost"])]["name"]), match_ref.board_of_opponent(pr))
+	else:
+		_toast("本轮轮空 · 无对手")
+
+
+# ── 浮讯（原版 showToast 对齐的最小落位） ──
+
+func _toast(msg: String) -> void:
+	if toast_label != null:
+		toast_label.queue_free()
+	toast_label = _label(msg, 17, Palette.PAPER[100])
+	toast_label.position = Vector2(660, 780)
+	toast_label.size = Vector2(600, 26)
+	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(toast_label)
+	var tw := create_tween()
+	tw.tween_interval(1.6)
+	tw.tween_property(toast_label, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(func() -> void:
+		if is_instance_valid(toast_label):
+			toast_label.queue_free())
 
 
 ## 战报双列（v1.12.0 图表口径）：我方（viewer=0 视角按 stats team 记录）左、敌方右；

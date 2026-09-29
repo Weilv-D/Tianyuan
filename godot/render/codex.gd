@@ -39,7 +39,11 @@ func _ready() -> void:
 	back.add_theme_font_size_override("font_size", 22)
 	back.add_theme_color_override("font_color", Palette.PAPER[100])
 	back.focus_mode = Control.FOCUS_NONE
-	back.pressed.connect(func() -> void: Sess.go("res://render/menu.tscn"))
+	back.pressed.connect(func() -> void:
+		if Sess.scene_data.get("from_game", false) and Sess.scene_data.get("match", null) != null:
+			Sess.go("res://render/game_scene.tscn", { "match": Sess.scene_data["match"] })
+		else:
+			Sess.go("res://render/menu.tscn"))
 	add_child(back)
 
 
@@ -70,7 +74,7 @@ func _detail(c: Dictionary) -> void:
 	var name_l := _lbl("%s · %s" % [c["name"], c["title"]], 26, Palette.RARITY_COLOR[rarity])
 	name_l.position = Vector2(270, 34)
 	panel.add_child(name_l)
-	var meta := _lbl("%s · %s%s · %d 金" % [String(c["origins"][0]), String(c["classes"][0]), " · " + String(c["cls"]), rarity], 17, Palette.PAPER[300])
+	var meta := _lbl("%s · %d 金" % [_trait_names_cx(c), rarity], 17, Palette.PAPER[300])
 	meta.position = Vector2(270, 78)
 	panel.add_child(meta)
 	var base: Dictionary = c["base"]
@@ -130,3 +134,14 @@ class _Portrait extends Button:
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(nm)
 		add_child(v)
+
+
+func _trait_names_cx(c: Dictionary) -> String:
+	var parts: Array = []
+	for tid in c["origins"]:
+		var td: Variant = Spec.traits_by_id.get(String(tid), null)
+		parts.append(String(td["name"]) if td != null else String(tid))
+	for tid2 in c["classes"]:
+		var td2: Variant = Spec.traits_by_id.get(String(tid2), null)
+		parts.append(String(td2["name"]) if td2 != null else String(tid2))
+	return " · ".join(parts)
